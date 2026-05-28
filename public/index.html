@@ -1,0 +1,445 @@
+<!doctype html>
+<html lang="vi">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Discord Bot Dashboard</title>
+    <!-- Outfit Font từ Google Fonts cho diện mạo cao cấp -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/styles.css?v=7" />
+  </head>
+  <body>
+    <main class="app-shell">
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">Discord Service Bot</p>
+          <h1>Bảng Điều Khiển Bot</h1>
+        </div>
+        <div class="status" id="status">Đang tải trạng thái...</div>
+      </header>
+
+      <section class="server-strip">
+        <div class="server-picker">
+          <label for="guildPicker">Máy chủ Discord</label>
+          <select id="guildPicker" name="guildPicker">
+            <option value="">Đang tải danh sách máy chủ...</option>
+          </select>
+        </div>
+        <div class="server-id">
+          <label for="guildId">Guild ID (ID máy chủ)</label>
+          <input id="guildId" name="guildId" placeholder="Nhập ID máy chủ Discord" />
+        </div>
+        <div class="server-actions">
+          <button id="loadBtn" type="button">Tải Cấu Hình</button>
+          <button id="refreshGuildsBtn" class="secondary" type="button">Làm Mới</button>
+        </div>
+      </section>
+
+      <form class="workspace" id="configForm">
+        <aside class="sidebar" aria-label="Config sections">
+          <button class="nav-item active" data-page="overview" type="button">
+            <span>Tổng Quan</span>
+            <small>Cài đặt chung & Tiền tố</small>
+          </button>
+          <button class="nav-item" data-page="commands-general" type="button">
+            <span>Lệnh Chung & Custom</span>
+            <small>Ping, help & lệnh tự tạo</small>
+          </button>
+          <button class="nav-item" data-page="user-levels" type="button">
+            <span>Thành Viên & Cấp Độ</span>
+            <small>Chào mừng, lệnh XP & Rank</small>
+          </button>
+          <button class="nav-item" data-page="server-broadcast" type="button">
+            <span>Máy Chủ & Phát Thanh</span>
+            <small>Thông báo, dọn dẹp, say</small>
+          </button>
+          <button class="nav-item" data-page="moderation-automod" type="button">
+            <span>Kiểm Duyệt & AutoMod</span>
+            <small>Bộ lọc từ cấm, ban, kick</small>
+          </button>
+          <button class="nav-item" data-page="interactions" type="button">
+            <span>Tương Tác & Nút Bấm</span>
+            <small>Tự chọn role, kênh ticket</small>
+          </button>
+          <button class="nav-item" data-page="auto-replies" type="button">
+            <span>Trả Lời Tự Động</span>
+            <small>Phản hồi theo từ khóa</small>
+          </button>
+          <button class="nav-item" data-page="advanced" type="button">
+            <span>Nâng Cao & Biến</span>
+            <small>Nhật ký log & biến mẫu</small>
+          </button>
+        </aside>
+
+        <section class="content">
+          <!-- PAGE 1: OVERVIEW -->
+          <section class="page active" data-page-panel="overview">
+            <div class="page-head">
+              <div>
+                <p class="eyebrow">Tổng Quan</p>
+                <h2>Cấu Hình Chung</h2>
+              </div>
+            </div>
+
+            <div class="settings-grid">
+              <section class="panel">
+                <h3>Trạng thái hoạt động</h3>
+                <label class="switch-card">
+                  <input id="enabled" name="enabled" type="checkbox" />
+                  <span>
+                    <strong>Kích hoạt Bot</strong>
+                    <small>Bật hoặc tắt toàn bộ các tính năng của bot trên máy chủ này.</small>
+                  </span>
+                </label>
+              </section>
+
+              <section class="panel">
+                <h3>Tiền tố lệnh (Prefix)</h3>
+                <div class="input-group">
+                  <label for="prefix">Ký tự bắt đầu lệnh</label>
+                  <input id="prefix" name="prefix" maxlength="5" placeholder="!" />
+                  <p class="input-hint">Mặc định là <code>!</code>. Ví dụ: !ping, !help</p>
+                </div>
+              </section>
+            </div>
+          </section>
+
+          <!-- PAGE 2: GENERAL COMMANDS -->
+          <section class="page" data-page-panel="commands-general">
+            <div class="page-head">
+              <div>
+                <p class="eyebrow">Lệnh Chung & Custom</p>
+                <h2>Quản Lý Lệnh Hệ Thống & Tự Tạo</h2>
+              </div>
+              <div class="button-row">
+                <button id="syncSlashBtn" class="secondary" type="button">Đồng bộ Slash Command (/)</button>
+                <button id="addCommandBtn" type="button">Thêm lệnh Custom</button>
+              </div>
+            </div>
+
+            <div class="hint">
+              Các lệnh Slash Command (lệnh gạch chéo <code>/</code>) sẽ được tự động đồng bộ hóa. Sau khi Lưu cấu hình hoặc bấm Đồng bộ, Discord có thể mất một vài giây để cập nhật menu <code>/</code>.
+            </div>
+
+            <div class="panel-section">
+              <h3>Danh sách lệnh</h3>
+              <div id="commands-general-list" class="command-list"></div>
+            </div>
+          </section>
+
+          <!-- PAGE 3: USER & LEVELS -->
+          <section class="page" data-page-panel="user-levels">
+            <div class="page-head">
+              <div>
+                <p class="eyebrow">Thành Viên & Cấp Độ</p>
+                <h2>Hệ Thống Chào Mừng & Tính Điểm XP</h2>
+              </div>
+            </div>
+
+            <div class="settings-grid">
+              <!-- Welcome flow -->
+              <section class="panel">
+                <h3>Chào mừng thành viên mới</h3>
+                <label class="switch-card">
+                  <input id="welcomeEnabled" name="welcomeEnabled" type="checkbox" />
+                  <span>
+                    <strong>Bật gửi tin nhắn chào mừng</strong>
+                    <small>Tự động gửi lời chào khi có người tham gia máy chủ.</small>
+                  </span>
+                </label>
+
+                <label for="welcomeChannelId">Kênh chào mừng</label>
+                <select id="welcomeChannelId" name="welcomeChannelId">
+                  <option value="">-- Tải cấu hình để hiển thị kênh --</option>
+                </select>
+
+                <label for="welcomeMessage">Nội dung tin nhắn chào mừng</label>
+                <textarea id="welcomeMessage" name="welcomeMessage" rows="5" placeholder="Chào mừng {user} đã tham gia {server}!"></textarea>
+              </section>
+
+              <!-- Leveling/XP system -->
+              <section class="panel">
+                <h3>Hệ thống cấp độ & XP</h3>
+                <label class="switch-card">
+                  <input id="levelsEnabled" name="levelsEnabled" type="checkbox" />
+                  <span>
+                    <strong>Bật tính điểm cấp độ</strong>
+                    <small>Thành viên nhắn tin sẽ được cộng XP để tăng cấp độ.</small>
+                  </span>
+                </label>
+
+                <label for="xpPerMessage">Số XP mỗi tin nhắn</label>
+                <input id="xpPerMessage" name="xpPerMessage" type="number" min="1" max="100" placeholder="5" />
+
+                <label for="levelUpMessage">Nội dung thông báo lên cấp</label>
+                <textarea id="levelUpMessage" name="levelUpMessage" rows="5" placeholder="Chúc mừng {user} đã đạt cấp độ {level}!"></textarea>
+              </section>
+            </div>
+
+            <div class="panel-section margin-top">
+              <h3>Cấu hình câu lệnh liên quan</h3>
+              <div class="hint-small">Bật/tắt hoặc sửa tiền tố phản hồi của các lệnh thành viên bên dưới:</div>
+              <div id="commands-user-levels-list" class="command-list"></div>
+            </div>
+          </section>
+
+          <!-- PAGE 4: SERVER & BROADCASTS -->
+          <section class="page" data-page-panel="server-broadcast">
+            <div class="page-head">
+              <div>
+                <p class="eyebrow">Máy Chủ & Phát Thanh</p>
+                <h2>Cấu Hình Thông Báo & Lệnh Máy Chủ</h2>
+              </div>
+            </div>
+
+            <div class="settings-grid">
+              <section class="panel full-width">
+                <h3>Thiết lập kênh phát thông báo</h3>
+                <label class="switch-card">
+                  <input id="announcementsEnabled" name="announcementsEnabled" type="checkbox" />
+                  <span>
+                    <strong>Bật tính năng phát thông báo</strong>
+                    <small>Cho phép gửi tin nhắn phát thanh quảng bá định dạng đẹp đến kênh chọn sẵn.</small>
+                  </span>
+                </label>
+
+                <div class="grid-2-col">
+                  <div>
+                    <label for="announcementChannelId">Kênh phát thông báo</label>
+                    <select id="announcementChannelId" name="announcementChannelId">
+                      <option value="">-- Tải cấu hình để hiển thị kênh --</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label for="announcementMention">Tag thông báo khi phát</label>
+                    <input id="announcementMention" name="announcementMention" placeholder="@everyone, @here hoặc ID role" />
+                  </div>
+                </div>
+              </section>
+            </div>
+
+            <div class="panel-section margin-top">
+              <h3>Cấu hình câu lệnh liên quan</h3>
+              <div class="hint-small">Bật/tắt hoặc sửa tiền tố phản hồi của các lệnh hệ thống/máy chủ bên dưới:</div>
+              <div id="commands-server-broadcast-list" class="command-list"></div>
+            </div>
+          </section>
+
+          <!-- PAGE 5: MODERATION & AUTOMOD -->
+          <section class="page" data-page-panel="moderation-automod">
+            <div class="page-head">
+              <div>
+                <p class="eyebrow">Kiểm Duyệt & AutoMod</p>
+                <h2>Hệ Thống Bảo Mật & Lệnh Ban/Kick</h2>
+              </div>
+            </div>
+
+            <div class="settings-grid">
+              <!-- Manual moderation settings -->
+              <section class="panel">
+                <h3>Quyền kiểm duyệt thủ công</h3>
+                <label class="switch-card">
+                  <input id="moderationEnabled" name="moderationEnabled" type="checkbox" />
+                  <span>
+                    <strong>Kích hoạt bộ lệnh kiểm duyệt</strong>
+                    <small>Bật các lệnh warn, kick, ban, timeout, warnings và purge.</small>
+                  </span>
+                </label>
+                <p class="panel-note">Lưu ý: Nhật ký (log) các hành động kiểm duyệt sẽ được gửi về kênh Log trong phần Nâng Cao.</p>
+              </section>
+
+              <!-- AutoMod settings -->
+              <section class="panel">
+                <h3>Tự động kiểm duyệt (AutoMod)</h3>
+                <label class="switch-card">
+                  <input id="autoModEnabled" name="autoModEnabled" type="checkbox" />
+                  <span>
+                    <strong>Bật AutoMod</strong>
+                    <small>Tự động phát hiện tin nhắn chứa từ cấm và link lạ từ thành viên.</small>
+                  </span>
+                </label>
+
+                <div class="sub-checkboxes">
+                  <label class="switch-card compact">
+                    <input id="antiLinkEnabled" name="antiLinkEnabled" type="checkbox" />
+                    <span><strong>Chặn liên kết (Anti-Link)</strong> <small>Chặn link web và link mời Discord.</small></span>
+                  </label>
+
+                  <label class="switch-card compact">
+                    <input id="deleteBlockedMessages" name="deleteBlockedMessages" type="checkbox" />
+                    <span><strong>Xóa tin nhắn vi phạm</strong> <small>Tự động xóa sạch tin nhắn của thành viên khi vi phạm.</small></span>
+                  </label>
+                </div>
+
+                <label for="badWords">Từ ngữ bị cấm (Một từ/cụm từ mỗi dòng)</label>
+                <textarea id="badWords" name="badWords" rows="3" placeholder="Nhập các từ tục tĩu hoặc spam..."></textarea>
+
+                <label for="blockedMessage">Tin nhắn cảnh cáo khi vi phạm</label>
+                <textarea id="blockedMessage" name="blockedMessage" rows="2" placeholder="{user}, tin nhắn của bạn đã bị chặn."></textarea>
+              </section>
+            </div>
+
+            <div class="panel-section margin-top">
+              <h3>Cấu hình câu lệnh liên quan</h3>
+              <div class="hint-small">Bật/tắt hoặc sửa cấu hình của các lệnh ban, kick, cảnh cáo bên dưới:</div>
+              <div id="commands-moderation-automod-list" class="command-list"></div>
+            </div>
+          </section>
+
+          <!-- PAGE 6: INTERACTIONS -->
+          <section class="page" data-page-panel="interactions">
+            <div class="page-head">
+              <div>
+                <p class="eyebrow">Tương Tác & Nút Bấm</p>
+                <h2>Tự Chọn Vai Trò (Self-Roles) & Kênh Trợ Giúp (Tickets)</h2>
+              </div>
+            </div>
+
+            <div class="settings-grid">
+              <!-- Roles automation -->
+              <section class="panel">
+                <div class="section-title-wrap">
+                  <h3>Tự động gán & chọn Vai Trò (Roles)</h3>
+                  <label class="switch-card">
+                    <input id="rolesEnabled" name="rolesEnabled" type="checkbox" />
+                    <span>
+                      <strong>Bật tính năng phân vai trò</strong>
+                      <small>Kích hoạt gán role tự động và panel nút bấm tự chọn role.</small>
+                    </span>
+                  </label>
+                </div>
+
+                <label for="autoRoleId">Role tự động gán khi gia nhập</label>
+                <select id="autoRoleId" name="autoRoleId">
+                  <option value="">-- Tải cấu hình để hiển thị vai trò --</option>
+                </select>
+
+                <div class="role-panel-custom">
+                  <label for="selfRolePanelTitle">Tiêu đề bảng tự chọn vai trò</label>
+                  <input id="selfRolePanelTitle" name="selfRolePanelTitle" placeholder="Chọn vai trò của bạn" />
+
+                  <label for="selfRolePanelMessage">Lời nhắn trong bảng tự chọn vai trò</label>
+                  <textarea id="selfRolePanelMessage" name="selfRolePanelMessage" rows="2" placeholder="Bấm vào các nút dưới đây để nhận/hủy vai trò tương ứng."></textarea>
+                </div>
+
+                <div class="role-buttons-section">
+                  <div class="section-head inline-head">
+                    <h4>Danh sách nút bấm nhận Role</h4>
+                    <button id="addSelfRoleBtn" type="button">Thêm nút chọn Role</button>
+                  </div>
+                  <div id="selfRoles" class="reply-list"></div>
+                </div>
+              </section>
+
+              <!-- Ticket system -->
+              <section class="panel">
+                <h3>Hệ thống hỗ trợ (Tickets)</h3>
+                <label class="switch-card">
+                  <input id="ticketsEnabled" name="ticketsEnabled" type="checkbox" />
+                  <span>
+                    <strong>Kích hoạt hệ thống Ticket</strong>
+                    <small>Cho phép người dùng tạo kênh chat riêng tư để nhận hỗ trợ.</small>
+                  </span>
+                </label>
+
+                <label for="ticketCategoryId">Danh mục tạo Ticket</label>
+                <select id="ticketCategoryId" name="ticketCategoryId">
+                  <option value="">-- Tải cấu hình để hiển thị danh mục --</option>
+                </select>
+
+                <label for="ticketLogChannelId">Kênh lưu nhật ký ticket</label>
+                <select id="ticketLogChannelId" name="ticketLogChannelId">
+                  <option value="">-- Tải cấu hình để hiển thị kênh --</option>
+                </select>
+
+                <label for="ticketPanelTitle">Tiêu đề bảng tạo Ticket</label>
+                <input id="ticketPanelTitle" name="ticketPanelTitle" placeholder="Yêu Cầu Hỗ Trợ" />
+
+                <label for="ticketPanelMessage">Lời nhắn trong bảng tạo Ticket</label>
+                <textarea id="ticketPanelMessage" name="ticketPanelMessage" rows="3" placeholder="Nhấp vào nút dưới đây để mở một kênh hỗ trợ riêng với quản trị viên."></textarea>
+              </section>
+            </div>
+
+            <div class="panel-section margin-top">
+              <h3>Cấu hình câu lệnh liên quan</h3>
+              <div class="hint-small">Bật/tắt hoặc sửa cấu hình của lệnh đăng bảng nút bấm:</div>
+              <div id="commands-interactions-list" class="command-list"></div>
+            </div>
+          </section>
+
+          <!-- PAGE 7: AUTO REPLIES -->
+          <section class="page" data-page-panel="auto-replies">
+            <div class="page-head">
+              <div>
+                <p class="eyebrow">Trả Lời Tự Động</p>
+                <h2>Phản Hồi Tin Nhắn Theo Từ Khóa</h2>
+              </div>
+              <button id="addReplyBtn" type="button">Thêm từ khóa phản hồi</button>
+            </div>
+
+            <section class="panel">
+              <label class="switch-card">
+                <input id="autoReplyEnabled" name="autoReplyEnabled" type="checkbox" />
+                <span>
+                  <strong>Bật trả lời tự động</strong>
+                  <small>Bot sẽ phản hồi ngay khi tin nhắn của thành viên chứa từ khóa cấu hình.</small>
+                </span>
+              </label>
+
+              <div id="autoReplies" class="reply-list"></div>
+            </section>
+          </section>
+
+          <!-- PAGE 8: ADVANCED -->
+          <section class="page" data-page-panel="advanced">
+            <div class="page-head">
+              <div>
+                <p class="eyebrow">Hệ Thống & Nâng Cao</p>
+                <h2>Nhật Ký & Danh Sách Biến Mẫu</h2>
+              </div>
+            </div>
+
+            <div class="settings-grid">
+              <section class="panel">
+                <h3>Kênh lưu Nhật ký hoạt động (Logs)</h3>
+                <label for="logChannelId">Nhật ký kiểm duyệt & sự kiện</label>
+                <select id="logChannelId" name="logChannelId">
+                  <option value="">-- Tải cấu hình để hiển thị kênh --</option>
+                </select>
+                <p class="input-hint">Dùng để ghi lại các hoạt động ban, kick, mute, cảnh cáo của bot.</p>
+              </section>
+
+              <section class="panel">
+                <h3>Danh sách biến mẫu khả dụng</h3>
+                <p class="panel-desc">Sử dụng các biến này trong tin nhắn chào mừng, phản hồi lệnh hoặc AutoMod:</p>
+                <div class="token-grid">
+                  <code>{user}</code>
+                  <code>{username}</code>
+                  <code>{server}</code>
+                  <code>{channel}</code>
+                  <code>{prefix}</code>
+                  <code>{ping}</code>
+                  <code>{args}</code>
+                  <code>{commands}</code>
+                  <code>{welcomeStatus}</code>
+                  <code>{autoReplyStatus}</code>
+                  <code>{commandCount}</code>
+                </div>
+              </section>
+            </div>
+          </section>
+        </section>
+
+        <!-- Dynamic Save Bar -->
+        <section class="savebar">
+          <p id="message" role="status">Vui lòng chọn máy chủ để bắt đầu cấu hình.</p>
+          <button id="saveBtn" type="submit">Lưu cấu hình</button>
+        </section>
+      </form>
+    </main>
+
+    <script src="/app.js?v=7" type="module"></script>
+  </body>
+</html>
