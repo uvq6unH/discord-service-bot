@@ -814,3 +814,44 @@ h3 {
   font-size: 0.82rem;
   font-style: italic;
 }
+
+/* ── Auth / user info ──────────────────────────────────────────────────────── */
+.topbar-right {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.user-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 4px 12px 4px 4px;
+}
+
+.user-avatar {
+  border-radius: 50%;
+  width: 28px;
+  height: 28px;
+  object-fit: cover;
+}
+
+.user-name {
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: var(--text);
+}
+
+.logout-btn {
+  font-size: 1rem;
+  color: var(--muted);
+  text-decoration: none;
+  padding-left: 4px;
+  transition: color 0.15s;
+}
+.logout-btn:hover { color: #ef4444; }

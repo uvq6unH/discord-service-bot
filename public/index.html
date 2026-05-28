@@ -17,7 +17,14 @@
           <p class="eyebrow">Discord Service Bot</p>
           <h1>Bảng Điều Khiển Bot</h1>
         </div>
-        <div class="status" id="status">Đang tải trạng thái...</div>
+        <div class="topbar-right">
+          <div class="status" id="status">Đang tải trạng thái...</div>
+          <div class="user-info" id="userInfo" style="display:none">
+            <img class="user-avatar" id="userAvatar" src="" alt="" width="28" height="28" />
+            <span class="user-name" id="userName"></span>
+            <a href="/auth/logout" class="logout-btn" title="Đăng xuất">↩</a>
+          </div>
+        </div>
       </header>
 
       <section class="server-strip">

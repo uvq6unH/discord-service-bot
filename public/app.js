@@ -1,3 +1,36 @@
+// ── Auth check on page load ──────────────────────────────────────────────────
+(async function checkAuth() {
+  try {
+    const res = await fetch('/auth/me');
+    const data = await res.json();
+    if (!data.loggedIn) {
+      window.location.href = '/login.html';
+      return;
+    }
+    // Show user info in header
+    const userInfo = document.querySelector('#userInfo');
+    const userName = document.querySelector('#userName');
+    const userAvatar = document.querySelector('#userAvatar');
+    if (userInfo) userInfo.style.display = 'flex';
+    if (userName) userName.textContent = data.username;
+    if (userAvatar && data.avatar) {
+      userAvatar.src = `https://cdn.discordapp.com/avatars/${data.id}/${data.avatar}.png?size=56`;
+    }
+  } catch {
+    window.location.href = '/login.html';
+  }
+})();
+
+// ── API error handler: redirect to login on 401 ─────────────────────────────
+const _origFetch = window.fetch.bind(window);
+window.fetch = async (...args) => {
+  const res = await _origFetch(...args);
+  if (res.status === 401) {
+    window.location.href = '/login.html';
+  }
+  return res;
+};
+
 const statusEl = document.querySelector('#status');
 const guildIdEl = document.querySelector('#guildId');
 const guildPickerEl = document.querySelector('#guildPicker');
