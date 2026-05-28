@@ -1,0 +1,205 @@
+{
+  "841519618677145612": {
+    "enabled": true,
+    "prefix": "/",
+    "commands": [
+      {
+        "enabled": true,
+        "type": "ping",
+        "name": "ping",
+        "description": "Check bot latency",
+        "response": "Pong. {ping}ms",
+        "allowedRoles": []
+      },
+      {
+        "enabled": true,
+        "type": "help",
+        "name": "help",
+        "description": "Show command list",
+        "response": "Commands:\n{commands}",
+        "allowedRoles": []
+      },
+      {
+        "enabled": true,
+        "type": "config",
+        "name": "config",
+        "description": "Show current server config",
+        "response": "Prefix: {prefix}\nWelcome: {welcomeStatus}\nAuto reply: {autoReplyStatus}\nCommands: {commandCount}",
+        "allowedRoles": []
+      },
+      {
+        "enabled": true,
+        "type": "custom",
+        "name": "hban",
+        "description": "",
+        "response": "gọi cái đéo gì ???",
+        "allowedRoles": []
+      },
+      {
+        "enabled": true,
+        "type": "user",
+        "name": "user",
+        "description": "Show user info",
+        "response": "User info",
+        "allowedRoles": []
+      },
+      {
+        "enabled": true,
+        "type": "avatar",
+        "name": "avatar",
+        "description": "Show user avatar",
+        "response": "Avatar",
+        "allowedRoles": []
+      },
+      {
+        "enabled": true,
+        "type": "rank",
+        "name": "rank",
+        "description": "Show your XP rank",
+        "response": "Rank",
+        "allowedRoles": []
+      },
+      {
+        "enabled": true,
+        "type": "leaderboard",
+        "name": "leaderboard",
+        "description": "Show XP leaderboard",
+        "response": "Leaderboard",
+        "allowedRoles": []
+      },
+      {
+        "enabled": true,
+        "type": "server",
+        "name": "server",
+        "description": "Show server info",
+        "response": "Server info",
+        "allowedRoles": []
+      },
+      {
+        "enabled": true,
+        "type": "say",
+        "name": "say",
+        "description": "Make the bot send a message",
+        "response": "{args}",
+        "allowedRoles": []
+      },
+      {
+        "enabled": true,
+        "type": "purge",
+        "name": "purge",
+        "description": "Delete recent messages",
+        "response": "Deleted {count} messages.",
+        "allowedRoles": []
+      },
+      {
+        "enabled": true,
+        "type": "announce",
+        "name": "announce",
+        "description": "Send an announcement",
+        "response": "{args}",
+        "allowedRoles": []
+      },
+      {
+        "enabled": true,
+        "type": "warn",
+        "name": "warn",
+        "description": "Warn a user",
+        "response": "Warned {target}. Reason: {reason}",
+        "allowedRoles": []
+      },
+      {
+        "enabled": true,
+        "type": "kick",
+        "name": "kick",
+        "description": "Kick a user",
+        "response": "Kicked {target}. Reason: {reason}",
+        "allowedRoles": []
+      },
+      {
+        "enabled": true,
+        "type": "ban",
+        "name": "ban",
+        "description": "Ban a user",
+        "response": "Banned {target}. Reason: {reason}",
+        "allowedRoles": []
+      },
+      {
+        "enabled": true,
+        "type": "timeout",
+        "name": "timeout",
+        "description": "Timeout a user in minutes",
+        "response": "Timed out {target} for {minutes} minutes. Reason: {reason}",
+        "allowedRoles": []
+      },
+      {
+        "enabled": true,
+        "type": "warnings",
+        "name": "warnings",
+        "description": "Show warnings for a user",
+        "response": "Warnings for {target}: {count}",
+        "allowedRoles": []
+      },
+      {
+        "enabled": true,
+        "type": "clearwarns",
+        "name": "clearwarns",
+        "description": "Clear warnings for a user",
+        "response": "Cleared {count} warnings for {target}.",
+        "allowedRoles": []
+      },
+      {
+        "enabled": true,
+        "type": "ticketpanel",
+        "name": "ticketpanel",
+        "description": "Post a ticket panel",
+        "response": "Need help? Open a ticket.",
+        "allowedRoles": []
+      },
+      {
+        "enabled": true,
+        "type": "rolepanel",
+        "name": "rolepanel",
+        "description": "Post a self-role panel",
+        "response": "Choose your roles.",
+        "allowedRoles": []
+      }
+    ],
+    "moderationEnabled": true,
+    "autoModEnabled": false,
+    "deleteBlockedMessages": true,
+    "antiLinkEnabled": false,
+    "badWords": [],
+    "blockedMessage": "{user}, message blocked.",
+    "rolesEnabled": false,
+    "autoRoleId": "",
+    "selfRolePanelTitle": "Choose roles",
+    "selfRolePanelMessage": "Click a button to toggle a role.",
+    "selfRoles": [],
+    "ticketsEnabled": false,
+    "ticketCategoryId": "",
+    "ticketLogChannelId": "",
+    "ticketPanelTitle": "Support tickets",
+    "ticketPanelMessage": "Need help? Open a ticket and the team will respond.",
+    "levelsEnabled": false,
+    "xpPerMessage": 5,
+    "levelUpMessage": "{user} reached level {level}.",
+    "announcementsEnabled": false,
+    "announcementChannelId": "",
+    "announcementMention": "",
+    "welcomeEnabled": false,
+    "welcomeChannelId": "",
+    "welcomeMessage": "Welcome {user} to {server}.",
+    "logChannelId": "1162032613486231562",
+    "autoReplyEnabled": true,
+    "autoReplies": [
+      {
+        "keyword": "đm",
+        "response": "chửi cái đéo gì hả chó ngu ???"
+      },
+      {
+        "keyword": "dm",
+        "response": "chửi cái đéo gì hả chó ngu ???"
+      }
+    ]
+  }
+}

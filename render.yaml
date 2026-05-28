@@ -1,0 +1,19 @@
+services:
+  - type: web
+    name: discord-service-bot
+    runtime: node
+    plan: free
+    buildCommand: npm install
+    startCommand: node src/index.js
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 10000
+      - key: CONFIG_PATH
+        value: ./data/configs.json
+      - key: STATE_PATH
+        value: ./data/state.json
+      - key: DISCORD_TOKEN
+        sync: false   # Render sẽ hỏi giá trị này khi deploy, không commit vào code
+    healthCheckPath: /api/status
