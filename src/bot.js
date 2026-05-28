@@ -552,9 +552,9 @@ async function runBuiltInCommand({ client, config, command, source, args }) {
       .setDescription(
         warnings.length
           ? warnings
-              .slice(-10)
-              .map((warning, index) => `${index + 1}. <t:${Math.floor(new Date(warning.createdAt).getTime() / 1000)}:R> by <@${warning.moderatorId}> - ${warning.reason}`)
-              .join('\n')
+            .slice(-10)
+            .map((warning, index) => `${index + 1}. <t:${Math.floor(new Date(warning.createdAt).getTime() / 1000)}:R> by <@${warning.moderatorId}> - ${warning.reason}`)
+            .join('\n')
           : 'No warnings.'
       );
     return reply({ embeds: [embed], ephemeral: isInteraction });
@@ -928,6 +928,32 @@ export function createBot(configStore, stateStore) {
       await message.reply(match.response);
     }
   });
+
+  // ── Self-ping keepalive ──────────────────────────────────────────────────
+  // Thay thế UptimeRobot: bot tự gửi tin nhắn vào channel keepalive mỗi 14 phút
+  // để Render không spin down process. Channel ID set qua env KEEPALIVE_CHANNEL_ID.
+  // Nếu không có channel ID, chỉ log heartbeat để giữ event loop active.
+  (function startKeepalive() {
+    const INTERVAL_MS = 14 * 60 * 1000; // 14 phút — Render spin down sau 15 phút
+
+    setInterval(async () => {
+      const channelId = process.env.KEEPALIVE_CHANNEL_ID;
+      if (!channelId) {
+        // Không có channel → chỉ log để event loop không idle
+        console.log(`[keepalive] heartbeat — uptime ${Math.floor(process.uptime())}s, ws.ping ${client.ws.ping}ms`);
+        return;
+      }
+      try {
+        const ch = await client.channels.fetch(channelId).catch(() => null);
+        if (!ch?.isTextBased()) return;
+        // Gửi tin nhắn invisible (zero-width space) để không spam visible
+        await ch.send('\u200b').catch(() => null);
+        console.log(`[keepalive] sent heartbeat to #${ch.name ?? channelId}`);
+      } catch (err) {
+        console.warn('[keepalive] error:', err.message);
+      }
+    }, INTERVAL_MS);
+  })();
 
   return client;
 }

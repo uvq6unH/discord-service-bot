@@ -134,5 +134,22 @@ export function createServer({ configStore, stateStore, botClient }) {
     res.json({ status: 'ok', uptime: process.uptime(), bot: Boolean(botClient.user) });
   });
 
+  // ── Keepalive config API ──────────────────────────────────────────────────
+  // Trả về danh sách text channels của tất cả guilds để chọn keepalive channel
+  app.get('/api/keepalive-status', auth.requireAuth, (_req, res) => {
+    const channelId = process.env.KEEPALIVE_CHANNEL_ID ?? null;
+    let channelName = null;
+    if (channelId) {
+      const ch = botClient.channels.cache.get(channelId);
+      channelName = ch ? `#${ch.name}` : `ID: ${channelId}`;
+    }
+    res.json({
+      enabled: Boolean(channelId),
+      channelId,
+      channelName,
+      intervalMinutes: 14,
+    });
+  });
+
   return app;
 }

@@ -994,3 +994,185 @@ select option {
   background   : var(--surface3);
   border-radius: 2px
 }
+
+/* ── Missing classes ── */
+.user-name-sm {
+  font-size    : 11px;
+  font-weight  : 500;
+  color        : var(--text);
+  white-space  : nowrap;
+  overflow     : hidden;
+  text-overflow: ellipsis;
+  max-width    : 70px;
+  display      : none;
+  /* hidden in rail, show on wider screens */
+}
+
+.save-btn {
+  flex-shrink: 0;
+}
+
+/* ── Responsive layout ── */
+@media (max-width: 900px) {
+  :root {
+    --nav-w: 180px;
+  }
+}
+
+@media (max-width: 700px) {
+  body {
+    flex-direction: column;
+    overflow      : auto;
+  }
+
+  .server-rail {
+    width         : 100%;
+    height        : auto;
+    flex-direction: row;
+    padding       : 8px 10px;
+    border-right  : none;
+    border-bottom : 1px solid var(--border);
+    overflow-x    : auto;
+    overflow-y    : hidden;
+    gap           : 8px;
+  }
+
+  .rail-top {
+    flex-direction: row;
+    flex          : 1;
+    padding       : 0;
+    gap           : 8px;
+    align-items   : center;
+  }
+
+  .rail-bottom {
+    flex-direction: row;
+    padding       : 0;
+    width         : auto;
+  }
+
+  .rail-divider {
+    width : 2px;
+    height: 28px;
+  }
+
+  .server-list {
+    flex-direction: row;
+    flex-wrap     : nowrap;
+    width         : auto;
+  }
+
+  .user-pill {
+    width: auto;
+  }
+
+  .plugin-nav {
+    width         : 100%;
+    height        : auto;
+    border-right  : none;
+    border-bottom : 1px solid var(--border);
+    flex-direction: row;
+    overflow-x    : auto;
+    overflow-y    : hidden;
+    padding       : 6px 8px;
+    gap           : 4px;
+  }
+
+  .plugin-nav-header {
+    display: none;
+  }
+
+  .nav-group {
+    display       : flex;
+    flex-direction: row;
+    align-items   : center;
+    padding       : 0;
+    gap           : 2px;
+    border-right  : 1px solid var(--border);
+    padding-right : 6px;
+  }
+
+  .nav-group-label {
+    display: none;
+  }
+
+  .nav-item {
+    white-space: nowrap;
+    padding    : 6px 9px;
+    flex-shrink: 0;
+  }
+
+  .nav-item span {
+    display: none;
+  }
+
+  .nav-item i {
+    width    : auto;
+    font-size: 18px;
+  }
+
+  .main-content {
+    height    : auto;
+    min-height: calc(100vh - 130px);
+  }
+
+  .topbar {
+    padding: 0 12px;
+  }
+
+  .plugin-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .field-grid-2 {
+    grid-template-columns: 1fr;
+  }
+
+  .command-fields {
+    grid-template-columns: 1fr;
+  }
+
+  .reply-item {
+    grid-template-columns: 1fr auto;
+  }
+
+  .reply-item input:first-child {
+    grid-column: 1/-1;
+  }
+
+  #configForm {
+    padding: 12px;
+  }
+
+  .save-bar {
+    padding: 0 12px;
+  }
+}
+
+@media (max-width: 480px) {
+  :root {
+    --topbar-h: 46px;
+  }
+
+  .page-title {
+    font-size: 13px;
+  }
+
+  .stat-value {
+    font-size: 20px;
+  }
+
+  .btn {
+    padding  : 6px 10px;
+    font-size: 12px;
+  }
+
+  .topbar-right {
+    gap: 6px;
+  }
+
+  .bot-status {
+    display: none;
+    /* quá chật trên mobile nhỏ */
+  }
+}
