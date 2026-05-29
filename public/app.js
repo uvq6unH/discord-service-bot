@@ -110,22 +110,32 @@ const commandGroupMeta = {
   general: {
     title: 'Lệnh chung',
     hint: 'Ping, help, config và custom command',
+    icon: 'ti ti-terminal-2',
+    tone: 'blue',
   },
   user: {
     title: 'Người dùng & XP',
     hint: 'Thông tin người dùng, rank, daily và economy',
+    icon: 'ti ti-award',
+    tone: 'green',
   },
   server: {
     title: 'Máy chủ & Thông báo',
     hint: 'Lệnh server, purge, say và announce',
+    icon: 'ti ti-speakerphone',
+    tone: 'amber',
   },
   moderation: {
     title: 'Moderation & AutoMod',
     hint: 'Warn, kick, ban, timeout và kiểm duyệt',
+    icon: 'ti ti-shield-check',
+    tone: 'red',
   },
   interactions: {
     title: 'Ticket & Roles',
     hint: 'Ticket panel và role panel',
+    icon: 'ti ti-ticket',
+    tone: 'teal',
   },
 };
 
@@ -146,6 +156,17 @@ function ensureCommandSections() {
   nav.className = 'command-section-grid';
   const panel = document.createElement('div');
   panel.className = 'command-panel';
+  panel.innerHTML = `
+    <div class="command-panel-head">
+      <div>
+        <h3 id="commandPanelTitle">Lệnh chung</h3>
+        <p id="commandPanelHint">Ping, help, config và custom command</p>
+      </div>
+      <span id="commandPanelCount" class="command-panel-count">0 lệnh</span>
+    </div>
+  `;
+  const panelBody = document.createElement('div');
+  panelBody.className = 'command-panel-body';
 
   for (const group of commandGroupOrder) {
     const meta = commandGroupMeta[group];
@@ -155,6 +176,9 @@ function ensureCommandSections() {
     section.dataset.commandGroup = group;
     section.dataset.open = 'false';
     section.innerHTML = `
+      <div class="command-section-icon ${meta.tone}">
+        <i class="${meta.icon}"></i>
+      </div>
       <div class="command-section-title">
         <strong>${meta.title}</strong>
         <span>${meta.hint}</span>
@@ -175,9 +199,10 @@ function ensureCommandSections() {
     list.hidden = true;
 
     nav.append(section);
-    panel.append(list);
+    panelBody.append(list);
   }
 
+  panel.append(panelBody);
   host.append(nav, panel);
   host.dataset.ready = '1';
   return host;
@@ -194,6 +219,20 @@ function activateCommandSection(group, { forceOpen = true } = {}) {
   for (const list of document.querySelectorAll('.command-list[data-command-group]')) {
     list.hidden = !(list.dataset.commandGroup === group && forceOpen);
   }
+
+  updateCommandPanelMeta(group);
+}
+
+function updateCommandPanelMeta(group) {
+  const meta = commandGroupMeta[group] ?? commandGroupMeta.general;
+  const title = document.querySelector('#commandPanelTitle');
+  const hint = document.querySelector('#commandPanelHint');
+  const count = document.querySelector('#commandPanelCount');
+  const activeRows = document.querySelectorAll(`.command-list[data-command-group="${group}"] .command-item`);
+  const visibleRows = [...activeRows].filter((row) => row.style.display !== 'none');
+  if (title) title.textContent = meta.title;
+  if (hint) hint.textContent = meta.hint;
+  if (count) count.textContent = `${visibleRows.length}/${activeRows.length} lệnh`;
 }
 
 function getCommandListContainer(type) {
@@ -242,13 +281,21 @@ function addCommandRow(cmd = { enabled: true, type: 'custom', name: '', descript
       <div><label>Mô tả</label><input class="command-description" value="${esc(cmd.description)}" placeholder="Mô tả ngắn..." /></div>
       <div class="command-response-wrap"><label>Phản hồi</label><textarea class="command-response" rows="2">${esc(cmd.response)}</textarea></div>
       <div class="command-roles-wrap">
-        <label>Vai trò được dùng lệnh (trống = tất cả)</label>
+        <div class="command-roles-head">
+          <label>Quyền dùng lệnh</label>
+          <span class="command-roles-count">Tất cả role</span>
+        </div>
         <div class="roles-checkbox-grid"></div>
       </div>
     </div>`;
 
   const grid = row.querySelector('.roles-checkbox-grid');
+  const rolesCount = row.querySelector('.command-roles-count');
   const roles = (window.currentGuildData?.roles ?? []).filter(r => r.name !== '@everyone');
+  const updateRolesCount = () => {
+    const checked = row.querySelectorAll('.command-role-chk:checked').length;
+    if (rolesCount) rolesCount.textContent = checked ? `${checked} role được phép` : 'Tất cả role';
+  };
   if (roles.length === 0) {
     grid.innerHTML = '<span class="no-roles-hint">Tải cấu hình server để hiển thị vai trò.</span>';
   } else {
@@ -269,12 +316,16 @@ function addCommandRow(cmd = { enabled: true, type: 'custom', name: '', descript
       if (isChecked) lbl.classList.add('checked');
 
       // Toggle checked class for border highlight
-      chk.addEventListener('change', () => lbl.classList.toggle('checked', chk.checked));
+      chk.addEventListener('change', () => {
+        lbl.classList.toggle('checked', chk.checked);
+        updateRolesCount();
+      });
 
       lbl.append(chk, document.createTextNode(r.name));
       grid.append(lbl);
     }
   }
+  updateRolesCount();
 
   row.querySelector('.remove-cmd')?.addEventListener('click', () => { row.remove(); setDirty(); });
   row.querySelector('.command-enabled')?.addEventListener('change', (event) => {
@@ -370,6 +421,9 @@ function applyCommandFilter() {
 
   if (shouldAutoOpen && firstVisibleGroup) {
     activateCommandSection(firstVisibleGroup);
+  } else {
+    const active = document.querySelector('.command-section.active');
+    if (active) updateCommandPanelMeta(active.dataset.commandGroup);
   }
 }
 

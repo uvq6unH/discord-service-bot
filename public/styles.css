@@ -1010,11 +1010,50 @@ select option {
   transform   : translateY(-1px);
 }
 
+.command-section-icon {
+  width          : 42px;
+  height         : 42px;
+  min-width      : 42px;
+  display        : inline-flex;
+  align-items    : center;
+  justify-content: center;
+  border-radius  : var(--r);
+  background     : var(--surface2);
+  color          : var(--accent);
+  font-size      : 20px;
+}
+
+.command-section-icon.blue {
+  background: var(--accent-bg);
+  color     : var(--accent);
+}
+
+.command-section-icon.green {
+  background: var(--green-bg);
+  color     : var(--green);
+}
+
+.command-section-icon.amber {
+  background: var(--amber-bg);
+  color     : var(--amber);
+}
+
+.command-section-icon.red {
+  background: var(--red-bg);
+  color     : var(--red);
+}
+
+.command-section-icon.teal {
+  background: rgba(45, 212, 191, .12);
+  color     : #2dd4bf;
+}
+
 .command-section-title {
   display       : flex;
   flex-direction: column;
   gap           : 3px;
   min-width     : 0;
+  flex          : 1;
 }
 
 .command-section-title strong {
@@ -1061,6 +1100,40 @@ select option {
   border       : 1px solid var(--border);
   border-radius: var(--rl);
   padding      : 14px;
+}
+
+.command-panel-head {
+  display        : flex;
+  align-items    : center;
+  justify-content: space-between;
+  gap            : 12px;
+  padding        : 0 0 12px;
+  border-bottom  : 1px solid var(--border);
+  margin-bottom  : 12px;
+}
+
+.command-panel-head h3 {
+  margin     : 0;
+  font-size  : 15px;
+  line-height: 1.25;
+}
+
+.command-panel-head p {
+  margin     : 4px 0 0;
+  color      : var(--hint);
+  font-size  : 12px;
+  line-height: 1.35;
+}
+
+.command-panel-count {
+  flex-shrink   : 0;
+  padding       : 4px 9px;
+  border        : 1px solid var(--border2);
+  border-radius : 999px;
+  background    : var(--surface2);
+  color         : var(--muted);
+  font-size     : 12px;
+  font-weight   : 700;
 }
 
 /* Command list */
@@ -1172,6 +1245,20 @@ select option {
   border       : 1px solid var(--border);
   border-radius: var(--r);
   padding      : 8px;
+}
+
+.command-roles-head {
+  display        : flex;
+  align-items    : center;
+  justify-content: space-between;
+  gap            : 8px;
+}
+
+.command-roles-count {
+  flex-shrink: 0;
+  color      : var(--hint);
+  font-size  : 11px;
+  font-weight: 600;
 }
 
 .roles-checkbox-grid {
