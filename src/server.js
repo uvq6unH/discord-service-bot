@@ -99,8 +99,8 @@ export function createServer({ configStore, stateStore, botClient }) {
     const guildsById = new Map();
 
     for (const [id, guild] of botClient.guilds.cache) {
-      let canManage = false;
-      if (userId) {
+      let canManage = Boolean(req.session?.user?.dev);
+      if (!canManage && userId) {
         const member = await guild.members.fetch(userId).catch(() => null);
         canManage = member?.permissions?.has('ManageGuild') || member?.permissions?.has('Administrator') || false;
       }

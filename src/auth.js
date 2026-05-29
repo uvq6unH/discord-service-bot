@@ -18,12 +18,33 @@ export function createAuthRouter(botClient) {
     }
 
     console.warn('[auth] OAuth env vars not set — dashboard is UNPROTECTED.');
+    const devRouter = Router();
+    const devUser = {
+      id: process.env.DEV_USER_ID || botClient.user?.id || 'dev-user',
+      username: process.env.DEV_USERNAME || 'Dev User',
+      avatar: null,
+      dev: true,
+    };
+
+    function ensureDevSession(req, _res, next) {
+      req.session.user ??= devUser;
+      next();
+    }
+
+    devRouter.use(ensureDevSession);
+    devRouter.get('/auth/login', (_req, res) => res.redirect('/'));
+    devRouter.get('/auth/logout', (_req, res) => res.redirect('/'));
+    devRouter.get('/auth/me', (req, res) => {
+      const { id, username, avatar, dev } = req.session.user;
+      res.json({ loggedIn: true, id, username, avatar, dev });
+    });
+
     return {
-      router: null,
-      attachTo: null,
-      requireAuth: (_req, _res, next) => next(),
-      requirePage: (_req, _res, next) => next(),
-      requireGuildAccess: (_req, _res, next) => next(),
+      router: devRouter,
+      attachTo: (app) => app.use(devRouter),
+      requireAuth: ensureDevSession,
+      requirePage: ensureDevSession,
+      requireGuildAccess: ensureDevSession,
     };
   }
 

@@ -202,16 +202,8 @@ function ensureCommandSections() {
       </div>
       <div class="command-section-action">
         <button type="button" class="command-group-action" title="Bật/tắt toàn bộ lệnh trong nhóm">
-          <span class="command-action-viewport">
-            <span class="command-action-line command-action-idle">
-              <i class="ti ti-power"></i>
-              <span class="command-action-label">Enable</span>
-            </span>
-            <span class="command-action-line command-action-hover">
-              <span class="command-action-hover-label">Enable</span>
-              <i class="ti ti-arrow-right"></i>
-            </span>
-          </span>
+          <i class="ti ti-power"></i>
+          <span class="command-action-label">Enable</span>
         </button>
       </div>
     `;
@@ -255,7 +247,6 @@ function activateCommandSection(group, { forceOpen = true, updateHash = true } =
   for (const section of document.querySelectorAll('.command-section')) {
     const isTarget = section.dataset.commandGroup === group;
     section.dataset.open = isTarget && forceOpen ? 'true' : 'false';
-    section.classList.toggle('active', isTarget && forceOpen);
     updateCommandSectionState(section);
   }
 
@@ -271,6 +262,13 @@ function showCommandSections({ updateHash = true } = {}) {
   if (host) host.dataset.view = 'sections';
   if (updateHash && window.location.hash.startsWith('#commands/')) {
     window.history.replaceState(null, '', window.location.pathname + window.location.search);
+  }
+  for (const section of document.querySelectorAll('.command-section')) {
+    section.dataset.open = 'false';
+    updateCommandSectionState(section);
+  }
+  for (const list of document.querySelectorAll('.command-list[data-command-group]')) {
+    list.hidden = true;
   }
 }
 
@@ -317,7 +315,6 @@ function updateCommandGroupAction(group) {
     action.dataset.state = isAllEnabled ? 'enabled' : hasAnyEnabled ? 'mixed' : 'disabled';
     action.title = isAllEnabled ? 'Tắt toàn bộ lệnh trong nhóm' : 'Bật toàn bộ lệnh trong nhóm';
     action.querySelector('.command-action-label').textContent = label;
-    action.querySelector('.command-action-hover-label').textContent = label;
   }
 }
 
@@ -330,7 +327,6 @@ function getCommandListContainer(type) {
 function updateCommandSectionState(section) {
   const icon = section.querySelector('.command-section-meta i');
   const open = section.dataset.open === 'true';
-  section.classList.toggle('active', open);
   if (icon) icon.classList.toggle('is-open', open);
 }
 
@@ -490,7 +486,7 @@ function applyCommandFilter() {
     section.hidden = visibleCount === 0;
     if (visibleCount === 0) {
       if (icon) icon.classList.remove('is-open');
-      section.classList.remove('active');
+      section.dataset.open = 'false';
       if (list) list.hidden = true;
       continue;
     }
@@ -499,7 +495,8 @@ function applyCommandFilter() {
       firstVisibleGroup = group;
     }
     if (!shouldAutoOpen) {
-      const isActive = section.classList.contains('active');
+      const isDetailView = document.querySelector('#command-sections')?.dataset.view === 'detail';
+      const isActive = isDetailView && section.dataset.open === 'true';
       section.dataset.open = isActive ? 'true' : 'false';
       if (list) list.hidden = !isActive;
       updateCommandSectionState(section);
@@ -509,7 +506,7 @@ function applyCommandFilter() {
   if (shouldAutoOpen && firstVisibleGroup) {
     activateCommandSection(firstVisibleGroup);
   } else {
-    const active = document.querySelector('.command-section.active');
+    const active = document.querySelector('.command-section[data-open="true"]');
     if (active) updateCommandPanelMeta(active.dataset.commandGroup);
   }
 }

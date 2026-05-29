@@ -9,7 +9,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
-  <link rel="stylesheet" href="/styles.css?v=10" />
+  <link rel="stylesheet" href="/styles.css?v=14" />
 </head>
 
 <body>
@@ -374,23 +374,25 @@
 
         <!-- ── PAGE: AUTO REPLIES ── -->
         <section class="page" data-page-panel="auto-replies">
-          <div class="plugin-card wide">
-            <div class="plugin-card-header">
-              <div class="plugin-icon bg-teal"><i class="ti ti-message-reply"></i></div>
-              <div>
-                <h3>Tự động trả lời</h3>
-                <p>Bot phản hồi khi tin nhắn chứa từ khóa</p>
+          <div class="plugin-grid">
+            <div class="plugin-card">
+              <div class="plugin-card-header">
+                <div class="plugin-icon bg-teal"><i class="ti ti-message-reply"></i></div>
+                <div>
+                  <h3>Tự động trả lời</h3>
+                  <p>Bot phản hồi khi tin nhắn chứa từ khóa</p>
+                </div>
+                <label class="toggle ml-auto">
+                  <input type="checkbox" id="autoReplyEnabled" name="autoReplyEnabled">
+                  <span class="toggle-track"></span>
+                </label>
               </div>
-              <label class="toggle ml-auto">
-                <input type="checkbox" id="autoReplyEnabled" name="autoReplyEnabled">
-                <span class="toggle-track"></span>
-              </label>
-            </div>
-            <div class="plugin-card-body">
-              <div id="autoReplies" class="reply-list"></div>
-              <button id="addReplyBtn" class="btn btn-secondary mt-2" type="button">
-                <i class="ti ti-plus"></i> Thêm từ khóa
-              </button>
+              <div class="plugin-card-body">
+                <div id="autoReplies" class="reply-list"></div>
+                <button id="addReplyBtn" class="btn btn-secondary mt-2" type="button">
+                  <i class="ti ti-plus"></i> Thêm từ khóa
+                </button>
+              </div>
             </div>
           </div>
         </section>
@@ -454,29 +456,31 @@
 
         <!-- ── PAGE: ANNOUNCEMENTS ── -->
         <section class="page" data-page-panel="server-broadcast">
-          <div class="plugin-card wide">
-            <div class="plugin-card-header">
-              <div class="plugin-icon bg-blue"><i class="ti ti-speakerphone"></i></div>
-              <div>
-                <h3>Phát thông báo</h3>
-                <p>Gửi announcement đến kênh cố định</p>
-              </div>
-              <label class="toggle ml-auto">
-                <input type="checkbox" id="announcementsEnabled" name="announcementsEnabled">
-                <span class="toggle-track"></span>
-              </label>
-            </div>
-            <div class="plugin-card-body">
-              <div class="field-grid-2">
+          <div class="plugin-grid">
+            <div class="plugin-card">
+              <div class="plugin-card-header">
+                <div class="plugin-icon bg-blue"><i class="ti ti-speakerphone"></i></div>
                 <div>
-                  <label>Kênh phát thông báo</label>
-                  <select id="announcementChannelId" name="announcementChannelId">
-                    <option value="">-- Chọn kênh --</option>
-                  </select>
+                  <h3>Phát thông báo</h3>
+                  <p>Gửi announcement đến kênh cố định</p>
                 </div>
-                <div>
-                  <label>Tag khi phát (@everyone...)</label>
-                  <input id="announcementMention" name="announcementMention" placeholder="@everyone" />
+                <label class="toggle ml-auto">
+                  <input type="checkbox" id="announcementsEnabled" name="announcementsEnabled">
+                  <span class="toggle-track"></span>
+                </label>
+              </div>
+              <div class="plugin-card-body">
+                <div class="field-grid-2">
+                  <div>
+                    <label>Kênh phát thông báo</label>
+                    <select id="announcementChannelId" name="announcementChannelId">
+                      <option value="">-- Chọn kênh --</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label>Tag khi phát (@everyone...)</label>
+                    <input id="announcementMention" name="announcementMention" placeholder="@everyone" />
+                  </div>
                 </div>
               </div>
             </div>
@@ -602,7 +606,7 @@
 
   </main>
 
-  <script src="/app.js?v=10" type="module"></script>
+  <script src="/app.js?v=14" type="module"></script>
 </body>
 
 </html>
