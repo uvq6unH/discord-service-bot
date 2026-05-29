@@ -26,6 +26,10 @@ const groupMap = {
   daily: 'user',
   economyleaderboard: 'user',
   blackjack: 'user',
+  poker: 'user',
+  coinflip: 'user',
+  dice: 'user',
+  slots: 'user',
   server: 'server',
   say: 'server',
   purge: 'server',
@@ -201,6 +205,10 @@ async function hasAllowedRole(guild, userId, command) {
 }
 
 const currencies = ['silver', 'gold', 'diamond'];
+const gameCurrency = 'silver';
+const blackjackSessions = new Map();
+const pokerSessions = new Map();
+const gameSessionTtlMs = 10 * 60 * 1000;
 
 function normalizeCurrency(value) {
   const input = String(value ?? '').trim().toLowerCase();
@@ -288,6 +296,376 @@ function playBlackjack() {
   else if (playerValue === dealerValue) outcome = 'push';
 
   return { player, dealer, playerValue, dealerValue, outcome };
+}
+
+function playCoinflip(choice) {
+  const normalizedChoice = ['tails', 'tail', 't', 'ngua'].includes(String(choice ?? '').toLowerCase()) ? 'tails' : 'heads';
+  const result = Math.random() < 0.5 ? 'heads' : 'tails';
+  return { choice: normalizedChoice, result, outcome: normalizedChoice === result ? 'win' : 'lose' };
+}
+
+function playDice(target) {
+  const normalizedTarget = Math.max(1, Math.min(6, Number.parseInt(target, 10) || 1));
+  const roll = Math.floor(Math.random() * 6) + 1;
+  return { target: normalizedTarget, roll, outcome: normalizedTarget === roll ? 'win' : 'lose' };
+}
+
+function playSlots() {
+  const symbols = ['7', 'BAR', 'Cherry', 'Bell', 'Gem'];
+  const reels = Array.from({ length: 3 }, () => symbols[Math.floor(Math.random() * symbols.length)]);
+  const unique = new Set(reels);
+  let multiplier = 0;
+  if (unique.size === 1) multiplier = reels[0] === '7' ? 10 : 5;
+  else if (unique.size === 2) multiplier = 2;
+  return { reels, multiplier, outcome: multiplier > 0 ? 'win' : 'lose' };
+}
+
+function getGameBetLimits(config, game) {
+  return {
+    min: config[`${game}MinBet`] ?? config.blackjackMinBet,
+    max: config[`${game}MaxBet`] ?? config.blackjackMaxBet
+  };
+}
+
+function parseBetCommand({ isInteraction, source, args, defaultCurrencyIndex = 1 }) {
+  const parts = args.split(/\s+/).filter(Boolean);
+  return {
+    parts,
+    bet: isInteraction ? source.options.getInteger('bet') : parseBet(parts[0]),
+    currency: gameCurrency
+  };
+}
+
+async function validateGameBet({ client, guildId, userId, config, currency, bet, game, disabledMessage, reply, isInteraction }) {
+  if (!config.economyEnabled || config[`${game}Enabled`] === false) {
+    await reply(isInteraction ? { content: disabledMessage, ephemeral: true } : disabledMessage);
+    return null;
+  }
+
+  const limits = getGameBetLimits(config, game);
+  if (!Number.isInteger(bet) || bet < limits.min || bet > limits.max) {
+    const message = `Bet must be between ${limits.min} and ${limits.max}.`;
+    await reply(isInteraction ? { content: message, ephemeral: true } : message);
+    return null;
+  }
+
+  const balance = await client.stateStore.getBalance(guildId, userId);
+  if ((balance[currency] ?? 0) < bet) {
+    const message = `Not enough ${currencyMeta(config, currency).name}.`;
+    await reply(isInteraction ? { content: message, ephemeral: true } : message);
+    return null;
+  }
+
+  return balance;
+}
+
+function expireSession(map, id) {
+  const session = map.get(id);
+  if (session?.timeout) clearTimeout(session.timeout);
+  map.delete(id);
+}
+
+function scheduleSessionExpiry(map, id) {
+  return setTimeout(() => expireSession(map, id), gameSessionTtlMs);
+}
+
+function visibleDealerHand(session, reveal = false) {
+  return reveal ? formatHand(session.dealer) : `${session.dealer[0].rank}${session.dealer[0].suit} ??`;
+}
+
+function isPair(hand) {
+  return hand.length === 2 && hand[0].rank === hand[1].rank;
+}
+
+function isNaturalBlackjack(hand) {
+  return hand.length === 2 && handValue(hand) === 21;
+}
+
+function createBlackjackPlayer(user, bet, deck, balanceAfterReserved) {
+  return {
+    userId: user.id,
+    username: user.username,
+    hands: [{ cards: [deck.pop(), deck.pop()], bet, done: false, didDouble: false }],
+    activeHandIndex: 0,
+    balanceAfterReserved
+  };
+}
+
+function blackjackHands(session) {
+  return session.players.flatMap((player) => player.hands.map((handState) => ({ player, handState })));
+}
+
+function activeBlackjackPlayer(session) {
+  return session.players[session.activePlayerIndex];
+}
+
+function activeBlackjackHand(session) {
+  const player = activeBlackjackPlayer(session);
+  return player?.hands[player.activeHandIndex];
+}
+
+function drawToBlackjackHand(session, handState) {
+  handState.cards.push(session.deck.pop());
+  if (handValue(handState.cards) >= 21) {
+    handState.done = true;
+  }
+}
+
+function advanceBlackjackHand(session) {
+  while (session.activePlayerIndex < session.players.length) {
+    const player = activeBlackjackPlayer(session);
+    while (player.activeHandIndex < player.hands.length && player.hands[player.activeHandIndex].done) {
+      player.activeHandIndex += 1;
+    }
+    if (player.activeHandIndex < player.hands.length) return;
+    session.activePlayerIndex += 1;
+  }
+}
+
+function settleBlackjackSession(client, session) {
+  while (shouldDealerHit(session)) {
+    session.dealer.push(session.deck.pop());
+  }
+
+  const dealerValue = handValue(session.dealer);
+  let totalPayout = 0;
+  const results = [];
+  for (const { player, handState } of blackjackHands(session)) {
+    if (handState.outcome === 'canceled') {
+      handState.payout = 0;
+      results.push(`${player.username}: ${formatHand(handState.cards)} - canceled`);
+      continue;
+    }
+    const playerValue = handValue(handState.cards);
+    let outcome = 'lose';
+    let payout = 0;
+    if (playerValue > 21) {
+      outcome = 'bust';
+    } else if (isNaturalBlackjack(handState.cards) && player.hands.length === 1 && !isNaturalBlackjack(session.dealer)) {
+      outcome = 'blackjack';
+      payout = Math.floor(handState.bet * 2.5);
+    } else if (dealerValue > 21 || playerValue > dealerValue) {
+      outcome = 'win';
+      payout = handState.bet * 2;
+    } else if (playerValue === dealerValue) {
+      outcome = 'push';
+      payout = handState.bet;
+    }
+    handState.outcome = outcome;
+    handState.payout = payout;
+    totalPayout += payout;
+    results.push(`${player.username}: ${formatHand(handState.cards)} (${playerValue}) - ${outcome}`);
+  }
+
+  session.status = 'finished';
+  return { totalPayout, results };
+}
+
+function hasSoftAce(hand) {
+  let total = 0;
+  let aces = 0;
+  for (const card of hand) {
+    if (card.rank === 'A') {
+      aces += 1;
+      total += 11;
+    } else if (['J', 'Q', 'K'].includes(card.rank)) {
+      total += 10;
+    } else {
+      total += Number(card.rank);
+    }
+  }
+  return aces > 0 && total <= 21;
+}
+
+function chance(percent) {
+  return Math.random() * 100 < percent;
+}
+
+function shouldDealerHit(session) {
+  const dealerValue = handValue(session.dealer);
+  if (dealerValue <= 11) return true;
+  if (dealerValue >= 21) return false;
+
+  const livePlayerValues = blackjackHands(session)
+    .map(({ handState }) => handValue(handState.cards))
+    .filter((value) => value <= 21);
+  if (livePlayerValues.length === 0) return false;
+
+  const bestPlayerValue = Math.max(...livePlayerValues);
+  const soft = hasSoftAce(session.dealer);
+
+  if (dealerValue < bestPlayerValue) {
+    if (dealerValue <= 15) return true;
+    if (dealerValue === 16) return chance(75);
+    if (dealerValue === 17 && soft) return chance(55);
+    if (dealerValue === 17) return chance(25);
+    if (dealerValue === 18) return chance(10);
+  }
+
+  if (dealerValue <= 14) return chance(70);
+  if (dealerValue === 15) return chance(45);
+  if (dealerValue === 16) return chance(30);
+  if (dealerValue === 17 && soft) return chance(20);
+  return false;
+}
+
+function buildBlackjackPayload(config, session) {
+  const finished = session.status === 'finished';
+  const activePlayer = activeBlackjackPlayer(session);
+  const fields = [
+    `Currency: ${currencyMeta(config, session.currency).name}`,
+    `Table bet: ${formatCurrency(config, session.currency, session.bet)}`,
+    finished ? '' : `Turn: ${activePlayer ? `<@${activePlayer.userId}>` : 'dealer'}`,
+    `Dealer: ${visibleDealerHand(session, finished)} (${finished ? handValue(session.dealer) : '?'})`,
+    ...session.players.flatMap((player, playerIndex) =>
+      player.hands.map((handState, handIndex) => {
+        const marker = !finished && playerIndex === session.activePlayerIndex && handIndex === player.activeHandIndex ? '>' : '-';
+        const suffix = handState.outcome ? ` | ${handState.outcome}` : '';
+        return `${marker} <@${player.userId}> hand ${handIndex + 1}: ${formatHand(handState.cards)} (${handValue(handState.cards)}) | Bet ${handState.bet}${suffix}`;
+      })
+    )
+  ].filter(Boolean);
+
+  if (finished) {
+    fields.push(`Payout: ${formatCurrency(config, session.currency, session.totalPayout ?? 0)}`);
+    fields.push(...session.players.map((player) => `<@${player.userId}> balance: ${formatCurrency(config, session.currency, player.finalBalance ?? 0)}`));
+  }
+
+  const active = activeBlackjackHand(session);
+  const canAct = !finished && active;
+  const canDouble = canAct && active.cards.length === 2 && !active.didDouble && activePlayer.balanceAfterReserved >= active.bet;
+  const canSplit = canAct && activePlayer.hands.length < 2 && isPair(active.cards) && activePlayer.balanceAfterReserved >= active.bet;
+  const embed = new EmbedBuilder()
+    .setTitle(finished ? 'Blackjack - finished' : 'Blackjack')
+    .setDescription(fields.join('\n'))
+    .setColor(finished ? 0x5865f2 : 0x3ba55d)
+    .setFooter({ text: 'Only the current player can act. Others can Join with the same Silver bet before dealer resolves.' });
+
+  const components = canAct
+    ? [
+        new ActionRowBuilder().addComponents(
+          new ButtonBuilder().setCustomId('bj:join').setLabel('Join').setStyle(ButtonStyle.Success),
+          new ButtonBuilder().setCustomId('bj:hit').setLabel('Hit').setStyle(ButtonStyle.Primary),
+          new ButtonBuilder().setCustomId('bj:stand').setLabel('Theo / Stand').setStyle(ButtonStyle.Secondary),
+          new ButtonBuilder().setCustomId('bj:double').setLabel('x2').setStyle(ButtonStyle.Success).setDisabled(!canDouble),
+          new ButtonBuilder().setCustomId('bj:split').setLabel('Split').setStyle(ButtonStyle.Success).setDisabled(!canSplit)
+        ),
+        new ActionRowBuilder().addComponents(
+          new ButtonBuilder().setCustomId('bj:cancel').setLabel('Huy').setStyle(ButtonStyle.Danger)
+        )
+      ]
+    : [];
+
+  return { embeds: [embed], components };
+}
+
+async function finishBlackjackSession(client, session, config) {
+  const result = settleBlackjackSession(client, session);
+  session.totalPayout = result.totalPayout;
+  if (result.totalPayout > 0) {
+    for (const player of session.players) {
+      const playerPayout = player.hands.reduce((sum, handState) => sum + (handState.payout ?? 0), 0);
+      const next = playerPayout > 0
+        ? await client.stateStore.adjustBalance(session.guildId, player.userId, session.currency, playerPayout)
+        : await client.stateStore.getBalance(session.guildId, player.userId);
+      player.finalBalance = next[session.currency] ?? 0;
+    }
+  } else {
+    for (const player of session.players) {
+      const balance = await client.stateStore.getBalance(session.guildId, player.userId);
+      player.finalBalance = balance[session.currency] ?? 0;
+    }
+  }
+  return buildBlackjackPayload(config, session);
+}
+
+function rankNumber(rank) {
+  if (rank === 'A') return 14;
+  if (rank === 'K') return 13;
+  if (rank === 'Q') return 12;
+  if (rank === 'J') return 11;
+  return Number(rank);
+}
+
+function evaluateVideoPoker(hand) {
+  const values = hand.map((card) => rankNumber(card.rank)).sort((a, b) => a - b);
+  const suits = new Set(hand.map((card) => card.suit));
+  const counts = new Map();
+  for (const value of values) counts.set(value, (counts.get(value) ?? 0) + 1);
+  const groups = [...counts.values()].sort((a, b) => b - a);
+  const isFlush = suits.size === 1;
+  const wheel = values.join(',') === '2,3,4,5,14';
+  const isStraight = wheel || values.every((value, index) => index === 0 || value === values[index - 1] + 1);
+  const highPair = [...counts.entries()].some(([value, count]) => count === 2 && value >= 11);
+
+  if (isFlush && values.join(',') === '10,11,12,13,14') return { name: 'Royal flush', multiplier: 250 };
+  if (isFlush && isStraight) return { name: 'Straight flush', multiplier: 50 };
+  if (groups[0] === 4) return { name: 'Four of a kind', multiplier: 25 };
+  if (groups[0] === 3 && groups[1] === 2) return { name: 'Full house', multiplier: 9 };
+  if (isFlush) return { name: 'Flush', multiplier: 6 };
+  if (isStraight) return { name: 'Straight', multiplier: 4 };
+  if (groups[0] === 3) return { name: 'Three of a kind', multiplier: 3 };
+  if (groups[0] === 2 && groups[1] === 2) return { name: 'Two pair', multiplier: 2 };
+  if (highPair) return { name: 'Jacks or better', multiplier: 1 };
+  return { name: 'No win', multiplier: 0 };
+}
+
+function buildPokerPayload(config, session) {
+  const finished = session.status === 'finished';
+  const heldText = session.held.size ? [...session.held].map((index) => index + 1).join(', ') : 'none';
+  const result = finished ? evaluateVideoPoker(session.hand) : null;
+  const embed = new EmbedBuilder()
+    .setTitle(finished ? 'Video Poker - finished' : 'Video Poker - Jacks or Better')
+    .setDescription([
+      `Bet: ${formatCurrency(config, session.currency, session.bet)}`,
+      `Hand: ${session.hand.map((card, index) => `${index + 1}:${card.rank}${card.suit}${session.held.has(index) ? '*' : ''}`).join(' ')}`,
+      `Held: ${heldText}`,
+      finished ? `Result: ${result.name} (${result.multiplier}x)` : 'Select cards to hold, then Draw.',
+      finished ? `Balance: ${formatCurrency(config, session.currency, session.finalBalance ?? 0)}` : ''
+    ].filter(Boolean).join('\n'))
+    .setColor(finished ? 0x5865f2 : 0xd8b428)
+    .setFooter({ text: 'Pay table: Jacks+ 1x, two pair 2x, trips 3x, straight 4x, flush 6x, full house 9x, quads 25x.' });
+
+  const components = finished
+    ? []
+    : [
+        new ActionRowBuilder().addComponents(
+          ...session.hand.map((card, index) =>
+            new ButtonBuilder()
+              .setCustomId(`vp:hold:${session.userId}:${index}`)
+              .setLabel(`${index + 1}${session.held.has(index) ? ' held' : ''}`)
+              .setStyle(session.held.has(index) ? ButtonStyle.Success : ButtonStyle.Secondary)
+          )
+        ),
+        new ActionRowBuilder().addComponents(
+          new ButtonBuilder().setCustomId(`vp:draw:${session.userId}`).setLabel('Draw').setStyle(ButtonStyle.Primary),
+          new ButtonBuilder().setCustomId(`vp:cancel:${session.userId}`).setLabel('Huy').setStyle(ButtonStyle.Danger)
+        )
+      ];
+
+  return { embeds: [embed], components };
+}
+
+async function finishPokerSession(client, session, config, canceled = false) {
+  session.status = 'finished';
+  let payout = 0;
+  if (!canceled) {
+    for (let i = 0; i < session.hand.length; i += 1) {
+      if (!session.held.has(i)) {
+        session.hand[i] = session.deck.pop();
+      }
+    }
+    payout = session.bet * evaluateVideoPoker(session.hand).multiplier;
+  }
+  session.payout = payout;
+  if (payout > 0) {
+    const next = await client.stateStore.adjustBalance(session.guildId, session.userId, session.currency, payout);
+    session.finalBalance = next[session.currency] ?? 0;
+  } else {
+    const balance = await client.stateStore.getBalance(session.guildId, session.userId);
+    session.finalBalance = balance[session.currency] ?? 0;
+  }
+  return buildPokerPayload(config, session);
 }
 
 function buildCommandList(config) {
@@ -389,7 +767,19 @@ function buildSlashOptions(command) {
     ];
   }
 
-  if (command.type === 'blackjack') {
+  if (['blackjack', 'poker', 'slots'].includes(command.type)) {
+    return [
+      {
+        name: 'bet',
+        description: 'Bet amount',
+        type: ApplicationCommandOptionType.Integer,
+        minValue: 1,
+        required: true
+      },
+    ];
+  }
+
+  if (command.type === 'coinflip') {
     return [
       {
         name: 'bet',
@@ -399,15 +789,34 @@ function buildSlashOptions(command) {
         required: true
       },
       {
-        name: 'currency',
-        description: 'Currency to bet',
+        name: 'side',
+        description: 'Pick heads or tails',
         type: ApplicationCommandOptionType.String,
         required: false,
         choices: [
-          { name: 'Bạc', value: 'silver' },
-          { name: 'Vàng', value: 'gold' },
-          { name: 'Kim cương', value: 'diamond' }
+          { name: 'Heads', value: 'heads' },
+          { name: 'Tails', value: 'tails' }
         ]
+      }
+    ];
+  }
+
+  if (command.type === 'dice') {
+    return [
+      {
+        name: 'bet',
+        description: 'Bet amount',
+        type: ApplicationCommandOptionType.Integer,
+        minValue: 1,
+        required: true
+      },
+      {
+        name: 'number',
+        description: 'Pick a number from 1 to 6',
+        type: ApplicationCommandOptionType.Integer,
+        minValue: 1,
+        maxValue: 6,
+        required: true
       }
     ];
   }
@@ -869,42 +1278,184 @@ async function runBuiltInCommand({ client, config, command, source, args }) {
   }
 
   if (command.type === 'blackjack') {
-    if (!config.economyEnabled || !config.blackjackEnabled) {
-      return reply(isInteraction ? { content: 'Blackjack is disabled.', ephemeral: true } : 'Blackjack is disabled.');
+    const { bet, currency } = parseBetCommand({ isInteraction, source, args });
+    const balance = await validateGameBet({
+      client,
+      guildId: guild.id,
+      userId: user.id,
+      config,
+      currency,
+      bet,
+      game: 'blackjack',
+      disabledMessage: 'Blackjack is disabled.',
+      reply,
+      isInteraction
+    });
+    if (!balance) return;
+    const reserved = await client.stateStore.adjustBalance(guild.id, user.id, currency, -bet);
+    const deck = createDeck();
+    const session = {
+      guildId: guild.id,
+      currency,
+      bet,
+      deck,
+      dealer: [deck.pop(), deck.pop()],
+      players: [createBlackjackPlayer(user, bet, deck, reserved[currency] ?? 0)],
+      activePlayerIndex: 0,
+      status: 'active'
+    };
+
+    const sent = await reply(buildBlackjackPayload(config, session));
+    const message = isInteraction ? await source.fetchReply().catch(() => null) : sent;
+    if (message?.id) {
+      session.messageId = message.id;
+      session.timeout = scheduleSessionExpiry(blackjackSessions, message.id);
+      blackjackSessions.set(message.id, session);
     }
+    return;
+  }
+
+  if (command.type === 'poker') {
+    const { bet, currency } = parseBetCommand({ isInteraction, source, args });
+    const balance = await validateGameBet({
+      client,
+      guildId: guild.id,
+      userId: user.id,
+      config,
+      currency,
+      bet,
+      game: 'poker',
+      disabledMessage: 'Poker is disabled.',
+      reply,
+      isInteraction
+    });
+    if (!balance) return;
+
+    await client.stateStore.adjustBalance(guild.id, user.id, currency, -bet);
+    const deck = createDeck();
+    const session = {
+      guildId: guild.id,
+      userId: user.id,
+      currency,
+      bet,
+      deck,
+      hand: [deck.pop(), deck.pop(), deck.pop(), deck.pop(), deck.pop()],
+      held: new Set(),
+      status: 'active'
+    };
+    const sent = await reply(buildPokerPayload(config, session));
+    const message = isInteraction ? await source.fetchReply().catch(() => null) : sent;
+    if (message?.id) {
+      session.messageId = message.id;
+      session.timeout = scheduleSessionExpiry(pokerSessions, message.id);
+      pokerSessions.set(message.id, session);
+    }
+    return;
+  }
+
+  if (command.type === 'coinflip') {
     const parts = args.split(/\s+/).filter(Boolean);
     const bet = isInteraction ? source.options.getInteger('bet') : parseBet(parts[0]);
-    const currency = normalizeCurrency(isInteraction ? source.options.getString('currency') : parts[1]);
-    if (!Number.isInteger(bet) || bet < config.blackjackMinBet || bet > config.blackjackMaxBet) {
-      return reply(isInteraction ? { content: `Bet must be between ${config.blackjackMinBet} and ${config.blackjackMaxBet}.`, ephemeral: true } : `Bet must be between ${config.blackjackMinBet} and ${config.blackjackMaxBet}.`);
-    }
-    const balance = await client.stateStore.getBalance(guild.id, user.id);
-    if ((balance[currency] ?? 0) < bet) {
-      return reply(isInteraction ? { content: `Not enough ${currencyMeta(config, currency).name}.`, ephemeral: true } : `Not enough ${currencyMeta(config, currency).name}.`);
-    }
+    const sideArg = isInteraction ? source.options.getString('side') : parts[1];
+    const currency = gameCurrency;
+    const balance = await validateGameBet({
+      client,
+      guildId: guild.id,
+      userId: user.id,
+      config,
+      currency,
+      bet,
+      game: 'coinflip',
+      disabledMessage: 'Coinflip is disabled.',
+      reply,
+      isInteraction
+    });
+    if (!balance) return;
 
-    const game = playBlackjack();
-    let delta = -bet;
-    let title = 'Blackjack - lost';
-    if (game.outcome === 'win') {
-      delta = bet;
-      title = 'Blackjack - won';
-    } else if (game.outcome === 'push') {
-      delta = 0;
-      title = 'Blackjack - push';
-    }
-    const nextBalance = delta === 0 ? balance : await client.stateStore.adjustBalance(guild.id, user.id, currency, delta);
+    const game = playCoinflip(sideArg);
+    const delta = game.outcome === 'win' ? bet : -bet;
+    const nextBalance = await client.stateStore.adjustBalance(guild.id, user.id, currency, delta);
     return reply({
       embeds: [
         new EmbedBuilder()
-          .setTitle(title)
+          .setTitle(game.outcome === 'win' ? 'Coinflip - won' : 'Coinflip - lost')
           .setDescription([
             `Bet: ${formatCurrency(config, currency, bet)}`,
-            `You: ${formatHand(game.player)} (${game.playerValue})`,
-            `Dealer: ${formatHand(game.dealer)} (${game.dealerValue})`,
+            `Pick: ${game.choice}`,
+            `Result: ${game.result}`,
             `Balance: ${formatCurrency(config, currency, nextBalance[currency] ?? balance[currency])}`
           ].join('\n'))
-          .setColor(game.outcome === 'win' ? 0x3ba55d : game.outcome === 'push' ? 0xfaa61a : 0xed4245)
+          .setColor(game.outcome === 'win' ? 0x3ba55d : 0xed4245)
+      ]
+    });
+  }
+
+  if (command.type === 'dice') {
+    const { parts, bet, currency } = parseBetCommand({ isInteraction, source, args, defaultCurrencyIndex: 2 });
+    const balance = await validateGameBet({
+      client,
+      guildId: guild.id,
+      userId: user.id,
+      config,
+      currency,
+      bet,
+      game: 'dice',
+      disabledMessage: 'Dice is disabled.',
+      reply,
+      isInteraction
+    });
+    if (!balance) return;
+
+    const target = isInteraction ? source.options.getInteger('number') : parts[1];
+    const game = playDice(target);
+    const delta = game.outcome === 'win' ? bet * 5 : -bet;
+    const nextBalance = await client.stateStore.adjustBalance(guild.id, user.id, currency, delta);
+    return reply({
+      embeds: [
+        new EmbedBuilder()
+          .setTitle(game.outcome === 'win' ? 'Dice - won' : 'Dice - lost')
+          .setDescription([
+            `Bet: ${formatCurrency(config, currency, bet)}`,
+            `Pick: ${game.target}`,
+            `Roll: ${game.roll}`,
+            `Payout: ${game.outcome === 'win' ? '6x' : '0x'}`,
+            `Balance: ${formatCurrency(config, currency, nextBalance[currency] ?? balance[currency])}`
+          ].join('\n'))
+          .setColor(game.outcome === 'win' ? 0x3ba55d : 0xed4245)
+      ]
+    });
+  }
+
+  if (command.type === 'slots') {
+    const { bet, currency } = parseBetCommand({ isInteraction, source, args });
+    const balance = await validateGameBet({
+      client,
+      guildId: guild.id,
+      userId: user.id,
+      config,
+      currency,
+      bet,
+      game: 'slots',
+      disabledMessage: 'Slots is disabled.',
+      reply,
+      isInteraction
+    });
+    if (!balance) return;
+
+    const game = playSlots();
+    const delta = game.multiplier > 0 ? bet * (game.multiplier - 1) : -bet;
+    const nextBalance = await client.stateStore.adjustBalance(guild.id, user.id, currency, delta);
+    return reply({
+      embeds: [
+        new EmbedBuilder()
+          .setTitle(game.outcome === 'win' ? 'Slots - won' : 'Slots - lost')
+          .setDescription([
+            `Bet: ${formatCurrency(config, currency, bet)}`,
+            `Reels: ${game.reels.join(' | ')}`,
+            `Payout: ${game.multiplier}x`,
+            `Balance: ${formatCurrency(config, currency, nextBalance[currency] ?? balance[currency])}`
+          ].join('\n'))
+          .setColor(game.outcome === 'win' ? 0x3ba55d : 0xed4245)
       ]
     });
   }
@@ -1110,6 +1661,129 @@ export function createBot(configStore, stateStore) {
 
     if (interaction.isButton() && interaction.guild) {
       const config = await configStore.getGuildConfig(interaction.guild.id);
+      if (interaction.customId.startsWith('bj:')) {
+        const [, action] = interaction.customId.split(':');
+        const session = blackjackSessions.get(interaction.message.id);
+        if (!session || session.status !== 'active') {
+          await interaction.reply({ content: 'Blackjack session expired.', ephemeral: true });
+          return;
+        }
+
+        if (action === 'join') {
+          if (session.players.some((player) => player.userId === interaction.user.id)) {
+            await interaction.reply({ content: 'You are already at this table.', ephemeral: true });
+            return;
+          }
+          const balance = await validateGameBet({
+            client,
+            guildId: session.guildId,
+            userId: interaction.user.id,
+            config,
+            currency: session.currency,
+            bet: session.bet,
+            game: 'blackjack',
+            disabledMessage: 'Blackjack is disabled.',
+            reply: (payload) => interaction.reply(payload),
+            isInteraction: true
+          });
+          if (!balance) return;
+          const reserved = await client.stateStore.adjustBalance(session.guildId, interaction.user.id, session.currency, -session.bet);
+          session.players.push(createBlackjackPlayer(interaction.user, session.bet, session.deck, reserved[session.currency] ?? 0));
+          await interaction.update(buildBlackjackPayload(config, session));
+          return;
+        }
+
+        const player = activeBlackjackPlayer(session);
+        if (!player || interaction.user.id !== player.userId) {
+          await interaction.reply({ content: 'Not your turn yet.', ephemeral: true });
+          return;
+        }
+
+        const hand = activeBlackjackHand(session);
+        if (!hand) {
+          const payload = await finishBlackjackSession(client, session, config);
+          expireSession(blackjackSessions, interaction.message.id);
+          await interaction.update(payload);
+          return;
+        }
+
+        if (action === 'hit') {
+          drawToBlackjackHand(session, hand);
+        } else if (action === 'stand') {
+          hand.done = true;
+        } else if (action === 'double') {
+          if (hand.cards.length !== 2 || hand.didDouble || player.balanceAfterReserved < hand.bet) {
+            await interaction.reply({ content: 'Cannot double this hand.', ephemeral: true });
+            return;
+          }
+          player.balanceAfterReserved -= hand.bet;
+          await client.stateStore.adjustBalance(session.guildId, player.userId, session.currency, -hand.bet);
+          hand.bet *= 2;
+          hand.didDouble = true;
+          hand.cards.push(session.deck.pop());
+          hand.done = true;
+        } else if (action === 'split') {
+          if (player.hands.length >= 2 || !isPair(hand.cards) || player.balanceAfterReserved < hand.bet) {
+            await interaction.reply({ content: 'Cannot split this hand.', ephemeral: true });
+            return;
+          }
+          player.balanceAfterReserved -= hand.bet;
+          await client.stateStore.adjustBalance(session.guildId, player.userId, session.currency, -hand.bet);
+          const secondCard = hand.cards.pop();
+          hand.cards.push(session.deck.pop());
+          player.hands.splice(player.activeHandIndex + 1, 0, {
+            cards: [secondCard, session.deck.pop()],
+            bet: hand.bet,
+            done: false,
+            didDouble: false
+          });
+        } else if (action === 'cancel') {
+          for (const handState of player.hands) {
+            handState.done = true;
+            handState.outcome = 'canceled';
+            handState.payout = 0;
+          }
+        }
+
+        advanceBlackjackHand(session);
+        const payload = session.activePlayerIndex >= session.players.length
+          ? await finishBlackjackSession(client, session, config)
+          : buildBlackjackPayload(config, session);
+        if (session.status === 'finished') {
+          expireSession(blackjackSessions, interaction.message.id);
+        }
+        await interaction.update(payload);
+        return;
+      }
+
+      if (interaction.customId.startsWith('vp:')) {
+        const [, action, targetUserId, indexValue] = interaction.customId.split(':');
+        const session = pokerSessions.get(interaction.message.id);
+        if (!session || session.status !== 'active') {
+          await interaction.reply({ content: 'Poker session expired.', ephemeral: true });
+          return;
+        }
+        if (interaction.user.id !== targetUserId || interaction.user.id !== session.userId) {
+          await interaction.reply({ content: 'This is not your poker hand.', ephemeral: true });
+          return;
+        }
+
+        if (action === 'hold') {
+          const index = Number.parseInt(indexValue, 10);
+          if (session.held.has(index)) session.held.delete(index);
+          else session.held.add(index);
+          await interaction.update(buildPokerPayload(config, session));
+          return;
+        }
+
+        if (action === 'draw' || action === 'cancel') {
+          const payload = await finishPokerSession(client, session, config, action === 'cancel');
+          expireSession(pokerSessions, interaction.message.id);
+          await interaction.update(payload);
+          return;
+        }
+      }
+
       if (interaction.customId === 'ticket:create') {
         if (!config.ticketsEnabled) {
           await interaction.reply({ content: 'Tickets are disabled.', ephemeral: true });

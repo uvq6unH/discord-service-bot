@@ -80,6 +80,9 @@ const FIELDS = [
   'economyEnabled', 'currencySilverName', 'currencySilverIcon', 'currencyGoldName', 'currencyGoldIcon',
   'currencyDiamondName', 'currencyDiamondIcon', 'dailyEnabled', 'dailyCooldownHours', 'dailySilverAmount',
   'dailyGoldAmount', 'dailyDiamondAmount', 'blackjackEnabled', 'blackjackMinBet', 'blackjackMaxBet',
+  'pokerEnabled', 'pokerMinBet', 'pokerMaxBet',
+  'coinflipEnabled', 'coinflipMinBet', 'coinflipMaxBet', 'diceEnabled', 'diceMinBet', 'diceMaxBet',
+  'slotsEnabled', 'slotsMinBet', 'slotsMaxBet',
   'announcementsEnabled', 'announcementChannelId', 'announcementMention',
   'welcomeEnabled', 'welcomeChannelId', 'welcomeMessage',
   'autoReplyEnabled',
@@ -89,7 +92,7 @@ const FIELDS = [
 const groupMap = {
   ping: 'general', help: 'general', custom: 'general', config: 'general',
   user: 'user', avatar: 'user', rank: 'user', leaderboard: 'user',
-  balance: 'user', daily: 'user', economyleaderboard: 'user', blackjack: 'user',
+  balance: 'user', daily: 'user', economyleaderboard: 'user', blackjack: 'user', poker: 'user', coinflip: 'user', dice: 'user', slots: 'user',
   server: 'server', say: 'server', purge: 'server', announce: 'server',
   warn: 'moderation', kick: 'moderation', ban: 'moderation', timeout: 'moderation', warnings: 'moderation', clearwarns: 'moderation',
   ecoadd: 'moderation', ecoset: 'moderation', ecoremove: 'moderation',
@@ -100,7 +103,7 @@ const commandLabels = {
   user: 'User info', avatar: 'Avatar', say: 'Say', purge: 'Purge', warn: 'Warn',
   kick: 'Kick', ban: 'Ban', timeout: 'Timeout', warnings: 'Warnings', clearwarns: 'Clear warns',
   rank: 'Rank', leaderboard: 'Leaderboard', balance: 'Balance', daily: 'Daily',
-  economyleaderboard: 'Economy leaderboard', blackjack: 'Blackjack',
+  economyleaderboard: 'Economy leaderboard', blackjack: 'Blackjack', poker: 'Poker', coinflip: 'Coinflip', dice: 'Dice', slots: 'Slots',
   ecoadd: 'Eco add', ecoset: 'Eco set', ecoremove: 'Eco remove',
   announce: 'Announce', ticketpanel: 'Ticket panel', rolepanel: 'Role panel',
 };
@@ -615,7 +618,8 @@ function updateModuleSummary(config, enabledCmds) {
   setModuleStatus('moduleTickets', config.ticketsEnabled);
   setModuleStatus('moduleRoles', config.rolesEnabled || Boolean(config.autoRoleId), config.selfRoles?.length ? `${config.selfRoles.length}` : 'On');
   setModuleStatus('moduleLevels', config.levelsEnabled);
-  setModuleStatus('moduleEconomy', config.economyEnabled, config.blackjackEnabled ? 'Cards' : 'On');
+  const activeGames = ['blackjackEnabled', 'pokerEnabled', 'coinflipEnabled', 'diceEnabled', 'slotsEnabled'].filter((field) => config[field] !== false).length;
+  setModuleStatus('moduleEconomy', config.economyEnabled, activeGames ? `${activeGames} games` : 'On');
   setModuleStatus('moduleAutoReplies', config.autoReplyEnabled, config.autoReplies?.length ? `${config.autoReplies.length}` : 'On');
 }
 

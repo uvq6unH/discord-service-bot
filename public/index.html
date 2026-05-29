@@ -293,7 +293,7 @@
                 <div class="plugin-icon bg-amber"><i class="ti ti-coins"></i></div>
                 <div>
                   <h3>Tiền ảo server</h3>
-                  <p>Quản lý Bạc, Vàng, Kim cương và các lệnh balance/daily/blackjack</p>
+                  <p>Game chỉ cược Bạc; Vàng và Kim cương để dùng cho tính năng khác</p>
                 </div>
                 <label class="toggle ml-auto">
                   <input type="checkbox" id="economyEnabled" name="economyEnabled">
@@ -354,7 +354,7 @@
                 <div class="plugin-icon bg-red"><i class="ti ti-cards"></i></div>
                 <div>
                   <h3>Blackjack</h3>
-                  <p>Game bài 52 lá đặt cược bằng tiền ảo</p>
+                  <p>Bàn nhiều người: join, chờ lượt, hit, stand, x2 và split</p>
                 </div>
                 <label class="toggle ml-auto">
                   <input type="checkbox" id="blackjackEnabled" name="blackjackEnabled">
@@ -366,7 +366,88 @@
                   <div><label>Cược tối thiểu</label><input id="blackjackMinBet" name="blackjackMinBet" type="number" min="1" /></div>
                   <div><label>Cược tối đa</label><input id="blackjackMaxBet" name="blackjackMaxBet" type="number" min="1" /></div>
                 </div>
-                <p class="field-hint">Poker/multiplayer nên thiết kế riêng sau: cần phòng chơi, timeout lượt và chia pot.</p>
+                <p class="field-hint">Bot trừ cược khi bắt đầu, trả thưởng khi kết thúc ván.</p>
+              </div>
+            </div>
+
+            <div class="plugin-card">
+              <div class="plugin-card-header">
+                <div class="plugin-icon bg-amber"><i class="ti ti-cards"></i></div>
+                <div>
+                  <h3>Poker</h3>
+                  <p>Jacks or Better: giữ lá, đổi lá, nhận thưởng theo hand</p>
+                </div>
+                <label class="toggle ml-auto">
+                  <input type="checkbox" id="pokerEnabled" name="pokerEnabled">
+                  <span class="toggle-track"></span>
+                </label>
+              </div>
+              <div class="plugin-card-body">
+                <div class="field-grid-2">
+                  <div><label>Cược tối thiểu</label><input id="pokerMinBet" name="pokerMinBet" type="number" min="1" /></div>
+                  <div><label>Cược tối đa</label><input id="pokerMaxBet" name="pokerMaxBet" type="number" min="1" /></div>
+                </div>
+                <p class="field-hint">Bản này là video poker một người chơi; poker nhiều người cần thiết kế phòng và pot riêng.</p>
+              </div>
+            </div>
+
+            <div class="plugin-card">
+              <div class="plugin-card-header">
+                <div class="plugin-icon bg-blue"><i class="ti ti-circle-half-2"></i></div>
+                <div>
+                  <h3>Coinflip</h3>
+                  <p>Chọn heads/tails, thắng nhận x2</p>
+                </div>
+                <label class="toggle ml-auto">
+                  <input type="checkbox" id="coinflipEnabled" name="coinflipEnabled">
+                  <span class="toggle-track"></span>
+                </label>
+              </div>
+              <div class="plugin-card-body">
+                <div class="field-grid-2">
+                  <div><label>Cược tối thiểu</label><input id="coinflipMinBet" name="coinflipMinBet" type="number" min="1" /></div>
+                  <div><label>Cược tối đa</label><input id="coinflipMaxBet" name="coinflipMaxBet" type="number" min="1" /></div>
+                </div>
+              </div>
+            </div>
+
+            <div class="plugin-card">
+              <div class="plugin-card-header">
+                <div class="plugin-icon bg-green"><i class="ti ti-dice-5"></i></div>
+                <div>
+                  <h3>Dice</h3>
+                  <p>Đoán số 1-6, trúng nhận x6</p>
+                </div>
+                <label class="toggle ml-auto">
+                  <input type="checkbox" id="diceEnabled" name="diceEnabled">
+                  <span class="toggle-track"></span>
+                </label>
+              </div>
+              <div class="plugin-card-body">
+                <div class="field-grid-2">
+                  <div><label>Cược tối thiểu</label><input id="diceMinBet" name="diceMinBet" type="number" min="1" /></div>
+                  <div><label>Cược tối đa</label><input id="diceMaxBet" name="diceMaxBet" type="number" min="1" /></div>
+                </div>
+              </div>
+            </div>
+
+            <div class="plugin-card">
+              <div class="plugin-card-header">
+                <div class="plugin-icon bg-purple"><i class="ti ti-slot-machine"></i></div>
+                <div>
+                  <h3>Slots</h3>
+                  <p>Quay 3 ô, trả thưởng x2/x5/x10</p>
+                </div>
+                <label class="toggle ml-auto">
+                  <input type="checkbox" id="slotsEnabled" name="slotsEnabled">
+                  <span class="toggle-track"></span>
+                </label>
+              </div>
+              <div class="plugin-card-body">
+                <div class="field-grid-2">
+                  <div><label>Cược tối thiểu</label><input id="slotsMinBet" name="slotsMinBet" type="number" min="1" /></div>
+                  <div><label>Cược tối đa</label><input id="slotsMaxBet" name="slotsMaxBet" type="number" min="1" /></div>
+                </div>
               </div>
             </div>
           </div>
