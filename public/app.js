@@ -31,12 +31,17 @@ const statusText = document.querySelector('#statusText');
 const guildNameEl = document.querySelector('#guildName');
 const guildMetaEl = document.querySelector('#guildMeta');
 const guildIconEl = document.querySelector('#guildIcon');
+const mobileGuildNameEl = document.querySelector('#mobileGuildName');
+const mobileGuildMetaEl = document.querySelector('#mobileGuildMeta');
+const mobilePageSelect = document.querySelector('#mobilePageSelect');
 const pageTitle = document.querySelector('#pageTitle');
 const accessBanner = document.querySelector('#accessBanner');
 const accessBannerMsg = document.querySelector('#accessBannerMsg');
 const serverList = document.querySelector('#serverList');
 const autoRepliesEl = document.querySelector('#autoReplies');
 const selfRolesEl = document.querySelector('#selfRoles');
+const commandSearchEl = document.querySelector('#commandSearch');
+const commandFilterEl = document.querySelector('#commandFilter');
 
 const navItems = [...document.querySelectorAll('.nav-item')];
 const pages = [...document.querySelectorAll('.page')];
@@ -51,6 +56,17 @@ const pageTitles = {
   interactions: 'Ticket & Roles',
   advanced: 'Nâng cao',
 };
+
+const pageOrder = [
+  'overview',
+  'commands-general',
+  'user-levels',
+  'auto-replies',
+  'moderation-automod',
+  'server-broadcast',
+  'interactions',
+  'advanced',
+];
 
 // ── Fields list ─────────────────────────────────────────────────────────────
 const FIELDS = [
@@ -86,6 +102,7 @@ function addCommandRow(cmd = { enabled: true, type: 'custom', name: '', descript
   const row = document.createElement('div');
   row.className = 'command-item';
   row.dataset.commandType = cmd.type;
+  row.dataset.commandEnabled = cmd.enabled !== false ? 'enabled' : 'disabled';
 
   const isCustom = cmd.type === 'custom';
   const badgeClass = isCustom ? 'custom' : 'system';
@@ -143,9 +160,14 @@ function addCommandRow(cmd = { enabled: true, type: 'custom', name: '', descript
   }
 
   row.querySelector('.remove-cmd')?.addEventListener('click', () => { row.remove(); setDirty(); });
-  row.addEventListener('input', setDirty);
+  row.querySelector('.command-enabled')?.addEventListener('change', (event) => {
+    row.dataset.commandEnabled = event.target.checked ? 'enabled' : 'disabled';
+    applyCommandFilter();
+  });
+  row.addEventListener('input', () => { setDirty(); applyCommandFilter(); });
   row.addEventListener('change', setDirty);
   container.append(row);
+  applyCommandFilter();
 }
 
 function readCommands() {
@@ -157,6 +179,27 @@ function readCommands() {
     response: row.querySelector('.command-response').value.trim(),
     allowedRoles: [...row.querySelectorAll('.command-role-chk:checked')].map(c => c.value),
   })).filter(c => c.name && c.response);
+}
+
+function applyCommandFilter() {
+  const query = commandSearchEl?.value.trim().toLowerCase() ?? '';
+  const filter = commandFilterEl?.value ?? 'all';
+
+  for (const row of document.querySelectorAll('.command-item')) {
+    const name = row.querySelector('.command-name')?.value.toLowerCase() ?? '';
+    const description = row.querySelector('.command-description')?.value.toLowerCase() ?? '';
+    const type = row.dataset.commandType ?? 'custom';
+    const enabled = row.querySelector('.command-enabled')?.checked ?? false;
+    const textMatches = !query || [name, description, type].some((value) => value.includes(query));
+    const filterMatches =
+      filter === 'all' ||
+      (filter === 'enabled' && enabled) ||
+      (filter === 'disabled' && !enabled) ||
+      (filter === 'custom' && type === 'custom') ||
+      (filter === 'system' && type !== 'custom');
+
+    row.style.display = textMatches && filterMatches ? '' : 'none';
+  }
 }
 
 // ── Reply helpers ────────────────────────────────────────────────────────────
@@ -241,7 +284,25 @@ function fillForm(config) {
   // Stats
   const enabledCmds = (config.commands ?? []).filter(c => c.enabled).length;
   document.querySelector('#statCmds').textContent = enabledCmds;
+  updateModuleSummary(config, enabledCmds);
+  applyCommandFilter();
   setDirty(false);
+}
+
+function setModuleStatus(id, active, detail = '') {
+  const el = document.querySelector(`#${id}`);
+  if (!el) return;
+  el.textContent = active ? (detail || 'On') : 'Off';
+  el.classList.toggle('on', Boolean(active));
+}
+
+function updateModuleSummary(config, enabledCmds) {
+  setModuleStatus('moduleCommands', enabledCmds > 0, String(enabledCmds));
+  setModuleStatus('moduleModeration', config.moderationEnabled || config.autoModEnabled, config.autoModEnabled ? 'AutoMod' : 'On');
+  setModuleStatus('moduleTickets', config.ticketsEnabled);
+  setModuleStatus('moduleRoles', config.rolesEnabled || Boolean(config.autoRoleId), config.selfRoles?.length ? `${config.selfRoles.length}` : 'On');
+  setModuleStatus('moduleLevels', config.levelsEnabled);
+  setModuleStatus('moduleAutoReplies', config.autoReplyEnabled, config.autoReplies?.length ? `${config.autoReplies.length}` : 'On');
 }
 
 function readForm() {
@@ -273,10 +334,25 @@ function showPage(name) {
   for (const item of navItems) item.classList.toggle('active', item.dataset.page === name);
   for (const page of pages) page.classList.toggle('active', page.dataset.pagePanel === name);
   if (pageTitle) pageTitle.textContent = pageTitles[name] || name;
+  if (mobilePageSelect && mobilePageSelect.value !== name) mobilePageSelect.value = name;
 }
 
 for (const item of navItems) {
   item.addEventListener('click', () => showPage(item.dataset.page));
+}
+
+if (mobilePageSelect) {
+  for (const pageName of pageOrder) {
+    const option = document.createElement('option');
+    option.value = pageName;
+    option.textContent = pageTitles[pageName] || pageName;
+    mobilePageSelect.append(option);
+  }
+  mobilePageSelect.addEventListener('change', () => showPage(mobilePageSelect.value));
+}
+
+for (const button of document.querySelectorAll('[data-page-jump]')) {
+  button.addEventListener('click', () => showPage(button.dataset.pageJump));
 }
 
 // ── Load guild data ──────────────────────────────────────────────────────────
@@ -316,6 +392,8 @@ async function selectGuild(guild) {
   currentGuildId = guild.id;
   guildNameEl.textContent = guild.name;
   guildMetaEl.textContent = guild.id;
+  if (mobileGuildNameEl) mobileGuildNameEl.textContent = guild.name;
+  if (mobileGuildMetaEl) mobileGuildMetaEl.textContent = guild.id;
   if (guildIconEl) {
     guildIconEl.src = guild.icon || '';
     guildIconEl.style.display = guild.icon ? 'block' : 'none';
@@ -424,6 +502,8 @@ document.querySelector('#addCommandBtn')?.addEventListener('click', () => { addC
 document.querySelector('#addReplyBtn')?.addEventListener('click', () => { addReplyRow(); setDirty(); });
 document.querySelector('#addSelfRoleBtn')?.addEventListener('click', () => { addSelfRoleRow(); setDirty(); });
 document.querySelector('#syncSlashBtn')?.addEventListener('click', syncSlash);
+commandSearchEl?.addEventListener('input', applyCommandFilter);
+commandFilterEl?.addEventListener('change', applyCommandFilter);
 configForm.addEventListener('input', () => setDirty());
 configForm.addEventListener('change', () => setDirty());
 window.addEventListener('beforeunload', e => { if (isDirty) { e.preventDefault(); e.returnValue = ''; } });

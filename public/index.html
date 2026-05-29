@@ -101,6 +101,14 @@
       </div>
     </header>
 
+    <div class="mobile-context">
+      <div class="mobile-guild">
+        <span id="mobileGuildName">Chọn máy chủ</span>
+        <small id="mobileGuildMeta">—</small>
+      </div>
+      <select id="mobilePageSelect" aria-label="Chọn trang cấu hình"></select>
+    </div>
+
     <!-- Scrollable body -->
     <div class="main-body">
 
@@ -170,6 +178,26 @@
               </div>
             </div>
           </div>
+          <div class="module-grid">
+            <button type="button" class="module-card" data-page-jump="commands-general">
+              <i class="ti ti-terminal-2"></i><span>Lệnh</span><strong id="moduleCommands">—</strong>
+            </button>
+            <button type="button" class="module-card" data-page-jump="moderation-automod">
+              <i class="ti ti-shield-check"></i><span>Moderation</span><strong id="moduleModeration">—</strong>
+            </button>
+            <button type="button" class="module-card" data-page-jump="interactions">
+              <i class="ti ti-ticket"></i><span>Tickets</span><strong id="moduleTickets">—</strong>
+            </button>
+            <button type="button" class="module-card" data-page-jump="interactions">
+              <i class="ti ti-users-group"></i><span>Roles</span><strong id="moduleRoles">—</strong>
+            </button>
+            <button type="button" class="module-card" data-page-jump="user-levels">
+              <i class="ti ti-award"></i><span>Levels</span><strong id="moduleLevels">—</strong>
+            </button>
+            <button type="button" class="module-card" data-page-jump="auto-replies">
+              <i class="ti ti-message-reply"></i><span>Auto replies</span><strong id="moduleAutoReplies">—</strong>
+            </button>
+          </div>
         </section>
 
         <!-- ── PAGE: COMMANDS ── -->
@@ -181,6 +209,16 @@
             <button id="addCommandBtn" class="btn btn-primary" type="button">
               <i class="ti ti-plus"></i> Thêm lệnh custom
             </button>
+          </div>
+          <div class="command-toolbar">
+            <input id="commandSearch" type="search" placeholder="Tìm lệnh theo tên, mô tả hoặc loại..." />
+            <select id="commandFilter">
+              <option value="all">Tất cả lệnh</option>
+              <option value="enabled">Đang bật</option>
+              <option value="disabled">Đang tắt</option>
+              <option value="custom">Custom</option>
+              <option value="system">System</option>
+            </select>
           </div>
           <div class="hint-box">
             <i class="ti ti-info-circle"></i>
