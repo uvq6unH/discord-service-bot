@@ -122,16 +122,21 @@ function addCommandRow(cmd = { enabled: true, type: 'custom', name: '', descript
     for (const r of roles) {
       const lbl = document.createElement('label');
       lbl.className = 'role-checkbox-label';
-      // Color dot
-      if (r.color) {
-        const dot = document.createElement('span');
-        dot.className = 'role-color-dot';
-        dot.style.background = r.color;
-        lbl.append(dot);
-      }
+      const roleColor = r.color || '#8b95a6';
+      // Background is a very faint tint of the role color
+      lbl.style.color = roleColor;
+      lbl.style.background = roleColor + '22'; // 13% opacity hex
+      lbl.style.borderColor = roleColor + '55'; // 33% opacity
+
       const chk = document.createElement('input');
       chk.type = 'checkbox'; chk.className = 'command-role-chk'; chk.value = r.id;
-      chk.checked = Array.isArray(cmd.allowedRoles) && cmd.allowedRoles.includes(r.id);
+      const isChecked = Array.isArray(cmd.allowedRoles) && cmd.allowedRoles.includes(r.id);
+      chk.checked = isChecked;
+      if (isChecked) lbl.classList.add('checked');
+
+      // Toggle checked class for border highlight
+      chk.addEventListener('change', () => lbl.classList.toggle('checked', chk.checked));
+
       lbl.append(chk, document.createTextNode(r.name));
       grid.append(lbl);
     }
