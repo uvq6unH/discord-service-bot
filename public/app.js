@@ -158,6 +158,9 @@ function ensureCommandSections() {
   panel.className = 'command-panel';
   panel.innerHTML = `
     <div class="command-panel-head">
+      <button type="button" id="commandBackBtn" class="btn btn-secondary btn-xs command-back-btn">
+        <i class="ti ti-arrow-left"></i> Nhóm lệnh
+      </button>
       <div>
         <h3 id="commandPanelTitle">Lệnh chung</h3>
         <p id="commandPanelHint">Ping, help, config và custom command</p>
@@ -167,11 +170,16 @@ function ensureCommandSections() {
   `;
   const panelBody = document.createElement('div');
   panelBody.className = 'command-panel-body';
+  panel.querySelector('#commandBackBtn')?.addEventListener('click', () => {
+    const hostEl = document.querySelector('#command-sections');
+    if (hostEl) hostEl.dataset.view = 'sections';
+  });
 
   for (const group of commandGroupOrder) {
     const meta = commandGroupMeta[group];
-    const section = document.createElement('button');
-    section.type = 'button';
+    const section = document.createElement('div');
+    section.role = 'button';
+    section.tabIndex = 0;
     section.className = 'command-section';
     section.dataset.commandGroup = group;
     section.dataset.open = 'false';
@@ -187,10 +195,31 @@ function ensureCommandSections() {
         <span class="command-section-count">0</span>
         <i class="ti ti-chevron-right"></i>
       </div>
+      <div class="command-section-hover">
+        <span>Bật/tắt nhóm</span>
+        <label class="toggle command-group-toggle" title="Bật/tắt toàn bộ lệnh trong nhóm">
+          <input type="checkbox" class="command-group-enabled">
+          <span class="toggle-track sm"></span>
+        </label>
+      </div>
     `;
 
-    section.addEventListener('click', () => {
+    section.addEventListener('click', (event) => {
+      if (event.target.closest('.command-section-hover')) return;
       activateCommandSection(group);
+    });
+    section.addEventListener('keydown', (event) => {
+      if (event.target.closest('.command-section-hover')) return;
+      if (event.key !== 'Enter' && event.key !== ' ') return;
+      event.preventDefault();
+      activateCommandSection(group);
+    });
+    section.querySelector('.command-group-toggle')?.addEventListener('click', (event) => {
+      event.stopPropagation();
+    });
+    section.querySelector('.command-group-enabled')?.addEventListener('change', (event) => {
+      event.stopPropagation();
+      setCommandGroupEnabled(group, event.target.checked);
     });
 
     const list = document.createElement('div');
@@ -209,6 +238,10 @@ function ensureCommandSections() {
 }
 
 function activateCommandSection(group, { forceOpen = true } = {}) {
+  const host = document.querySelector('#command-sections');
+  if (host) {
+    host.dataset.view = forceOpen ? 'detail' : 'sections';
+  }
   for (const section of document.querySelectorAll('.command-section')) {
     const isTarget = section.dataset.commandGroup === group;
     section.dataset.open = isTarget && forceOpen ? 'true' : 'false';
@@ -223,6 +256,18 @@ function activateCommandSection(group, { forceOpen = true } = {}) {
   updateCommandPanelMeta(group);
 }
 
+function setCommandGroupEnabled(group, enabled) {
+  const rows = document.querySelectorAll(`.command-list[data-command-group="${group}"] .command-item`);
+  for (const row of rows) {
+    const checkbox = row.querySelector('.command-enabled');
+    if (!checkbox) continue;
+    checkbox.checked = enabled;
+    row.dataset.commandEnabled = enabled ? 'enabled' : 'disabled';
+  }
+  setDirty();
+  applyCommandFilter();
+}
+
 function updateCommandPanelMeta(group) {
   const meta = commandGroupMeta[group] ?? commandGroupMeta.general;
   const title = document.querySelector('#commandPanelTitle');
@@ -230,9 +275,17 @@ function updateCommandPanelMeta(group) {
   const count = document.querySelector('#commandPanelCount');
   const activeRows = document.querySelectorAll(`.command-list[data-command-group="${group}"] .command-item`);
   const visibleRows = [...activeRows].filter((row) => row.style.display !== 'none');
+  const enabledRows = [...activeRows].filter((row) => row.querySelector('.command-enabled')?.checked);
   if (title) title.textContent = meta.title;
   if (hint) hint.textContent = meta.hint;
   if (count) count.textContent = `${visibleRows.length}/${activeRows.length} lệnh`;
+
+  const section = document.querySelector(`.command-section[data-command-group="${group}"]`);
+  const toggle = section?.querySelector('.command-group-enabled');
+  if (toggle) {
+    toggle.checked = activeRows.length > 0 && enabledRows.length === activeRows.length;
+    toggle.indeterminate = enabledRows.length > 0 && enabledRows.length < activeRows.length;
+  }
 }
 
 function getCommandListContainer(type) {
@@ -399,6 +452,12 @@ function applyCommandFilter() {
       const total = rows.length;
       countEl.textContent = shouldAutoOpen ? `${visibleCount}/${total}` : String(total);
     }
+    const groupToggle = section.querySelector('.command-group-enabled');
+    if (groupToggle) {
+      const enabledCount = rows.filter((row) => row.querySelector('.command-enabled')?.checked).length;
+      groupToggle.checked = rows.length > 0 && enabledCount === rows.length;
+      groupToggle.indeterminate = enabledCount > 0 && enabledCount < rows.length;
+    }
 
     section.hidden = visibleCount === 0;
     if (visibleCount === 0) {
@@ -501,6 +560,8 @@ function fillForm(config) {
   activateCommandSection('general');
   for (const list of document.querySelectorAll('.command-list')) list.replaceChildren();
   for (const cmd of config.commands ?? []) addCommandRow(cmd);
+  const commandHost = document.querySelector('#command-sections');
+  if (commandHost) commandHost.dataset.view = 'sections';
 
   autoRepliesEl.replaceChildren();
   for (const r of config.autoReplies ?? []) addReplyRow(r);
