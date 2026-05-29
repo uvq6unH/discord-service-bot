@@ -101,363 +101,368 @@
       </div>
     </header>
 
-    <!-- Access denied banner -->
-    <div class="access-banner" id="accessBanner" style="display:none">
-      <i class="ti ti-lock"></i>
-      <div>
-        <strong>Không có quyền truy cập</strong>
-        <p id="accessBannerMsg">Bạn cần quyền Quản lý Máy chủ để cấu hình trang này.</p>
+    <!-- Scrollable body -->
+    <div class="main-body">
+
+      <!-- Access denied banner -->
+      <div class="access-banner" id="accessBanner" style="display:none">
+        <i class="ti ti-lock"></i>
+        <div>
+          <strong>Không có quyền truy cập</strong>
+          <p id="accessBannerMsg">Bạn cần quyền Quản lý Máy chủ để cấu hình trang này.</p>
+        </div>
       </div>
-    </div>
 
-    <!-- No server selected -->
-    <div class="empty-state" id="emptyState">
-      <i class="ti ti-server"></i>
-      <h2>Chọn máy chủ</h2>
-      <p>Chọn một server từ thanh bên trái để bắt đầu cấu hình bot.</p>
-    </div>
+      <!-- No server selected -->
+      <div class="empty-state" id="emptyState">
+        <i class="ti ti-server"></i>
+        <h2>Chọn máy chủ</h2>
+        <p>Chọn một server từ thanh bên trái để bắt đầu cấu hình bot.</p>
+      </div>
 
-    <form id="configForm" style="display:none">
+      <form id="configForm" style="display:none">
 
-      <!-- ── PAGE: OVERVIEW ── -->
-      <section class="page active" data-page-panel="overview">
-        <div class="plugin-grid">
+        <!-- ── PAGE: OVERVIEW ── -->
+        <section class="page active" data-page-panel="overview">
+          <div class="plugin-grid">
 
-          <div class="plugin-card wide">
-            <div class="plugin-card-header">
-              <div class="plugin-icon bg-purple"><i class="ti ti-robot"></i></div>
-              <div>
-                <h3>Trạng thái Bot</h3>
-                <p>Bật/tắt bot và cài tiền tố lệnh</p>
+            <div class="plugin-card wide">
+              <div class="plugin-card-header">
+                <div class="plugin-icon bg-purple"><i class="ti ti-robot"></i></div>
+                <div>
+                  <h3>Trạng thái Bot</h3>
+                  <p>Bật/tắt bot và cài tiền tố lệnh</p>
+                </div>
+                <label class="toggle ml-auto">
+                  <input type="checkbox" id="enabled" name="enabled">
+                  <span class="toggle-track"></span>
+                </label>
               </div>
-              <label class="toggle ml-auto">
-                <input type="checkbox" id="enabled" name="enabled">
-                <span class="toggle-track"></span>
-              </label>
-            </div>
-            <div class="plugin-card-body">
-              <div class="field-row">
-                <label for="prefix">Tiền tố lệnh (Prefix)</label>
-                <input id="prefix" name="prefix" maxlength="5" placeholder="!" class="input-sm" style="width:80px" />
+              <div class="plugin-card-body">
+                <div class="field-row">
+                  <label for="prefix">Tiền tố lệnh (Prefix)</label>
+                  <input id="prefix" name="prefix" maxlength="5" placeholder="!" class="input-sm" style="width:80px" />
+                </div>
+                <p class="field-hint">Ví dụ: <code>!</code> → gõ <code>!ping</code>, <code>!help</code></p>
               </div>
-              <p class="field-hint">Ví dụ: <code>!</code> → gõ <code>!ping</code>, <code>!help</code></p>
             </div>
-          </div>
 
-          <div class="stat-card">
-            <i class="ti ti-server-2 stat-icon"></i>
-            <p class="stat-label">Server</p>
-            <p class="stat-value" id="statGuilds">—</p>
-          </div>
-          <div class="stat-card">
-            <i class="ti ti-terminal-2 stat-icon"></i>
-            <p class="stat-label">Lệnh đang bật</p>
-            <p class="stat-value" id="statCmds">—</p>
-          </div>
-          <div class="stat-card">
-            <i class="ti ti-shield-check stat-icon"></i>
-            <p class="stat-label">Cảnh cáo</p>
-            <p class="stat-value" id="statWarns">—</p>
-          </div>
-          <div class="stat-card">
-            <i class="ti ti-award stat-icon"></i>
-            <p class="stat-label">Thành viên có XP</p>
-            <p class="stat-value" id="statRanked">—</p>
-          </div>
-
-        </div>
-      </section>
-
-      <!-- ── PAGE: COMMANDS ── -->
-      <section class="page" data-page-panel="commands-general">
-        <div class="page-actions">
-          <button id="syncSlashBtn" class="btn btn-secondary" type="button">
-            <i class="ti ti-refresh"></i> Đồng bộ Slash (/)
-          </button>
-          <button id="addCommandBtn" class="btn btn-primary" type="button">
-            <i class="ti ti-plus"></i> Thêm lệnh custom
-          </button>
-        </div>
-        <div class="hint-box">
-          <i class="ti ti-info-circle"></i>
-          Slash commands sẽ tự đồng bộ sau khi lưu. Discord cần vài giây để cập nhật menu <code>/</code>.
-        </div>
-        <div id="commands-general-list" class="command-list"></div>
-        <div id="commands-user-levels-list" class="command-list"></div>
-        <div id="commands-server-broadcast-list" class="command-list"></div>
-        <div id="commands-moderation-automod-list" class="command-list"></div>
-        <div id="commands-interactions-list" class="command-list"></div>
-      </section>
-
-      <!-- ── PAGE: LEVELS ── -->
-      <section class="page" data-page-panel="user-levels">
-        <div class="plugin-grid">
-          <div class="plugin-card">
-            <div class="plugin-card-header">
-              <div class="plugin-icon bg-green"><i class="ti ti-user-plus"></i></div>
-              <div>
-                <h3>Chào mừng thành viên</h3>
-                <p>Gửi tin khi có người vào server</p>
-              </div>
-              <label class="toggle ml-auto">
-                <input type="checkbox" id="welcomeEnabled" name="welcomeEnabled">
-                <span class="toggle-track"></span>
-              </label>
+            <div class="stat-card">
+              <i class="ti ti-server-2 stat-icon"></i>
+              <p class="stat-label">Server</p>
+              <p class="stat-value" id="statGuilds">—</p>
             </div>
-            <div class="plugin-card-body">
-              <label>Kênh chào mừng</label>
-              <select id="welcomeChannelId" name="welcomeChannelId">
-                <option value="">-- Chọn kênh --</option>
-              </select>
-              <label>Nội dung tin nhắn</label>
-              <textarea id="welcomeMessage" name="welcomeMessage" rows="3"
-                placeholder="Chào mừng {user} đến với {server}!"></textarea>
+            <div class="stat-card">
+              <i class="ti ti-terminal-2 stat-icon"></i>
+              <p class="stat-label">Lệnh đang bật</p>
+              <p class="stat-value" id="statCmds">—</p>
             </div>
-          </div>
+            <div class="stat-card">
+              <i class="ti ti-shield-check stat-icon"></i>
+              <p class="stat-label">Cảnh cáo</p>
+              <p class="stat-value" id="statWarns">—</p>
+            </div>
+            <div class="stat-card">
+              <i class="ti ti-award stat-icon"></i>
+              <p class="stat-label">Thành viên có XP</p>
+              <p class="stat-value" id="statRanked">—</p>
+            </div>
 
-          <div class="plugin-card">
-            <div class="plugin-card-header">
-              <div class="plugin-icon bg-amber"><i class="ti ti-award"></i></div>
-              <div>
-                <h3>Hệ thống cấp độ XP</h3>
-                <p>Tích điểm & thăng cấp qua tin nhắn</p>
-              </div>
-              <label class="toggle ml-auto">
-                <input type="checkbox" id="levelsEnabled" name="levelsEnabled">
-                <span class="toggle-track"></span>
-              </label>
-            </div>
-            <div class="plugin-card-body">
-              <div class="field-row">
-                <label for="xpPerMessage">XP mỗi tin nhắn</label>
-                <input id="xpPerMessage" name="xpPerMessage" type="number" min="1" max="100" placeholder="5"
-                  class="input-sm" style="width:80px" />
-              </div>
-              <label>Thông báo lên cấp</label>
-              <textarea id="levelUpMessage" name="levelUpMessage" rows="2"
-                placeholder="Chúc mừng {user} đạt cấp {level}!"></textarea>
-            </div>
           </div>
-        </div>
-      </section>
+        </section>
 
-      <!-- ── PAGE: AUTO REPLIES ── -->
-      <section class="page" data-page-panel="auto-replies">
-        <div class="plugin-card wide">
-          <div class="plugin-card-header">
-            <div class="plugin-icon bg-teal"><i class="ti ti-message-reply"></i></div>
-            <div>
-              <h3>Tự động trả lời</h3>
-              <p>Bot phản hồi khi tin nhắn chứa từ khóa</p>
-            </div>
-            <label class="toggle ml-auto">
-              <input type="checkbox" id="autoReplyEnabled" name="autoReplyEnabled">
-              <span class="toggle-track"></span>
-            </label>
-          </div>
-          <div class="plugin-card-body">
-            <div id="autoReplies" class="reply-list"></div>
-            <button id="addReplyBtn" class="btn btn-secondary mt-2" type="button">
-              <i class="ti ti-plus"></i> Thêm từ khóa
+        <!-- ── PAGE: COMMANDS ── -->
+        <section class="page" data-page-panel="commands-general">
+          <div class="page-actions">
+            <button id="syncSlashBtn" class="btn btn-secondary" type="button">
+              <i class="ti ti-refresh"></i> Đồng bộ Slash (/)
+            </button>
+            <button id="addCommandBtn" class="btn btn-primary" type="button">
+              <i class="ti ti-plus"></i> Thêm lệnh custom
             </button>
           </div>
-        </div>
-      </section>
-
-      <!-- ── PAGE: MODERATION ── -->
-      <section class="page" data-page-panel="moderation-automod">
-        <div class="plugin-grid">
-          <div class="plugin-card">
-            <div class="plugin-card-header">
-              <div class="plugin-icon bg-red"><i class="ti ti-gavel"></i></div>
-              <div>
-                <h3>Lệnh kiểm duyệt</h3>
-                <p>Ban, kick, warn, timeout</p>
-              </div>
-              <label class="toggle ml-auto">
-                <input type="checkbox" id="moderationEnabled" name="moderationEnabled">
-                <span class="toggle-track"></span>
-              </label>
-            </div>
-            <div class="plugin-card-body">
-              <p class="field-hint">Log hành động kiểm duyệt được gửi về kênh log trong phần Nâng cao.</p>
-            </div>
+          <div class="hint-box">
+            <i class="ti ti-info-circle"></i>
+            Slash commands sẽ tự đồng bộ sau khi lưu. Discord cần vài giây để cập nhật menu <code>/</code>.
           </div>
+          <div id="commands-general-list" class="command-list"></div>
+          <div id="commands-user-levels-list" class="command-list"></div>
+          <div id="commands-server-broadcast-list" class="command-list"></div>
+          <div id="commands-moderation-automod-list" class="command-list"></div>
+          <div id="commands-interactions-list" class="command-list"></div>
+        </section>
 
-          <div class="plugin-card">
-            <div class="plugin-card-header">
-              <div class="plugin-icon bg-orange"><i class="ti ti-shield-x"></i></div>
-              <div>
-                <h3>AutoMod</h3>
-                <p>Tự động lọc từ cấm & link</p>
-              </div>
-              <label class="toggle ml-auto">
-                <input type="checkbox" id="autoModEnabled" name="autoModEnabled">
-                <span class="toggle-track"></span>
-              </label>
-            </div>
-            <div class="plugin-card-body">
-              <div class="toggle-row">
-                <label class="toggle-inline">
-                  <input type="checkbox" id="antiLinkEnabled" name="antiLinkEnabled">
-                  <span class="toggle-track sm"></span>
+        <!-- ── PAGE: LEVELS ── -->
+        <section class="page" data-page-panel="user-levels">
+          <div class="plugin-grid">
+            <div class="plugin-card">
+              <div class="plugin-card-header">
+                <div class="plugin-icon bg-green"><i class="ti ti-user-plus"></i></div>
+                <div>
+                  <h3>Chào mừng thành viên</h3>
+                  <p>Gửi tin khi có người vào server</p>
+                </div>
+                <label class="toggle ml-auto">
+                  <input type="checkbox" id="welcomeEnabled" name="welcomeEnabled">
+                  <span class="toggle-track"></span>
                 </label>
-                <span>Chặn link (Anti-Link)</span>
               </div>
-              <div class="toggle-row">
-                <label class="toggle-inline">
-                  <input type="checkbox" id="deleteBlockedMessages" name="deleteBlockedMessages">
-                  <span class="toggle-track sm"></span>
-                </label>
-                <span>Xóa tin nhắn vi phạm</span>
-              </div>
-              <label class="mt-2">Từ bị cấm (mỗi dòng một từ)</label>
-              <textarea id="badWords" name="badWords" rows="3" placeholder="từ xấu 1&#10;từ xấu 2"></textarea>
-              <label>Tin nhắn cảnh cáo</label>
-              <textarea id="blockedMessage" name="blockedMessage" rows="2"
-                placeholder="{user}, tin nhắn của bạn đã bị chặn."></textarea>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <!-- ── PAGE: ANNOUNCEMENTS ── -->
-      <section class="page" data-page-panel="server-broadcast">
-        <div class="plugin-card wide">
-          <div class="plugin-card-header">
-            <div class="plugin-icon bg-blue"><i class="ti ti-speakerphone"></i></div>
-            <div>
-              <h3>Phát thông báo</h3>
-              <p>Gửi announcement đến kênh cố định</p>
-            </div>
-            <label class="toggle ml-auto">
-              <input type="checkbox" id="announcementsEnabled" name="announcementsEnabled">
-              <span class="toggle-track"></span>
-            </label>
-          </div>
-          <div class="plugin-card-body">
-            <div class="field-grid-2">
-              <div>
-                <label>Kênh phát thông báo</label>
-                <select id="announcementChannelId" name="announcementChannelId">
+              <div class="plugin-card-body">
+                <label>Kênh chào mừng</label>
+                <select id="welcomeChannelId" name="welcomeChannelId">
                   <option value="">-- Chọn kênh --</option>
                 </select>
+                <label>Nội dung tin nhắn</label>
+                <textarea id="welcomeMessage" name="welcomeMessage" rows="3"
+                  placeholder="Chào mừng {user} đến với {server}!"></textarea>
               </div>
-              <div>
-                <label>Tag khi phát (@everyone...)</label>
-                <input id="announcementMention" name="announcementMention" placeholder="@everyone" />
+            </div>
+
+            <div class="plugin-card">
+              <div class="plugin-card-header">
+                <div class="plugin-icon bg-amber"><i class="ti ti-award"></i></div>
+                <div>
+                  <h3>Hệ thống cấp độ XP</h3>
+                  <p>Tích điểm & thăng cấp qua tin nhắn</p>
+                </div>
+                <label class="toggle ml-auto">
+                  <input type="checkbox" id="levelsEnabled" name="levelsEnabled">
+                  <span class="toggle-track"></span>
+                </label>
+              </div>
+              <div class="plugin-card-body">
+                <div class="field-row">
+                  <label for="xpPerMessage">XP mỗi tin nhắn</label>
+                  <input id="xpPerMessage" name="xpPerMessage" type="number" min="1" max="100" placeholder="5"
+                    class="input-sm" style="width:80px" />
+                </div>
+                <label>Thông báo lên cấp</label>
+                <textarea id="levelUpMessage" name="levelUpMessage" rows="2"
+                  placeholder="Chúc mừng {user} đạt cấp {level}!"></textarea>
               </div>
             </div>
           </div>
-        </div>
-      </section>
+        </section>
 
-      <!-- ── PAGE: INTERACTIONS ── -->
-      <section class="page" data-page-panel="interactions">
-        <div class="plugin-grid">
-          <div class="plugin-card">
+        <!-- ── PAGE: AUTO REPLIES ── -->
+        <section class="page" data-page-panel="auto-replies">
+          <div class="plugin-card wide">
             <div class="plugin-card-header">
-              <div class="plugin-icon bg-purple"><i class="ti ti-users-group"></i></div>
+              <div class="plugin-icon bg-teal"><i class="ti ti-message-reply"></i></div>
               <div>
-                <h3>Self-Roles</h3>
-                <p>Thành viên tự chọn vai trò</p>
+                <h3>Tự động trả lời</h3>
+                <p>Bot phản hồi khi tin nhắn chứa từ khóa</p>
               </div>
               <label class="toggle ml-auto">
-                <input type="checkbox" id="rolesEnabled" name="rolesEnabled">
+                <input type="checkbox" id="autoReplyEnabled" name="autoReplyEnabled">
                 <span class="toggle-track"></span>
               </label>
             </div>
             <div class="plugin-card-body">
-              <label>Role tự động khi vào server</label>
-              <select id="autoRoleId" name="autoRoleId">
-                <option value="">-- Không gán tự động --</option>
-              </select>
-              <label>Tiêu đề bảng chọn role</label>
-              <input id="selfRolePanelTitle" name="selfRolePanelTitle" placeholder="Chọn vai trò của bạn" />
-              <label>Mô tả bảng</label>
-              <textarea id="selfRolePanelMessage" name="selfRolePanelMessage" rows="2"
-                placeholder="Bấm nút bên dưới để nhận role."></textarea>
-              <div class="section-subhead">
-                <span>Danh sách nút Role</span>
-                <button id="addSelfRoleBtn" class="btn btn-secondary btn-xs" type="button"><i class="ti ti-plus"></i>
-                  Thêm</button>
-              </div>
-              <div id="selfRoles" class="reply-list"></div>
+              <div id="autoReplies" class="reply-list"></div>
+              <button id="addReplyBtn" class="btn btn-secondary mt-2" type="button">
+                <i class="ti ti-plus"></i> Thêm từ khóa
+              </button>
             </div>
           </div>
+        </section>
 
-          <div class="plugin-card">
+        <!-- ── PAGE: MODERATION ── -->
+        <section class="page" data-page-panel="moderation-automod">
+          <div class="plugin-grid">
+            <div class="plugin-card">
+              <div class="plugin-card-header">
+                <div class="plugin-icon bg-red"><i class="ti ti-gavel"></i></div>
+                <div>
+                  <h3>Lệnh kiểm duyệt</h3>
+                  <p>Ban, kick, warn, timeout</p>
+                </div>
+                <label class="toggle ml-auto">
+                  <input type="checkbox" id="moderationEnabled" name="moderationEnabled">
+                  <span class="toggle-track"></span>
+                </label>
+              </div>
+              <div class="plugin-card-body">
+                <p class="field-hint">Log hành động kiểm duyệt được gửi về kênh log trong phần Nâng cao.</p>
+              </div>
+            </div>
+
+            <div class="plugin-card">
+              <div class="plugin-card-header">
+                <div class="plugin-icon bg-orange"><i class="ti ti-shield-x"></i></div>
+                <div>
+                  <h3>AutoMod</h3>
+                  <p>Tự động lọc từ cấm & link</p>
+                </div>
+                <label class="toggle ml-auto">
+                  <input type="checkbox" id="autoModEnabled" name="autoModEnabled">
+                  <span class="toggle-track"></span>
+                </label>
+              </div>
+              <div class="plugin-card-body">
+                <div class="toggle-row">
+                  <label class="toggle-inline">
+                    <input type="checkbox" id="antiLinkEnabled" name="antiLinkEnabled">
+                    <span class="toggle-track sm"></span>
+                  </label>
+                  <span>Chặn link (Anti-Link)</span>
+                </div>
+                <div class="toggle-row">
+                  <label class="toggle-inline">
+                    <input type="checkbox" id="deleteBlockedMessages" name="deleteBlockedMessages">
+                    <span class="toggle-track sm"></span>
+                  </label>
+                  <span>Xóa tin nhắn vi phạm</span>
+                </div>
+                <label class="mt-2">Từ bị cấm (mỗi dòng một từ)</label>
+                <textarea id="badWords" name="badWords" rows="3" placeholder="từ xấu 1&#10;từ xấu 2"></textarea>
+                <label>Tin nhắn cảnh cáo</label>
+                <textarea id="blockedMessage" name="blockedMessage" rows="2"
+                  placeholder="{user}, tin nhắn của bạn đã bị chặn."></textarea>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- ── PAGE: ANNOUNCEMENTS ── -->
+        <section class="page" data-page-panel="server-broadcast">
+          <div class="plugin-card wide">
             <div class="plugin-card-header">
-              <div class="plugin-icon bg-teal"><i class="ti ti-ticket"></i></div>
+              <div class="plugin-icon bg-blue"><i class="ti ti-speakerphone"></i></div>
               <div>
-                <h3>Hệ thống Ticket</h3>
-                <p>Kênh hỗ trợ riêng tư</p>
+                <h3>Phát thông báo</h3>
+                <p>Gửi announcement đến kênh cố định</p>
               </div>
               <label class="toggle ml-auto">
-                <input type="checkbox" id="ticketsEnabled" name="ticketsEnabled">
+                <input type="checkbox" id="announcementsEnabled" name="announcementsEnabled">
                 <span class="toggle-track"></span>
               </label>
             </div>
             <div class="plugin-card-body">
-              <label>Danh mục chứa ticket</label>
-              <select id="ticketCategoryId" name="ticketCategoryId">
-                <option value="">-- Chọn danh mục --</option>
-              </select>
-              <label>Kênh log ticket</label>
-              <select id="ticketLogChannelId" name="ticketLogChannelId">
-                <option value="">-- Chọn kênh --</option>
-              </select>
-              <label>Tiêu đề bảng ticket</label>
-              <input id="ticketPanelTitle" name="ticketPanelTitle" placeholder="Yêu Cầu Hỗ Trợ" />
-              <label>Mô tả bảng ticket</label>
-              <textarea id="ticketPanelMessage" name="ticketPanelMessage" rows="2"
-                placeholder="Nhấn nút để mở ticket hỗ trợ."></textarea>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <!-- ── PAGE: ADVANCED ── -->
-      <section class="page" data-page-panel="advanced">
-        <div class="plugin-grid">
-          <div class="plugin-card">
-            <div class="plugin-card-header">
-              <div class="plugin-icon bg-gray"><i class="ti ti-file-text"></i></div>
-              <div>
-                <h3>Kênh Log</h3>
-                <p>Ghi lại hoạt động kiểm duyệt</p>
-              </div>
-            </div>
-            <div class="plugin-card-body">
-              <label>Kênh nhật ký sự kiện</label>
-              <select id="logChannelId" name="logChannelId">
-                <option value="">-- Không log --</option>
-              </select>
-            </div>
-          </div>
-
-          <div class="plugin-card">
-            <div class="plugin-card-header">
-              <div class="plugin-icon bg-gray"><i class="ti ti-code"></i></div>
-              <div>
-                <h3>Biến mẫu</h3>
-                <p>Dùng trong tin nhắn & lệnh</p>
-              </div>
-            </div>
-            <div class="plugin-card-body">
-              <div class="token-grid">
-                <code>{user}</code><code>{username}</code><code>{server}</code>
-                <code>{channel}</code><code>{prefix}</code><code>{ping}</code>
-                <code>{args}</code><code>{commands}</code><code>{level}</code>
-                <code>{xp}</code><code>{count}</code><code>{target}</code>
-                <code>{reason}</code><code>{minutes}</code>
+              <div class="field-grid-2">
+                <div>
+                  <label>Kênh phát thông báo</label>
+                  <select id="announcementChannelId" name="announcementChannelId">
+                    <option value="">-- Chọn kênh --</option>
+                  </select>
+                </div>
+                <div>
+                  <label>Tag khi phát (@everyone...)</label>
+                  <input id="announcementMention" name="announcementMention" placeholder="@everyone" />
+                </div>
               </div>
             </div>
           </div>
-        </div>
-      </section>
+        </section>
 
-    </form>
+        <!-- ── PAGE: INTERACTIONS ── -->
+        <section class="page" data-page-panel="interactions">
+          <div class="plugin-grid">
+            <div class="plugin-card">
+              <div class="plugin-card-header">
+                <div class="plugin-icon bg-purple"><i class="ti ti-users-group"></i></div>
+                <div>
+                  <h3>Self-Roles</h3>
+                  <p>Thành viên tự chọn vai trò</p>
+                </div>
+                <label class="toggle ml-auto">
+                  <input type="checkbox" id="rolesEnabled" name="rolesEnabled">
+                  <span class="toggle-track"></span>
+                </label>
+              </div>
+              <div class="plugin-card-body">
+                <label>Role tự động khi vào server</label>
+                <select id="autoRoleId" name="autoRoleId">
+                  <option value="">-- Không gán tự động --</option>
+                </select>
+                <label>Tiêu đề bảng chọn role</label>
+                <input id="selfRolePanelTitle" name="selfRolePanelTitle" placeholder="Chọn vai trò của bạn" />
+                <label>Mô tả bảng</label>
+                <textarea id="selfRolePanelMessage" name="selfRolePanelMessage" rows="2"
+                  placeholder="Bấm nút bên dưới để nhận role."></textarea>
+                <div class="section-subhead">
+                  <span>Danh sách nút Role</span>
+                  <button id="addSelfRoleBtn" class="btn btn-secondary btn-xs" type="button"><i class="ti ti-plus"></i>
+                    Thêm</button>
+                </div>
+                <div id="selfRoles" class="reply-list"></div>
+              </div>
+            </div>
+
+            <div class="plugin-card">
+              <div class="plugin-card-header">
+                <div class="plugin-icon bg-teal"><i class="ti ti-ticket"></i></div>
+                <div>
+                  <h3>Hệ thống Ticket</h3>
+                  <p>Kênh hỗ trợ riêng tư</p>
+                </div>
+                <label class="toggle ml-auto">
+                  <input type="checkbox" id="ticketsEnabled" name="ticketsEnabled">
+                  <span class="toggle-track"></span>
+                </label>
+              </div>
+              <div class="plugin-card-body">
+                <label>Danh mục chứa ticket</label>
+                <select id="ticketCategoryId" name="ticketCategoryId">
+                  <option value="">-- Chọn danh mục --</option>
+                </select>
+                <label>Kênh log ticket</label>
+                <select id="ticketLogChannelId" name="ticketLogChannelId">
+                  <option value="">-- Chọn kênh --</option>
+                </select>
+                <label>Tiêu đề bảng ticket</label>
+                <input id="ticketPanelTitle" name="ticketPanelTitle" placeholder="Yêu Cầu Hỗ Trợ" />
+                <label>Mô tả bảng ticket</label>
+                <textarea id="ticketPanelMessage" name="ticketPanelMessage" rows="2"
+                  placeholder="Nhấn nút để mở ticket hỗ trợ."></textarea>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- ── PAGE: ADVANCED ── -->
+        <section class="page" data-page-panel="advanced">
+          <div class="plugin-grid">
+            <div class="plugin-card">
+              <div class="plugin-card-header">
+                <div class="plugin-icon bg-gray"><i class="ti ti-file-text"></i></div>
+                <div>
+                  <h3>Kênh Log</h3>
+                  <p>Ghi lại hoạt động kiểm duyệt</p>
+                </div>
+              </div>
+              <div class="plugin-card-body">
+                <label>Kênh nhật ký sự kiện</label>
+                <select id="logChannelId" name="logChannelId">
+                  <option value="">-- Không log --</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="plugin-card">
+              <div class="plugin-card-header">
+                <div class="plugin-icon bg-gray"><i class="ti ti-code"></i></div>
+                <div>
+                  <h3>Biến mẫu</h3>
+                  <p>Dùng trong tin nhắn & lệnh</p>
+                </div>
+              </div>
+              <div class="plugin-card-body">
+                <div class="token-grid">
+                  <code>{user}</code><code>{username}</code><code>{server}</code>
+                  <code>{channel}</code><code>{prefix}</code><code>{ping}</code>
+                  <code>{args}</code><code>{commands}</code><code>{level}</code>
+                  <code>{xp}</code><code>{count}</code><code>{target}</code>
+                  <code>{reason}</code><code>{minutes}</code>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+      </form>
+
+    </div><!-- /.main-body -->
 
     <!-- Save bar -->
     <div class="save-bar" id="saveBar" style="display:none">
