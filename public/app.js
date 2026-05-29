@@ -142,40 +142,58 @@ function ensureCommandSections() {
   }
 
   host.replaceChildren();
+  const nav = document.createElement('div');
+  nav.className = 'command-section-grid';
+  const panel = document.createElement('div');
+  panel.className = 'command-panel';
 
   for (const group of commandGroupOrder) {
     const meta = commandGroupMeta[group];
-    const section = document.createElement('section');
+    const section = document.createElement('button');
+    section.type = 'button';
     section.className = 'command-section';
     section.dataset.commandGroup = group;
     section.dataset.open = 'false';
     section.innerHTML = `
-      <button type="button" class="command-section-head">
-        <div class="command-section-title">
-          <strong>${meta.title}</strong>
-          <span>${meta.hint}</span>
-        </div>
-        <div class="command-section-meta">
-          <span class="command-section-count">0</span>
-          <i class="ti ti-chevron-down"></i>
-        </div>
-      </button>
-      <div class="command-section-body" hidden>
-        <div class="command-list" data-command-group="${group}"></div>
+      <div class="command-section-title">
+        <strong>${meta.title}</strong>
+        <span>${meta.hint}</span>
+      </div>
+      <div class="command-section-meta">
+        <span class="command-section-count">0</span>
+        <i class="ti ti-chevron-right"></i>
       </div>
     `;
 
-    section.querySelector('.command-section-head')?.addEventListener('click', () => {
-      const open = section.dataset.open === 'true';
-      section.dataset.open = open ? 'false' : 'true';
-      updateCommandSectionState(section);
+    section.addEventListener('click', () => {
+      activateCommandSection(group);
     });
 
-    host.append(section);
+    const list = document.createElement('div');
+    list.className = 'command-list';
+    list.dataset.commandGroup = group;
+    list.hidden = true;
+
+    nav.append(section);
+    panel.append(list);
   }
 
+  host.append(nav, panel);
   host.dataset.ready = '1';
   return host;
+}
+
+function activateCommandSection(group, { forceOpen = true } = {}) {
+  for (const section of document.querySelectorAll('.command-section')) {
+    const isTarget = section.dataset.commandGroup === group;
+    section.dataset.open = isTarget && forceOpen ? 'true' : 'false';
+    section.classList.toggle('active', isTarget && forceOpen);
+    updateCommandSectionState(section);
+  }
+
+  for (const list of document.querySelectorAll('.command-list[data-command-group]')) {
+    list.hidden = !(list.dataset.commandGroup === group && forceOpen);
+  }
 }
 
 function getCommandListContainer(type) {
@@ -185,10 +203,9 @@ function getCommandListContainer(type) {
 }
 
 function updateCommandSectionState(section) {
-  const body = section.querySelector('.command-section-body');
   const icon = section.querySelector('.command-section-meta i');
   const open = section.dataset.open === 'true';
-  if (body) body.hidden = !open;
+  section.classList.toggle('active', open);
   if (icon) icon.classList.toggle('is-open', open);
 }
 
@@ -279,11 +296,8 @@ function addCommandRow(cmd = { enabled: true, type: 'custom', name: '', descript
   applyCommandFilter();
 
   if (cmd.type === 'custom' && !cmd.name) {
-    const section = container.closest('.command-section');
-    if (section) {
-      section.dataset.open = 'true';
-      updateCommandSectionState(section);
-    }
+    const group = getCommandGroup(cmd.type);
+    activateCommandSection(group);
   }
 }
 
@@ -302,9 +316,12 @@ function applyCommandFilter() {
   const query = commandSearchEl?.value.trim().toLowerCase() ?? '';
   const filter = commandFilterEl?.value ?? 'all';
   const shouldAutoOpen = Boolean(query || filter !== 'all');
+  let firstVisibleGroup = null;
 
   for (const section of document.querySelectorAll('.command-section')) {
-    const rows = [...section.querySelectorAll('.command-item')];
+    const group = section.dataset.commandGroup;
+    const list = document.querySelector(`.command-list[data-command-group="${group}"]`);
+    const rows = [...(list?.querySelectorAll('.command-item') ?? [])];
     let visibleCount = 0;
 
     for (const row of rows) {
@@ -334,19 +351,25 @@ function applyCommandFilter() {
 
     section.hidden = visibleCount === 0;
     if (visibleCount === 0) {
-      const body = section.querySelector('.command-section-body');
-      if (body) body.hidden = true;
       if (icon) icon.classList.remove('is-open');
+      section.classList.remove('active');
+      if (list) list.hidden = true;
       continue;
     }
 
-    if (shouldAutoOpen) {
-      const body = section.querySelector('.command-section-body');
-      if (body) body.hidden = false;
-      if (icon) icon.classList.add('is-open');
-    } else {
+    if (!firstVisibleGroup) {
+      firstVisibleGroup = group;
+    }
+    if (!shouldAutoOpen) {
+      const isActive = section.classList.contains('active');
+      section.dataset.open = isActive ? 'true' : 'false';
+      if (list) list.hidden = !isActive;
       updateCommandSectionState(section);
     }
+  }
+
+  if (shouldAutoOpen && firstVisibleGroup) {
+    activateCommandSection(firstVisibleGroup);
   }
 }
 
@@ -421,10 +444,7 @@ function fillForm(config) {
   if (bwEl) bwEl.value = (config.badWords ?? []).join('\n');
 
   ensureCommandSections();
-  for (const section of document.querySelectorAll('.command-section')) {
-    section.dataset.open = 'false';
-    updateCommandSectionState(section);
-  }
+  activateCommandSection('general');
   for (const list of document.querySelectorAll('.command-list')) list.replaceChildren();
   for (const cmd of config.commands ?? []) addCommandRow(cmd);
 
