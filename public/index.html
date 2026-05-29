@@ -122,10 +122,33 @@
 
       <form id="configForm" style="display:none">
 
-        <!-- ── PAGE: OVERVIEW ── -->
         <section class="page active" data-page-panel="overview">
-          <div class="plugin-grid">
+          <!-- Stat row: 4 equal columns -->
+          <div class="stat-grid">
+            <div class="stat-card">
+              <i class="ti ti-server-2 stat-icon"></i>
+              <p class="stat-label">Servers</p>
+              <p class="stat-value" id="statGuilds">—</p>
+            </div>
+            <div class="stat-card">
+              <i class="ti ti-terminal-2 stat-icon"></i>
+              <p class="stat-label">Lệnh đang bật</p>
+              <p class="stat-value" id="statCmds">—</p>
+            </div>
+            <div class="stat-card">
+              <i class="ti ti-shield-check stat-icon"></i>
+              <p class="stat-label">Cảnh cáo</p>
+              <p class="stat-value" id="statWarns">—</p>
+            </div>
+            <div class="stat-card">
+              <i class="ti ti-award stat-icon"></i>
+              <p class="stat-label">Thành viên có XP</p>
+              <p class="stat-value" id="statRanked">—</p>
+            </div>
+          </div>
 
+          <!-- 2-col plugin grid -->
+          <div class="plugin-grid">
             <div class="plugin-card wide">
               <div class="plugin-card-header">
                 <div class="plugin-icon bg-purple"><i class="ti ti-robot"></i></div>
@@ -146,28 +169,6 @@
                 <p class="field-hint">Ví dụ: <code>!</code> → gõ <code>!ping</code>, <code>!help</code></p>
               </div>
             </div>
-
-            <div class="stat-card">
-              <i class="ti ti-server-2 stat-icon"></i>
-              <p class="stat-label">Server</p>
-              <p class="stat-value" id="statGuilds">—</p>
-            </div>
-            <div class="stat-card">
-              <i class="ti ti-terminal-2 stat-icon"></i>
-              <p class="stat-label">Lệnh đang bật</p>
-              <p class="stat-value" id="statCmds">—</p>
-            </div>
-            <div class="stat-card">
-              <i class="ti ti-shield-check stat-icon"></i>
-              <p class="stat-label">Cảnh cáo</p>
-              <p class="stat-value" id="statWarns">—</p>
-            </div>
-            <div class="stat-card">
-              <i class="ti ti-award stat-icon"></i>
-              <p class="stat-label">Thành viên có XP</p>
-              <p class="stat-value" id="statRanked">—</p>
-            </div>
-
           </div>
         </section>
 

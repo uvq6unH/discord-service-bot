@@ -122,6 +122,13 @@ function addCommandRow(cmd = { enabled: true, type: 'custom', name: '', descript
     for (const r of roles) {
       const lbl = document.createElement('label');
       lbl.className = 'role-checkbox-label';
+      // Color dot
+      if (r.color) {
+        const dot = document.createElement('span');
+        dot.className = 'role-color-dot';
+        dot.style.background = r.color;
+        lbl.append(dot);
+      }
       const chk = document.createElement('input');
       chk.type = 'checkbox'; chk.className = 'command-role-chk'; chk.value = r.id;
       chk.checked = Array.isArray(cmd.allowedRoles) && cmd.allowedRoles.includes(r.id);

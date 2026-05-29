@@ -122,7 +122,12 @@ export function createServer({ configStore, stateStore, botClient }) {
     try {
       const channels = guild.channels.cache.map((c) => ({ id: c.id, name: c.name, type: c.type }));
       const roles = guild.roles.cache
-        .map((r) => ({ id: r.id, name: r.name, rawPosition: r.rawPosition }))
+        .map((r) => ({
+          id: r.id,
+          name: r.name,
+          rawPosition: r.rawPosition,
+          color: r.color ? `#${r.color.toString(16).padStart(6, '0')}` : null,
+        }))
         .sort((a, b) => b.rawPosition - a.rawPosition);
       res.json({ channels, roles });
     } catch (error) {
