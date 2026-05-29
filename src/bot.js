@@ -208,7 +208,7 @@ const currencies = ['silver', 'gold', 'diamond'];
 const gameCurrency = 'silver';
 const blackjackSessions = new Map();
 const pokerSessions = new Map();
-const gameSessionTtlMs = 10 * 60 * 1000;
+const gameSessionTtlMs = 2 * 60 * 60 * 1000;
 
 function normalizeCurrency(value) {
   const input = String(value ?? '').trim().toLowerCase();
@@ -365,8 +365,53 @@ function expireSession(map, id) {
   map.delete(id);
 }
 
+async function deletePersistedSession(client, type, session, messageId) {
+  if (!session?.guildId) return;
+  await client.stateStore.deleteGameSession(session.guildId, type, messageId).catch(() => null);
+}
+
+function revivePokerSession(session) {
+  if (session && !(session.held instanceof Set)) {
+    session.held = new Set(session.held ?? []);
+  }
+  return session;
+}
+
+function serializeSession(session) {
+  const copy = { ...session };
+  delete copy.timeout;
+  if (copy.held instanceof Set) {
+    copy.held = [...copy.held];
+  }
+  return copy;
+}
+
+async function persistGameSession(client, type, messageId, session) {
+  await client.stateStore.setGameSession(session.guildId, type, messageId, serializeSession(session));
+}
+
+async function getGameSession(client, type, map, guildId, messageId) {
+  let session = map.get(messageId);
+  if (!session) {
+    session = await client.stateStore.getGameSession(guildId, type, messageId);
+    if (type === 'poker') revivePokerSession(session);
+    if (session?.status === 'active') {
+      session.timeout = scheduleSessionExpiry(map, messageId);
+      map.set(messageId, session);
+    }
+  }
+  return session;
+}
+
 function scheduleSessionExpiry(map, id) {
   return setTimeout(() => expireSession(map, id), gameSessionTtlMs);
+}
+
+function refreshSessionExpiry(map, id) {
+  const session = map.get(id);
+  if (!session) return;
+  if (session.timeout) clearTimeout(session.timeout);
+  session.timeout = scheduleSessionExpiry(map, id);
 }
 
 function visibleDealerHand(session, reveal = false) {
@@ -1253,7 +1298,9 @@ async function runBuiltInCommand({ client, config, command, source, args }) {
       gold: config.dailyGoldAmount,
       diamond: config.dailyDiamondAmount
     };
-    const result = await client.stateStore.claimDaily(guild.id, user.id, rewards, config.dailyCooldownHours * 60 * 60 * 1000);
+    const result = await client.stateStore.claimDaily(guild.id, user.id, rewards, {
+      utcOffsetMinutes: Number.parseInt(process.env.DAILY_RESET_UTC_OFFSET_MINUTES, 10) || 420
+    });
     if (!result.claimed) {
       return reply(isInteraction ? { content: `You can claim daily again <t:${Math.floor(result.nextAt / 1000)}:R>.`, ephemeral: true } : `You can claim daily again <t:${Math.floor(result.nextAt / 1000)}:R>.`);
     }
@@ -1311,6 +1358,7 @@ async function runBuiltInCommand({ client, config, command, source, args }) {
       session.messageId = message.id;
       session.timeout = scheduleSessionExpiry(blackjackSessions, message.id);
       blackjackSessions.set(message.id, session);
+      await persistGameSession(client, 'blackjack', message.id, session);
     }
     return;
   }
@@ -1349,6 +1397,7 @@ async function runBuiltInCommand({ client, config, command, source, args }) {
       session.messageId = message.id;
       session.timeout = scheduleSessionExpiry(pokerSessions, message.id);
       pokerSessions.set(message.id, session);
+      await persistGameSession(client, 'poker', message.id, session);
     }
     return;
   }
@@ -1663,11 +1712,12 @@ export function createBot(configStore, stateStore) {
       const config = await configStore.getGuildConfig(interaction.guild.id);
       if (interaction.customId.startsWith('bj:')) {
         const [, action] = interaction.customId.split(':');
-        const session = blackjackSessions.get(interaction.message.id);
+        const session = await getGameSession(client, 'blackjack', blackjackSessions, interaction.guild.id, interaction.message.id);
         if (!session || session.status !== 'active') {
           await interaction.reply({ content: 'Blackjack session expired.', ephemeral: true });
           return;
         }
+        refreshSessionExpiry(blackjackSessions, interaction.message.id);
 
         if (action === 'join') {
           if (session.players.some((player) => player.userId === interaction.user.id)) {
@@ -1689,6 +1739,7 @@ export function createBot(configStore, stateStore) {
           if (!balance) return;
           const reserved = await client.stateStore.adjustBalance(session.guildId, interaction.user.id, session.currency, -session.bet);
           session.players.push(createBlackjackPlayer(interaction.user, session.bet, session.deck, reserved[session.currency] ?? 0));
+          await persistGameSession(client, 'blackjack', interaction.message.id, session);
           await interaction.update(buildBlackjackPayload(config, session));
           return;
         }
@@ -1703,6 +1754,7 @@ export function createBot(configStore, stateStore) {
         if (!hand) {
           const payload = await finishBlackjackSession(client, session, config);
           expireSession(blackjackSessions, interaction.message.id);
+          await deletePersistedSession(client, 'blackjack', session, interaction.message.id);
           await interaction.update(payload);
           return;
         }
@@ -1751,6 +1803,9 @@ export function createBot(configStore, stateStore) {
           : buildBlackjackPayload(config, session);
         if (session.status === 'finished') {
           expireSession(blackjackSessions, interaction.message.id);
+          await deletePersistedSession(client, 'blackjack', session, interaction.message.id);
+        } else {
+          await persistGameSession(client, 'blackjack', interaction.message.id, session);
         }
         await interaction.update(payload);
         return;
@@ -1758,11 +1813,12 @@ export function createBot(configStore, stateStore) {
 
       if (interaction.customId.startsWith('vp:')) {
         const [, action, targetUserId, indexValue] = interaction.customId.split(':');
-        const session = pokerSessions.get(interaction.message.id);
+        const session = await getGameSession(client, 'poker', pokerSessions, interaction.guild.id, interaction.message.id);
         if (!session || session.status !== 'active') {
           await interaction.reply({ content: 'Poker session expired.', ephemeral: true });
           return;
         }
+        refreshSessionExpiry(pokerSessions, interaction.message.id);
         if (interaction.user.id !== targetUserId || interaction.user.id !== session.userId) {
           await interaction.reply({ content: 'This is not your poker hand.', ephemeral: true });
           return;
@@ -1772,6 +1828,7 @@ export function createBot(configStore, stateStore) {
           const index = Number.parseInt(indexValue, 10);
           if (session.held.has(index)) session.held.delete(index);
           else session.held.add(index);
+          await persistGameSession(client, 'poker', interaction.message.id, session);
           await interaction.update(buildPokerPayload(config, session));
           return;
         }
@@ -1779,6 +1836,7 @@ export function createBot(configStore, stateStore) {
         if (action === 'draw' || action === 'cancel') {
           const payload = await finishPokerSession(client, session, config, action === 'cancel');
           expireSession(pokerSessions, interaction.message.id);
+          await deletePersistedSession(client, 'poker', session, interaction.message.id);
           await interaction.update(payload);
           return;
         }

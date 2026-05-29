@@ -1,6 +1,16 @@
 import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 
+const dayMs = 24 * 60 * 60 * 1000;
+
+function dayKeyForOffset(timestamp, utcOffsetMinutes) {
+  return Math.floor((timestamp + utcOffsetMinutes * 60 * 1000) / dayMs);
+}
+
+function nextDayStartForOffset(dayKey, utcOffsetMinutes) {
+  return (dayKey + 1) * dayMs - utcOffsetMinutes * 60 * 1000;
+}
+
 export class StateStore {
   constructor(filePath) {
     this.filePath = path.resolve(filePath);
@@ -48,7 +58,31 @@ export class StateStore {
     this.cache.guilds[guildId].tickets  ??= { nextNumber: 1 };
     this.cache.guilds[guildId].economy  ??= { users: {} };
     this.cache.guilds[guildId].economy.users ??= {};
+    this.cache.guilds[guildId].gameSessions ??= { blackjack: {}, poker: {} };
+    this.cache.guilds[guildId].gameSessions.blackjack ??= {};
+    this.cache.guilds[guildId].gameSessions.poker ??= {};
     return this.cache.guilds[guildId];
+  }
+
+  async getGameSession(guildId, type, messageId) {
+    const guild = await this.getGuild(guildId);
+    return guild.gameSessions?.[type]?.[messageId] ?? null;
+  }
+
+  async setGameSession(guildId, type, messageId, session) {
+    const guild = await this.getGuild(guildId);
+    guild.gameSessions[type] ??= {};
+    guild.gameSessions[type][messageId] = session;
+    await this.save();
+    return session;
+  }
+
+  async deleteGameSession(guildId, type, messageId) {
+    const guild = await this.getGuild(guildId);
+    if (guild.gameSessions?.[type]) {
+      delete guild.gameSessions[type][messageId];
+      await this.save();
+    }
   }
 
   _getEconomyUser(guild, userId) {
@@ -56,12 +90,14 @@ export class StateStore {
       silver: 0,
       gold: 0,
       diamond: 0,
-      lastDailyAt: 0
+      lastDailyAt: 0,
+      lastDailyDay: null
     };
     guild.economy.users[userId].silver ??= 0;
     guild.economy.users[userId].gold ??= 0;
     guild.economy.users[userId].diamond ??= 0;
     guild.economy.users[userId].lastDailyAt ??= 0;
+    guild.economy.users[userId].lastDailyDay ??= null;
     return guild.economy.users[userId];
   }
 
@@ -86,12 +122,15 @@ export class StateStore {
     return { ...user };
   }
 
-  async claimDaily(guildId, userId, rewards, cooldownMs) {
+  async claimDaily(guildId, userId, rewards, options = {}) {
     const guild = await this.getGuild(guildId);
     const user = this._getEconomyUser(guild, userId);
     const now = Date.now();
-    const nextAt = user.lastDailyAt + cooldownMs;
-    if (user.lastDailyAt && now < nextAt) {
+    const utcOffsetMinutes = Number.isFinite(options.utcOffsetMinutes) ? options.utcOffsetMinutes : 420;
+    const todayKey = dayKeyForOffset(now, utcOffsetMinutes);
+    const nextAt = nextDayStartForOffset(todayKey, utcOffsetMinutes);
+
+    if (user.lastDailyDay === todayKey) {
       return { claimed: false, nextAt, balance: { ...user } };
     }
 
@@ -99,8 +138,9 @@ export class StateStore {
     user.gold += rewards.gold ?? 0;
     user.diamond += rewards.diamond ?? 0;
     user.lastDailyAt = now;
+    user.lastDailyDay = todayKey;
     await this.save();
-    return { claimed: true, nextAt: now + cooldownMs, balance: { ...user } };
+    return { claimed: true, nextAt, balance: { ...user } };
   }
 
   async getEconomyLeaderboard(guildId, currency, limit = 10) {
