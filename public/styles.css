@@ -1105,33 +1105,87 @@ select option {
   transform: rotate(90deg);
 }
 
-.command-section-hover {
-  position       : absolute;
-  inset          : 0;
+.command-section-action {
+  position      : absolute;
+  right         : 14px;
+  bottom        : 13px;
+  opacity       : 0;
+  pointer-events: none;
+  transform     : translateY(8px);
+  transition    : opacity .18s ease, transform .18s ease;
+}
+
+.command-section:hover .command-section-action,
+.command-section:focus-visible .command-section-action {
+  opacity  : 1;
+  transform: translateY(0);
+}
+
+.command-group-action {
+  width          : 108px;
+  height         : 34px;
+  padding        : 0 12px;
+  overflow       : hidden;
+  color          : var(--text);
+  background     : var(--surface3);
+  border         : 1px solid var(--border2);
+  border-radius  : var(--r);
+  cursor         : pointer;
+  font-family    : inherit;
+  font-size      : 12px;
+  font-weight    : 800;
+  letter-spacing : .01em;
+  pointer-events : auto;
+  transition     : border-color .18s ease, box-shadow .18s ease;
+}
+
+.command-group-action:hover {
+  border-color: var(--accent);
+  box-shadow  : 0 8px 24px rgba(0, 0, 0, .18);
+}
+
+.command-action-viewport {
+  position: relative;
+  display : block;
+  height  : 100%;
+  overflow: hidden;
+}
+
+.command-action-line {
+  height         : 100%;
   display        : flex;
   align-items    : center;
-  justify-content: space-between;
-  gap            : 10px;
-  padding        : 13px 14px;
-  background     : color-mix(in srgb, var(--surface) 88%, transparent);
-  opacity        : 0;
-  pointer-events : none;
-  transition     : opacity .15s ease;
+  justify-content: center;
+  gap            : 6px;
+  white-space    : nowrap;
+  transition     : transform .2s ease;
 }
 
-.command-section:hover .command-section-hover,
-.command-section:focus-visible .command-section-hover {
-  opacity: 1;
+.command-action-hover {
+  position  : absolute;
+  inset     : 0;
+  color     : #fff;
+  background: var(--accent);
+  transform : translateY(100%);
 }
 
-.command-section-hover span {
-  color      : var(--text);
-  font-size  : 13px;
-  font-weight: 700;
+.command-section:hover .command-action-idle,
+.command-section:focus-visible .command-action-idle {
+  transform: translateY(-100%);
 }
 
-.command-section-hover .toggle {
-  pointer-events: auto;
+.command-section:hover .command-action-hover,
+.command-section:focus-visible .command-action-hover {
+  transform: translateY(0);
+}
+
+.command-group-action[data-state="enabled"] .command-action-hover {
+  background: var(--red);
+}
+
+.command-group-action[data-state="mixed"] .command-action-hover {
+  color     : #12151d;
+  background: var(--amber);
 }
 
 .command-panel {
@@ -1287,7 +1341,7 @@ select option {
   background   : var(--surface2);
   border       : 1px solid var(--border);
   border-radius: var(--r);
-  padding      : 8px;
+  padding      : 10px;
 }
 
 .command-roles-head {
@@ -1307,11 +1361,11 @@ select option {
 .roles-checkbox-grid {
   display   : flex;
   flex-wrap : wrap;
-  gap       : 6px;
-  margin-top: 3px;
-  max-height: 82px;
+  gap       : 8px;
+  margin-top: 6px;
+  max-height: 112px;
   overflow-y: auto;
-  padding-right: 2px;
+  padding-right: 3px;
 }
 
 /* Role tag: full colored text, no dot */
@@ -1324,7 +1378,7 @@ select option {
   max-width      : none;
   font-size      : 11px;
   font-weight    : 600;
-  padding        : 3px 8px;
+  padding        : 5px 9px;
   border-radius  : 5px;
   cursor         : pointer;
   border         : 1.5px solid transparent;

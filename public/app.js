@@ -143,6 +143,12 @@ function getCommandGroup(type) {
   return groupMap[String(type ?? '').toLowerCase()] ?? 'general';
 }
 
+function getCommandGroupFromHash() {
+  const match = /^#commands\/([a-z-]+)$/.exec(window.location.hash);
+  const group = match?.[1];
+  return commandGroupOrder.includes(group) ? group : '';
+}
+
 function ensureCommandSections() {
   const host = document.querySelector('#command-sections');
   if (!host) return null;
@@ -171,8 +177,7 @@ function ensureCommandSections() {
   const panelBody = document.createElement('div');
   panelBody.className = 'command-panel-body';
   panel.querySelector('#commandBackBtn')?.addEventListener('click', () => {
-    const hostEl = document.querySelector('#command-sections');
-    if (hostEl) hostEl.dataset.view = 'sections';
+    showCommandSections();
   });
 
   for (const group of commandGroupOrder) {
@@ -195,31 +200,33 @@ function ensureCommandSections() {
         <span class="command-section-count">0</span>
         <i class="ti ti-chevron-right"></i>
       </div>
-      <div class="command-section-hover">
-        <span>Bật/tắt nhóm</span>
-        <label class="toggle command-group-toggle" title="Bật/tắt toàn bộ lệnh trong nhóm">
-          <input type="checkbox" class="command-group-enabled">
-          <span class="toggle-track sm"></span>
-        </label>
+      <div class="command-section-action">
+        <button type="button" class="command-group-action" title="Bật/tắt toàn bộ lệnh trong nhóm">
+          <span class="command-action-viewport">
+            <span class="command-action-line command-action-idle">
+              <i class="ti ti-power"></i>
+              <span class="command-action-label">Enable</span>
+            </span>
+            <span class="command-action-line command-action-hover">
+              <span class="command-action-hover-label">Enable</span>
+              <i class="ti ti-arrow-right"></i>
+            </span>
+          </span>
+        </button>
       </div>
     `;
 
     section.addEventListener('click', (event) => {
-      if (event.target.closest('.command-section-hover')) return;
       activateCommandSection(group);
     });
     section.addEventListener('keydown', (event) => {
-      if (event.target.closest('.command-section-hover')) return;
       if (event.key !== 'Enter' && event.key !== ' ') return;
       event.preventDefault();
       activateCommandSection(group);
     });
-    section.querySelector('.command-group-toggle')?.addEventListener('click', (event) => {
+    section.querySelector('.command-group-action')?.addEventListener('click', (event) => {
       event.stopPropagation();
-    });
-    section.querySelector('.command-group-enabled')?.addEventListener('change', (event) => {
-      event.stopPropagation();
-      setCommandGroupEnabled(group, event.target.checked);
+      setCommandGroupEnabled(group, !isCommandGroupFullyEnabled(group));
     });
 
     const list = document.createElement('div');
@@ -237,10 +244,13 @@ function ensureCommandSections() {
   return host;
 }
 
-function activateCommandSection(group, { forceOpen = true } = {}) {
+function activateCommandSection(group, { forceOpen = true, updateHash = true } = {}) {
   const host = document.querySelector('#command-sections');
   if (host) {
     host.dataset.view = forceOpen ? 'detail' : 'sections';
+  }
+  if (forceOpen && updateHash && window.location.hash !== `#commands/${group}`) {
+    window.history.replaceState(null, '', `#commands/${group}`);
   }
   for (const section of document.querySelectorAll('.command-section')) {
     const isTarget = section.dataset.commandGroup === group;
@@ -254,6 +264,19 @@ function activateCommandSection(group, { forceOpen = true } = {}) {
   }
 
   updateCommandPanelMeta(group);
+}
+
+function showCommandSections({ updateHash = true } = {}) {
+  const host = document.querySelector('#command-sections');
+  if (host) host.dataset.view = 'sections';
+  if (updateHash && window.location.hash.startsWith('#commands/')) {
+    window.history.replaceState(null, '', window.location.pathname + window.location.search);
+  }
+}
+
+function isCommandGroupFullyEnabled(group) {
+  const rows = [...document.querySelectorAll(`.command-list[data-command-group="${group}"] .command-item`)];
+  return rows.length > 0 && rows.every((row) => row.querySelector('.command-enabled')?.checked);
 }
 
 function setCommandGroupEnabled(group, enabled) {
@@ -275,16 +298,26 @@ function updateCommandPanelMeta(group) {
   const count = document.querySelector('#commandPanelCount');
   const activeRows = document.querySelectorAll(`.command-list[data-command-group="${group}"] .command-item`);
   const visibleRows = [...activeRows].filter((row) => row.style.display !== 'none');
-  const enabledRows = [...activeRows].filter((row) => row.querySelector('.command-enabled')?.checked);
   if (title) title.textContent = meta.title;
   if (hint) hint.textContent = meta.hint;
   if (count) count.textContent = `${visibleRows.length}/${activeRows.length} lệnh`;
 
+  updateCommandGroupAction(group);
+}
+
+function updateCommandGroupAction(group) {
   const section = document.querySelector(`.command-section[data-command-group="${group}"]`);
-  const toggle = section?.querySelector('.command-group-enabled');
-  if (toggle) {
-    toggle.checked = activeRows.length > 0 && enabledRows.length === activeRows.length;
-    toggle.indeterminate = enabledRows.length > 0 && enabledRows.length < activeRows.length;
+  const action = section?.querySelector('.command-group-action');
+  const activeRows = document.querySelectorAll(`.command-list[data-command-group="${group}"] .command-item`);
+  const enabledRows = [...activeRows].filter((row) => row.querySelector('.command-enabled')?.checked);
+  if (action) {
+    const isAllEnabled = activeRows.length > 0 && enabledRows.length === activeRows.length;
+    const hasAnyEnabled = enabledRows.length > 0;
+    const label = isAllEnabled ? 'Disable' : 'Enable';
+    action.dataset.state = isAllEnabled ? 'enabled' : hasAnyEnabled ? 'mixed' : 'disabled';
+    action.title = isAllEnabled ? 'Tắt toàn bộ lệnh trong nhóm' : 'Bật toàn bộ lệnh trong nhóm';
+    action.querySelector('.command-action-label').textContent = label;
+    action.querySelector('.command-action-hover-label').textContent = label;
   }
 }
 
@@ -452,12 +485,7 @@ function applyCommandFilter() {
       const total = rows.length;
       countEl.textContent = shouldAutoOpen ? `${visibleCount}/${total}` : String(total);
     }
-    const groupToggle = section.querySelector('.command-group-enabled');
-    if (groupToggle) {
-      const enabledCount = rows.filter((row) => row.querySelector('.command-enabled')?.checked).length;
-      groupToggle.checked = rows.length > 0 && enabledCount === rows.length;
-      groupToggle.indeterminate = enabledCount > 0 && enabledCount < rows.length;
-    }
+    updateCommandGroupAction(group);
 
     section.hidden = visibleCount === 0;
     if (visibleCount === 0) {
@@ -557,11 +585,11 @@ function fillForm(config) {
   if (bwEl) bwEl.value = (config.badWords ?? []).join('\n');
 
   ensureCommandSections();
-  activateCommandSection('general');
+  activateCommandSection(getCommandGroupFromHash() || 'general', { updateHash: false });
   for (const list of document.querySelectorAll('.command-list')) list.replaceChildren();
   for (const cmd of config.commands ?? []) addCommandRow(cmd);
-  const commandHost = document.querySelector('#command-sections');
-  if (commandHost) commandHost.dataset.view = 'sections';
+  const hashGroup = getCommandGroupFromHash();
+  hashGroup ? activateCommandSection(hashGroup, { updateHash: false }) : showCommandSections({ updateHash: false });
 
   autoRepliesEl.replaceChildren();
   for (const r of config.autoReplies ?? []) addReplyRow(r);
@@ -795,6 +823,16 @@ commandSearchEl?.addEventListener('input', applyCommandFilter);
 commandFilterEl?.addEventListener('change', applyCommandFilter);
 configForm.addEventListener('input', () => setDirty());
 configForm.addEventListener('change', () => setDirty());
+window.addEventListener('hashchange', () => {
+  const group = getCommandGroupFromHash();
+  if (!group) {
+    showCommandSections({ updateHash: false });
+    return;
+  }
+  showPage('commands-general');
+  ensureCommandSections();
+  activateCommandSection(group, { updateHash: false });
+});
 window.addEventListener('beforeunload', e => { if (isDirty) { e.preventDefault(); e.returnValue = ''; } });
 
 // ── Init ─────────────────────────────────────────────────────────────────────
