@@ -971,14 +971,93 @@ select option {
 }
 
 /* Command list */
+.command-sections {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.command-section {
+  background   : var(--surface);
+  border       : 1px solid var(--border);
+  border-radius: var(--rl);
+  overflow     : hidden;
+}
+
+.command-section-head {
+  width           : 100%;
+  display         : flex;
+  align-items     : center;
+  justify-content : space-between;
+  gap             : 12px;
+  padding         : 12px 14px;
+  border          : 0;
+  background      : linear-gradient(180deg, rgba(255, 255, 255, .02), transparent);
+  color           : inherit;
+  cursor          : pointer;
+  text-align      : left;
+}
+
+.command-section-title {
+  display       : flex;
+  flex-direction: column;
+  gap           : 3px;
+  min-width     : 0;
+}
+
+.command-section-title strong {
+  font-size  : 14px;
+  line-height: 1.2;
+}
+
+.command-section-title span {
+  color      : var(--hint);
+  font-size  : 12px;
+  line-height: 1.35;
+}
+
+.command-section-meta {
+  display    : flex;
+  align-items: center;
+  gap        : 8px;
+  color      : var(--hint);
+  flex-shrink: 0;
+}
+
+.command-section-count {
+  min-width    : 34px;
+  text-align   : center;
+  padding      : 3px 8px;
+  border       : 1px solid var(--border2);
+  border-radius: 999px;
+  background   : var(--surface2);
+  color        : var(--text);
+  font-size    : 12px;
+  font-weight  : 700;
+}
+
+.command-section-meta i {
+  transition: transform .18s ease;
+}
+
+.command-section-meta i.is-open {
+  transform: rotate(180deg);
+}
+
+.command-section-body {
+  border-top: 1px solid var(--border);
+  padding   : 12px;
+}
+
 /* Command list: 3 per row */
 .command-list {
   display              : grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap                  : 10px;
 }
 
 .command-item {
+  min-width     : 0;
   background    : var(--surface);
   border        : 1px solid var(--border);
   border-radius : var(--rl);
@@ -991,10 +1070,19 @@ select option {
   display      : flex;
   align-items  : center;
   gap          : 8px;
-  padding      : 10px 13px;
+  padding      : 9px 11px;
   border-bottom: 1px solid var(--border);
   flex-wrap    : wrap;
   flex-shrink  : 0;
+  background   : linear-gradient(180deg, rgba(255, 255, 255, .02), transparent);
+}
+
+.command-title-group {
+  display    : flex;
+  align-items: center;
+  gap        : 8px;
+  min-width  : 0;
+  flex       : 1 1 auto;
 }
 
 .command-badge {
@@ -1002,6 +1090,7 @@ select option {
   font-weight  : 600;
   padding      : 2px 7px;
   border-radius: 5px;
+  flex-shrink  : 0;
 }
 
 .command-badge.system {
@@ -1014,6 +1103,21 @@ select option {
   color     : var(--green);
 }
 
+.command-name-pill {
+  min-width     : 0;
+  max-width     : 100%;
+  padding       : 3px 8px;
+  border-radius : 999px;
+  background    : var(--surface2);
+  border        : 1px solid var(--border2);
+  color         : var(--text);
+  font-size     : 11.5px;
+  font-weight   : 600;
+  overflow      : hidden;
+  text-overflow : ellipsis;
+  white-space   : nowrap;
+}
+
 .command-actions {
   margin-left: auto;
   display    : flex;
@@ -1022,32 +1126,53 @@ select option {
 }
 
 .command-fields {
-  padding       : 11px 13px;
-  display       : flex;
+  padding             : 11px;
+  display             : grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap                 : 10px;
+  flex                : 1;
+}
+
+.command-fields > div {
+  min-width: 0;
+  display  : flex;
   flex-direction: column;
-  gap           : 9px;
-  flex          : 1;
+  gap      : 6px;
+}
+
+.command-response-wrap,
+.command-roles-wrap {
+  grid-column: 1 / -1;
+}
+
+.command-response-wrap textarea {
+  min-height: 82px;
 }
 
 .roles-checkbox-grid {
-  display   : flex;
-  flex-wrap : wrap;
-  gap       : 5px;
-  margin-top: 4px;
+  display             : grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap                 : 6px;
+  margin-top          : 2px;
 }
 
 /* Role tag: full colored text, no dot */
 .role-checkbox-label {
-  display      : inline-flex;
-  align-items  : center;
-  gap          : 5px;
-  font-size    : 11.5px;
-  font-weight  : 600;
-  padding      : 3px 8px;
-  border-radius: 5px;
-  cursor       : pointer;
-  border       : 1.5px solid transparent;
-  transition   : opacity .15s;
+  display        : inline-flex;
+  align-items    : center;
+  gap            : 5px;
+  min-width      : 0;
+  width          : 100%;
+  font-size      : 11px;
+  font-weight    : 600;
+  padding        : 4px 8px;
+  border-radius  : 5px;
+  cursor         : pointer;
+  border         : 1.5px solid transparent;
+  transition     : opacity .15s, border-color .15s;
+  overflow       : hidden;
+  text-overflow  : ellipsis;
+  white-space    : nowrap;
 }
 
 .role-checkbox-label input {
@@ -1134,6 +1259,10 @@ select option {
     grid-template-columns: repeat(2, 1fr);
   }
 
+  .roles-checkbox-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
   .plugin-grid {
     grid-template-columns: repeat(2, 1fr);
   }
@@ -1154,6 +1283,10 @@ select option {
 
   .command-list {
     grid-template-columns: repeat(2, 1fr);
+  }
+
+  .roles-checkbox-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .plugin-grid {
@@ -1307,7 +1440,20 @@ select option {
     grid-template-columns: 1fr;
   }
 
+  .command-fields {
+    grid-template-columns: 1fr;
+  }
+
+  .command-response-wrap,
+  .command-roles-wrap {
+    grid-column: auto;
+  }
+
   .command-toolbar {
+    grid-template-columns: 1fr;
+  }
+
+  .roles-checkbox-grid {
     grid-template-columns: 1fr;
   }
 

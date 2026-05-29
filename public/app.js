@@ -105,12 +105,100 @@ const commandLabels = {
   announce: 'Announce', ticketpanel: 'Ticket panel', rolepanel: 'Role panel',
 };
 
+const commandGroupOrder = ['general', 'user', 'server', 'moderation', 'interactions'];
+const commandGroupMeta = {
+  general: {
+    title: 'Lệnh chung',
+    hint: 'Ping, help, config và custom command',
+  },
+  user: {
+    title: 'Người dùng & XP',
+    hint: 'Thông tin người dùng, rank, daily và economy',
+  },
+  server: {
+    title: 'Máy chủ & Thông báo',
+    hint: 'Lệnh server, purge, say và announce',
+  },
+  moderation: {
+    title: 'Moderation & AutoMod',
+    hint: 'Warn, kick, ban, timeout và kiểm duyệt',
+  },
+  interactions: {
+    title: 'Ticket & Roles',
+    hint: 'Ticket panel và role panel',
+  },
+};
+
+function getCommandGroup(type) {
+  return groupMap[String(type ?? '').toLowerCase()] ?? 'general';
+}
+
+function ensureCommandSections() {
+  const host = document.querySelector('#command-sections');
+  if (!host) return null;
+
+  if (host.dataset.ready === '1') {
+    return host;
+  }
+
+  host.replaceChildren();
+
+  for (const group of commandGroupOrder) {
+    const meta = commandGroupMeta[group];
+    const section = document.createElement('section');
+    section.className = 'command-section';
+    section.dataset.commandGroup = group;
+    section.dataset.open = 'false';
+    section.innerHTML = `
+      <button type="button" class="command-section-head">
+        <div class="command-section-title">
+          <strong>${meta.title}</strong>
+          <span>${meta.hint}</span>
+        </div>
+        <div class="command-section-meta">
+          <span class="command-section-count">0</span>
+          <i class="ti ti-chevron-down"></i>
+        </div>
+      </button>
+      <div class="command-section-body" hidden>
+        <div class="command-list" data-command-group="${group}"></div>
+      </div>
+    `;
+
+    section.querySelector('.command-section-head')?.addEventListener('click', () => {
+      const open = section.dataset.open === 'true';
+      section.dataset.open = open ? 'false' : 'true';
+      updateCommandSectionState(section);
+    });
+
+    host.append(section);
+  }
+
+  host.dataset.ready = '1';
+  return host;
+}
+
+function getCommandListContainer(type) {
+  ensureCommandSections();
+  const group = getCommandGroup(type);
+  return document.querySelector(`.command-list[data-command-group="${group}"]`);
+}
+
+function updateCommandSectionState(section) {
+  const body = section.querySelector('.command-section-body');
+  const icon = section.querySelector('.command-section-meta i');
+  const open = section.dataset.open === 'true';
+  if (body) body.hidden = !open;
+  if (icon) icon.classList.toggle('is-open', open);
+}
+
 function addCommandRow(cmd = { enabled: true, type: 'custom', name: '', description: '', response: '', allowedRoles: [] }) {
-  const container = document.querySelector('#commands-general-list');
+  const container = getCommandListContainer(cmd.type);
   if (!container) return;
 
   const row = document.createElement('div');
   row.className = 'command-item';
+  row.dataset.commandGroup = getCommandGroup(cmd.type);
   row.dataset.commandType = cmd.type;
   row.dataset.commandEnabled = cmd.enabled !== false ? 'enabled' : 'disabled';
 
@@ -122,6 +210,7 @@ function addCommandRow(cmd = { enabled: true, type: 'custom', name: '', descript
     <div class="command-top">
       <div class="command-title-group">
         <span class="command-badge ${badgeClass}">${label}</span>
+        <span class="command-name-pill">${esc(cmd.name || 'chưa đặt tên')}</span>
         <label class="toggle command-enabled-toggle" title="Bật/tắt lệnh">
           <input type="checkbox" class="command-enabled" ${cmd.enabled !== false ? 'checked' : ''}>
           <span class="toggle-track sm"></span>
@@ -149,6 +238,7 @@ function addCommandRow(cmd = { enabled: true, type: 'custom', name: '', descript
     for (const r of roles) {
       const lbl = document.createElement('label');
       lbl.className = 'role-checkbox-label';
+      lbl.title = r.name;
       const roleColor = r.color || '#8b95a6';
       // Background is a very faint tint of the role color
       lbl.style.color = roleColor;
@@ -174,10 +264,27 @@ function addCommandRow(cmd = { enabled: true, type: 'custom', name: '', descript
     row.dataset.commandEnabled = event.target.checked ? 'enabled' : 'disabled';
     applyCommandFilter();
   });
+  const nameInput = row.querySelector('.command-name');
+  const namePill = row.querySelector('.command-name-pill');
+  const syncNamePill = () => {
+    if (namePill && nameInput) {
+      namePill.textContent = nameInput.value.trim() || 'chưa đặt tên';
+    }
+  };
+  nameInput?.addEventListener('input', syncNamePill);
+  syncNamePill();
   row.addEventListener('input', () => { setDirty(); applyCommandFilter(); });
   row.addEventListener('change', setDirty);
   container.append(row);
   applyCommandFilter();
+
+  if (cmd.type === 'custom' && !cmd.name) {
+    const section = container.closest('.command-section');
+    if (section) {
+      section.dataset.open = 'true';
+      updateCommandSectionState(section);
+    }
+  }
 }
 
 function readCommands() {
@@ -194,21 +301,52 @@ function readCommands() {
 function applyCommandFilter() {
   const query = commandSearchEl?.value.trim().toLowerCase() ?? '';
   const filter = commandFilterEl?.value ?? 'all';
+  const shouldAutoOpen = Boolean(query || filter !== 'all');
 
-  for (const row of document.querySelectorAll('.command-item')) {
-    const name = row.querySelector('.command-name')?.value.toLowerCase() ?? '';
-    const description = row.querySelector('.command-description')?.value.toLowerCase() ?? '';
-    const type = row.dataset.commandType ?? 'custom';
-    const enabled = row.querySelector('.command-enabled')?.checked ?? false;
-    const textMatches = !query || [name, description, type].some((value) => value.includes(query));
-    const filterMatches =
-      filter === 'all' ||
-      (filter === 'enabled' && enabled) ||
-      (filter === 'disabled' && !enabled) ||
-      (filter === 'custom' && type === 'custom') ||
-      (filter === 'system' && type !== 'custom');
+  for (const section of document.querySelectorAll('.command-section')) {
+    const rows = [...section.querySelectorAll('.command-item')];
+    let visibleCount = 0;
 
-    row.style.display = textMatches && filterMatches ? '' : 'none';
+    for (const row of rows) {
+      const name = row.querySelector('.command-name')?.value.toLowerCase() ?? '';
+      const description = row.querySelector('.command-description')?.value.toLowerCase() ?? '';
+      const type = row.dataset.commandType ?? 'custom';
+      const enabled = row.querySelector('.command-enabled')?.checked ?? false;
+      const textMatches = !query || [name, description, type].some((value) => value.includes(query));
+      const filterMatches =
+        filter === 'all' ||
+        (filter === 'enabled' && enabled) ||
+        (filter === 'disabled' && !enabled) ||
+        (filter === 'custom' && type === 'custom') ||
+        (filter === 'system' && type !== 'custom');
+
+      const isVisible = textMatches && filterMatches;
+      row.style.display = isVisible ? '' : 'none';
+      if (isVisible) visibleCount += 1;
+    }
+
+    const countEl = section.querySelector('.command-section-count');
+    const icon = section.querySelector('.command-section-meta i');
+    if (countEl) {
+      const total = rows.length;
+      countEl.textContent = shouldAutoOpen ? `${visibleCount}/${total}` : String(total);
+    }
+
+    section.hidden = visibleCount === 0;
+    if (visibleCount === 0) {
+      const body = section.querySelector('.command-section-body');
+      if (body) body.hidden = true;
+      if (icon) icon.classList.remove('is-open');
+      continue;
+    }
+
+    if (shouldAutoOpen) {
+      const body = section.querySelector('.command-section-body');
+      if (body) body.hidden = false;
+      if (icon) icon.classList.add('is-open');
+    } else {
+      updateCommandSectionState(section);
+    }
   }
 }
 
@@ -282,7 +420,12 @@ function fillForm(config) {
   const bwEl = document.querySelector('#badWords');
   if (bwEl) bwEl.value = (config.badWords ?? []).join('\n');
 
-  document.querySelector('#commands-general-list').replaceChildren();
+  ensureCommandSections();
+  for (const section of document.querySelectorAll('.command-section')) {
+    section.dataset.open = 'false';
+    updateCommandSectionState(section);
+  }
+  for (const list of document.querySelectorAll('.command-list')) list.replaceChildren();
   for (const cmd of config.commands ?? []) addCommandRow(cmd);
 
   autoRepliesEl.replaceChildren();
