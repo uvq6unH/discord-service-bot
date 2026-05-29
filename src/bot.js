@@ -164,6 +164,35 @@ async function sendLog(guild, config, message) {
   }
 }
 
+async function sendTicketLog(guild, config, message) {
+  const channelId = config.ticketLogChannelId || config.logChannelId;
+  if (!channelId) {
+    return;
+  }
+
+  const channel = await guild.channels.fetch(channelId).catch(() => null);
+  if (channel?.isTextBased()) {
+    await channel.send(message).catch(() => null);
+  }
+}
+
+async function hasAllowedRole(guild, userId, command) {
+  if (!Array.isArray(command.allowedRoles) || command.allowedRoles.length === 0) {
+    return true;
+  }
+
+  const member = await guild.members.fetch(userId).catch(() => null);
+  if (!member) {
+    return false;
+  }
+
+  if (member.permissions.has(PermissionFlagsBits.Administrator) || member.permissions.has(PermissionFlagsBits.ManageGuild)) {
+    return true;
+  }
+
+  return command.allowedRoles.some((roleId) => member.roles.cache.has(roleId));
+}
+
 function buildCommandList(config) {
   const prefix = config.prefix === '/' ? '/' : config.prefix || '!';
   return config.commands
@@ -402,6 +431,11 @@ async function runBuiltInCommand({ client, config, command, source, args }) {
     username: user.username
   };
 
+  const hasCommandAccess = await hasAllowedRole(guild, user.id, command);
+  if (!hasCommandAccess) {
+    return reply(isInteraction ? { content: 'You do not have permission to use this command.', ephemeral: true } : 'You do not have permission to use this command.');
+  }
+
   if (command.type === 'help') {
     let selectedGroup = null;
     if (isInteraction) {
@@ -443,6 +477,10 @@ async function runBuiltInCommand({ client, config, command, source, args }) {
   }
 
   if (command.type === 'say') {
+    if (!permissions?.has(PermissionFlagsBits.ManageMessages) && !permissions?.has(PermissionFlagsBits.ManageGuild)) {
+      return reply(isInteraction ? { content: 'You need Manage Messages or Manage Server permission.', ephemeral: true } : 'You need Manage Messages or Manage Server permission.');
+    }
+
     const messageText = isInteraction ? source.options.getString('message') : args;
     if (!messageText?.trim()) {
       return reply(isInteraction ? { content: 'Missing message.', ephemeral: true } : 'Missing message.');
@@ -462,6 +500,9 @@ async function runBuiltInCommand({ client, config, command, source, args }) {
     }
     if (!permissions?.has(PermissionFlagsBits.ManageMessages)) {
       return reply(isInteraction ? { content: 'You need Manage Messages permission.', ephemeral: true } : 'You need Manage Messages permission.');
+    }
+    if (!channel.permissionsFor(client.user)?.has(PermissionFlagsBits.ManageMessages)) {
+      return reply(isInteraction ? { content: 'Bot needs Manage Messages permission in this channel.', ephemeral: true } : 'Bot needs Manage Messages permission in this channel.');
     }
     const deleted = await channel.bulkDelete(amount, true);
     const content = renderCommandResponse(command.response, {
@@ -494,6 +535,9 @@ async function runBuiltInCommand({ client, config, command, source, args }) {
       if (!permissions?.has(PermissionFlagsBits.KickMembers)) {
         return reply(isInteraction ? { content: 'You need Kick Members permission.', ephemeral: true } : 'You need Kick Members permission.');
       }
+      if (!guild.members.me?.permissions.has(PermissionFlagsBits.KickMembers)) {
+        return reply(isInteraction ? { content: 'Bot needs Kick Members permission.', ephemeral: true } : 'Bot needs Kick Members permission.');
+      }
       await target.member.kick(reason);
     }
 
@@ -501,12 +545,18 @@ async function runBuiltInCommand({ client, config, command, source, args }) {
       if (!permissions?.has(PermissionFlagsBits.BanMembers)) {
         return reply(isInteraction ? { content: 'You need Ban Members permission.', ephemeral: true } : 'You need Ban Members permission.');
       }
+      if (!guild.members.me?.permissions.has(PermissionFlagsBits.BanMembers)) {
+        return reply(isInteraction ? { content: 'Bot needs Ban Members permission.', ephemeral: true } : 'Bot needs Ban Members permission.');
+      }
       await target.member.ban({ reason });
     }
 
     if (command.type === 'timeout') {
       if (!permissions?.has(PermissionFlagsBits.ModerateMembers)) {
         return reply(isInteraction ? { content: 'You need Moderate Members permission.', ephemeral: true } : 'You need Moderate Members permission.');
+      }
+      if (!guild.members.me?.permissions.has(PermissionFlagsBits.ModerateMembers)) {
+        return reply(isInteraction ? { content: 'Bot needs Moderate Members permission.', ephemeral: true } : 'Bot needs Moderate Members permission.');
       }
       const minutes = isInteraction ? source.options.getInteger('minutes') : Number.parseInt(args.match(/\b\d+\b/)?.[0] ?? '10', 10);
       await target.member.timeout(Math.min(minutes, 10080) * 60 * 1000, reason);
@@ -614,6 +664,9 @@ async function runBuiltInCommand({ client, config, command, source, args }) {
     if (!permissions?.has(PermissionFlagsBits.ManageGuild)) {
       return reply(isInteraction ? { content: 'You need Manage Server permission.', ephemeral: true } : 'You need Manage Server permission.');
     }
+    if (!guild.members.me?.permissions.has(PermissionFlagsBits.ManageChannels)) {
+      return reply(isInteraction ? { content: 'Bot needs Manage Channels permission.', ephemeral: true } : 'Bot needs Manage Channels permission.');
+    }
     const row = new ActionRowBuilder().addComponents(
       new ButtonBuilder().setCustomId('ticket:create').setLabel('Open ticket').setStyle(ButtonStyle.Primary)
     );
@@ -630,6 +683,9 @@ async function runBuiltInCommand({ client, config, command, source, args }) {
     }
     if (!permissions?.has(PermissionFlagsBits.ManageGuild)) {
       return reply(isInteraction ? { content: 'You need Manage Server permission.', ephemeral: true } : 'You need Manage Server permission.');
+    }
+    if (!guild.members.me?.permissions.has(PermissionFlagsBits.ManageRoles)) {
+      return reply(isInteraction ? { content: 'Bot needs Manage Roles permission.', ephemeral: true } : 'Bot needs Manage Roles permission.');
     }
     const rows = [];
     for (let i = 0; i < config.selfRoles.length; i += 5) {
@@ -762,6 +818,10 @@ export function createBot(configStore, stateStore) {
           await interaction.reply({ content: 'Tickets are disabled.', ephemeral: true });
           return;
         }
+        if (!interaction.guild.members.me?.permissions.has(PermissionFlagsBits.ManageChannels)) {
+          await interaction.reply({ content: 'Bot needs Manage Channels permission.', ephemeral: true });
+          return;
+        }
         const number = await stateStore.nextTicketNumber(interaction.guild.id);
         const channel = await interaction.guild.channels.create({
           name: `ticket-${number}-${interaction.user.username}`.toLowerCase().replace(/[^a-z0-9-]/g, '-').slice(0, 90),
@@ -782,7 +842,7 @@ export function createBot(configStore, stateStore) {
           components: [row]
         });
         await interaction.reply({ content: `Ticket created: <#${channel.id}>`, ephemeral: true });
-        await sendLog(interaction.guild, config, `Ticket #${number} opened by ${interaction.user.tag}.`);
+        await sendTicketLog(interaction.guild, config, `Ticket #${number} opened by ${interaction.user.tag}.`);
         return;
       }
 
@@ -792,7 +852,7 @@ export function createBot(configStore, stateStore) {
           return;
         }
         await interaction.reply({ content: 'Closing ticket in 3 seconds.', ephemeral: true });
-        await sendLog(interaction.guild, config, `Ticket closed: ${interaction.channel.name}`);
+        await sendTicketLog(interaction.guild, config, `Ticket closed: ${interaction.channel.name}`);
         setTimeout(() => interaction.channel.delete().catch(() => null), 3000);
         return;
       }
@@ -809,6 +869,10 @@ export function createBot(configStore, stateStore) {
           return;
         }
         const member = await interaction.guild.members.fetch(interaction.user.id);
+        if (!interaction.guild.members.me?.permissions.has(PermissionFlagsBits.ManageRoles)) {
+          await interaction.reply({ content: 'Bot needs Manage Roles permission.', ephemeral: true });
+          return;
+        }
         const hasRole = member.roles.cache.has(roleId);
         if (hasRole) {
           await member.roles.remove(roleId);

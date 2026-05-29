@@ -1,4 +1,4 @@
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 
 const defaultConfig = {
@@ -301,6 +301,7 @@ export class ConfigStore {
   constructor(filePath) {
     this.filePath = path.resolve(filePath);
     this.cache = {};
+    this._saveQueue = Promise.resolve();
     this.ready = this.load();
   }
 
@@ -319,9 +320,18 @@ export class ConfigStore {
     }
   }
 
-  async save() {
+  async _writeToDisk() {
+    const tmp = `${this.filePath}.tmp`;
     await mkdir(path.dirname(this.filePath), { recursive: true });
-    await writeFile(this.filePath, `${JSON.stringify(this.cache, null, 2)}\n`, 'utf8');
+    await writeFile(tmp, `${JSON.stringify(this.cache, null, 2)}\n`, 'utf8');
+    await rename(tmp, this.filePath);
+  }
+
+  save() {
+    this._saveQueue = this._saveQueue
+      .then(() => this._writeToDisk())
+      .catch((err) => console.error('[ConfigStore] Save error:', err));
+    return this._saveQueue;
   }
 
   async getGuildConfig(guildId) {

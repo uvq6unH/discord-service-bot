@@ -10,8 +10,13 @@ export function createAuthRouter(botClient) {
   const clientId = process.env.DISCORD_CLIENT_ID;
   const clientSecret = process.env.DISCORD_CLIENT_SECRET;
   const redirectUri = process.env.DISCORD_REDIRECT_URI;
+  const isProduction = process.env.NODE_ENV === 'production';
 
   if (!clientId || !clientSecret || !redirectUri) {
+    if (isProduction) {
+      throw new Error('Missing Discord OAuth env vars in production: DISCORD_CLIENT_ID, DISCORD_CLIENT_SECRET, DISCORD_REDIRECT_URI.');
+    }
+
     console.warn('[auth] OAuth env vars not set — dashboard is UNPROTECTED.');
     return {
       router: null,

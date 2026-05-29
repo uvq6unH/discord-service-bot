@@ -14,6 +14,12 @@ function requireGuildId(req, res, next) {
 
 export function createServer({ configStore, stateStore, botClient }) {
   const app = express();
+  const isProduction = process.env.NODE_ENV === 'production';
+  const sessionSecret = process.env.SESSION_SECRET;
+
+  if (isProduction && !sessionSecret) {
+    throw new Error('Missing SESSION_SECRET in production.');
+  }
 
   // Render (và hầu hết cloud) chạy sau reverse proxy — phải trust proxy
   // để cookie secure hoạt động đúng với HTTPS
@@ -22,9 +28,9 @@ export function createServer({ configStore, stateStore, botClient }) {
   // ── Session ────────────────────────────────────────────────────────────────
   app.use(cookieSession({
     name: 'dsession',
-    keys: [process.env.SESSION_SECRET || 'dev-secret-change-me'],
+    keys: [sessionSecret || 'dev-secret-change-me'],
     maxAge: 7 * 24 * 60 * 60 * 1000,
-    secure: false,   // để false — Render tự handle HTTPS ở layer trên
+    secure: isProduction,
     httpOnly: true,
     sameSite: 'lax',
   }));
