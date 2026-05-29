@@ -50,6 +50,7 @@ const pageTitles = {
   overview: 'Dashboard',
   'commands-general': 'Lệnh & Custom',
   'user-levels': 'Cấp độ & XP',
+  economy: 'Tiền ảo',
   'auto-replies': 'Tự động trả lời',
   'moderation-automod': 'Kiểm duyệt',
   'server-broadcast': 'Thông báo',
@@ -61,6 +62,7 @@ const pageOrder = [
   'overview',
   'commands-general',
   'user-levels',
+  'economy',
   'auto-replies',
   'moderation-automod',
   'server-broadcast',
@@ -75,6 +77,9 @@ const FIELDS = [
   'rolesEnabled', 'autoRoleId', 'selfRolePanelTitle', 'selfRolePanelMessage',
   'ticketsEnabled', 'ticketCategoryId', 'ticketLogChannelId', 'ticketPanelTitle', 'ticketPanelMessage',
   'levelsEnabled', 'xpPerMessage', 'levelUpMessage',
+  'economyEnabled', 'currencySilverName', 'currencySilverIcon', 'currencyGoldName', 'currencyGoldIcon',
+  'currencyDiamondName', 'currencyDiamondIcon', 'dailyEnabled', 'dailyCooldownHours', 'dailySilverAmount',
+  'dailyGoldAmount', 'dailyDiamondAmount', 'blackjackEnabled', 'blackjackMinBet', 'blackjackMaxBet',
   'announcementsEnabled', 'announcementChannelId', 'announcementMention',
   'welcomeEnabled', 'welcomeChannelId', 'welcomeMessage',
   'autoReplyEnabled',
@@ -84,15 +89,20 @@ const FIELDS = [
 const groupMap = {
   ping: 'general', help: 'general', custom: 'general', config: 'general',
   user: 'user', avatar: 'user', rank: 'user', leaderboard: 'user',
+  balance: 'user', daily: 'user', economyleaderboard: 'user', blackjack: 'user',
   server: 'server', say: 'server', purge: 'server', announce: 'server',
   warn: 'moderation', kick: 'moderation', ban: 'moderation', timeout: 'moderation', warnings: 'moderation', clearwarns: 'moderation',
+  ecoadd: 'moderation', ecoset: 'moderation', ecoremove: 'moderation',
   ticketpanel: 'interactions', rolepanel: 'interactions',
 };
 const commandLabels = {
   custom: 'Custom', ping: 'Ping', help: 'Help', config: 'Config', server: 'Server info',
   user: 'User info', avatar: 'Avatar', say: 'Say', purge: 'Purge', warn: 'Warn',
   kick: 'Kick', ban: 'Ban', timeout: 'Timeout', warnings: 'Warnings', clearwarns: 'Clear warns',
-  rank: 'Rank', leaderboard: 'Leaderboard', announce: 'Announce', ticketpanel: 'Ticket panel', rolepanel: 'Role panel',
+  rank: 'Rank', leaderboard: 'Leaderboard', balance: 'Balance', daily: 'Daily',
+  economyleaderboard: 'Economy leaderboard', blackjack: 'Blackjack',
+  ecoadd: 'Eco add', ecoset: 'Eco set', ecoremove: 'Eco remove',
+  announce: 'Announce', ticketpanel: 'Ticket panel', rolepanel: 'Role panel',
 };
 
 function addCommandRow(cmd = { enabled: true, type: 'custom', name: '', description: '', response: '', allowedRoles: [] }) {
@@ -302,6 +312,7 @@ function updateModuleSummary(config, enabledCmds) {
   setModuleStatus('moduleTickets', config.ticketsEnabled);
   setModuleStatus('moduleRoles', config.rolesEnabled || Boolean(config.autoRoleId), config.selfRoles?.length ? `${config.selfRoles.length}` : 'On');
   setModuleStatus('moduleLevels', config.levelsEnabled);
+  setModuleStatus('moduleEconomy', config.economyEnabled, config.blackjackEnabled ? 'Cards' : 'On');
   setModuleStatus('moduleAutoReplies', config.autoReplyEnabled, config.autoReplies?.length ? `${config.autoReplies.length}` : 'On');
 }
 

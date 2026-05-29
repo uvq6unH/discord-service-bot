@@ -60,6 +60,9 @@
       <button class="nav-item" data-page="user-levels">
         <i class="ti ti-award"></i><span>Cấp độ & XP</span>
       </button>
+      <button class="nav-item" data-page="economy">
+        <i class="ti ti-coins"></i><span>Tiền ảo</span>
+      </button>
       <button class="nav-item" data-page="auto-replies">
         <i class="ti ti-message-reply"></i><span>Tự động trả lời</span>
       </button>
@@ -194,6 +197,9 @@
             <button type="button" class="module-card" data-page-jump="user-levels">
               <i class="ti ti-award"></i><span>Levels</span><strong id="moduleLevels">—</strong>
             </button>
+            <button type="button" class="module-card" data-page-jump="economy">
+              <i class="ti ti-coins"></i><span>Economy</span><strong id="moduleEconomy">—</strong>
+            </button>
             <button type="button" class="module-card" data-page-jump="auto-replies">
               <i class="ti ti-message-reply"></i><span>Auto replies</span><strong id="moduleAutoReplies">—</strong>
             </button>
@@ -278,6 +284,93 @@
                 <label>Thông báo lên cấp</label>
                 <textarea id="levelUpMessage" name="levelUpMessage" rows="2"
                   placeholder="Chúc mừng {user} đạt cấp {level}!"></textarea>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- ── PAGE: ECONOMY ── -->
+        <section class="page" data-page-panel="economy">
+          <div class="plugin-grid">
+            <div class="plugin-card wide">
+              <div class="plugin-card-header">
+                <div class="plugin-icon bg-amber"><i class="ti ti-coins"></i></div>
+                <div>
+                  <h3>Tiền ảo server</h3>
+                  <p>Quản lý Bạc, Vàng, Kim cương và các lệnh balance/daily/blackjack</p>
+                </div>
+                <label class="toggle ml-auto">
+                  <input type="checkbox" id="economyEnabled" name="economyEnabled">
+                  <span class="toggle-track"></span>
+                </label>
+              </div>
+              <div class="plugin-card-body">
+                <div class="currency-grid">
+                  <div>
+                    <label>Tên tiền 1</label>
+                    <input id="currencySilverName" name="currencySilverName" placeholder="Bạc" />
+                    <label>Icon tiền 1</label>
+                    <input id="currencySilverIcon" name="currencySilverIcon" placeholder="🥈" />
+                  </div>
+                  <div>
+                    <label>Tên tiền 2</label>
+                    <input id="currencyGoldName" name="currencyGoldName" placeholder="Vàng" />
+                    <label>Icon tiền 2</label>
+                    <input id="currencyGoldIcon" name="currencyGoldIcon" placeholder="🪙" />
+                  </div>
+                  <div>
+                    <label>Tên tiền 3</label>
+                    <input id="currencyDiamondName" name="currencyDiamondName" placeholder="Kim cương" />
+                    <label>Icon tiền 3</label>
+                    <input id="currencyDiamondIcon" name="currencyDiamondIcon" placeholder="💎" />
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="plugin-card">
+              <div class="plugin-card-header">
+                <div class="plugin-icon bg-green"><i class="ti ti-calendar-check"></i></div>
+                <div>
+                  <h3>Điểm danh hằng ngày</h3>
+                  <p>Phần thưởng /daily theo cooldown</p>
+                </div>
+                <label class="toggle ml-auto">
+                  <input type="checkbox" id="dailyEnabled" name="dailyEnabled">
+                  <span class="toggle-track"></span>
+                </label>
+              </div>
+              <div class="plugin-card-body">
+                <div class="field-row">
+                  <label>Cooldown giờ</label>
+                  <input id="dailyCooldownHours" name="dailyCooldownHours" type="number" min="1" max="168" class="input-sm" />
+                </div>
+                <div class="field-grid-3">
+                  <div><label>Bạc</label><input id="dailySilverAmount" name="dailySilverAmount" type="number" min="0" /></div>
+                  <div><label>Vàng</label><input id="dailyGoldAmount" name="dailyGoldAmount" type="number" min="0" /></div>
+                  <div><label>Kim cương</label><input id="dailyDiamondAmount" name="dailyDiamondAmount" type="number" min="0" /></div>
+                </div>
+              </div>
+            </div>
+
+            <div class="plugin-card">
+              <div class="plugin-card-header">
+                <div class="plugin-icon bg-red"><i class="ti ti-cards"></i></div>
+                <div>
+                  <h3>Blackjack</h3>
+                  <p>Game bài 52 lá đặt cược bằng tiền ảo</p>
+                </div>
+                <label class="toggle ml-auto">
+                  <input type="checkbox" id="blackjackEnabled" name="blackjackEnabled">
+                  <span class="toggle-track"></span>
+                </label>
+              </div>
+              <div class="plugin-card-body">
+                <div class="field-grid-2">
+                  <div><label>Cược tối thiểu</label><input id="blackjackMinBet" name="blackjackMinBet" type="number" min="1" /></div>
+                  <div><label>Cược tối đa</label><input id="blackjackMaxBet" name="blackjackMaxBet" type="number" min="1" /></div>
+                </div>
+                <p class="field-hint">Poker/multiplayer nên thiết kế riêng sau: cần phòng chơi, timeout lượt và chia pot.</p>
               </div>
             </div>
           </div>

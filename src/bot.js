@@ -22,6 +22,10 @@ const groupMap = {
   avatar: 'user',
   rank: 'user',
   leaderboard: 'user',
+  balance: 'user',
+  daily: 'user',
+  economyleaderboard: 'user',
+  blackjack: 'user',
   server: 'server',
   say: 'server',
   purge: 'server',
@@ -32,6 +36,9 @@ const groupMap = {
   timeout: 'moderation',
   warnings: 'moderation',
   clearwarns: 'moderation',
+  ecoadd: 'moderation',
+  ecoset: 'moderation',
+  ecoremove: 'moderation',
   ticketpanel: 'interactions',
   rolepanel: 'interactions'
 };
@@ -193,6 +200,96 @@ async function hasAllowedRole(guild, userId, command) {
   return command.allowedRoles.some((roleId) => member.roles.cache.has(roleId));
 }
 
+const currencies = ['silver', 'gold', 'diamond'];
+
+function normalizeCurrency(value) {
+  const input = String(value ?? '').trim().toLowerCase();
+  if (['silver', 'bac', 'bạc'].includes(input)) return 'silver';
+  if (['gold', 'vang', 'vàng'].includes(input)) return 'gold';
+  if (['diamond', 'kimcuong', 'kim-cuong', 'kim cương'].includes(input)) return 'diamond';
+  return 'silver';
+}
+
+function isCurrencyToken(value) {
+  const input = String(value ?? '').trim().toLowerCase();
+  return ['silver', 'bac', 'bạc', 'gold', 'vang', 'vàng', 'diamond', 'kimcuong', 'kim-cuong', 'kim cương'].includes(input);
+}
+
+function currencyMeta(config, currency) {
+  const meta = {
+    silver: { name: config.currencySilverName, icon: config.currencySilverIcon },
+    gold: { name: config.currencyGoldName, icon: config.currencyGoldIcon },
+    diamond: { name: config.currencyDiamondName, icon: config.currencyDiamondIcon }
+  }[currency] ?? { name: 'Bạc', icon: '🥈' };
+  return { name: meta.name || currency, icon: meta.icon || '' };
+}
+
+function formatCurrency(config, currency, amount) {
+  const meta = currencyMeta(config, currency);
+  return `${meta.icon} ${amount.toLocaleString('vi-VN')} ${meta.name}`.trim();
+}
+
+function parseBet(value) {
+  const amount = Number.parseInt(value, 10);
+  return Number.isFinite(amount) ? amount : 0;
+}
+
+function createDeck() {
+  const suits = ['♠', '♥', '♦', '♣'];
+  const ranks = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
+  const deck = [];
+  for (const suit of suits) {
+    for (const rank of ranks) deck.push({ rank, suit });
+  }
+  for (let i = deck.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [deck[i], deck[j]] = [deck[j], deck[i]];
+  }
+  return deck;
+}
+
+function handValue(hand) {
+  let total = 0;
+  let aces = 0;
+  for (const card of hand) {
+    if (card.rank === 'A') {
+      aces += 1;
+      total += 11;
+    } else if (['J', 'Q', 'K'].includes(card.rank)) {
+      total += 10;
+    } else {
+      total += Number(card.rank);
+    }
+  }
+  while (total > 21 && aces > 0) {
+    total -= 10;
+    aces -= 1;
+  }
+  return total;
+}
+
+function formatHand(hand) {
+  return hand.map((card) => `${card.rank}${card.suit}`).join(' ');
+}
+
+function playBlackjack() {
+  const deck = createDeck();
+  const player = [deck.pop(), deck.pop()];
+  const dealer = [deck.pop(), deck.pop()];
+
+  while (handValue(player) < 17) player.push(deck.pop());
+  while (handValue(dealer) < 17) dealer.push(deck.pop());
+
+  const playerValue = handValue(player);
+  const dealerValue = handValue(dealer);
+  let outcome = 'lose';
+  if (playerValue > 21) outcome = 'lose';
+  else if (dealerValue > 21 || playerValue > dealerValue) outcome = 'win';
+  else if (playerValue === dealerValue) outcome = 'push';
+
+  return { player, dealer, playerValue, dealerValue, outcome };
+}
+
 function buildCommandList(config) {
   const prefix = config.prefix === '/' ? '/' : config.prefix || '!';
   return config.commands
@@ -260,6 +357,85 @@ function buildSlashOptions(command) {
         name: 'target',
         description: 'Target user',
         type: ApplicationCommandOptionType.User,
+        required: true
+      }
+    ];
+  }
+
+  if (command.type === 'balance') {
+    return [
+      {
+        name: 'target',
+        description: 'User to inspect',
+        type: ApplicationCommandOptionType.User,
+        required: false
+      }
+    ];
+  }
+
+  if (command.type === 'economyleaderboard') {
+    return [
+      {
+        name: 'currency',
+        description: 'Currency leaderboard',
+        type: ApplicationCommandOptionType.String,
+        required: false,
+        choices: [
+          { name: 'Bạc', value: 'silver' },
+          { name: 'Vàng', value: 'gold' },
+          { name: 'Kim cương', value: 'diamond' }
+        ]
+      }
+    ];
+  }
+
+  if (command.type === 'blackjack') {
+    return [
+      {
+        name: 'bet',
+        description: 'Bet amount',
+        type: ApplicationCommandOptionType.Integer,
+        minValue: 1,
+        required: true
+      },
+      {
+        name: 'currency',
+        description: 'Currency to bet',
+        type: ApplicationCommandOptionType.String,
+        required: false,
+        choices: [
+          { name: 'Bạc', value: 'silver' },
+          { name: 'Vàng', value: 'gold' },
+          { name: 'Kim cương', value: 'diamond' }
+        ]
+      }
+    ];
+  }
+
+  if (['ecoadd', 'ecoset', 'ecoremove'].includes(command.type)) {
+    return [
+      {
+        name: 'target',
+        description: 'Target user',
+        type: ApplicationCommandOptionType.User,
+        required: true
+      },
+      {
+        name: 'currency',
+        description: 'Currency',
+        type: ApplicationCommandOptionType.String,
+        required: true,
+        choices: [
+          { name: 'Bạc', value: 'silver' },
+          { name: 'Vàng', value: 'gold' },
+          { name: 'Kim cương', value: 'diamond' }
+        ]
+      },
+      {
+        name: 'amount',
+        description: 'Amount',
+        type: ApplicationCommandOptionType.Integer,
+        minValue: 0,
         required: true
       }
     ];
@@ -638,6 +814,127 @@ async function runBuiltInCommand({ client, config, command, source, args }) {
       ? top.map((entry, index) => `${index + 1}. <@${entry.userId}> - level ${entry.level}, ${entry.xp} XP`).join('\n')
       : 'No XP yet.';
     return reply({ embeds: [new EmbedBuilder().setTitle('Leaderboard').setDescription(description).setColor(0x2864d8)] });
+  }
+
+  if (command.type === 'balance') {
+    if (!config.economyEnabled) {
+      return reply(isInteraction ? { content: 'Economy is disabled.', ephemeral: true } : 'Economy is disabled.');
+    }
+    const targetUser = isInteraction ? source.options.getUser('target') ?? user : null;
+    const target = targetUser
+      ? { user: targetUser, member: await guild.members.fetch(targetUser.id).catch(() => null) }
+      : await resolveMentionedUser(client, guild, args, user);
+    const balance = await client.stateStore.getBalance(guild.id, target.user.id);
+    return reply({
+      embeds: [
+        new EmbedBuilder()
+          .setTitle(`${target.user.username}'s balance`)
+          .setDescription(currencies.map((currency) => formatCurrency(config, currency, balance[currency] ?? 0)).join('\n'))
+          .setColor(0xd8b428)
+      ]
+    });
+  }
+
+  if (command.type === 'daily') {
+    if (!config.economyEnabled || !config.dailyEnabled) {
+      return reply(isInteraction ? { content: 'Daily rewards are disabled.', ephemeral: true } : 'Daily rewards are disabled.');
+    }
+    const rewards = {
+      silver: config.dailySilverAmount,
+      gold: config.dailyGoldAmount,
+      diamond: config.dailyDiamondAmount
+    };
+    const result = await client.stateStore.claimDaily(guild.id, user.id, rewards, config.dailyCooldownHours * 60 * 60 * 1000);
+    if (!result.claimed) {
+      return reply(isInteraction ? { content: `You can claim daily again <t:${Math.floor(result.nextAt / 1000)}:R>.`, ephemeral: true } : `You can claim daily again <t:${Math.floor(result.nextAt / 1000)}:R>.`);
+    }
+    const claimed = currencies
+      .filter((currency) => rewards[currency] > 0)
+      .map((currency) => formatCurrency(config, currency, rewards[currency]))
+      .join('\n') || 'No rewards configured.';
+    return reply({ embeds: [new EmbedBuilder().setTitle('Daily claimed').setDescription(claimed).setColor(0x3ba55d)] });
+  }
+
+  if (command.type === 'economyleaderboard') {
+    if (!config.economyEnabled) {
+      return reply(isInteraction ? { content: 'Economy is disabled.', ephemeral: true } : 'Economy is disabled.');
+    }
+    const currency = normalizeCurrency(isInteraction ? source.options.getString('currency') : args.split(/\s+/)[0]);
+    const top = await client.stateStore.getEconomyLeaderboard(guild.id, currency, 10);
+    const meta = currencyMeta(config, currency);
+    const description = top.length
+      ? top.map((entry, index) => `${index + 1}. <@${entry.userId}> - ${formatCurrency(config, currency, entry.amount)}`).join('\n')
+      : `No ${meta.name} yet.`;
+    return reply({ embeds: [new EmbedBuilder().setTitle(`${meta.icon} ${meta.name} leaderboard`).setDescription(description).setColor(0xd8b428)] });
+  }
+
+  if (command.type === 'blackjack') {
+    if (!config.economyEnabled || !config.blackjackEnabled) {
+      return reply(isInteraction ? { content: 'Blackjack is disabled.', ephemeral: true } : 'Blackjack is disabled.');
+    }
+    const parts = args.split(/\s+/).filter(Boolean);
+    const bet = isInteraction ? source.options.getInteger('bet') : parseBet(parts[0]);
+    const currency = normalizeCurrency(isInteraction ? source.options.getString('currency') : parts[1]);
+    if (!Number.isInteger(bet) || bet < config.blackjackMinBet || bet > config.blackjackMaxBet) {
+      return reply(isInteraction ? { content: `Bet must be between ${config.blackjackMinBet} and ${config.blackjackMaxBet}.`, ephemeral: true } : `Bet must be between ${config.blackjackMinBet} and ${config.blackjackMaxBet}.`);
+    }
+    const balance = await client.stateStore.getBalance(guild.id, user.id);
+    if ((balance[currency] ?? 0) < bet) {
+      return reply(isInteraction ? { content: `Not enough ${currencyMeta(config, currency).name}.`, ephemeral: true } : `Not enough ${currencyMeta(config, currency).name}.`);
+    }
+
+    const game = playBlackjack();
+    let delta = -bet;
+    let title = 'Blackjack - lost';
+    if (game.outcome === 'win') {
+      delta = bet;
+      title = 'Blackjack - won';
+    } else if (game.outcome === 'push') {
+      delta = 0;
+      title = 'Blackjack - push';
+    }
+    const nextBalance = delta === 0 ? balance : await client.stateStore.adjustBalance(guild.id, user.id, currency, delta);
+    return reply({
+      embeds: [
+        new EmbedBuilder()
+          .setTitle(title)
+          .setDescription([
+            `Bet: ${formatCurrency(config, currency, bet)}`,
+            `You: ${formatHand(game.player)} (${game.playerValue})`,
+            `Dealer: ${formatHand(game.dealer)} (${game.dealerValue})`,
+            `Balance: ${formatCurrency(config, currency, nextBalance[currency] ?? balance[currency])}`
+          ].join('\n'))
+          .setColor(game.outcome === 'win' ? 0x3ba55d : game.outcome === 'push' ? 0xfaa61a : 0xed4245)
+      ]
+    });
+  }
+
+  if (['ecoadd', 'ecoset', 'ecoremove'].includes(command.type)) {
+    if (!config.economyEnabled) {
+      return reply(isInteraction ? { content: 'Economy is disabled.', ephemeral: true } : 'Economy is disabled.');
+    }
+    if (!permissions?.has(PermissionFlagsBits.ManageGuild)) {
+      return reply(isInteraction ? { content: 'You need Manage Server permission.', ephemeral: true } : 'You need Manage Server permission.');
+    }
+    const parts = args.split(/\s+/).filter(Boolean);
+    const targetUser = isInteraction ? source.options.getUser('target') : null;
+    const target = targetUser
+      ? { user: targetUser, member: await guild.members.fetch(targetUser.id).catch(() => null) }
+      : await resolveMentionedUser(client, guild, args, user);
+    const currency = normalizeCurrency(isInteraction ? source.options.getString('currency') : parts.find(isCurrencyToken) ?? 'silver');
+    const amount = isInteraction ? source.options.getInteger('amount') : parseBet(parts.find((part) => /^\d+$/.test(part)));
+    if (!Number.isInteger(amount) || amount < 0) {
+      return reply(isInteraction ? { content: 'Amount must be a positive number.', ephemeral: true } : 'Amount must be a positive number.');
+    }
+    const next = command.type === 'ecoset'
+      ? await client.stateStore.setBalance(guild.id, target.user.id, currency, amount)
+      : await client.stateStore.adjustBalance(guild.id, target.user.id, currency, command.type === 'ecoremove' ? -amount : amount);
+    const content = command.response
+      .replaceAll('{target}', `<@${target.user.id}>`)
+      .replaceAll('{amount}', String(amount))
+      .replaceAll('{currency}', currencyMeta(config, currency).name);
+    await sendLog(guild, config, content);
+    return reply(isInteraction ? { content: `${content} Balance: ${formatCurrency(config, currency, next[currency])}`, ephemeral: true } : `${content} Balance: ${formatCurrency(config, currency, next[currency])}`);
   }
 
   if (command.type === 'announce') {
