@@ -15,7 +15,7 @@ services:
       - key: PORT
         value: 10000
       - key: CONFIG_PATH
-        value: ./data/configs.json
+        value: /var/data/configs.json
       - key: STATE_PATH
         value: /var/data/state.json
       - key: DAILY_RESET_UTC_OFFSET_MINUTES

@@ -85,6 +85,63 @@ export class StateStore {
     }
   }
 
+  // Called once on bot startup: refund bets from sessions that were left
+  // active (e.g. bot crashed / was redeployed mid-game) and remove them.
+  // Sessions older than maxAgeMs (default 6 hours) are always purged even
+  // without a createdAt timestamp so legacy data is cleaned up too.
+  async purgeStaleGameSessions(maxAgeMs = 6 * 60 * 60 * 1000) {
+    await this.ready;
+    const now = Date.now();
+    let dirty = false;
+
+    for (const [guildId, guild] of Object.entries(this.cache.guilds ?? {})) {
+      if (!guild.gameSessions) continue;
+
+      for (const type of ['blackjack', 'poker']) {
+        const sessions = guild.gameSessions[type] ?? {};
+        for (const [messageId, session] of Object.entries(sessions)) {
+          if (!session || session.status !== 'active') {
+            // Already finished — just remove the entry
+            delete guild.gameSessions[type][messageId];
+            dirty = true;
+            continue;
+          }
+
+          const age = session.createdAt ? now - session.createdAt : maxAgeMs + 1;
+          if (age < maxAgeMs) continue; // Still fresh enough, skip
+
+          // Refund bets
+          if (type === 'blackjack' && Array.isArray(session.players)) {
+            for (const player of session.players) {
+              const totalBet = player.hands
+                ? player.hands.reduce((sum, h) => sum + (h.bet ?? 0), 0)
+                : (player.bet ?? 0);
+              if (totalBet > 0 && player.userId && session.currency) {
+                this._getEconomyUser(guild, player.userId);
+                guild.economy.users[player.userId][session.currency] = Math.max(
+                  0,
+                  Math.floor((guild.economy.users[player.userId][session.currency] ?? 0) + totalBet)
+                );
+              }
+            }
+          } else if (type === 'poker' && session.userId && session.bet > 0 && session.currency) {
+            this._getEconomyUser(guild, session.userId);
+            guild.economy.users[session.userId][session.currency] = Math.max(
+              0,
+              Math.floor((guild.economy.users[session.userId][session.currency] ?? 0) + session.bet)
+            );
+          }
+
+          delete guild.gameSessions[type][messageId];
+          dirty = true;
+          console.log(`[StateStore] Purged stale ${type} session ${messageId} in guild ${guildId}`);
+        }
+      }
+    }
+
+    if (dirty) await this.save();
+  }
+
   _getEconomyUser(guild, userId) {
     guild.economy.users[userId] ??= {
       silver: 0,

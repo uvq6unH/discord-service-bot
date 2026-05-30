@@ -359,6 +359,35 @@ async function validateGameBet({ client, guildId, userId, config, currency, bet,
   return balance;
 }
 
+async function expireSessionWithRefund(client, type, map, id) {
+  const session = map.get(id);
+  if (!session) return;
+  if (session.timeout) clearTimeout(session.timeout);
+  map.delete(id);
+
+  if (session.status !== 'active') return;
+
+  // Refund bets for sessions abandoned via TTL
+  try {
+    if (type === 'blackjack' && Array.isArray(session.players)) {
+      for (const player of session.players) {
+        const totalBet = player.hands
+          ? player.hands.reduce((sum, h) => sum + (h.bet ?? 0), 0)
+          : (player.bet ?? 0);
+        if (totalBet > 0 && player.userId && session.currency) {
+          await client.stateStore.adjustBalance(session.guildId, player.userId, session.currency, totalBet);
+        }
+      }
+    } else if (type === 'poker' && session.userId && session.bet > 0 && session.currency) {
+      await client.stateStore.adjustBalance(session.guildId, session.userId, session.currency, session.bet);
+    }
+    await client.stateStore.deleteGameSession(session.guildId, type, id).catch(() => null);
+    console.log(`[game] Refunded expired ${type} session ${id}`);
+  } catch (err) {
+    console.error(`[game] Failed to refund expired ${type} session ${id}:`, err.message);
+  }
+}
+
 function expireSession(map, id) {
   const session = map.get(id);
   if (session?.timeout) clearTimeout(session.timeout);
@@ -396,22 +425,22 @@ async function getGameSession(client, type, map, guildId, messageId) {
     session = await client.stateStore.getGameSession(guildId, type, messageId);
     if (type === 'poker') revivePokerSession(session);
     if (session?.status === 'active') {
-      session.timeout = scheduleSessionExpiry(map, messageId);
+      session.timeout = scheduleSessionExpiry(client, type, map, messageId);
       map.set(messageId, session);
     }
   }
   return session;
 }
 
-function scheduleSessionExpiry(map, id) {
-  return setTimeout(() => expireSession(map, id), gameSessionTtlMs);
+function scheduleSessionExpiry(client, type, map, id) {
+  return setTimeout(() => expireSessionWithRefund(client, type, map, id), gameSessionTtlMs);
 }
 
-function refreshSessionExpiry(map, id) {
+function refreshSessionExpiry(client, type, map, id) {
   const session = map.get(id);
   if (!session) return;
   if (session.timeout) clearTimeout(session.timeout);
-  session.timeout = scheduleSessionExpiry(map, id);
+  session.timeout = scheduleSessionExpiry(client, type, map, id);
 }
 
 function visibleDealerHand(session, reveal = false) {
@@ -477,8 +506,9 @@ function settleBlackjackSession(client, session) {
   const results = [];
   for (const { player, handState } of blackjackHands(session)) {
     if (handState.outcome === 'canceled') {
-      handState.payout = 0;
-      results.push(`${player.username}: ${formatHand(handState.cards)} - canceled`);
+      // Refund the original bet on cancel
+      handState.payout = handState.bet ?? 0;
+      results.push(`${player.username}: ${formatHand(handState.cards)} - canceled (refunded)`);
       continue;
     }
     const playerValue = handValue(handState.cards);
@@ -694,7 +724,10 @@ function buildPokerPayload(config, session) {
 async function finishPokerSession(client, session, config, canceled = false) {
   session.status = 'finished';
   let payout = 0;
-  if (!canceled) {
+  if (canceled) {
+    // Refund the full bet on cancel
+    payout = session.bet;
+  } else {
     for (let i = 0; i < session.hand.length; i += 1) {
       if (!session.held.has(i)) {
         session.hand[i] = session.deck.pop();
@@ -1298,8 +1331,14 @@ async function runBuiltInCommand({ client, config, command, source, args }) {
       gold: config.dailyGoldAmount,
       diamond: config.dailyDiamondAmount
     };
+    // dailyResetUtcOffset from config (minutes, e.g. 420 = UTC+7).
+    // Falls back to DAILY_RESET_UTC_OFFSET_MINUTES env var, then UTC+7.
+    const utcOffset =
+      Number.isFinite(config.dailyResetUtcOffset)
+        ? config.dailyResetUtcOffset
+        : (Number.parseInt(process.env.DAILY_RESET_UTC_OFFSET_MINUTES, 10) || 420);
     const result = await client.stateStore.claimDaily(guild.id, user.id, rewards, {
-      utcOffsetMinutes: Number.parseInt(process.env.DAILY_RESET_UTC_OFFSET_MINUTES, 10) || 420
+      utcOffsetMinutes: utcOffset
     });
     if (!result.claimed) {
       return reply(isInteraction ? { content: `You can claim daily again <t:${Math.floor(result.nextAt / 1000)}:R>.`, ephemeral: true } : `You can claim daily again <t:${Math.floor(result.nextAt / 1000)}:R>.`);
@@ -1349,14 +1388,15 @@ async function runBuiltInCommand({ client, config, command, source, args }) {
       dealer: [deck.pop(), deck.pop()],
       players: [createBlackjackPlayer(user, bet, deck, reserved[currency] ?? 0)],
       activePlayerIndex: 0,
-      status: 'active'
+      status: 'active',
+      createdAt: Date.now()
     };
 
     const sent = await reply(buildBlackjackPayload(config, session));
     const message = isInteraction ? await source.fetchReply().catch(() => null) : sent;
     if (message?.id) {
       session.messageId = message.id;
-      session.timeout = scheduleSessionExpiry(blackjackSessions, message.id);
+      session.timeout = scheduleSessionExpiry(client, 'blackjack', blackjackSessions, message.id);
       blackjackSessions.set(message.id, session);
       await persistGameSession(client, 'blackjack', message.id, session);
     }
@@ -1389,13 +1429,14 @@ async function runBuiltInCommand({ client, config, command, source, args }) {
       deck,
       hand: [deck.pop(), deck.pop(), deck.pop(), deck.pop(), deck.pop()],
       held: new Set(),
-      status: 'active'
+      status: 'active',
+      createdAt: Date.now()
     };
     const sent = await reply(buildPokerPayload(config, session));
     const message = isInteraction ? await source.fetchReply().catch(() => null) : sent;
     if (message?.id) {
       session.messageId = message.id;
-      session.timeout = scheduleSessionExpiry(pokerSessions, message.id);
+      session.timeout = scheduleSessionExpiry(client, 'poker', pokerSessions, message.id);
       pokerSessions.set(message.id, session);
       await persistGameSession(client, 'poker', message.id, session);
     }
@@ -1621,6 +1662,12 @@ export function createBot(configStore, stateStore) {
 
   client.once(Events.ClientReady, (readyClient) => {
     console.log(`Discord bot logged in as ${readyClient.user.tag}`);
+
+    // Purge stale game sessions left from previous runs and refund bets
+    stateStore.purgeStaleGameSessions().catch((err) =>
+      console.error('[bot] Failed to purge stale game sessions:', err.message)
+    );
+
     for (const guild of readyClient.guilds.cache.values()) {
       configStore
         .getGuildConfig(guild.id)
@@ -1717,7 +1764,7 @@ export function createBot(configStore, stateStore) {
           await interaction.reply({ content: 'Blackjack session expired.', ephemeral: true });
           return;
         }
-        refreshSessionExpiry(blackjackSessions, interaction.message.id);
+        refreshSessionExpiry(client, 'blackjack', blackjackSessions, interaction.message.id);
 
         if (action === 'join') {
           if (session.players.some((player) => player.userId === interaction.user.id)) {
@@ -1818,7 +1865,7 @@ export function createBot(configStore, stateStore) {
           await interaction.reply({ content: 'Poker session expired.', ephemeral: true });
           return;
         }
-        refreshSessionExpiry(pokerSessions, interaction.message.id);
+        refreshSessionExpiry(client, 'poker', pokerSessions, interaction.message.id);
         if (interaction.user.id !== targetUserId || interaction.user.id !== session.userId) {
           await interaction.reply({ content: 'This is not your poker hand.', ephemeral: true });
           return;

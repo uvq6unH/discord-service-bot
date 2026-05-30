@@ -244,6 +244,7 @@ const defaultConfig = {
   currencyDiamondIcon: '💎',
   dailyEnabled: true,
   dailyCooldownHours: 24,
+  dailyResetUtcOffset: 420,
   dailySilverAmount: 100,
   dailyGoldAmount: 5,
   dailyDiamondAmount: 0,
@@ -499,6 +500,9 @@ export class ConfigStore {
       currencyDiamondIcon: String(patch.currencyDiamondIcon ?? '').trim().slice(0, 8) || defaultConfig.currencyDiamondIcon,
       dailyEnabled: patch.dailyEnabled !== false,
       dailyCooldownHours: Math.max(1, Math.min(168, Number.parseInt(patch.dailyCooldownHours, 10) || defaultConfig.dailyCooldownHours)),
+      dailyResetUtcOffset: Number.isFinite(Number(patch.dailyResetUtcOffset))
+        ? Math.max(-720, Math.min(840, Math.round(Number(patch.dailyResetUtcOffset))))
+        : (current.dailyResetUtcOffset ?? defaultConfig.dailyResetUtcOffset),
       dailySilverAmount: Math.max(0, Math.min(1000000, Number.parseInt(patch.dailySilverAmount, 10) || 0)),
       dailyGoldAmount: Math.max(0, Math.min(1000000, Number.parseInt(patch.dailyGoldAmount, 10) || 0)),
       dailyDiamondAmount: Math.max(0, Math.min(1000000, Number.parseInt(patch.dailyDiamondAmount, 10) || 0)),
