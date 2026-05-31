@@ -261,11 +261,12 @@ export async function getSummonerByPuuid(puuid, region, apiKey) {
   return data;
 }
 
-export async function getRankedInfo(summonerId, region, apiKey) {
-  const cacheKey = `ranked:${region}:${summonerId}`;
+export async function getRankedInfo(puuid, region, apiKey) {
+  const cacheKey = `ranked:${region}:${puuid}`;
   let data = cache.get(cacheKey);
   if (!data) {
-    data = await riotGet(`/lol/league/v4/entries/by-summoner/${summonerId}`, region, apiKey);
+    // Use puuid-based endpoint (by-summoner/{summonerId} is deprecated as of 2024)
+    data = await riotGet(`/lol/league/v4/entries/by-puuid/${puuid}`, region, apiKey);
     cache.set(cacheKey, data, TTL.profile);
   }
   return data;

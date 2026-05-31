@@ -85,7 +85,7 @@ export async function handleLsd({ source, args, isInteraction, stateStore, guild
     if (!matchIds.length) return editOrReply(source, isInteraction, { content: 'Không tìm thấy lịch sử trận đấu.' });
 
     const matches = await Promise.all(matchIds.map((id) => getMatchDetail(id, region, apiKey)));
-    const rankedEntries = await getRankedInfo(summoner.id, region, apiKey);
+    const rankedEntries = await getRankedInfo(account.puuid, region, apiKey);
     const solo = rankedEntries.find((e) => e.queueType === 'RANKED_SOLO_5x5');
 
     const lines = matches.map((m, i) => {
@@ -132,7 +132,7 @@ export async function handleLolProfile({ source, args, isInteraction, stateStore
     const patch = await getLatestPatch();
 
     const [rankedEntries, masteries, champData] = await Promise.all([
-      getRankedInfo(summoner.id, region, apiKey),
+      getRankedInfo(account.puuid, region, apiKey),
       getTopMastery(account.puuid, region, apiKey, 5),
       getChampionData('vi_VN')
     ]);
