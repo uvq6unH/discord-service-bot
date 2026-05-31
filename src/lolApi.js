@@ -154,30 +154,87 @@ export async function getLatestPatch() {
 }
 
 export async function getChampionData(lang = 'vi_VN') {
-  const patch = await getLatestPatch();
-  const cacheKey = `ddragon:champions:${patch}:${lang}`;
-  let data = cache.get(cacheKey);
-  if (!data) {
-    data = await httpGet(`${DDRAGON_BASE}/cdn/${patch}/data/${lang}/champion.json`);
-    cache.set(cacheKey, data, TTL.ddragon);
+  const cdLang = lang === 'vi_VN' ? 'vi_vn' : 'en_us';
+  const cacheKey = `cdragon:champions:${cdLang}`;
+  let cached = cache.get(cacheKey);
+  if (cached) return cached;
+
+  // CommunityDragon champion-summary: always public, no IP restrictions
+  const list = await httpGet(`${CDRAGON_BASE}/plugins/rcp-be-lol-game-data/global/${cdLang}/v1/champion-summary.json`);
+
+  // Normalize to DDragon-compatible shape: { data: { [key]: { key, name, ... } } }
+  const data = { data: {} };
+  for (const c of list) {
+    if (c.id === -1) continue; // skip "None"
+    const champKey = c.alias; // e.g. "Vi", "Ahri"
+    data.data[champKey] = {
+      key: String(c.id),   // numeric string like DDragon
+      id: champKey,
+      name: c.name,
+      tags: c.roles ?? [],
+    };
   }
+  cache.set(cacheKey, data, TTL.ddragon);
   return data;
 }
 
-export async function getChampionDetail(championId, lang = 'vi_VN') {
-  const patch = await getLatestPatch();
-  const cacheKey = `ddragon:champion:${championId}:${patch}:${lang}`;
-  let data = cache.get(cacheKey);
-  if (!data) {
-    try {
-      data = await httpGet(`${DDRAGON_BASE}/cdn/${patch}/data/${lang}/champion/${championId}.json`);
-    } catch {
-      // Fallback to English if Vietnamese not available
-      data = await httpGet(`${DDRAGON_BASE}/cdn/${patch}/data/en_US/champion/${championId}.json`);
-    }
-    cache.set(cacheKey, data, TTL.ddragon);
+export async function getChampionDetail(champKey, lang = 'vi_VN') {
+  const cdLang = lang === 'vi_VN' ? 'vi_vn' : 'en_us';
+  const cacheKey = `cdragon:champdetail:${champKey}:${cdLang}`;
+  let cached = cache.get(cacheKey);
+  if (cached) return cached;
+
+  // Get champion list first to resolve key -> numeric id
+  const champData = await getChampionData(lang);
+  const entry = champData.data[champKey];
+  const numericId = entry ? entry.key : null;
+  if (!numericId) throw Object.assign(new Error(`Champion not found: ${champKey}`), { status: 404 });
+
+  let raw;
+  try {
+    raw = await httpGet(`${CDRAGON_BASE}/plugins/rcp-be-lol-game-data/global/${cdLang}/v1/champions/${numericId}.json`);
+  } catch {
+    // fallback to English
+    raw = await httpGet(`${CDRAGON_BASE}/plugins/rcp-be-lol-game-data/global/en_us/v1/champions/${numericId}.json`);
   }
-  return data.data[championId];
+
+  // Normalize cdragon shape to match what lolCommands expects (DDragon-like)
+  const detail = {
+    id: numericId,   // numeric id needed for image URLs
+    name: raw.name,
+    title: raw.title,
+    lore: raw.shortBio ?? raw.lore ?? '',
+    blurb: raw.shortBio ?? '',
+    tags: raw.roles ?? [],
+    info: { difficulty: raw.difficulty ?? 1 },
+    allytips: raw.tips ?? [],
+    stats: {
+      hp: raw.baseStats?.hp ?? 0,
+      hpperlevel: raw.baseStats?.hpPerLevel ?? 0,
+      mp: raw.baseStats?.mp ?? 0,
+      mpperlevel: raw.baseStats?.mpPerLevel ?? 0,
+      armor: raw.baseStats?.armor ?? 0,
+      armorperlevel: raw.baseStats?.armorPerLevel ?? 0,
+      spellblock: raw.baseStats?.spellBlock ?? 0,
+      spellblockperlevel: raw.baseStats?.spellBlockPerLevel ?? 0,
+      attackdamage: raw.baseStats?.attackDamage ?? 0,
+      attackdamageperlevel: raw.baseStats?.attackDamagePerLevel ?? 0,
+      attackspeed: raw.baseStats?.attackSpeed ?? 0,
+      movespeed: raw.baseStats?.moveSpeed ?? 0,
+      attackrange: raw.baseStats?.attackRange ?? 0,
+    },
+    passive: {
+      name: raw.passive?.name ?? '',
+      description: raw.passive?.description ?? '',
+    },
+    spells: (raw.spells ?? []).map(sp => ({
+      name: sp.name,
+      description: sp.description,
+    })),
+  };
+
+  cache.set(cacheKey, detail, TTL.ddragon);
+  return detail;
 }
 
 export async function getItemData(lang = 'vi_VN') {

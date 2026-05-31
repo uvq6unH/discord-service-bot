@@ -255,8 +255,9 @@ export async function handleLolChamp({ source, args, isInteraction, config, repl
     const detail = await getChampionDetail(found.key, 'vi_VN');
     const s = detail.stats;
 
-    const iconUrl = `${DD(patch)}/img/champion/${found.key}.png`;
-    const splashUrl = `https://ddragon.leagueoflegends.com/cdn/img/champion/loading/${found.key}_0.jpg`;
+    // Use cdragon for images — DDragon CDN can block server IPs
+    const iconUrl = `https://raw.communitydragon.org/latest/plugins/rcp-be-lol-game-data/global/default/v1/champion-icons/${detail.id}.png`;
+    const splashUrl = `https://raw.communitydragon.org/latest/plugins/rcp-be-lol-game-data/global/default/v1/champion-splashes/${detail.id}/${detail.id}000.jpg`;
 
     const stats = [
       `❤️ HP: ${s.hp} (+${s.hpperlevel}/lv)`,
