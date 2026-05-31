@@ -1675,7 +1675,9 @@ async function runBuiltInCommand({ client, config, command, source, args }) {
   const LOL_CMDS = ['lsd','lolprofile','lolmatch','lolchamp','lolitem','lolrunes','lolpatch','lollink','lolunlink'];
   if (LOL_CMDS.includes(command.type)) {
     const lolArgs = isInteraction ? '' : args;
-    const lolCtx = { source, args: lolArgs, isInteraction, stateStore, guildId: guild.id, config, reply };
+    // stateStore is not in scope of runBuiltInCommand — use client.stateStore (set in createBot)
+    const ss = client.stateStore;
+    const lolCtx = { source, args: lolArgs, isInteraction, stateStore: ss, guildId: guild.id, config, reply };
     if (command.type === 'lsd')        return handleLsd(lolCtx);
     if (command.type === 'lolprofile') return handleLolProfile(lolCtx);
     if (command.type === 'lolmatch')   return handleLolMatch(lolCtx);
@@ -1684,7 +1686,7 @@ async function runBuiltInCommand({ client, config, command, source, args }) {
     if (command.type === 'lolrunes')   return handleLolRunes({ ...lolCtx });
     if (command.type === 'lolpatch')   return handleLolPatch({ ...lolCtx });
     if (command.type === 'lollink')    return handleLolLink(lolCtx);
-    if (command.type === 'lolunlink')  return handleLolUnlink({ source, isInteraction, stateStore, guildId: guild.id, reply });
+    if (command.type === 'lolunlink')  return handleLolUnlink({ source, isInteraction, stateStore: ss, guildId: guild.id, reply });
   }
 
   return reply(renderCommandResponse(command.response, { client, context, config, args }));
