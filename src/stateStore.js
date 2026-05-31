@@ -61,6 +61,7 @@ export class StateStore {
     this.cache.guilds[guildId].gameSessions ??= { blackjack: {}, poker: {} };
     this.cache.guilds[guildId].gameSessions.blackjack ??= {};
     this.cache.guilds[guildId].gameSessions.poker ??= {};
+    this.cache.guilds[guildId].lolAccounts ??= {};
     return this.cache.guilds[guildId];
   }
 
@@ -275,4 +276,29 @@ export class StateStore {
     await this.save();
     return number;
   }
+
+  // ── League of Legends linked accounts ──────────────────────────────────────
+
+  async linkLolAccount(guildId, userId, data) {
+    const guild = await this.getGuild(guildId);
+    guild.lolAccounts[userId] = {
+      riotId: data.riotId,
+      puuid:  data.puuid,
+      region: data.region,
+      linkedAt: new Date().toISOString()
+    };
+    await this.save();
+  }
+
+  async unlinkLolAccount(guildId, userId) {
+    const guild = await this.getGuild(guildId);
+    delete guild.lolAccounts[userId];
+    await this.save();
+  }
+
+  async getLinkedLolAccount(guildId, userId) {
+    const guild = await this.getGuild(guildId);
+    return guild.lolAccounts?.[userId] ?? null;
+  }
+
 }

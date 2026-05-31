@@ -13,6 +13,11 @@ import {
   StringSelectMenuBuilder,
   StringSelectMenuOptionBuilder
 } from 'discord.js';
+import {
+  handleLsd, handleLolProfile, handleLolMatch, handleLolChamp,
+  handleLolItem, handleLolRunes, handleLolPatch,
+  handleLolLink, handleLolUnlink, buildLolSlashOptions
+} from './lolCommands.js';
 
 const groupMap = {
   ping: 'general',
@@ -44,7 +49,16 @@ const groupMap = {
   ecoset: 'moderation',
   ecoremove: 'moderation',
   ticketpanel: 'interactions',
-  rolepanel: 'interactions'
+  rolepanel: 'interactions',
+  lsd: 'lol',
+  lolprofile: 'lol',
+  lolmatch: 'lol',
+  lolchamp: 'lol',
+  lolitem: 'lol',
+  lolrunes: 'lol',
+  lolpatch: 'lol',
+  lollink: 'lol',
+  lolunlink: 'lol'
 };
 
 const groupMetadata = {
@@ -67,6 +81,10 @@ const groupMetadata = {
   interactions: {
     title: '🔔 Tương Tác & Nút Bấm',
     description: 'Các lệnh đăng bảng chọn vai trò tự động và tạo kênh hỗ trợ (ticket).'
+  },
+  lol: {
+    title: '⚔️ League of Legends',
+    description: 'Tra cứu lịch sử đấu, hồ sơ người chơi, thông tin tướng, trang bị và bảng ngọc.'
   }
 };
 
@@ -801,7 +819,8 @@ function buildSlashOptions(command) {
           { name: '👤 Thành Viên & Cấp Độ', value: 'user' },
           { name: '🖥️ Máy Chủ & Phát Thanh', value: 'server' },
           { name: '🛡️ Kiểm Duyệt & Bảo Mật', value: 'moderation' },
-          { name: '🔔 Tương Tác & Nút Bấm', value: 'interactions' }
+          { name: '🔔 Tương Tác & Nút Bấm', value: 'interactions' },
+          { name: '⚔️ League of Legends', value: 'lol' }
         ]
       }
     ];
@@ -1016,6 +1035,11 @@ function buildSlashOptions(command) {
     ];
   }
 
+  // ── League of Legends ───────────────────────────────────────────────────
+  if (['lsd','lolprofile','lolmatch','lolchamp','lolitem','lolrunes','lolpatch','lollink','lolunlink'].includes(command.type)) {
+    return buildLolSlashOptions(command.type);
+  }
+
   return [
     {
       name: 'args',
@@ -1115,6 +1139,8 @@ async function runBuiltInCommand({ client, config, command, source, args }) {
         selectedGroup = 'moderation';
       } else if (['tương tác', 'interactions', 'role', 'ticket', 'nút bấm'].includes(lowerArgs)) {
         selectedGroup = 'interactions';
+      } else if (['lol', 'league', 'liên minh', 'lsd', 'tướng'].includes(lowerArgs)) {
+        selectedGroup = 'lol';
       }
     }
 
@@ -1643,6 +1669,22 @@ async function runBuiltInCommand({ client, config, command, source, args }) {
       components: rows
     });
     return reply(isInteraction ? { content: 'Role panel posted.', ephemeral: true } : 'Role panel posted.');
+  }
+
+  // ── League of Legends commands ──────────────────────────────────────────────
+  const LOL_CMDS = ['lsd','lolprofile','lolmatch','lolchamp','lolitem','lolrunes','lolpatch','lollink','lolunlink'];
+  if (LOL_CMDS.includes(command.type)) {
+    const lolArgs = isInteraction ? '' : args;
+    const lolCtx = { source, args: lolArgs, isInteraction, stateStore, guildId: guild.id, config, reply };
+    if (command.type === 'lsd')        return handleLsd(lolCtx);
+    if (command.type === 'lolprofile') return handleLolProfile(lolCtx);
+    if (command.type === 'lolmatch')   return handleLolMatch(lolCtx);
+    if (command.type === 'lolchamp')   return handleLolChamp({ ...lolCtx });
+    if (command.type === 'lolitem')    return handleLolItem({ ...lolCtx });
+    if (command.type === 'lolrunes')   return handleLolRunes({ ...lolCtx });
+    if (command.type === 'lolpatch')   return handleLolPatch({ ...lolCtx });
+    if (command.type === 'lollink')    return handleLolLink(lolCtx);
+    if (command.type === 'lolunlink')  return handleLolUnlink({ source, isInteraction, stateStore, guildId: guild.id, reply });
   }
 
   return reply(renderCommandResponse(command.response, { client, context, config, args }));

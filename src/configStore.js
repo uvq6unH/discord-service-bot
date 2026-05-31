@@ -214,7 +214,17 @@ const defaultConfig = {
       name: 'rolepanel',
       description: 'Post a self-role panel',
       response: 'Choose your roles.'
-    }
+    },
+    // ── League of Legends ───────────────────────────────────────────────────
+    { enabled: true,  type: 'lsd',        name: 'lsd',       description: 'Lịch sử 5 trận đấu gần nhất' },
+    { enabled: true,  type: 'lolprofile', name: 'lol',       description: 'Hồ sơ người chơi LoL (rank, mastery)' },
+    { enabled: true,  type: 'lolmatch',   name: 'lolmatch',  description: 'Chi tiết một trận đấu cụ thể' },
+    { enabled: true,  type: 'lolchamp',   name: 'lolchamp',  description: 'Thông tin tướng LoL' },
+    { enabled: true,  type: 'lolitem',    name: 'lolitem',   description: 'Thông tin trang bị LoL' },
+    { enabled: true,  type: 'lolrunes',   name: 'lolrunes',  description: 'Bảng ngọc LoL' },
+    { enabled: true,  type: 'lolpatch',   name: 'lolpatch',  description: 'Phiên bản LoL mới nhất' },
+    { enabled: true,  type: 'lollink',    name: 'lollink',   description: 'Liên kết tài khoản LoL với Discord' },
+    { enabled: true,  type: 'lolunlink',  name: 'lolunlink', description: 'Bỏ liên kết tài khoản LoL' }
   ],
   moderationEnabled: true,
   autoModEnabled: false,
@@ -245,6 +255,7 @@ const defaultConfig = {
   dailyEnabled: true,
   dailyCooldownHours: 24,
   dailyResetUtcOffset: 420,
+  riotApiKey: '',
   dailySilverAmount: 100,
   dailyGoldAmount: 5,
   dailyDiamondAmount: 0,
@@ -503,6 +514,9 @@ export class ConfigStore {
       dailyResetUtcOffset: Number.isFinite(Number(patch.dailyResetUtcOffset))
         ? Math.max(-720, Math.min(840, Math.round(Number(patch.dailyResetUtcOffset))))
         : (current.dailyResetUtcOffset ?? defaultConfig.dailyResetUtcOffset),
+      riotApiKey: typeof patch.riotApiKey === 'string'
+        ? patch.riotApiKey.trim().slice(0, 60)
+        : (current.riotApiKey ?? ''),
       dailySilverAmount: Math.max(0, Math.min(1000000, Number.parseInt(patch.dailySilverAmount, 10) || 0)),
       dailyGoldAmount: Math.max(0, Math.min(1000000, Number.parseInt(patch.dailyGoldAmount, 10) || 0)),
       dailyDiamondAmount: Math.max(0, Math.min(1000000, Number.parseInt(patch.dailyDiamondAmount, 10) || 0)),
