@@ -19,27 +19,27 @@ export const REGIONS = {
   // Routing for Account-v1 (uses asia for VN2/SEA accounts)
   accountRouting: {
     br1: 'americas', eun1: 'europe', euw1: 'europe',
-    jp1: 'asia',     kr: 'asia',     la1: 'americas',
+    jp1: 'asia', kr: 'asia', la1: 'americas',
     la2: 'americas', na1: 'americas', oc1: 'sea',
-    ph2: 'asia',     ru: 'europe',   sg2: 'asia',
-    th2: 'asia',     tr1: 'europe',  tw2: 'asia',
+    ph2: 'asia', ru: 'europe', sg2: 'asia',
+    th2: 'asia', tr1: 'europe', tw2: 'asia',
     vn2: 'asia'
   },
   // Routing for Match-v5 (VN2 uses sea)
   routing: {
     br1: 'americas', eun1: 'europe', euw1: 'europe',
-    jp1: 'asia',     kr: 'asia',     la1: 'americas',
+    jp1: 'asia', kr: 'asia', la1: 'americas',
     la2: 'americas', na1: 'americas', oc1: 'sea',
-    ph2: 'sea',      ru: 'europe',   sg2: 'sea',
-    th2: 'sea',      tr1: 'europe',  tw2: 'sea',
+    ph2: 'sea', ru: 'europe', sg2: 'sea',
+    th2: 'sea', tr1: 'europe', tw2: 'sea',
     vn2: 'sea'
   },
   // Display names
   display: {
-    br1: 'BR',   eun1: 'EUNE', euw1: 'EUW',  jp1: 'JP',
-    kr: 'KR',    la1: 'LAN',   la2: 'LAS',    na1: 'NA',
-    oc1: 'OCE',  ph2: 'PH',    ru: 'RU',      sg2: 'SG',
-    th2: 'TH',   tr1: 'TR',    tw2: 'TW',     vn2: 'VN'
+    br1: 'BR', eun1: 'EUNE', euw1: 'EUW', jp1: 'JP',
+    kr: 'KR', la1: 'LAN', la2: 'LAS', na1: 'NA',
+    oc1: 'OCE', ph2: 'PH', ru: 'RU', sg2: 'SG',
+    th2: 'TH', tr1: 'TR', tw2: 'TW', vn2: 'VN'
   }
 };
 
@@ -47,12 +47,12 @@ const DDRAGON_BASE = 'https://ddragon.leagueoflegends.com';
 const CDRAGON_BASE = 'https://raw.communitydragon.org/latest';
 
 const QUEUE_IDS = {
-  400:  'Normal Draft',     420: 'Ranked Solo/Duo', 430: 'Normal Blind',
-  440:  'Ranked Flex',      450: 'ARAM',             490: 'Quickplay',
-  700:  'Clash',            830: 'Co-op Intro',      840: 'Co-op Beginner',
-  850:  'Co-op Intermediate', 900: 'URF',            1020: 'One for All',
-  1300: 'Nexus Blitz',      1400: 'Ultimate Spellbook', 1900: 'URF',
-  2000: 'Tutorial 1',       2010: 'Tutorial 2',         2020: 'Tutorial 3'
+  400: 'Normal Draft', 420: 'Ranked Solo/Duo', 430: 'Normal Blind',
+  440: 'Ranked Flex', 450: 'ARAM', 490: 'Quickplay',
+  700: 'Clash', 830: 'Co-op Intro', 840: 'Co-op Beginner',
+  850: 'Co-op Intermediate', 900: 'URF', 1020: 'One for All',
+  1300: 'Nexus Blitz', 1400: 'Ultimate Spellbook', 1900: 'URF',
+  2000: 'Tutorial 1', 2010: 'Tutorial 2', 2020: 'Tutorial 3'
 };
 
 const RANK_EMOJIS = {
@@ -92,7 +92,7 @@ export const cache = new Cache();
 const TTL = {
   ddragon: 60 * 60 * 1000,     // 1 hour  – static data
   profile: 2 * 60 * 1000,      // 2 min   – summoner / rank
-  match:   5 * 60 * 1000,      // 5 min   – match history
+  match: 5 * 60 * 1000,      // 5 min   – match history
   mastery: 10 * 60 * 1000,     // 10 min  – champion mastery
 };
 
@@ -309,13 +309,13 @@ export async function findChampion(query) {
 
   // Exact key match first
   for (const [champKey, champ] of Object.entries(data.data)) {
-    if (champKey.toLowerCase() === query) return { key: champKey, ...champ };
+    if (champKey.toLowerCase() === query) return { alias: champKey, ...champ };
   }
   // Partial name match
   for (const [champKey, champ] of Object.entries(data.data)) {
     const name = champ.name.toLowerCase()
       .normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-    if (name.includes(q) || champKey.toLowerCase().includes(q)) return { key: champKey, ...champ };
+    if (name.includes(q) || champKey.toLowerCase().includes(q)) return { alias: champKey, ...champ };
   }
   return null;
 }
@@ -430,7 +430,7 @@ export function formatRank(entry) {
     ? Math.round(entry.wins / (entry.wins + entry.losses) * 100)
     : 0;
   return `${emoji} **${entry.tier} ${entry.rank}** — ${entry.leaguePoints} LP\n` +
-         `${entry.wins}W/${entry.losses}L (${wr}% WR)`;
+    `${entry.wins}W/${entry.losses}L (${wr}% WR)`;
 }
 
 export function formatDuration(seconds) {

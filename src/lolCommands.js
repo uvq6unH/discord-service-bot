@@ -24,13 +24,13 @@ import {
 
 // ── Colours ───────────────────────────────────────────────────────────────────
 const C = {
-  win:      0x3ba55d,
-  lose:     0xed4245,
-  neutral:  0xc89b3c,
-  champ:    0x785a28,
-  rune:     0x9b59b6,
-  info:     0x1a78c2,
-  patch:    0xe67e22
+  win: 0x3ba55d,
+  lose: 0xed4245,
+  neutral: 0xc89b3c,
+  champ: 0x785a28,
+  rune: 0x9b59b6,
+  info: 0x1a78c2,
+  patch: 0xe67e22
 };
 
 // DDragon base URL helper
@@ -42,13 +42,13 @@ async function resolveSummoner(source, args, isInteraction, stateStore, guildId,
 
   if (isInteraction) {
     riotIdStr = source.options.getString('summoner');
-    region    = (source.options.getString('region') ?? 'vn2').toLowerCase();
+    region = (source.options.getString('region') ?? 'vn2').toLowerCase();
   } else {
     const parts = args.trim().split(/\s+/);
-    region     = (parts[parts.length - 1]?.toLowerCase() in ({ vn2:1, na1:1, euw1:1, kr:1, jp1:1, sg2:1, eun1:1, br1:1, la1:1, la2:1, oc1:1, ph2:1, ru:1, th2:1, tr1:1, tw2:1 }))
-                   ? parts.pop()
-                   : 'vn2';
-    riotIdStr  = parts.join(' ');
+    region = (parts[parts.length - 1]?.toLowerCase() in ({ vn2: 1, na1: 1, euw1: 1, kr: 1, jp1: 1, sg2: 1, eun1: 1, br1: 1, la1: 1, la2: 1, oc1: 1, ph2: 1, ru: 1, th2: 1, tr1: 1, tw2: 1 }))
+      ? parts.pop()
+      : 'vn2';
+    riotIdStr = parts.join(' ');
   }
 
   // If no summoner given, try linked account
@@ -57,7 +57,7 @@ async function resolveSummoner(source, args, isInteraction, stateStore, guildId,
     const linked = await stateStore.getLinkedLolAccount(guildId, userId);
     if (linked) {
       riotIdStr = linked.riotId;
-      region    = linked.region;
+      region = linked.region;
     }
   }
 
@@ -100,7 +100,7 @@ export async function handleLsd({ source, args, isInteraction, stateStore, guild
       const queue = getQueueName(m.info.queueId);
       const csMin = (cs / (m.info.gameDuration / 60)).toFixed(1);
       return `\`${i + 1}\` **${p.championName}** — ${win} | ${queue}\n` +
-             `   KDA: \`${kda}\` (${kdaRatio}) | CS: \`${cs}\` (${csMin}/min) | ⏱ ${dur}`;
+        `   KDA: \`${kda}\` (${kdaRatio}) | CS: \`${cs}\` (${csMin}/min) | ⏱ ${dur}`;
     }).filter(Boolean);
 
     const iconUrl = `${DD(patch)}/img/profileicon/${summoner.profileIconId}.png`;
@@ -144,14 +144,14 @@ export async function handleLolProfile({ source, args, isInteraction, stateStore
       champById[Number(c.key)] = c.name;
     }
 
-    const solo  = rankedEntries.find((e) => e.queueType === 'RANKED_SOLO_5x5');
-    const flex  = rankedEntries.find((e) => e.queueType === 'RANKED_FLEX_SR');
+    const solo = rankedEntries.find((e) => e.queueType === 'RANKED_SOLO_5x5');
+    const flex = rankedEntries.find((e) => e.queueType === 'RANKED_FLEX_SR');
     const iconUrl = `${DD(patch)}/img/profileicon/${summoner.profileIconId}.png`;
 
     const masteryLines = masteries.slice(0, 5).map((m, i) => {
       const name = champById[m.championId] ?? `Champ #${m.championId}`;
-      const pts  = m.championPoints.toLocaleString();
-      const lvl  = m.championLevel;
+      const pts = m.championPoints.toLocaleString();
+      const lvl = m.championLevel;
       return `${i + 1}. **${name}** — Cấp ${lvl} · ${pts} điểm`;
     }).join('\n');
 
@@ -223,14 +223,14 @@ export async function handleLolMatch({ source, args, isInteraction, stateStore, 
       .setThumbnail(champIcon)
       .setColor(win ? C.win : C.lose)
       .addFields(
-        { name: '⚔️ KDA',         value: `**${kda}** (${kdaRatio})`, inline: true },
-        { name: '🌾 CS',           value: `${cs} (${csMin}/min)`,     inline: true },
-        { name: '💰 Gold',         value: gold,                        inline: true },
-        { name: '💥 Sát Thương',   value: dmg,                         inline: true },
-        { name: '👁️ Vision',       value: String(vision),              inline: true },
-        { name: '🏅 Cấp',          value: String(me.champLevel),       inline: true },
-        { name: '🔵 Đội Xanh',     value: teams[100].join('\n') || '—', inline: true },
-        { name: '🔴 Đội Đỏ',       value: teams[200].join('\n') || '—', inline: true }
+        { name: '⚔️ KDA', value: `**${kda}** (${kdaRatio})`, inline: true },
+        { name: '🌾 CS', value: `${cs} (${csMin}/min)`, inline: true },
+        { name: '💰 Gold', value: gold, inline: true },
+        { name: '💥 Sát Thương', value: dmg, inline: true },
+        { name: '👁️ Vision', value: String(vision), inline: true },
+        { name: '🏅 Cấp', value: String(me.champLevel), inline: true },
+        { name: '🔵 Đội Xanh', value: teams[100].join('\n') || '—', inline: true },
+        { name: '🔴 Đội Đỏ', value: teams[200].join('\n') || '—', inline: true }
       )
       .setFooter({ text: `Match ID: ${match.metadata.matchId} • ${new Date(info.gameStartTimestamp).toLocaleString('vi-VN')}` });
 
@@ -252,7 +252,7 @@ export async function handleLolChamp({ source, args, isInteraction, config, repl
     if (!found) return editOrReply(source, isInteraction, { content: `Không tìm thấy tướng: **${champName}**` });
 
     const patch = await getLatestPatch();
-    const detail = await getChampionDetail(found.key, 'vi_VN');
+    const detail = await getChampionDetail(found.alias, 'vi_VN');
     const s = detail.stats;
 
     // Use cdragon for images — DDragon CDN can block server IPs
@@ -334,9 +334,9 @@ export async function handleLolItem({ source, args, isInteraction, config, reply
       .setThumbnail(iconUrl)
       .setColor(C.neutral)
       .addFields(
-        { name: '💰 Giá',      value: `${(found.gold?.total ?? 0).toLocaleString()} vàng (bán: ${(found.gold?.sell ?? 0).toLocaleString()})`, inline: false },
-        { name: '📊 Chỉ Số',  value: statsLines, inline: false },
-        { name: '📖 Mô Tả',   value: desc.slice(0, 1024), inline: false }
+        { name: '💰 Giá', value: `${(found.gold?.total ?? 0).toLocaleString()} vàng (bán: ${(found.gold?.sell ?? 0).toLocaleString()})`, inline: false },
+        { name: '📊 Chỉ Số', value: statsLines, inline: false },
+        { name: '📖 Mô Tả', value: desc.slice(0, 1024), inline: false }
       )
       .setFooter({ text: `Item ID: ${foundId} • Patch ${patch}` });
 
@@ -410,7 +410,7 @@ export async function handleLolPatch({ source, isInteraction, config, reply }) {
 
     // Lấy changelog URL từ Riot website (chỉ link, không scrape)
     const patchNoteUrl = `https://www.leagueoflegends.com/vi-vn/news/game-updates/patch-${major}-${minor}-notes/`;
-    const enPatchUrl   = `https://www.leagueoflegends.com/en-us/news/game-updates/patch-${major}-${minor}-notes/`;
+    const enPatchUrl = `https://www.leagueoflegends.com/en-us/news/game-updates/patch-${major}-${minor}-notes/`;
 
     const embed = new EmbedBuilder()
       .setTitle(`📰 Phiên Bản Mới Nhất: ${patch}`)
@@ -422,8 +422,8 @@ export async function handleLolPatch({ source, isInteraction, config, reply }) {
       )
       .addFields(
         { name: '🗓️ Chu Kỳ Patch', value: 'Mỗi 2 tuần (thứ 4)', inline: true },
-        { name: '🔗 OP.GG',        value: 'https://op.gg',             inline: true },
-        { name: '🔗 U.GG',         value: 'https://u.gg',              inline: true }
+        { name: '🔗 OP.GG', value: 'https://op.gg', inline: true },
+        { name: '🔗 U.GG', value: 'https://u.gg', inline: true }
       )
       .setFooter({ text: 'Dữ liệu từ Data Dragon API' });
 
@@ -439,7 +439,7 @@ export async function handleLolLink({ source, args, isInteraction, stateStore, g
   if (!apiKey) return reply(noApiKeyMsg(isInteraction));
 
   const riotIdStr = (isInteraction ? source.options.getString('summoner') : args).trim();
-  const region    = ((isInteraction ? source.options.getString('region') : null) ?? 'vn2').toLowerCase();
+  const region = ((isInteraction ? source.options.getString('region') : null) ?? 'vn2').toLowerCase();
 
   if (!riotIdStr) return reply(isInteraction
     ? { content: 'Nhập Riot ID của bạn. VD: `/lollink PlayerName#VN2`', ephemeral: true }
@@ -453,11 +453,11 @@ export async function handleLolLink({ source, args, isInteraction, stateStore, g
 
     // Verify account exists
     const account = await getAccountByRiotId(parsed.gameName, parsed.tagLine, region, apiKey);
-    const userId  = isInteraction ? source.user.id : source.author.id;
+    const userId = isInteraction ? source.user.id : source.author.id;
 
     await stateStore.linkLolAccount(guildId, userId, {
       riotId: `${account.gameName}#${account.tagLine}`,
-      puuid:  account.puuid,
+      puuid: account.puuid,
       region
     });
 
@@ -511,10 +511,10 @@ export function buildLolSlashOptions(commandType) {
       { name: 'index', description: 'Số thứ tự trận (1–10)', type: ApplicationCommandOptionType.Integer, required: false, minValue: 1, maxValue: 10 }
     ];
     case 'lolchamp': return [champOpt];
-    case 'lolitem':  return [itemOpt];
+    case 'lolitem': return [itemOpt];
     case 'lolrunes': return [treeOpt];
     case 'lolpatch': return [];
-    case 'lollink':  return [{ ...summonerRequired, description: 'Riot ID của bạn (VD: PlayerName#VN2)' }, regionOpt];
+    case 'lollink': return [{ ...summonerRequired, description: 'Riot ID của bạn (VD: PlayerName#VN2)' }, regionOpt];
     case 'lolunlink': return [];
     default: return [];
   }
@@ -527,7 +527,13 @@ function noApiKeyMsg(isInteraction) {
 }
 
 function formatError(err) {
-  if (err.status === 404) return '❌ Không tìm thấy người chơi. Kiểm tra lại Riot ID và khu vực.';
+  if (err.status === 404) {
+    // Champion/item/static data not found vs summoner not found
+    if (err.message && (err.message.startsWith('Champion not found') || err.message.startsWith('Not found'))) {
+      return `❌ Không tìm thấy dữ liệu: ${err.message}`;
+    }
+    return '❌ Không tìm thấy người chơi. Kiểm tra lại Riot ID và khu vực.';
+  }
   if (err.status === 429) return '❌ Đã vượt giới hạn API. Vui lòng thử lại sau vài giây.';
   if (err.status === 403) {
     const isRiotApi = err.body && err.body.includes('status_code');
