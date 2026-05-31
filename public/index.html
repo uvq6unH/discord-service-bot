@@ -79,6 +79,9 @@
 
     <div class="nav-group">
       <p class="nav-group-label">Hệ thống</p>
+      <button class="nav-item" data-page="lol-tft">
+        <i class="ti ti-sword"></i><span>LoL & TFT</span>
+      </button>
       <button class="nav-item" data-page="advanced">
         <i class="ti ti-settings"></i><span>Nâng cao</span>
       </button>
@@ -339,12 +342,16 @@
               <div class="plugin-card-body">
                 <div class="field-row">
                   <label>Cooldown giờ</label>
-                  <input id="dailyCooldownHours" name="dailyCooldownHours" type="number" min="1" max="168" class="input-sm" />
+                  <input id="dailyCooldownHours" name="dailyCooldownHours" type="number" min="1" max="168"
+                    class="input-sm" />
                 </div>
                 <div class="field-grid-3">
-                  <div><label>Bạc</label><input id="dailySilverAmount" name="dailySilverAmount" type="number" min="0" /></div>
-                  <div><label>Vàng</label><input id="dailyGoldAmount" name="dailyGoldAmount" type="number" min="0" /></div>
-                  <div><label>Kim cương</label><input id="dailyDiamondAmount" name="dailyDiamondAmount" type="number" min="0" /></div>
+                  <div><label>Bạc</label><input id="dailySilverAmount" name="dailySilverAmount" type="number" min="0" />
+                  </div>
+                  <div><label>Vàng</label><input id="dailyGoldAmount" name="dailyGoldAmount" type="number" min="0" />
+                  </div>
+                  <div><label>Kim cương</label><input id="dailyDiamondAmount" name="dailyDiamondAmount" type="number"
+                      min="0" /></div>
                 </div>
               </div>
             </div>
@@ -363,8 +370,10 @@
               </div>
               <div class="plugin-card-body">
                 <div class="field-grid-2">
-                  <div><label>Cược tối thiểu</label><input id="blackjackMinBet" name="blackjackMinBet" type="number" min="1" /></div>
-                  <div><label>Cược tối đa</label><input id="blackjackMaxBet" name="blackjackMaxBet" type="number" min="1" /></div>
+                  <div><label>Cược tối thiểu</label><input id="blackjackMinBet" name="blackjackMinBet" type="number"
+                      min="1" /></div>
+                  <div><label>Cược tối đa</label><input id="blackjackMaxBet" name="blackjackMaxBet" type="number"
+                      min="1" /></div>
                 </div>
                 <p class="field-hint">Bot trừ cược khi bắt đầu, trả thưởng khi kết thúc ván.</p>
               </div>
@@ -384,10 +393,13 @@
               </div>
               <div class="plugin-card-body">
                 <div class="field-grid-2">
-                  <div><label>Cược tối thiểu</label><input id="pokerMinBet" name="pokerMinBet" type="number" min="1" /></div>
-                  <div><label>Cược tối đa</label><input id="pokerMaxBet" name="pokerMaxBet" type="number" min="1" /></div>
+                  <div><label>Cược tối thiểu</label><input id="pokerMinBet" name="pokerMinBet" type="number" min="1" />
+                  </div>
+                  <div><label>Cược tối đa</label><input id="pokerMaxBet" name="pokerMaxBet" type="number" min="1" />
+                  </div>
                 </div>
-                <p class="field-hint">Bản này là video poker một người chơi; poker nhiều người cần thiết kế phòng và pot riêng.</p>
+                <p class="field-hint">Bản này là video poker một người chơi; poker nhiều người cần thiết kế phòng và pot
+                  riêng.</p>
               </div>
             </div>
 
@@ -405,8 +417,10 @@
               </div>
               <div class="plugin-card-body">
                 <div class="field-grid-2">
-                  <div><label>Cược tối thiểu</label><input id="coinflipMinBet" name="coinflipMinBet" type="number" min="1" /></div>
-                  <div><label>Cược tối đa</label><input id="coinflipMaxBet" name="coinflipMaxBet" type="number" min="1" /></div>
+                  <div><label>Cược tối thiểu</label><input id="coinflipMinBet" name="coinflipMinBet" type="number"
+                      min="1" /></div>
+                  <div><label>Cược tối đa</label><input id="coinflipMaxBet" name="coinflipMaxBet" type="number"
+                      min="1" /></div>
                 </div>
               </div>
             </div>
@@ -425,7 +439,8 @@
               </div>
               <div class="plugin-card-body">
                 <div class="field-grid-2">
-                  <div><label>Cược tối thiểu</label><input id="diceMinBet" name="diceMinBet" type="number" min="1" /></div>
+                  <div><label>Cược tối thiểu</label><input id="diceMinBet" name="diceMinBet" type="number" min="1" />
+                  </div>
                   <div><label>Cược tối đa</label><input id="diceMaxBet" name="diceMaxBet" type="number" min="1" /></div>
                 </div>
               </div>
@@ -445,8 +460,10 @@
               </div>
               <div class="plugin-card-body">
                 <div class="field-grid-2">
-                  <div><label>Cược tối thiểu</label><input id="slotsMinBet" name="slotsMinBet" type="number" min="1" /></div>
-                  <div><label>Cược tối đa</label><input id="slotsMaxBet" name="slotsMaxBet" type="number" min="1" /></div>
+                  <div><label>Cược tối thiểu</label><input id="slotsMinBet" name="slotsMinBet" type="number" min="1" />
+                  </div>
+                  <div><label>Cược tối đa</label><input id="slotsMaxBet" name="slotsMaxBet" type="number" min="1" />
+                  </div>
                 </div>
               </div>
             </div>
@@ -634,6 +651,58 @@
         </section>
 
         <!-- ── PAGE: ADVANCED ── -->
+        <section class="page" data-page-panel="lol-tft">
+          <div class="plugin-grid">
+            <div class="plugin-card wide">
+              <div class="plugin-card-header">
+                <div class="plugin-icon bg-orange"><i class="ti ti-sword"></i></div>
+                <div>
+                  <h3>Riot API Keys</h3>
+                  <p>API key để bật các lệnh League of Legends &amp; TFT</p>
+                </div>
+              </div>
+              <div class="plugin-card-body">
+                <label>LoL API Key <small style="opacity:.6">(RIOT_API_KEY)</small></label>
+                <input id="riotApiKey" name="riotApiKey" type="text"
+                  placeholder="RGAPI-xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" autocomplete="off"
+                  style="font-family:monospace;font-size:.85em" />
+                <p class="field-hint">Dùng cho tất cả lệnh <code>/lol</code>, <code>/lsd</code>, <code>/lolchamp</code>…
+                  Lấy key tại <a href="https://developer.riotgames.com" target="_blank">developer.riotgames.com</a>.
+                  Development key hết hạn sau 24h, Personal key không hết hạn và có quyền truy cập match-v5.</p>
+
+                <label style="margin-top:1rem">TFT API Key <small style="opacity:.6">(TFT_API_KEY — tùy
+                    chọn)</small></label>
+                <input id="tftApiKey" name="tftApiKey" type="text" placeholder="Để trống → dùng chung LoL API Key"
+                  autocomplete="off" style="font-family:monospace;font-size:.85em" />
+                <p class="field-hint">Nếu bạn có API key riêng cho TFT (ví dụ Personal key thứ hai), nhập vào đây. Nếu
+                  để trống sẽ tự động dùng LoL API Key ở trên.</p>
+              </div>
+            </div>
+
+            <div class="plugin-card">
+              <div class="plugin-card-header">
+                <div class="plugin-icon bg-orange"><i class="ti ti-info-circle"></i></div>
+                <div>
+                  <h3>Lưu ý Dev Key</h3>
+                  <p>Giới hạn của Development API key</p>
+                </div>
+              </div>
+              <div class="plugin-card-body">
+                <div class="token-grid" style="grid-template-columns:1fr">
+                  <p>✅ Account-v1 (tra cứu Riot ID)</p>
+                  <p>✅ Summoner-v4 (thông tin account)</p>
+                  <p>✅ League-v4 (rank solo/flex/TFT)</p>
+                  <p>✅ Champion-Mastery-v4</p>
+                  <p>✅ Match-v5 /ids (lấy danh sách ID trận)</p>
+                  <p>⚠️ Match-v5 /matches/{"{id}"} — giới hạn rate, có thể 403</p>
+                  <p style="margin-top:.5rem;opacity:.7;font-size:.82em">Để dùng đầy đủ match history, cần nâng cấp lên
+                    <strong>Personal API key</strong> (miễn phí, đăng ký tại Riot Developer Portal).</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
         <section class="page" data-page-panel="advanced">
           <div class="plugin-grid">
             <div class="plugin-card">

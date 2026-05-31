@@ -19,7 +19,7 @@ import {
   getMatchHistory, getMatchDetail, getTopMastery, findChampion,
   getChampionDetail, getChampionData, getItemData, getRuneData,
   getLatestPatch, formatRank, formatDuration, getQueueName,
-  getRegionChoices, RANK_EMOJIS, REGIONS
+  getRegionChoices, RANK_EMOJIS, REGIONS, batchFetch
 } from './lolApi.js';
 
 // ── Colours ───────────────────────────────────────────────────────────────────
@@ -85,7 +85,11 @@ export async function handleLsd({ source, args, isInteraction, stateStore, guild
     console.log(`[lsd] puuid=${account.puuid} region=${region} matchRouting=${REGIONS.routing[region]} matchIds=${JSON.stringify(matchIds)}`);
     if (!matchIds.length) return editOrReply(source, isInteraction, { content: `❌ Không tìm thấy lịch sử trận đấu cho **${account.gameName}#${account.tagLine}** (${region.toUpperCase()}).\n\n> Nguyên nhân có thể do:\n> • Development API key không có quyền truy cập match history\n> • Tài khoản chưa chơi trận nào gần đây\n\nThử dùng account khác hoặc nâng cấp lên Personal API key tại developer.riotgames.com` });
 
-    const matches = await Promise.all(matchIds.map((id) => getMatchDetail(id, region, apiKey)));
+    const matchResults = await batchFetch(matchIds, (id) => getMatchDetail(id, region, apiKey));
+    const matches = matchResults.filter(r => r.status === 'fulfilled').map(r => r.value);
+    const failCount = matchResults.filter(r => r.status === 'rejected').length;
+    const firstErr = matchResults.find(r => r.status === 'rejected')?.reason;
+    const isKeyError = firstErr?.status === 403 || firstErr?.status === 401;
     const rankedEntries = await getRankedInfo(account.puuid, region, apiKey);
     const solo = rankedEntries.find((e) => e.queueType === 'RANKED_SOLO_5x5');
 
@@ -106,10 +110,23 @@ export async function handleLsd({ source, args, isInteraction, stateStore, guild
     const iconUrl = `${DD(patch)}/img/profileicon/${summoner.profileIconId}.png`;
     const rankStr = solo ? formatRank(solo) : 'Chưa xếp hạng';
 
+    if (!matches.length) {
+      const reason = isKeyError
+        ? '> ⚠️ API key không có quyền truy cập match-v5 (Development key).\n> Cần **Personal API key** tại developer.riotgames.com'
+        : `> Không thể tải dữ liệu trận (lỗi: ${firstErr?.message ?? 'unknown'})`;
+      return editOrReply(source, isInteraction, { content: `❌ Lấy được thông tin tài khoản nhưng không tải được chi tiết trận đấu.\n\n${reason}` });
+    }
+
+    const keyWarnLine = failCount > 0
+      ? (isKeyError
+        ? `\n⚠️ ${failCount} trận không tải được — dev key bị giới hạn match-v5.`
+        : `\n⚠️ ${failCount} trận không tải được (lỗi mạng/rate limit).`)
+      : '';
+
     const embed = new EmbedBuilder()
       .setAuthor({ name: `${account.gameName}#${account.tagLine}`, iconURL: iconUrl })
       .setTitle('📋 Lịch Sử 5 Trận Gần Nhất')
-      .setDescription(lines.join('\n\n'))
+      .setDescription(lines.join('\n\n') + keyWarnLine)
       .addFields({ name: '🏆 Rank Solo/Duo', value: rankStr, inline: false })
       .setFooter({ text: `Region: ${region.toUpperCase()} • Patch ${patch} • Dùng /lolmatch để xem chi tiết` })
       .setColor(C.neutral)
@@ -194,7 +211,17 @@ export async function handleLolMatch({ source, args, isInteraction, stateStore, 
 
     if (!matchIds[matchIndex]) return editOrReply(source, isInteraction, { content: 'Không tìm thấy trận đấu.' });
 
-    const match = await getMatchDetail(matchIds[matchIndex], region, apiKey);
+    let match;
+    try {
+      match = await getMatchDetail(matchIds[matchIndex], region, apiKey);
+    } catch (detailErr) {
+      const is403 = detailErr?.status === 403 || detailErr?.status === 401;
+      return editOrReply(source, isInteraction, {
+        content: is403
+          ? `❌ Không tải được chi tiết trận đấu.\n> ⚠️ Development API key không có quyền truy cập match-v5.\n> Cần **Personal API key** tại developer.riotgames.com`
+          : `❌ Không tải được chi tiết trận đấu: ${detailErr.message}`
+      });
+    }
     const me = match.info.participants.find((p) => p.puuid === account.puuid);
     if (!me) return editOrReply(source, isInteraction, { content: 'Không tìm thấy dữ liệu người chơi trong trận.' });
 

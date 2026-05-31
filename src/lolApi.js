@@ -96,6 +96,24 @@ const TTL = {
   mastery: 10 * 60 * 1000,     // 10 min  – champion mastery
 };
 
+// ── Rate-limit-aware batch fetch ─────────────────────────────────────────────
+// Dev keys: 20 req/s, 100 req/2min. Fetching 20 match details simultaneously
+// blows through the per-second limit. This helper fires in small concurrent
+// bursts with a gap between them so we stay well inside the rate limit.
+
+export async function batchFetch(ids, fetcher, { concurrency = 3, delayMs = 400 } = {}) {
+  const results = [];
+  for (let i = 0; i < ids.length; i += concurrency) {
+    const chunk = ids.slice(i, i + concurrency);
+    const chunkResults = await Promise.allSettled(chunk.map(id => fetcher(id)));
+    results.push(...chunkResults);
+    if (i + concurrency < ids.length) {
+      await new Promise(r => setTimeout(r, delayMs));
+    }
+  }
+  return results;
+}
+
 // ── Generic HTTP fetch (Node built-in, no extra deps) ────────────────────────
 
 function httpGet(url, headers = {}) {

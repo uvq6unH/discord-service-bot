@@ -16,7 +16,7 @@
 import { EmbedBuilder, ApplicationCommandOptionType } from 'discord.js';
 import {
   parseRiotId, getAccountByRiotId, getSummonerByPuuid,
-  getRegionChoices, formatDuration, REGIONS,
+  getRegionChoices, formatDuration, REGIONS, batchFetch,
 } from './lolApi.js';
 import {
   getTftRankedInfo, getTftMatchHistory, getTftMatchDetail,
@@ -75,7 +75,7 @@ function getTftParticipantData(participant) {
 
 // ── /tftlsd — History list ─────────────────────────────────────────────────────
 export async function handleTftLsd({ source, args, isInteraction, stateStore, guildId, config, reply }) {
-  const apiKey = config.riotApiKey;
+  const apiKey = config.tftApiKey || config.riotApiKey;
   if (!apiKey) return reply(noApiKeyMsg(isInteraction));
   if (isInteraction) await source.deferReply();
 
@@ -93,10 +93,14 @@ export async function handleTftLsd({ source, args, isInteraction, stateStore, gu
       });
     }
 
-    const [matches, itemsMap, champMap, augMap] = await Promise.all([
-      Promise.all(matchIds.map((id) => getTftMatchDetail(id, region, apiKey))),
-      getTftItems(), getTftChampions(), getTftAugments(),
+    const [matchResults, [itemsMap, champMap, augMap]] = await Promise.all([
+      batchFetch(matchIds, (id) => getTftMatchDetail(id, region, apiKey)),
+      Promise.all([getTftItems(), getTftChampions(), getTftAugments()]),
     ]);
+    const matches = matchResults.filter(r => r.status === 'fulfilled').map(r => r.value);
+    const failCount = matchResults.filter(r => r.status === 'rejected').length;
+    const firstErr = matchResults.find(r => r.status === 'rejected')?.reason;
+    const isKeyError = firstErr?.status === 403 || firstErr?.status === 401;
 
     const lines = matches.map((m, i) => {
       const p = m.info.participants.find((x) => x.puuid === account.puuid);
@@ -133,10 +137,23 @@ export async function handleTftLsd({ source, args, isInteraction, stateStore, gu
     const hyper  = rankedEntries.find((e) => e.queueType === 'RANKED_TFT_TURBO');
     const iconUrl = `https://ddragon.leagueoflegends.com/cdn/img/profileicon/${summoner.profileIconId}.png`;
 
+    if (!matches.length) {
+      const reason = isKeyError
+        ? '> ⚠️ API key không có quyền truy cập match-v5 (Development key).\n> Cần **Personal API key** tại developer.riotgames.com'
+        : `> Không thể tải dữ liệu trận (${firstErr?.message ?? 'unknown'})`;
+      return editOrReply(source, isInteraction, { content: `❌ Lấy được thông tin tài khoản nhưng không tải được chi tiết trận TFT.\n\n${reason}` });
+    }
+
+    const keyWarnLine = failCount > 0
+      ? (isKeyError
+        ? `\n⚠️ ${failCount} trận không tải được — dev key bị giới hạn match-v5.`
+        : `\n⚠️ ${failCount} trận không tải được (rate limit/lỗi mạng).`)
+      : '';
+
     const embed = new EmbedBuilder()
       .setAuthor({ name: `${account.gameName}#${account.tagLine}`, iconURL: iconUrl })
       .setTitle('📋 Lịch Sử TFT Gần Nhất')
-      .setDescription(lines.join('\n\n') || '—')
+      .setDescription(lines.join('\n\n') + keyWarnLine || '—')
       .addFields(
         { name: '🏆 Rank TFT', value: ranked ? formatTftRank(ranked) : 'Chưa xếp hạng', inline: false },
         { name: '⚡ Hyper Roll', value: hyper ? formatTftRank(hyper) : 'Chưa xếp hạng', inline: false },
@@ -153,7 +170,7 @@ export async function handleTftLsd({ source, args, isInteraction, stateStore, gu
 
 // ── /tft — TFT Profile ─────────────────────────────────────────────────────────
 export async function handleTftProfile({ source, args, isInteraction, stateStore, guildId, config, reply }) {
-  const apiKey = config.riotApiKey;
+  const apiKey = config.tftApiKey || config.riotApiKey;
   if (!apiKey) return reply(noApiKeyMsg(isInteraction));
   if (isInteraction) await source.deferReply();
 
@@ -171,7 +188,8 @@ export async function handleTftProfile({ source, args, isInteraction, stateStore
     let topTraits = 'Chưa có dữ liệu';
 
     if (matchIds.length) {
-      const matches = await Promise.all(matchIds.slice(0, 10).map((id) => getTftMatchDetail(id, region, apiKey)));
+      const matchResults = await batchFetch(matchIds.slice(0, 10), (id) => getTftMatchDetail(id, region, apiKey));
+      const matches = matchResults.filter(r => r.status === 'fulfilled').map(r => r.value);
       const placements = matches
         .map((m) => m.info.participants.find((p) => p.puuid === account.puuid)?.placement)
         .filter((v) => typeof v === 'number');
@@ -219,7 +237,7 @@ export async function handleTftProfile({ source, args, isInteraction, stateStore
 
 // ── /tftmatch — Single match detail ───────────────────────────────────────────
 export async function handleTftMatch({ source, args, isInteraction, stateStore, guildId, config, reply }) {
-  const apiKey = config.riotApiKey;
+  const apiKey = config.tftApiKey || config.riotApiKey;
   if (!apiKey) return reply(noApiKeyMsg(isInteraction));
   if (isInteraction) await source.deferReply();
 
@@ -230,10 +248,20 @@ export async function handleTftMatch({ source, args, isInteraction, stateStore, 
     const matchIds = await getTftMatchHistory(account.puuid, region, apiKey, Math.max(matchIndex + 1, 1));
     if (!matchIds[matchIndex]) return editOrReply(source, isInteraction, { content: `❌ Không tìm thấy trận TFT thứ ${matchIndex + 1}.` });
 
-    const [match, itemsMap, champMap, augMap] = await Promise.all([
-      getTftMatchDetail(matchIds[matchIndex], region, apiKey),
-      getTftItems(), getTftChampions(), getTftAugments(),
-    ]);
+    let match, itemsMap, champMap, augMap;
+    try {
+      [match, itemsMap, champMap, augMap] = await Promise.all([
+        getTftMatchDetail(matchIds[matchIndex], region, apiKey),
+        getTftItems(), getTftChampions(), getTftAugments(),
+      ]);
+    } catch (detailErr) {
+      const is403 = detailErr?.status === 403 || detailErr?.status === 401;
+      return editOrReply(source, isInteraction, {
+        content: is403
+          ? `❌ Không tải được chi tiết trận TFT.\n> ⚠️ Development API key không có quyền truy cập match-v5.\n> Cần **Personal API key** tại developer.riotgames.com`
+          : `❌ Không tải được chi tiết trận: ${detailErr.message}`
+      });
+    }
 
     const me = match.info.participants.find((p) => p.puuid === account.puuid);
     if (!me) return editOrReply(source, isInteraction, { content: 'Không tìm thấy dữ liệu người chơi trong trận.' });
@@ -321,7 +349,7 @@ export async function handleTftMatch({ source, args, isInteraction, stateStore, 
 
 // ── /tftlink ───────────────────────────────────────────────────────────────────
 export async function handleTftLink({ source, args, isInteraction, stateStore, guildId, config, reply }) {
-  const apiKey = config.riotApiKey;
+  const apiKey = config.tftApiKey || config.riotApiKey;
   if (!apiKey) return reply(noApiKeyMsg(isInteraction));
 
   const riotIdStr = (isInteraction ? source.options.getString('summoner') : args).trim();

@@ -24,7 +24,7 @@ const defaultConfig = {
       type: 'config',
       name: 'config',
       description: 'Show current server config',
-      response: 'Prefix: {prefix}\nWelcome: {welcomeStatus}\nAuto reply: {autoReplyStatus}\nCommands: {commandCount}'
+      response: 'Prefix: {prefix}\nWelcome: {welcomeStatus}\nAuto reply: {autoReplyStatus}\nCommands: {commandCount}\nRiot API: {riotKeyStatus}\nTFT API: {tftKeyStatus}'
     },
     {
       enabled: true,
@@ -262,6 +262,7 @@ const defaultConfig = {
   dailyCooldownHours: 24,
   dailyResetUtcOffset: 420,
   riotApiKey: '',
+  tftApiKey: '',
   dailySilverAmount: 100,
   dailyGoldAmount: 5,
   dailyDiamondAmount: 0,
@@ -444,6 +445,13 @@ function mergeWithDefaultCommands(commands) {
     }
   }
 
+  // Upgrade existing config command response to include Riot key status if not already present
+  for (const command of merged) {
+    if (command.type === 'config' && command.response && !command.response.includes('{riotKeyStatus}')) {
+      command.response = command.response + '\nRiot API: {riotKeyStatus}\nTFT API: {tftKeyStatus}';
+    }
+  }
+
   return merged;
 }
 
@@ -506,6 +514,12 @@ export class ConfigStore {
     } else {
       console.warn('[ConfigStore] RIOT_API_KEY not set anywhere!');
     }
+    // Fall back to TFT_API_KEY env var if separately set (optional separate key for TFT)
+    if (!base.tftApiKey && process.env.TFT_API_KEY) {
+      base.tftApiKey = process.env.TFT_API_KEY.trim();
+      const kp = base.tftApiKey;
+      console.log(`[ConfigStore] TFT_API_KEY from env: ${kp.slice(0,8)}...(len=${kp.length})`);
+    }
     return base;
   }
 
@@ -551,6 +565,9 @@ export class ConfigStore {
       riotApiKey: typeof patch.riotApiKey === 'string'
         ? patch.riotApiKey.trim().slice(0, 100)
         : (current.riotApiKey ?? ''),
+      tftApiKey: typeof patch.tftApiKey === 'string'
+        ? patch.tftApiKey.trim().slice(0, 100)
+        : (current.tftApiKey ?? ''),
       dailySilverAmount: Math.max(0, Math.min(1000000, Number.parseInt(patch.dailySilverAmount, 10) || 0)),
       dailyGoldAmount: Math.max(0, Math.min(1000000, Number.parseInt(patch.dailyGoldAmount, 10) || 0)),
       dailyDiamondAmount: Math.max(0, Math.min(1000000, Number.parseInt(patch.dailyDiamondAmount, 10) || 0)),

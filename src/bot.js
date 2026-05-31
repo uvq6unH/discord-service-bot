@@ -63,12 +63,12 @@ const groupMap = {
   lolpatch: 'lol',
   lollink: 'lol',
   lolunlink: 'lol',
-  // ── TFT ──
-  tftlsd: 'tft',
-  tftprofile: 'tft',
-  tftmatch: 'tft',
-  tftlink: 'tft',
-  tftunlink: 'tft'
+  // ── TFT — grouped with LoL ──
+  tftlsd: 'lol',
+  tftprofile: 'lol',
+  tftmatch: 'lol',
+  tftlink: 'lol',
+  tftunlink: 'lol'
 };
 
 const groupMetadata = {
@@ -97,13 +97,9 @@ const groupMetadata = {
     description: 'Blackjack, Poker, Coinflip, Dice và Slots — đặt cược bằng tiền ảo của server.'
   },
   lol: {
-    title: '⚔️ League of Legends',
-    description: 'Tra cứu lịch sử đấu, hồ sơ người chơi, thông tin tướng, trang bị và bảng ngọc.'
+    title: '⚔️ League of Legends & TFT',
+    description: 'Tra cứu lịch sử đấu LoL/TFT, hồ sơ người chơi, thông tin tướng, trang bị, bảng ngọc và chi tiết trận TFT.'
   },
-  tft: {
-    title: '🎲 Teamfight Tactics',
-    description: 'Tra cứu lịch sử TFT, hồ sơ, chi tiết trận (bài chơi, con, đồ, augment).'
-  }
 };
 
 async function buildHelpPayload(client, config, guild, userId, selectedGroup = null) {
@@ -156,17 +152,11 @@ async function buildHelpPayload(client, config, guild, userId, selectedGroup = n
         .setEmoji('🎮')
         .setDefault(selectedGroup === 'games'),
       new StringSelectMenuOptionBuilder()
-        .setLabel('League of Legends')
+        .setLabel('League of Legends & TFT')
         .setValue('help_group:lol')
-        .setDescription('Tra cứu đấu, hồ sơ, tướng, trang bị, bảng ngọc')
+        .setDescription('Tra cứu đấu LoL/TFT, hồ sơ, tướng, trang bị, bảng ngọc')
         .setEmoji('⚔️')
-        .setDefault(selectedGroup === 'lol'),
-      new StringSelectMenuOptionBuilder()
-        .setLabel('Teamfight Tactics')
-        .setValue('help_group:tft')
-        .setDescription('Lịch sử TFT, hồ sơ, chi tiết trận, bài, con, đồ')
-        .setEmoji('🎲')
-        .setDefault(selectedGroup === 'tft')
+        .setDefault(selectedGroup === 'lol' || selectedGroup === 'tft'),
     );
 
   const row = new ActionRowBuilder().addComponents(selectMenu);
@@ -819,6 +809,10 @@ function getContextValue(context, key) {
 
 function renderCommandResponse(template, { client, context, config, args }) {
   const commandCount = config.commands.filter((command) => command.enabled).length;
+  const riotKey = config.riotApiKey;
+  const tftKey = config.tftApiKey;
+  const riotKeyStatus = riotKey ? `✅ Đã cấu hình (${riotKey.slice(0, 8)}…)` : '❌ Chưa cấu hình';
+  const tftKeyStatus = tftKey ? `✅ Riêng (${tftKey.slice(0, 8)}…)` : (riotKey ? '♻️ Dùng chung LoL key' : '❌ Chưa cấu hình');
   return template
     .replaceAll('{args}', args)
     .replaceAll('{autoReplyStatus}', config.autoReplyEnabled ? 'on' : 'off')
@@ -827,6 +821,8 @@ function renderCommandResponse(template, { client, context, config, args }) {
     .replaceAll('{commands}', buildCommandList(config))
     .replaceAll('{ping}', String(client.ws.ping))
     .replaceAll('{prefix}', config.prefix || '!')
+    .replaceAll('{riotKeyStatus}', riotKeyStatus)
+    .replaceAll('{tftKeyStatus}', tftKeyStatus)
     .replaceAll('{server}', getContextValue(context, 'guildName'))
     .replaceAll('{user}', `<@${getContextValue(context, 'userId')}>`)
     .replaceAll('{username}', getContextValue(context, 'username'))
@@ -858,8 +854,7 @@ function buildSlashOptions(command) {
           { name: '🖥️ Máy Chủ & Phát Thanh', value: 'server' },
           { name: '🛡️ Kiểm Duyệt & Bảo Mật', value: 'moderation' },
           { name: '🔔 Tương Tác & Nút Bấm', value: 'interactions' },
-          { name: '⚔️ League of Legends', value: 'lol' },
-          { name: '🎲 Teamfight Tactics', value: 'tft' }
+          { name: '⚔️ League of Legends & TFT', value: 'lol' },
         ]
       }
     ];
@@ -1183,10 +1178,8 @@ async function runBuiltInCommand({ client, config, command, source, args }) {
         selectedGroup = 'moderation';
       } else if (['tương tác', 'interactions', 'role', 'ticket', 'nút bấm'].includes(lowerArgs)) {
         selectedGroup = 'interactions';
-      } else if (['lol', 'league', 'liên minh', 'lsd', 'tướng'].includes(lowerArgs)) {
+      } else if (['lol', 'league', 'liên minh', 'lsd', 'tướng', 'tft', 'teamfight', 'tactics', 'tftlsd', 'đấu trường'].includes(lowerArgs)) {
         selectedGroup = 'lol';
-      } else if (['tft', 'teamfight', 'tactics', 'tftlsd', 'đấu trường'].includes(lowerArgs)) {
-        selectedGroup = 'tft';
       }
     }
 

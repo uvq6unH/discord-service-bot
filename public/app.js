@@ -55,6 +55,7 @@ const pageTitles = {
   'moderation-automod': 'Kiểm duyệt',
   'server-broadcast': 'Thông báo',
   interactions: 'Ticket & Roles',
+  'lol-tft': 'LoL & TFT',
   advanced: 'Nâng cao',
 };
 
@@ -67,6 +68,7 @@ const pageOrder = [
   'moderation-automod',
   'server-broadcast',
   'interactions',
+  'lol-tft',
   'advanced',
 ];
 
@@ -86,6 +88,7 @@ const FIELDS = [
   'announcementsEnabled', 'announcementChannelId', 'announcementMention',
   'welcomeEnabled', 'welcomeChannelId', 'welcomeMessage',
   'autoReplyEnabled',
+  'riotApiKey', 'tftApiKey',
 ];
 
 // ── Command helpers ──────────────────────────────────────────────────────────
@@ -100,6 +103,7 @@ const groupMap = {
   ticketpanel: 'interactions', rolepanel: 'interactions',
   lsd: 'lol', lolprofile: 'lol', lolmatch: 'lol', lolchamp: 'lol',
   lolitem: 'lol', lolrunes: 'lol', lolpatch: 'lol', lollink: 'lol', lolunlink: 'lol',
+  tftlsd: 'lol', tftprofile: 'lol', tftmatch: 'lol', tftlink: 'lol', tftunlink: 'lol',
 };
 const commandLabels = {
   custom: 'Custom', ping: 'Ping', help: 'Help', config: 'Config', server: 'Server info',
@@ -112,6 +116,8 @@ const commandLabels = {
   lsd: 'Lịch sử đấu', lolprofile: 'Hồ sơ LoL', lolmatch: 'Chi tiết trận',
   lolchamp: 'Thông tin tướng', lolitem: 'Trang bị', lolrunes: 'Bảng ngọc',
   lolpatch: 'Phiên bản', lollink: 'Liên kết tài khoản', lolunlink: 'Bỏ liên kết',
+  tftlsd: 'Lịch sử TFT', tftprofile: 'Hồ sơ TFT', tftmatch: 'Chi tiết TFT',
+  tftlink: 'Liên kết TFT', tftunlink: 'Bỏ liên kết TFT',
 };
 
 const commandGroupOrder = ['general', 'user', 'server', 'moderation', 'interactions', 'games', 'lol'];
@@ -153,8 +159,8 @@ const commandGroupMeta = {
     tone: 'purple',
   },
   lol: {
-    title: '⚔️ League of Legends',
-    hint: 'Lịch sử đấu, hồ sơ, tướng, trang bị, bảng ngọc',
+    title: '⚔️ LoL & TFT',
+    hint: 'Lịch sử đấu, hồ sơ, tướng, trang bị, bảng ngọc · TFT match history, profile',
     icon: 'ti ti-sword',
     tone: 'orange',
   },
