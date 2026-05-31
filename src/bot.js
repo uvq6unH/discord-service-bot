@@ -1705,17 +1705,33 @@ export function createBot(configStore, stateStore) {
   client.once(Events.ClientReady, (readyClient) => {
     console.log(`Discord bot logged in as ${readyClient.user.tag}`);
 
-    // Purge stale game sessions left from previous runs and refund bets
-    stateStore.purgeStaleGameSessions().catch((err) =>
-      console.error('[bot] Failed to purge stale game sessions:', err.message)
-    );
+    // Run async startup tasks without blocking the event loop
+    (async () => {
+      // 1. Wait for stores to finish loading from disk before doing anything
+      await configStore.ready;
+      await stateStore.ready;
 
-    for (const guild of readyClient.guilds.cache.values()) {
-      configStore
-        .getGuildConfig(guild.id)
-        .then((config) => readyClient.syncGuildCommands(guild.id, config))
-        .catch((error) => console.warn(`Could not sync commands for ${guild.id}: ${error.message}`));
-    }
+      // 2. Purge stale game sessions and refund bets
+      await stateStore.purgeStaleGameSessions().catch((err) =>
+        console.error('[bot] Failed to purge stale game sessions:', err.message)
+      );
+
+      // 3. Sync slash commands for every guild — await each one so errors surface clearly
+      const guilds = [...readyClient.guilds.cache.values()];
+      console.log(`[bot] Syncing slash commands for ${guilds.length} guild(s)...`);
+      let synced = 0;
+      for (const guild of guilds) {
+        try {
+          const config = await configStore.getGuildConfig(guild.id);
+          const result = await readyClient.syncGuildCommands(guild.id, config);
+          console.log(`[bot] ✅ Synced ${result.count} commands → ${guild.name} (${guild.id})`);
+          synced += 1;
+        } catch (error) {
+          console.error(`[bot] ❌ Failed to sync commands for ${guild.name} (${guild.id}): ${error.message}`);
+        }
+      }
+      console.log(`[bot] Command sync complete: ${synced}/${guilds.length} guilds OK`);
+    })().catch((err) => console.error('[bot] Startup error:', err));
   });
 
   // ── Resilience: log disconnects and errors instead of silently dying ────────
@@ -1752,8 +1768,21 @@ export function createBot(configStore, stateStore) {
     }
 
     const commands = buildSlashCommands(config);
-    await guild.commands.set(commands);
-    return { synced: true, count: commands.length };
+
+    // Validate: Discord requires name 1-32 chars, description 1-100 chars
+    for (const cmd of commands) {
+      if (!cmd.name || cmd.name.length > 32) {
+        console.warn(`[sync] Skipping invalid command name: "${cmd.name}"`);
+        continue;
+      }
+      if (!cmd.description || cmd.description.length > 100) {
+        cmd.description = (cmd.description ?? cmd.name).slice(0, 100);
+      }
+    }
+
+    const validCommands = commands.filter((cmd) => cmd.name && cmd.name.length <= 32);
+    await guild.commands.set(validCommands);
+    return { synced: true, count: validCommands.length };
   };
 
   client.on(Events.GuildMemberAdd, async (member) => {
