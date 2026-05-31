@@ -23,7 +23,7 @@ export const REGIONS = {
     la2: 'americas', na1: 'americas', oc1: 'sea',
     ph2: 'sea',      ru: 'europe',   sg2: 'sea',
     th2: 'sea',      tr1: 'europe',  tw2: 'sea',
-    vn2: 'sea'
+    vn2: 'asia'
   },
   // Display names
   display: {
