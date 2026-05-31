@@ -103,28 +103,46 @@ export async function getTftRankedInfo(puuid, region, apiKey) {
  * Fetches a larger batch (up to 3× requested) to compensate for filtering.
  */
 export async function getTftMatchHistory(puuid, region, apiKey, count = 5) {
-  // Fetch more than needed since we filter by queue
-  const fetchCount = Math.min(count * 4, 20);
   const cacheKey = `tft:matchids:${region}:${puuid}:${count}`;
   let cached = _cache.get(cacheKey);
   if (cached) return cached;
 
-  // Use LoL match endpoint with queue filter — queue 1090 is most common TFT normal,
-  // but ranked TFT is 1100. We fetch without queue filter then slice.
-  const allIds = await getMatchHistory(puuid, region, apiKey, fetchCount, null);
+  // Use queue filter directly on the API — avoids downloading all match details just to
+  // identify TFT games. match-v5 accepts one queue param per call, so we try queues in
+  // priority order and merge until we have enough.
+  const TFT_QUEUE_PRIORITY = [1100, 1090, 1130, 1160];
 
-  // Filter to only TFT match IDs by checking each match — batch fetch details
-  // to avoid N+1 but cap at fetchCount to respect rate limits
-  const details = await Promise.allSettled(
-    allIds.map((id) => getMatchDetail(id, region, apiKey))
-  );
-
+  const seen = new Set();
   const tftIds = [];
-  for (let i = 0; i < details.length && tftIds.length < count; i++) {
-    const r = details[i];
-    if (r.status === 'fulfilled' && TFT_QUEUE_SET.has(r.value?.info?.queueId)) {
-      tftIds.push(allIds[i]);
+
+  for (const queueId of TFT_QUEUE_PRIORITY) {
+    if (tftIds.length >= count) break;
+    const needed = count - tftIds.length;
+    try {
+      const ids = await getMatchHistory(puuid, region, apiKey, needed, queueId);
+      console.log(`[TFT] queue=${queueId} returned ${ids.length} ids`);
+      for (const id of ids) {
+        if (!seen.has(id)) { seen.add(id); tftIds.push(id); }
+      }
+    } catch (e) {
+      console.warn(`[TFT] queue=${queueId} error: ${e.message} (status=${e.status ?? '?'})`);
     }
+  }
+  console.log(`[TFT] total tftIds after queue filter: ${tftIds.length}`);
+
+  // Last-resort fallback: if all queue-filtered calls returned nothing (e.g. very old account),
+  // fetch unfiltered IDs and check the first few details. Capped at 5 to avoid rate limits.
+  if (tftIds.length === 0) {
+    try {
+      const allIds = await getMatchHistory(puuid, region, apiKey, 10, null);
+      for (const id of allIds.slice(0, 5)) {
+        if (tftIds.length >= count) break;
+        try {
+          const detail = await getMatchDetail(id, region, apiKey);
+          if (TFT_QUEUE_SET.has(detail?.info?.queueId)) tftIds.push(id);
+        } catch { /* skip */ }
+      }
+    } catch { /* skip */ }
   }
 
   _cache.set(cacheKey, tftIds, TTL.match);

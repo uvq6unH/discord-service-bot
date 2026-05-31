@@ -90,6 +90,7 @@ export async function handleLsd({ source, args, isInteraction, stateStore, guild
     const failCount = matchResults.filter(r => r.status === 'rejected').length;
     const firstErr = matchResults.find(r => r.status === 'rejected')?.reason;
     const isKeyError = firstErr?.status === 403 || firstErr?.status === 401;
+    console.log(`[lsd] loaded=${matches.length} failed=${failCount}${firstErr ? ` firstErr=${firstErr.status}:${firstErr.message}` : ''}`);
     const rankedEntries = await getRankedInfo(account.puuid, region, apiKey);
     const solo = rankedEntries.find((e) => e.queueType === 'RANKED_SOLO_5x5');
 
