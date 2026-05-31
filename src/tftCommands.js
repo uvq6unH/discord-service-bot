@@ -1,66 +1,45 @@
 /**
  * tftCommands.js — Teamfight Tactics command handlers
  *
- * Commands (song song với LoL):
+ * Uses LoL match/v5 + league/v4 endpoints (Dev API key compatible).
+ * TFT data sits in the same endpoints — participants have TFT-specific fields
+ * (placement, traits[], units[], augments[]) when queueId is a TFT queue.
+ *
+ * Commands:
  *   /tftlsd   [summoner] [region]         — Lịch sử 5 trận TFT gần nhất
- *   /tft      [summoner] [region]         — Hồ sơ TFT (rank, top traits)
- *   /tftmatch [summoner] [region] [index] — Chi tiết 1 trận TFT cụ thể
- *                                           (bài chơi, con, đồ, augment)
- *   /tftlink  [summoner] [region]         — Liên kết tài khoản (dùng chung với LoL)
+ *   /tft      [summoner] [region]         — Hồ sơ TFT (rank, avg placement, traits)
+ *   /tftmatch [summoner] [region] [index] — Chi tiết 1 trận (bài, con, đồ, augment)
+ *   /tftlink  [summoner] [region]         — Liên kết tài khoản
  *   /tftunlink                            — Bỏ liên kết
  */
 
 import { EmbedBuilder, ApplicationCommandOptionType } from 'discord.js';
 import {
-  parseRiotId,
-  getAccountByRiotId,
-  getSummonerByPuuid,
-  getRegionChoices,
-  formatDuration,
-  REGIONS,
+  parseRiotId, getAccountByRiotId, getSummonerByPuuid,
+  getRegionChoices, formatDuration, REGIONS,
 } from './lolApi.js';
 import {
-  getTftRankedInfo,
-  getTftMatchHistory,
-  getTftMatchDetail,
-  getTftItems,
-  getTftTraits,
-  getTftChampions,
-  getTftAugments,
-  getTftStaticData,
-  formatTftRank,
-  getTftQueueName,
-  placementEmoji,
-  TFT_RANK_EMOJIS,
+  getTftRankedInfo, getTftMatchHistory, getTftMatchDetail,
+  getTftItems, getTftChampions, getTftAugments,
+  formatTftRank, getTftQueueName, placementEmoji,
 } from './tftApi.js';
 
 // ── Colours ───────────────────────────────────────────────────────────────────
-const C = {
-  tft:    0xc89b3c,
-  win:    0x3ba55d,  // top 4
-  lose:   0xed4245,  // bot 4
-  gold:   0xf1c40f,
-  info:   0x1a78c2,
-  trait:  0x9b59b6,
-};
+const C = { tft: 0xc89b3c, win: 0x3ba55d, lose: 0xed4245, info: 0x1a78c2 };
 
-// ── Summoner resolution (reuses linked account, same as LoL) ─────────────────
+// ── Summoner resolution ───────────────────────────────────────────────────────
 async function resolveSummoner(source, args, isInteraction, stateStore, guildId, apiKey) {
   let riotIdStr, region;
-
   if (isInteraction) {
     riotIdStr = source.options.getString('summoner');
     region = (source.options.getString('region') ?? 'vn2').toLowerCase();
   } else {
     const parts = args.trim().split(/\s+/);
-    region = (parts[parts.length - 1]?.toLowerCase() in ({
-      vn2:1, na1:1, euw1:1, kr:1, jp1:1, sg2:1, eun1:1,
-      br1:1, la1:1, la2:1, oc1:1, ph2:1, ru:1, th2:1, tr1:1, tw2:1
-    })) ? parts.pop() : 'vn2';
+    const REGIONS_SET = new Set(['vn2','na1','euw1','kr','jp1','sg2','eun1','br1','la1','la2','oc1','ph2','ru','th2','tr1','tw2']);
+    region = REGIONS_SET.has(parts[parts.length - 1]?.toLowerCase()) ? parts.pop() : 'vn2';
     riotIdStr = parts.join(' ');
   }
 
-  // If no summoner given, try linked account (shared with LoL)
   if (!riotIdStr) {
     const userId = isInteraction ? source.user.id : source.author.id;
     const linked = await stateStore.getLinkedLolAccount(guildId, userId);
@@ -68,86 +47,103 @@ async function resolveSummoner(source, args, isInteraction, stateStore, guildId,
   }
 
   if (!riotIdStr) throw new Error('Vui lòng nhập tên người chơi (VD: PlayerName#VN2) hoặc dùng `/tftlink` để liên kết tài khoản.');
-
   const parsed = parseRiotId(riotIdStr);
-  if (!parsed) throw new Error('Định dạng không hợp lệ. Dùng: `TênNgườiChơi#TAG` (VD: `PlayerName#VN2`)');
+  if (!parsed) throw new Error('Định dạng không hợp lệ. Dùng: `TênNgườiChơi#TAG`');
 
   const account = await getAccountByRiotId(parsed.gameName, parsed.tagLine, region, apiKey);
   const summoner = await getSummonerByPuuid(account.puuid, region, apiKey);
   return { account, summoner, region };
 }
 
-// ── /tftlsd — TFT match history list ─────────────────────────────────────────
+// ── Helper: extract TFT participant data from match/v5 participant ─────────────
+// match/v5 stores TFT data in participant fields when queueId is TFT
+function getTftParticipantData(participant) {
+  // TFT fields may be nested under participant directly (match/v5 TFT format)
+  // or in a metadata object depending on game version
+  return {
+    placement:  participant.placement  ?? participant.augments?.length ? participant.placement : null,
+    traits:     participant.traits     ?? [],
+    units:      participant.units      ?? [],
+    augments:   participant.augments   ?? [],
+    level:      participant.level      ?? participant.participantId ?? 1,
+    gold_left:  participant.gold_left  ?? 0,
+    last_round: participant.last_round ?? 0,
+    players_eliminated: participant.players_eliminated ?? 0,
+    total_damage_to_players: participant.total_damage_to_players ?? 0,
+  };
+}
+
+// ── /tftlsd — History list ─────────────────────────────────────────────────────
 export async function handleTftLsd({ source, args, isInteraction, stateStore, guildId, config, reply }) {
   const apiKey = config.riotApiKey;
   if (!apiKey) return reply(noApiKeyMsg(isInteraction));
-
   if (isInteraction) await source.deferReply();
 
   try {
     const { account, summoner, region } = await resolveSummoner(source, args, isInteraction, stateStore, guildId, apiKey);
-    const matchIds = await getTftMatchHistory(account.puuid, region, apiKey, 5);
 
-    if (!matchIds.length) return editOrReply(source, isInteraction, {
-      content: `❌ Không tìm thấy lịch sử TFT cho **${account.gameName}#${account.tagLine}** (${region.toUpperCase()}).`
-    });
-
-    const [matches, rankedEntries] = await Promise.all([
-      Promise.all(matchIds.map((id) => getTftMatchDetail(id, region, apiKey))),
+    const [matchIds, rankedEntries] = await Promise.all([
+      getTftMatchHistory(account.puuid, region, apiKey, 5),
       getTftRankedInfo(account.puuid, region, apiKey),
     ]);
 
-    // Load static data once for the whole batch
-    const [itemsMap, champMap, augMap] = await Promise.all([
+    if (!matchIds.length) {
+      return editOrReply(source, isInteraction, {
+        content: `❌ Không tìm thấy lịch sử TFT cho **${account.gameName}#${account.tagLine}** (${region.toUpperCase()}).\n\n> Nguyên nhân có thể do:\n> • Tài khoản chưa chơi TFT gần đây\n> • Development API key giới hạn số trận có thể tìm được`
+      });
+    }
+
+    const [matches, itemsMap, champMap, augMap] = await Promise.all([
+      Promise.all(matchIds.map((id) => getTftMatchDetail(id, region, apiKey))),
       getTftItems(), getTftChampions(), getTftAugments(),
     ]);
 
     const lines = matches.map((m, i) => {
       const p = m.info.participants.find((x) => x.puuid === account.puuid);
       if (!p) return '';
-      const place = p.placement;
-      const placeStr = `${placementEmoji(place)} **Hạng ${place}/8**`;
-      const top4 = place <= 4;
-      const dur = formatDuration(m.info.game_length ? Math.round(m.info.game_length) : 0);
-      const queue = getTftQueueName(m.info.queue_id);
-      const level = p.level ?? '?';
+      const tft = getTftParticipantData(p);
+      const place = tft.placement ?? p.placement ?? '?';
+      const top4 = typeof place === 'number' && place <= 4;
+      const dur = formatDuration(m.info.gameDuration ?? m.info.game_length ?? 0);
+      const queue = getTftQueueName(m.info.queueId ?? m.info.queue_id);
 
-      // Top 3 units by tier
-      const topUnits = (p.units ?? [])
-        .sort((a, b) => (b.tier ?? 0) - (a.tier ?? 0))
+      // Top 3 units by stars
+      const topUnits = tft.units
+        .sort((a, b) => (b.tier ?? b.rarity ?? 0) - (a.tier ?? a.rarity ?? 0))
         .slice(0, 3)
         .map((u) => {
-          const champName = champMap[u.character_id]?.name ?? u.character_id ?? '?';
-          const stars = '⭐'.repeat(Math.min(u.tier ?? 1, 3));
-          return `${champName}${stars}`;
-        }).join(', ');
+          const name = champMap[u.character_id]?.name
+            ?? champMap[u.characterId]?.name
+            ?? (u.character_id ?? u.characterId ?? '?');
+          const stars = '⭐'.repeat(Math.min(u.tier ?? u.rarity ?? 1, 3));
+          return `${name}${stars}`;
+        }).join(', ') || '—';
 
-      // Active augments
-      const augs = (p.augments ?? [])
+      // Augments (short name)
+      const augs = tft.augments
         .slice(0, 2)
-        .map((a) => augMap[a]?.name ?? a)
+        .map((a) => augMap[a]?.name ?? augMap[a.toLowerCase()]?.name ?? a.replace(/^TFT\d+_Augment_/i, ''))
         .join(' / ') || '—';
 
-      return `\`${i + 1}\` ${placeStr} — ${queue} · ⏱ ${dur} · Lv.${level}\n` +
-        `   🃏 ${topUnits || '—'} | 🔮 ${augs}`;
+      const placeStr = typeof place === 'number' ? `${placementEmoji(place)} Hạng ${place}/8` : '❓';
+      return `\`${i + 1}\` ${placeStr} — ${queue} · ⏱ ${dur}\n   🃏 ${topUnits} | 🔮 ${augs}`;
     }).filter(Boolean);
 
     const ranked = rankedEntries.find((e) => e.queueType === 'RANKED_TFT');
     const hyper  = rankedEntries.find((e) => e.queueType === 'RANKED_TFT_TURBO');
-
-    const patch = `https://ddragon.leagueoflegends.com/cdn/img/profileicon/${summoner.profileIconId}.png`;
+    const iconUrl = `https://ddragon.leagueoflegends.com/cdn/img/profileicon/${summoner.profileIconId}.png`;
 
     const embed = new EmbedBuilder()
-      .setAuthor({ name: `${account.gameName}#${account.tagLine}`, iconURL: patch })
-      .setTitle('📋 Lịch Sử 5 Trận TFT Gần Nhất')
-      .setDescription(lines.join('\n\n'))
+      .setAuthor({ name: `${account.gameName}#${account.tagLine}`, iconURL: iconUrl })
+      .setTitle('📋 Lịch Sử TFT Gần Nhất')
+      .setDescription(lines.join('\n\n') || '—')
       .addFields(
         { name: '🏆 Rank TFT', value: ranked ? formatTftRank(ranked) : 'Chưa xếp hạng', inline: false },
         { name: '⚡ Hyper Roll', value: hyper ? formatTftRank(hyper) : 'Chưa xếp hạng', inline: false },
       )
-      .setFooter({ text: `Region: ${region.toUpperCase()} • Dùng /tftmatch để xem chi tiết trận` })
+      .setFooter({ text: `Region: ${region.toUpperCase()} • Dùng /tftmatch [số] để xem chi tiết` })
       .setColor(C.tft)
-      .setThumbnail(patch);
+      .setThumbnail(iconUrl);
 
     return editOrReply(source, isInteraction, { embeds: [embed] });
   } catch (err) {
@@ -155,16 +151,15 @@ export async function handleTftLsd({ source, args, isInteraction, stateStore, gu
   }
 }
 
-// ── /tft — TFT Profile ────────────────────────────────────────────────────────
+// ── /tft — TFT Profile ─────────────────────────────────────────────────────────
 export async function handleTftProfile({ source, args, isInteraction, stateStore, guildId, config, reply }) {
   const apiKey = config.riotApiKey;
   if (!apiKey) return reply(noApiKeyMsg(isInteraction));
-
   if (isInteraction) await source.deferReply();
 
   try {
     const { account, summoner, region } = await resolveSummoner(source, args, isInteraction, stateStore, guildId, apiKey);
-    const [rankedEntries, recentIds] = await Promise.all([
+    const [rankedEntries, matchIds] = await Promise.all([
       getTftRankedInfo(account.puuid, region, apiKey),
       getTftMatchHistory(account.puuid, region, apiKey, 10),
     ]);
@@ -172,53 +167,48 @@ export async function handleTftProfile({ source, args, isInteraction, stateStore
     const ranked = rankedEntries.find((e) => e.queueType === 'RANKED_TFT');
     const hyper  = rankedEntries.find((e) => e.queueType === 'RANKED_TFT_TURBO');
 
-    // Compute avg placement from last 10 matches
     let avgPlace = '—';
-    if (recentIds.length) {
-      const recentMatches = await Promise.all(recentIds.slice(0, 10).map((id) => getTftMatchDetail(id, region, apiKey)));
-      const placements = recentMatches
-        .map((m) => m.info.participants.find((p) => p.puuid === account.puuid)?.placement)
-        .filter(Boolean);
-      if (placements.length) {
-        avgPlace = (placements.reduce((a, b) => a + b, 0) / placements.length).toFixed(2);
-      }
-    }
+    let topTraits = 'Chưa có dữ liệu';
 
-    // Trait frequency from last 10 matches
-    const traitCounts = {};
-    if (recentIds.length) {
-      const recentMatches = await Promise.all(recentIds.slice(0, 10).map((id) => getTftMatchDetail(id, region, apiKey)));
-      for (const m of recentMatches) {
+    if (matchIds.length) {
+      const matches = await Promise.all(matchIds.slice(0, 10).map((id) => getTftMatchDetail(id, region, apiKey)));
+      const placements = matches
+        .map((m) => m.info.participants.find((p) => p.puuid === account.puuid)?.placement)
+        .filter((v) => typeof v === 'number');
+      if (placements.length) avgPlace = (placements.reduce((a, b) => a + b, 0) / placements.length).toFixed(2);
+
+      const traitCounts = {};
+      for (const m of matches) {
         const p = m.info.participants.find((x) => x.puuid === account.puuid);
         if (!p) continue;
         for (const t of (p.traits ?? [])) {
-          if ((t.tier_current ?? 0) > 0) {
-            traitCounts[t.name] = (traitCounts[t.name] ?? 0) + 1;
+          if ((t.tier_current ?? t.tierCurrent ?? 0) > 0) {
+            const name = t.name ?? t.traitId ?? '?';
+            traitCounts[name] = (traitCounts[name] ?? 0) + 1;
           }
         }
       }
+      const entries = Object.entries(traitCounts).sort(([,a],[,b]) => b - a).slice(0, 5);
+      if (entries.length) {
+        topTraits = entries.map(([name, cnt]) => `**${name}** — ${cnt}/10 ván`).join('\n');
+      }
     }
-    const topTraits = Object.entries(traitCounts)
-      .sort(([,a],[,b]) => b - a)
-      .slice(0, 5)
-      .map(([name, cnt]) => `**${name}** — ${cnt}/10 ván`)
-      .join('\n') || 'Chưa có dữ liệu';
 
     const iconUrl = `https://ddragon.leagueoflegends.com/cdn/img/profileicon/${summoner.profileIconId}.png`;
 
     const embed = new EmbedBuilder()
       .setAuthor({ name: `${account.gameName}#${account.tagLine}`, iconURL: iconUrl })
-      .setTitle('🎮 Hồ Sơ TFT')
+      .setTitle('🎲 Hồ Sơ TFT')
       .setThumbnail(iconUrl)
       .addFields(
         { name: '📊 Level', value: `**${summoner.summonerLevel}**`, inline: true },
         { name: '🌏 Region', value: region.toUpperCase(), inline: true },
-        { name: '📍 Avg. Placement (10 ván)', value: `**${avgPlace}**`, inline: true },
+        { name: '📍 Avg. Placement', value: `**${avgPlace}** (${matchIds.length} ván)`, inline: true },
         { name: '🏆 Rank TFT', value: ranked ? formatTftRank(ranked) : 'Chưa xếp hạng', inline: false },
         { name: '⚡ Hyper Roll', value: hyper ? formatTftRank(hyper) : 'Chưa xếp hạng', inline: false },
-        { name: '🔮 Traits hay dùng (10 ván)', value: topTraits, inline: false },
+        { name: '🔮 Traits hay dùng', value: topTraits, inline: false },
       )
-      .setFooter({ text: 'Dùng /tftlsd để xem lịch sử trận đấu • /tftmatch để xem chi tiết' })
+      .setFooter({ text: 'Dùng /tftlsd để xem lịch sử • /tftmatch để xem chi tiết' })
       .setColor(C.info);
 
     return editOrReply(source, isInteraction, { embeds: [embed] });
@@ -227,23 +217,18 @@ export async function handleTftProfile({ source, args, isInteraction, stateStore
   }
 }
 
-// ── /tftmatch — Single TFT match detail ──────────────────────────────────────
-// Hiển thị: bài (comp/traits), con đã mang (units + stars), đồ (items), augment
+// ── /tftmatch — Single match detail ───────────────────────────────────────────
 export async function handleTftMatch({ source, args, isInteraction, stateStore, guildId, config, reply }) {
   const apiKey = config.riotApiKey;
   if (!apiKey) return reply(noApiKeyMsg(isInteraction));
-
   if (isInteraction) await source.deferReply();
 
   try {
-    const matchIndex = isInteraction
-      ? (source.options.getInteger('index') ?? 1) - 1
-      : 0;
-
+    const matchIndex = isInteraction ? (source.options.getInteger('index') ?? 1) - 1 : 0;
     const { account, region } = await resolveSummoner(source, args, isInteraction, stateStore, guildId, apiKey);
-    const matchIds = await getTftMatchHistory(account.puuid, region, apiKey, Math.max(matchIndex + 1, 1));
 
-    if (!matchIds[matchIndex]) return editOrReply(source, isInteraction, { content: 'Không tìm thấy trận đấu.' });
+    const matchIds = await getTftMatchHistory(account.puuid, region, apiKey, Math.max(matchIndex + 1, 1));
+    if (!matchIds[matchIndex]) return editOrReply(source, isInteraction, { content: `❌ Không tìm thấy trận TFT thứ ${matchIndex + 1}.` });
 
     const [match, itemsMap, champMap, augMap] = await Promise.all([
       getTftMatchDetail(matchIds[matchIndex], region, apiKey),
@@ -253,72 +238,72 @@ export async function handleTftMatch({ source, args, isInteraction, stateStore, 
     const me = match.info.participants.find((p) => p.puuid === account.puuid);
     if (!me) return editOrReply(source, isInteraction, { content: 'Không tìm thấy dữ liệu người chơi trong trận.' });
 
-    const { info } = match;
-    const place = me.placement;
-    const top4 = place <= 4;
-    const dur = formatDuration(info.game_length ? Math.round(info.game_length) : 0);
-    const queue = getTftQueueName(info.queue_id);
-    const level = me.level ?? '?';
-    const gold = me.gold_left ?? 0;
+    const tft = getTftParticipantData(me);
+    const place = tft.placement ?? me.placement ?? '?';
+    const top4 = typeof place === 'number' && place <= 4;
+    const dur = formatDuration(match.info.gameDuration ?? match.info.game_length ?? 0);
+    const queue = getTftQueueName(match.info.queueId ?? match.info.queue_id);
 
-    // ── Augments ───────────────────────────────────────────────────────────
-    const augLines = (me.augments ?? []).map((a, i) => {
-      const aug = augMap[a];
-      const tier = aug?.tier === 3 ? '🟣 Lăng kính' : aug?.tier === 2 ? '🟡 Vàng' : '⚪ Bạc';
-      return `${tier} **${aug?.name ?? a}**${aug?.desc ? `\n> ${aug.desc.slice(0, 120)}` : ''}`;
+    // ── Augments ───────────────────────────────────────────────────────────────
+    const augLines = tft.augments.map((a) => {
+      const aug = augMap[a] ?? augMap[a?.toLowerCase()];
+      const tierLabel = !aug ? '' : aug.tier >= 3 ? '🟣 Lăng kính' : aug.tier === 2 ? '🟡 Vàng' : '⚪ Bạc';
+      const displayName = aug?.name ?? a.replace(/^TFT\d+_Augment_/i, '');
+      const desc = aug?.desc ? `\n> ${aug.desc.slice(0, 100)}` : '';
+      return `${tierLabel} **${displayName}**${desc}`;
     }).join('\n\n') || '—';
 
-    // ── Units (con đã mang) ────────────────────────────────────────────────
-    const unitsSorted = (me.units ?? []).sort((a, b) => (b.tier ?? 0) - (a.tier ?? 0) || (b.rarity ?? 0) - (a.rarity ?? 0));
+    // ── Units (con đã mang) ───────────────────────────────────────────────────
+    const unitsSorted = tft.units.sort((a, b) => (b.tier ?? b.rarity ?? 0) - (a.tier ?? a.rarity ?? 0));
     const unitLines = unitsSorted.map((u) => {
-      const champ = champMap[u.character_id];
-      const name = champ?.name ?? u.character_id ?? '?';
-      const stars = '⭐'.repeat(Math.min(u.tier ?? 1, 3));
-      const cost = champ?.cost ?? 1;
-      const costColor = ['', '⬜', '🟢', '🔵', '🟣', '🟡'][cost] ?? '';
-      // Items on this unit
-      const unitItems = (u.itemNames ?? u.items ?? [])
-        .map((it) => {
-          const item = typeof it === 'string' ? itemsMap[it] : itemsMap[String(it)];
-          return item?.name ?? it;
-        }).join(', ');
-      return `${costColor} **${name}**${stars}${unitItems ? ` — 🛡️ ${unitItems}` : ''}`;
+      const charId = u.character_id ?? u.characterId ?? '';
+      const champ = champMap[charId] ?? champMap[charId.toLowerCase()];
+      const name = champ?.name ?? charId;
+      const stars = '⭐'.repeat(Math.min(u.tier ?? u.rarity ?? 1, 3));
+      const cost = champ?.cost ?? 0;
+      const costEmoji = ['', '⬜', '🟢', '🔵', '🟣', '🟡'][cost] ?? '';
+
+      const unitItemNames = (u.itemNames ?? u.items ?? []).map((it) => {
+        const item = typeof it === 'string'
+          ? (itemsMap[it] ?? itemsMap[it.toLowerCase()])
+          : itemsMap[String(it)];
+        return item?.name ?? (typeof it === 'string' ? it.replace(/^TFT_Item_/i, '') : String(it));
+      }).join(', ');
+
+      return `${costEmoji}**${name}**${stars}${unitItemNames ? ` — ${unitItemNames}` : ''}`;
     }).join('\n') || '—';
 
-    // ── Traits (bài/comp) ─────────────────────────────────────────────────
-    const activeTraits = (me.traits ?? [])
-      .filter((t) => (t.tier_current ?? 0) > 0)
-      .sort((a, b) => (b.tier_current ?? 0) - (a.tier_current ?? 0) || (b.num_units ?? 0) - (a.num_units ?? 0));
+    // ── Traits (bài/comp) ─────────────────────────────────────────────────────
+    const activeTraits = tft.traits
+      .filter((t) => (t.tier_current ?? t.tierCurrent ?? 0) > 0)
+      .sort((a, b) => (b.tier_current ?? b.tierCurrent ?? 0) - (a.tier_current ?? a.tierCurrent ?? 0));
+
     const traitLines = activeTraits.map((t) => {
-      const tierStars = t.tier_current >= 3 ? '🌟' : t.tier_current === 2 ? '✨' : '•';
-      return `${tierStars} **${t.name}** (${t.num_units ?? '?'} quân)`;
+      const tier = t.tier_current ?? t.tierCurrent ?? 1;
+      const star = tier >= 3 ? '🌟' : tier === 2 ? '✨' : '•';
+      const numUnits = t.num_units ?? t.numUnits ?? '?';
+      return `${star} **${t.name ?? t.traitId}** (${numUnits} quân)`;
     }).join('\n') || '—';
 
-    // ── All items on the board (unique) ────────────────────────────────────
-    const allItemNames = new Set();
-    for (const u of (me.units ?? [])) {
+    // ── All items summary ─────────────────────────────────────────────────────
+    const allItemSet = new Set();
+    for (const u of tft.units) {
       for (const it of (u.itemNames ?? u.items ?? [])) {
-        const item = typeof it === 'string' ? itemsMap[it] : itemsMap[String(it)];
-        allItemNames.add(item?.name ?? it);
+        const item = typeof it === 'string'
+          ? (itemsMap[it] ?? itemsMap[it.toLowerCase()])
+          : itemsMap[String(it)];
+        allItemSet.add(item?.name ?? (typeof it === 'string' ? it.replace(/^TFT_Item_/i, '') : String(it)));
       }
     }
-    const itemSummary = [...allItemNames].join(', ') || '—';
+    const itemSummary = [...allItemSet].join(', ') || '—';
 
-    // ── Leaderboard of all 8 players ──────────────────────────────────────
-    const allPlayers = info.participants
-      .sort((a, b) => a.placement - b.placement)
-      .map((p) => {
-        const isMe = p.puuid === account.puuid;
-        const topTraitName = (p.traits ?? [])
-          .filter((t) => (t.tier_current ?? 0) > 0)
-          .sort((a, b) => (b.tier_current ?? 0) - (a.tier_current ?? 0))[0]?.name ?? '—';
-        const tag = isMe ? ' **← bạn**' : '';
-        return `${placementEmoji(p.placement)} ${p.puuid === account.puuid ? `__${p.augments?.length ? 'Bạn' : 'Bạn'}__` : ''}${topTraitName}${tag}`;
-      }).join('\n');
+    const placeStr = typeof place === 'number' ? `${placementEmoji(place)} Hạng ${place}/8` : '❓';
+    const matchId = match.metadata?.matchId ?? match.metadata?.match_id ?? matchIds[matchIndex];
+    const gameTime = match.info.gameStartTimestamp ?? match.info.game_datetime ?? Date.now();
 
     const embed = new EmbedBuilder()
-      .setTitle(`${placementEmoji(place)} Hạng ${place}/8 — TFT`)
-      .setDescription(`**${queue}** · Lv.${level} · ⏱ ${dur} · 💰 ${gold} vàng còn lại`)
+      .setTitle(`${placeStr} — TFT`)
+      .setDescription(`**${queue}** · Lv.${tft.level} · ⏱ ${dur}${tft.gold_left ? ` · 💰 ${tft.gold_left} vàng` : ''}`)
       .setColor(top4 ? C.win : C.lose)
       .addFields(
         { name: '🔮 Augments (Tăng cường)', value: augLines.slice(0, 1024), inline: false },
@@ -326,7 +311,7 @@ export async function handleTftMatch({ source, args, isInteraction, stateStore, 
         { name: '🦸 Quân đã mang', value: unitLines.slice(0, 1024), inline: false },
         { name: '🛡️ Đồ (tổng hợp)', value: itemSummary.slice(0, 512), inline: false },
       )
-      .setFooter({ text: `Match ID: ${match.metadata.match_id} • ${new Date(info.game_datetime ?? Date.now()).toLocaleString('vi-VN')}` });
+      .setFooter({ text: `Match ID: ${matchId} • ${new Date(gameTime).toLocaleString('vi-VN')}` });
 
     return editOrReply(source, isInteraction, { embeds: [embed] });
   } catch (err) {
@@ -334,7 +319,7 @@ export async function handleTftMatch({ source, args, isInteraction, stateStore, 
   }
 }
 
-// ── /tftlink — Link Discord ↔ Riot (shared storage with LoL) ─────────────────
+// ── /tftlink ───────────────────────────────────────────────────────────────────
 export async function handleTftLink({ source, args, isInteraction, stateStore, guildId, config, reply }) {
   const apiKey = config.riotApiKey;
   if (!apiKey) return reply(noApiKeyMsg(isInteraction));
@@ -358,12 +343,12 @@ export async function handleTftLink({ source, args, isInteraction, stateStore, g
     await stateStore.linkLolAccount(guildId, userId, {
       riotId: `${account.gameName}#${account.tagLine}`,
       puuid: account.puuid,
-      region
+      region,
     });
 
     return editOrReply(source, isInteraction, {
-      content: `✅ Đã liên kết tài khoản **${account.gameName}#${account.tagLine}** (${region.toUpperCase()}) với Discord!\nBây giờ bạn có thể dùng **/tftlsd**, **/tft**, **/tftmatch** (và cả **/lsd**, **/lol**) mà không cần nhập tên.`,
-      ephemeral: true
+      content: `✅ Đã liên kết **${account.gameName}#${account.tagLine}** (${region.toUpperCase()})!\nBạn có thể dùng **/tftlsd**, **/tft**, **/tftmatch** (và **/lsd**, **/lol**) không cần nhập tên.`,
+      ephemeral: true,
     });
   } catch (err) {
     return editOrReply(source, isInteraction, { content: formatError(err), ephemeral: true });
@@ -378,7 +363,7 @@ export async function handleTftUnlink({ source, isInteraction, stateStore, guild
   return reply(isInteraction ? { content: msg, ephemeral: true } : msg);
 }
 
-// ── Slash command option builders ─────────────────────────────────────────────
+// ── Slash options builder ─────────────────────────────────────────────────────
 export function buildTftSlashOptions(commandType) {
   const summonerOpt = {
     name: 'summoner',
@@ -400,22 +385,11 @@ export function buildTftSlashOptions(commandType) {
       return [summonerOpt, regionOpt];
     case 'tftmatch':
       return [
-        summonerOpt,
-        regionOpt,
-        {
-          name: 'index',
-          description: 'Số thứ tự trận (1–10)',
-          type: ApplicationCommandOptionType.Integer,
-          required: false,
-          minValue: 1,
-          maxValue: 10,
-        },
+        summonerOpt, regionOpt,
+        { name: 'index', description: 'Số thứ tự trận (1–10)', type: ApplicationCommandOptionType.Integer, required: false, minValue: 1, maxValue: 10 },
       ];
     case 'tftlink':
-      return [
-        { ...summonerOpt, required: true, description: 'Riot ID của bạn (VD: PlayerName#VN2)' },
-        regionOpt,
-      ];
+      return [{ ...summonerOpt, required: true, description: 'Riot ID của bạn (VD: PlayerName#VN2)' }, regionOpt];
     case 'tftunlink':
       return [];
     default:
@@ -425,14 +399,14 @@ export function buildTftSlashOptions(commandType) {
 
 // ── Utilities ─────────────────────────────────────────────────────────────────
 function noApiKeyMsg(isInteraction) {
-  const msg = '❌ Bot chưa được cấu hình Riot API Key. Admin cần thêm `RIOT_API_KEY` vào cài đặt.';
+  const msg = '❌ Bot chưa được cấu hình Riot API Key.';
   return isInteraction ? { content: msg, ephemeral: true } : msg;
 }
 
 function formatError(err) {
   if (err.status === 404) return '❌ Không tìm thấy người chơi. Kiểm tra lại Riot ID và khu vực.';
   if (err.status === 429) return '❌ Đã vượt giới hạn API. Vui lòng thử lại sau vài giây.';
-  if (err.status === 403) return '❌ API Key không hợp lệ hoặc đã hết hạn. Vui lòng refresh key tại developer.riotgames.com.';
+  if (err.status === 403) return '❌ API Key không hợp lệ hoặc hết hạn. Refresh key tại developer.riotgames.com.';
   return `❌ Lỗi: ${err.message}`;
 }
 

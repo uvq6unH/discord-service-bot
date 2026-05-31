@@ -1,22 +1,26 @@
 /**
- * tftApi.js — Riot API wrapper for Teamfight Tactics
+ * tftApi.js — TFT wrapper using LoL endpoints (Dev API key compatible)
  *
- * Endpoints covered:
- *   Riot API  — Account-v1, Summoner-v4, League-v4 (TFT), Match-v1 (TFT)
- *   CDragon   — TFT sets, augments, traits, units, items (latest)
+ * Dev API keys do NOT have access to:
+ *   ❌ /tft/league/v1/*
+ *   ❌ /tft/match/v1/*
  *
- * Reuses the same routing maps, Cache class, and httpGet/riotGet helpers
- * from lolApi.js to avoid duplication.
+ * Instead we use LoL endpoints available to all keys, filtering by TFT queues:
+ *   ✅ /lol/league/v4/entries/by-puuid/{puuid}  → filter queueType TFT_*
+ *   ✅ /lol/match/v5/matches/by-puuid/{puuid}   → filter queue 1090/1100/1130/1160
+ *   ✅ /lol/match/v5/matches/{matchId}           → TFT match data lives here too
+ *
+ * CDragon static data (no auth needed):
+ *   ✅ communitydragon.org — items, traits, champions, augments
  */
 
 import https from 'node:https';
 import { URL } from 'node:url';
+import { REGIONS, cache as _cache, getRankedInfo, getMatchHistory, getMatchDetail } from './lolApi.js';
 
-// ── Re-export shared constants from lolApi (routing, regions) ────────────────
+// ── Re-exports ────────────────────────────────────────────────────────────────
 export {
   REGIONS,
-  cache,
-  getLatestPatch,
   getAccountByRiotId,
   getSummonerByPuuid,
   parseRiotId,
@@ -25,36 +29,35 @@ export {
   RANK_EMOJIS,
 } from './lolApi.js';
 
-// ── TFT-specific constants ────────────────────────────────────────────────────
+// ── Constants ─────────────────────────────────────────────────────────────────
 
 const CDRAGON_TFT = 'https://raw.communitydragon.org/latest/cdragon/tft';
 
-const TFT_RANK_EMOJIS = {
-  IRON: '⚫', BRONZE: '🟤', SILVER: '⚪', GOLD: '🟡',
-  PLATINUM: '🟢', EMERALD: '💚', DIAMOND: '🔵',
-  MASTER: '🟣', GRANDMASTER: '🔴', CHALLENGER: '✨'
-};
-
-// TFT queue IDs
-const TFT_QUEUE_IDS = {
-  1090: 'Ranked TFT',
+// TFT queue IDs used in match/v5
+export const TFT_QUEUE_IDS = {
+  1090: 'TFT Thường',
   1091: 'TFT Thường',
-  1092: 'TFT Ranked (old)',
+  1092: 'TFT Ranked',
   1100: 'Ranked TFT',
   1130: 'TFT Hyper Roll',
   1160: 'TFT Double Up',
 };
 
-// ── Simple in-memory cache (shared instance via import) ───────────────────────
-// We import `cache` from lolApi.js above, so no separate cache needed.
+const TFT_QUEUE_SET = new Set([1090, 1091, 1092, 1100, 1130, 1160]);
 
-const TTL = {
-  cdragon: 60 * 60 * 1000,   // 1 hour  – static CDragon data
-  profile: 2 * 60 * 1000,    // 2 min   – summoner / rank
-  match:   5 * 60 * 1000,    // 5 min   – match history
+const TFT_RANK_EMOJIS = {
+  IRON: '⚫', BRONZE: '🟤', SILVER: '⚪', GOLD: '🟡',
+  PLATINUM: '🟢', EMERALD: '💚', DIAMOND: '🔵',
+  MASTER: '🟣', GRANDMASTER: '🔴', CHALLENGER: '✨',
 };
 
-// ── Generic HTTP fetch ────────────────────────────────────────────────────────
+const TTL = {
+  cdragon: 60 * 60 * 1000,  // 1 hour
+  profile: 2  * 60 * 1000,  // 2 min
+  match:   5  * 60 * 1000,  // 5 min
+};
+
+// ── HTTP helper (no auth — CDragon only) ──────────────────────────────────────
 
 function httpGet(url, headers = {}) {
   return new Promise((resolve, reject) => {
@@ -62,122 +65,128 @@ function httpGet(url, headers = {}) {
     const options = {
       hostname: parsed.hostname,
       path: parsed.pathname + parsed.search,
-      headers: { 'User-Agent': 'discord-service-bot/1.0', ...headers }
+      headers: { 'User-Agent': 'discord-service-bot/1.0', ...headers },
     };
     const req = https.get(options, (res) => {
       const chunks = [];
       res.on('data', (c) => chunks.push(c));
       res.on('end', () => {
         const body = Buffer.concat(chunks).toString('utf8');
-        if (res.statusCode === 404) {
-          reject(Object.assign(new Error('Not found'), { status: 404 }));
-          return;
-        }
-        if (res.statusCode === 429) {
-          reject(Object.assign(new Error('Rate limited'), { status: 429 }));
-          return;
-        }
+        if (res.statusCode === 404) { reject(Object.assign(new Error('Not found'), { status: 404 })); return; }
+        if (res.statusCode === 429) { reject(Object.assign(new Error('Rate limited'), { status: 429 })); return; }
         if (res.statusCode >= 400) {
-          console.error(`[TFT API] HTTP ${res.statusCode} for ${url} | body: ${body.slice(0, 200)}`);
-          reject(Object.assign(new Error(`HTTP ${res.statusCode}`), { status: res.statusCode, body }));
-          return;
+          console.error(`[CDragon] HTTP ${res.statusCode} for ${url}`);
+          reject(Object.assign(new Error(`HTTP ${res.statusCode}`), { status: res.statusCode })); return;
         }
-        try { resolve(JSON.parse(body)); }
-        catch { reject(new Error('Invalid JSON')); }
+        try { resolve(JSON.parse(body)); } catch { reject(new Error('Invalid JSON')); }
       });
     });
     req.on('error', reject);
-    req.setTimeout(10_000, () => { req.destroy(); reject(new Error('Request timeout')); });
+    req.setTimeout(15_000, () => { req.destroy(); reject(new Error('Request timeout')); });
   });
 }
 
-function riotGet(path, platform, apiKey) {
-  const url = `https://${platform}.api.riotgames.com${path}`;
-  const keyPreview = apiKey ? `${apiKey.slice(0, 8)}...(len=${apiKey.length})` : 'EMPTY';
-  console.log(`[TFT API] ${platform} ${path.split('?')[0]} | key: ${keyPreview}`);
-  return httpGet(url, { 'X-Riot-Token': apiKey });
-}
-
-// ── TFT Static Data (CDragon) ─────────────────────────────────────────────────
+// ── Riot API — reuse LoL endpoints, filter TFT queues ────────────────────────
 
 /**
- * Fetch the full TFT data blob from CDragon (en_us as base, vn fallback).
- * Returns an object with { sets, items, augments, traits, champions, ... }
+ * TFT rank info — reuses /lol/league/v4/entries/by-puuid, filters TFT queue types.
+ * queueType for TFT: "RANKED_TFT" (normal ranked) and "RANKED_TFT_TURBO" (Hyper Roll).
  */
+export async function getTftRankedInfo(puuid, region, apiKey) {
+  // getRankedInfo fetches all ranked entries (LoL + TFT share the same endpoint)
+  const allEntries = await getRankedInfo(puuid, region, apiKey);
+  return allEntries.filter((e) => e.queueType?.startsWith('RANKED_TFT'));
+}
+
+/**
+ * TFT match IDs — reuses /lol/match/v5, filters by TFT queue IDs.
+ * Fetches a larger batch (up to 3× requested) to compensate for filtering.
+ */
+export async function getTftMatchHistory(puuid, region, apiKey, count = 5) {
+  // Fetch more than needed since we filter by queue
+  const fetchCount = Math.min(count * 4, 20);
+  const cacheKey = `tft:matchids:${region}:${puuid}:${count}`;
+  let cached = _cache.get(cacheKey);
+  if (cached) return cached;
+
+  // Use LoL match endpoint with queue filter — queue 1090 is most common TFT normal,
+  // but ranked TFT is 1100. We fetch without queue filter then slice.
+  const allIds = await getMatchHistory(puuid, region, apiKey, fetchCount, null);
+
+  // Filter to only TFT match IDs by checking each match — batch fetch details
+  // to avoid N+1 but cap at fetchCount to respect rate limits
+  const details = await Promise.allSettled(
+    allIds.map((id) => getMatchDetail(id, region, apiKey))
+  );
+
+  const tftIds = [];
+  for (let i = 0; i < details.length && tftIds.length < count; i++) {
+    const r = details[i];
+    if (r.status === 'fulfilled' && TFT_QUEUE_SET.has(r.value?.info?.queueId)) {
+      tftIds.push(allIds[i]);
+    }
+  }
+
+  _cache.set(cacheKey, tftIds, TTL.match);
+  return tftIds;
+}
+
+/**
+ * TFT match detail — same /lol/match/v5/matches/{id} endpoint.
+ * TFT matches have participants with TFT-specific fields (placement, traits, units, augments).
+ */
+export async function getTftMatchDetail(matchId, region, apiKey) {
+  return getMatchDetail(matchId, region, apiKey);
+}
+
+// ── CDragon TFT Static Data ───────────────────────────────────────────────────
+
 export async function getTftStaticData() {
-  const { cache } = await import('./lolApi.js');
   const cacheKey = 'cdragon:tft:full';
-  let data = cache.get(cacheKey);
+  let data = _cache.get(cacheKey);
   if (data) return data;
 
-  // CDragon provides a single JSON with all TFT set data
-  data = await httpGet(`${CDRAGON_TFT}/en_us.json`);
-  cache.set(cacheKey, data, TTL.cdragon);
+  try {
+    data = await httpGet(`${CDRAGON_TFT}/en_us.json`);
+  } catch (e) {
+    console.error('[CDragon] Failed to fetch TFT static data:', e.message);
+    // Return empty structure — commands will gracefully show raw IDs
+    data = { items: [], augments: [], sets: {} };
+  }
+  _cache.set(cacheKey, data, TTL.cdragon);
   return data;
 }
 
-/**
- * Get TFT set items map: id → { id, name, desc, icon }
- */
 export async function getTftItems() {
-  const { cache } = await import('./lolApi.js');
   const cacheKey = 'cdragon:tft:items';
-  let data = cache.get(cacheKey);
+  let data = _cache.get(cacheKey);
   if (data) return data;
 
   const full = await getTftStaticData();
   const map = {};
   for (const item of (full.items ?? [])) {
-    map[item.apiName ?? item.id] = {
-      id: item.apiName ?? item.id,
-      name: item.name ?? `Item ${item.id}`,
+    const key = item.apiName ?? String(item.id);
+    const entry = {
+      id: key,
+      name: item.name ?? key,
       desc: (item.desc ?? item.description ?? '').replace(/<[^>]+>/g, '').trim(),
       icon: item.icon ? normalizeCdragonPath(item.icon) : null,
       isComponent: !item.composition || item.composition.length === 0,
-      composition: item.composition ?? [],
     };
-    // Also index by numeric id
-    if (item.id != null) map[String(item.id)] = map[item.apiName ?? item.id];
+    map[key] = entry;
+    if (item.id != null) map[String(item.id)] = entry;
+    if (item.name) map[item.name.toLowerCase()] = entry;
   }
-  cache.set(cacheKey, map, TTL.cdragon);
+  _cache.set(cacheKey, map, TTL.cdragon);
   return map;
 }
 
-/**
- * Get TFT traits map: apiName → { apiName, name, desc, sets }
- */
-export async function getTftTraits() {
-  const { cache } = await import('./lolApi.js');
-  const cacheKey = 'cdragon:tft:traits';
-  let data = cache.get(cacheKey);
-  if (data) return data;
-
-  const full = await getTftStaticData();
-  const map = {};
-  for (const trait of (full.sets?.[Object.keys(full.sets ?? {}).pop()]?.traits ?? full.traits ?? [])) {
-    map[trait.apiName] = {
-      apiName: trait.apiName,
-      name: trait.name ?? trait.apiName,
-      desc: (trait.desc ?? '').replace(/<[^>]+>/g, '').trim(),
-      icon: trait.icon ? normalizeCdragonPath(trait.icon) : null,
-      sets: trait.sets ?? [],
-    };
-  }
-  cache.set(cacheKey, map, TTL.cdragon);
-  return map;
-}
-
-/**
- * Get TFT champions map: apiName → { apiName, name, cost, traits, ability, stats }
- */
 export async function getTftChampions() {
-  const { cache } = await import('./lolApi.js');
   const cacheKey = 'cdragon:tft:champions';
-  let data = cache.get(cacheKey);
+  let data = _cache.get(cacheKey);
   if (data) return data;
 
   const full = await getTftStaticData();
-  // Latest set is the last key in full.sets
   const setKeys = Object.keys(full.sets ?? {});
   const latestSet = setKeys.length ? full.sets[setKeys[setKeys.length - 1]] : null;
   const units = latestSet?.champions ?? full.champions ?? [];
@@ -185,7 +194,8 @@ export async function getTftChampions() {
   const map = {};
   for (const unit of units) {
     const apiName = unit.apiName ?? unit.characterName ?? unit.name;
-    map[apiName] = {
+    if (!apiName) continue;
+    const entry = {
       apiName,
       name: unit.name ?? apiName,
       cost: unit.cost ?? 1,
@@ -196,93 +206,34 @@ export async function getTftChampions() {
         name: unit.ability?.name ?? '',
         desc: (unit.ability?.desc ?? '').replace(/<[^>]+>/g, '').trim(),
       },
-      stats: unit.stats ?? {},
     };
-    // index by display name (lowercased)
-    map[unit.name?.toLowerCase()] = map[apiName];
+    map[apiName] = entry;
+    map[apiName.toLowerCase()] = entry;
+    if (unit.name) map[unit.name.toLowerCase()] = entry;
   }
-  cache.set(cacheKey, map, TTL.cdragon);
+  _cache.set(cacheKey, map, TTL.cdragon);
   return map;
 }
 
-/**
- * Get TFT augments map: apiName → { name, desc, tier, icon }
- */
 export async function getTftAugments() {
-  const { cache } = await import('./lolApi.js');
   const cacheKey = 'cdragon:tft:augments';
-  let data = cache.get(cacheKey);
+  let data = _cache.get(cacheKey);
   if (data) return data;
 
   const full = await getTftStaticData();
   const map = {};
   for (const aug of (full.augments ?? [])) {
+    if (!aug.apiName) continue;
     map[aug.apiName] = {
       apiName: aug.apiName,
       name: aug.name ?? aug.apiName,
       desc: (aug.desc ?? '').replace(/<[^>]+>/g, '').trim(),
-      tier: aug.tier ?? 1, // 1=silver, 2=gold, 3=prismatic
-      icon: aug.icon ? normalizeCdragonPath(aug.icon) : null,
+      tier: aug.tier ?? 1,  // 1=silver, 2=gold, 3=prismatic
     };
+    map[aug.apiName.toLowerCase()] = map[aug.apiName];
   }
-  cache.set(cacheKey, map, TTL.cdragon);
+  _cache.set(cacheKey, map, TTL.cdragon);
   return map;
-}
-
-// Convert CDragon path like "ASSETS/Maps/..." to a full URL
-function normalizeCdragonPath(path) {
-  if (!path) return null;
-  const lower = path.toLowerCase().replace(/\\/g, '/');
-  return `https://raw.communitydragon.org/latest/game/${lower}`;
-}
-
-// ── Riot API — TFT-specific endpoints ────────────────────────────────────────
-
-import { REGIONS, cache as _cache } from './lolApi.js';
-
-/**
- * TFT rank info for a summoner (by PUUID).
- * Returns array of rank entries (RANKED_TFT, RANKED_TFT_TURBO, etc.)
- */
-export async function getTftRankedInfo(puuid, region, apiKey) {
-  const cacheKey = `tft:ranked:${region}:${puuid}`;
-  let data = _cache.get(cacheKey);
-  if (!data) {
-    data = await riotGet(`/tft/league/v1/entries/by-puuid/${puuid}`, region, apiKey);
-    _cache.set(cacheKey, data, TTL.profile);
-  }
-  return data;
-}
-
-/**
- * TFT match IDs list.
- */
-export async function getTftMatchHistory(puuid, region, apiKey, count = 10) {
-  const routing = REGIONS.routing[region] ?? 'sea';
-  const cacheKey = `tft:matches:${routing}:${puuid}:${count}`;
-  let data = _cache.get(cacheKey);
-  if (!data) {
-    data = await riotGet(
-      `/tft/match/v1/matches/by-puuid/${puuid}/ids?start=0&count=${count}`,
-      routing, apiKey
-    );
-    _cache.set(cacheKey, data, TTL.match);
-  }
-  return data;
-}
-
-/**
- * Full TFT match detail.
- */
-export async function getTftMatchDetail(matchId, region, apiKey) {
-  const routing = REGIONS.routing[region] ?? 'sea';
-  const cacheKey = `tft:match:${matchId}`;
-  let data = _cache.get(cacheKey);
-  if (!data) {
-    data = await riotGet(`/tft/match/v1/matches/${matchId}`, routing, apiKey);
-    _cache.set(cacheKey, data, TTL.match);
-  }
-  return data;
 }
 
 // ── Formatting helpers ────────────────────────────────────────────────────────
@@ -290,24 +241,25 @@ export async function getTftMatchDetail(matchId, region, apiKey) {
 export function formatTftRank(entry) {
   if (!entry) return 'Chưa xếp hạng';
   const emoji = TFT_RANK_EMOJIS[entry.tier] ?? '❓';
-  const wr = entry.wins + entry.losses > 0
-    ? Math.round(entry.wins / (entry.wins + entry.losses) * 100)
-    : 0;
-  const queueLabel = entry.queueType === 'RANKED_TFT_TURBO' ? 'Hyper Roll' : 'Ranked TFT';
+  const games = entry.wins + entry.losses;
+  const wr = games > 0 ? Math.round(entry.wins / games * 100) : 0;
+  const label = entry.queueType === 'RANKED_TFT_TURBO' ? 'Hyper Roll' : 'Ranked TFT';
   return `${emoji} **${entry.tier} ${entry.rank}** — ${entry.leaguePoints} LP\n` +
-    `${entry.wins}W/${entry.losses}L (${wr}% WR) · ${queueLabel}`;
+    `${entry.wins}W/${entry.losses}L (${wr}% WR) · ${label}`;
 }
 
 export function getTftQueueName(queueId) {
   return TFT_QUEUE_IDS[queueId] ?? `Queue ${queueId}`;
 }
 
-/**
- * Placement medal: 1st → 🥇, 2nd → 🥈, etc.
- */
 export function placementEmoji(placement) {
-  const medals = ['🥇', '🥈', '🥉', '4️⃣', '5️⃣', '6️⃣', '7️⃣', '8️⃣'];
-  return medals[placement - 1] ?? `#${placement}`;
+  return ['🥇', '🥈', '🥉', '4️⃣', '5️⃣', '6️⃣', '7️⃣', '8️⃣'][placement - 1] ?? `#${placement}`;
+}
+
+function normalizeCdragonPath(path) {
+  if (!path) return null;
+  const lower = path.toLowerCase().replace(/\\/g, '/');
+  return `https://raw.communitydragon.org/latest/game/${lower}`;
 }
 
 export { TFT_RANK_EMOJIS };
