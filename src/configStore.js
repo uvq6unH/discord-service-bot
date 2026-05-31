@@ -321,7 +321,17 @@ const commandTypes = new Set([
   'ecoremove',
   'announce',
   'ticketpanel',
-  'rolepanel'
+  'rolepanel',
+  // ── League of Legends ──────────────────────────────────────────────────────
+  'lsd',
+  'lolprofile',
+  'lolmatch',
+  'lolchamp',
+  'lolitem',
+  'lolrunes',
+  'lolpatch',
+  'lollink',
+  'lolunlink'
 ]);
 const builtInTypesByName = new Map(
   defaultConfig.commands.filter((command) => command.type !== 'custom').map((command) => [command.name, command.type])
@@ -397,7 +407,8 @@ function normalizeCommands(commands) {
       };
     })
     .filter((item) => {
-      if (!item.name || !item.response || seen.has(item.name)) {
+      // custom commands require a response; built-in types (including LoL) do not
+      if (!item.name || (item.type === 'custom' && !item.response) || seen.has(item.name)) {
         return false;
       }
       seen.add(item.name);
