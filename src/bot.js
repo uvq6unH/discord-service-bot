@@ -18,6 +18,10 @@ import {
   handleLolItem, handleLolRunes, handleLolPatch,
   handleLolLink, handleLolUnlink, buildLolSlashOptions
 } from './lolCommands.js';
+import {
+  handleTftLsd, handleTftProfile, handleTftMatch,
+  handleTftLink, handleTftUnlink, buildTftSlashOptions
+} from './tftCommands.js';
 
 const groupMap = {
   ping: 'general',
@@ -58,7 +62,13 @@ const groupMap = {
   lolrunes: 'lol',
   lolpatch: 'lol',
   lollink: 'lol',
-  lolunlink: 'lol'
+  lolunlink: 'lol',
+  // ── TFT ──
+  tftlsd: 'tft',
+  tftprofile: 'tft',
+  tftmatch: 'tft',
+  tftlink: 'tft',
+  tftunlink: 'tft'
 };
 
 const groupMetadata = {
@@ -89,6 +99,10 @@ const groupMetadata = {
   lol: {
     title: '⚔️ League of Legends',
     description: 'Tra cứu lịch sử đấu, hồ sơ người chơi, thông tin tướng, trang bị và bảng ngọc.'
+  },
+  tft: {
+    title: '🎲 Teamfight Tactics',
+    description: 'Tra cứu lịch sử TFT, hồ sơ, chi tiết trận (bài chơi, con, đồ, augment).'
   }
 };
 
@@ -146,7 +160,13 @@ async function buildHelpPayload(client, config, guild, userId, selectedGroup = n
         .setValue('help_group:lol')
         .setDescription('Tra cứu đấu, hồ sơ, tướng, trang bị, bảng ngọc')
         .setEmoji('⚔️')
-        .setDefault(selectedGroup === 'lol')
+        .setDefault(selectedGroup === 'lol'),
+      new StringSelectMenuOptionBuilder()
+        .setLabel('Teamfight Tactics')
+        .setValue('help_group:tft')
+        .setDescription('Lịch sử TFT, hồ sơ, chi tiết trận, bài, con, đồ')
+        .setEmoji('🎲')
+        .setDefault(selectedGroup === 'tft')
     );
 
   const row = new ActionRowBuilder().addComponents(selectMenu);
@@ -838,7 +858,8 @@ function buildSlashOptions(command) {
           { name: '🖥️ Máy Chủ & Phát Thanh', value: 'server' },
           { name: '🛡️ Kiểm Duyệt & Bảo Mật', value: 'moderation' },
           { name: '🔔 Tương Tác & Nút Bấm', value: 'interactions' },
-          { name: '⚔️ League of Legends', value: 'lol' }
+          { name: '⚔️ League of Legends', value: 'lol' },
+          { name: '🎲 Teamfight Tactics', value: 'tft' }
         ]
       }
     ];
@@ -1058,6 +1079,11 @@ function buildSlashOptions(command) {
     return buildLolSlashOptions(command.type);
   }
 
+  // ── Teamfight Tactics ────────────────────────────────────────────────────
+  if (['tftlsd', 'tftprofile', 'tftmatch', 'tftlink', 'tftunlink'].includes(command.type)) {
+    return buildTftSlashOptions(command.type);
+  }
+
   return [
     {
       name: 'args',
@@ -1159,6 +1185,8 @@ async function runBuiltInCommand({ client, config, command, source, args }) {
         selectedGroup = 'interactions';
       } else if (['lol', 'league', 'liên minh', 'lsd', 'tướng'].includes(lowerArgs)) {
         selectedGroup = 'lol';
+      } else if (['tft', 'teamfight', 'tactics', 'tftlsd', 'đấu trường'].includes(lowerArgs)) {
+        selectedGroup = 'tft';
       }
     }
 
@@ -1705,6 +1733,19 @@ async function runBuiltInCommand({ client, config, command, source, args }) {
     if (command.type === 'lolpatch') return handleLolPatch({ ...lolCtx });
     if (command.type === 'lollink') return handleLolLink(lolCtx);
     if (command.type === 'lolunlink') return handleLolUnlink({ source, isInteraction, stateStore: ss, guildId: guild.id, reply });
+  }
+
+  // ── Teamfight Tactics commands ──────────────────────────────────────────────
+  const TFT_CMDS = ['tftlsd', 'tftprofile', 'tftmatch', 'tftlink', 'tftunlink'];
+  if (TFT_CMDS.includes(command.type)) {
+    const ss = client.stateStore;
+    const tftArgs = isInteraction ? '' : args;
+    const tftCtx = { source, args: tftArgs, isInteraction, stateStore: ss, guildId: guild.id, config, reply };
+    if (command.type === 'tftlsd')     return handleTftLsd(tftCtx);
+    if (command.type === 'tftprofile') return handleTftProfile(tftCtx);
+    if (command.type === 'tftmatch')   return handleTftMatch(tftCtx);
+    if (command.type === 'tftlink')    return handleTftLink(tftCtx);
+    if (command.type === 'tftunlink')  return handleTftUnlink({ source, isInteraction, stateStore: ss, guildId: guild.id, reply });
   }
 
   return reply(renderCommandResponse(command.response, { client, context, config, args }));

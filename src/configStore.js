@@ -224,7 +224,13 @@ const defaultConfig = {
     { enabled: true,  type: 'lolrunes',   name: 'lolrunes',  description: 'Bảng ngọc LoL' },
     { enabled: true,  type: 'lolpatch',   name: 'lolpatch',  description: 'Phiên bản LoL mới nhất' },
     { enabled: true,  type: 'lollink',    name: 'lollink',   description: 'Liên kết tài khoản LoL với Discord' },
-    { enabled: true,  type: 'lolunlink',  name: 'lolunlink', description: 'Bỏ liên kết tài khoản LoL' }
+    { enabled: true,  type: 'lolunlink',  name: 'lolunlink', description: 'Bỏ liên kết tài khoản LoL' },
+    // ── Teamfight Tactics ────────────────────────────────────────────────────
+    { enabled: true,  type: 'tftlsd',     name: 'tftlsd',    description: 'Lịch sử 5 trận TFT gần nhất (hạng, bài, con, đồ)' },
+    { enabled: true,  type: 'tftprofile', name: 'tft',       description: 'Hồ sơ TFT (rank, avg placement, traits)' },
+    { enabled: true,  type: 'tftmatch',   name: 'tftmatch',  description: 'Chi tiết trận TFT (bài chơi, con, đồ, augment)' },
+    { enabled: true,  type: 'tftlink',    name: 'tftlink',   description: 'Liên kết tài khoản TFT với Discord' },
+    { enabled: true,  type: 'tftunlink',  name: 'tftunlink', description: 'Bỏ liên kết tài khoản TFT' }
   ],
   moderationEnabled: true,
   autoModEnabled: false,
@@ -331,7 +337,13 @@ const commandTypes = new Set([
   'lolrunes',
   'lolpatch',
   'lollink',
-  'lolunlink'
+  'lolunlink',
+  // ── Teamfight Tactics ──────────────────────────────────────────────────────
+  'tftlsd',
+  'tftprofile',
+  'tftmatch',
+  'tftlink',
+  'tftunlink'
 ]);
 const builtInTypesByName = new Map(
   defaultConfig.commands.filter((command) => command.type !== 'custom').map((command) => [command.name, command.type])
