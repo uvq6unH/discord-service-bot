@@ -487,6 +487,12 @@ export class ConfigStore {
     // Fall back to RIOT_API_KEY env var if not set in dashboard
     if (!base.riotApiKey && process.env.RIOT_API_KEY) {
       base.riotApiKey = process.env.RIOT_API_KEY.trim();
+      const kp = base.riotApiKey;
+      console.log(`[ConfigStore] RIOT_API_KEY from env: ${kp.slice(0,8)}...(len=${kp.length})`);
+    } else if (base.riotApiKey) {
+      console.log(`[ConfigStore] RIOT_API_KEY from dashboard: ${base.riotApiKey.slice(0,8)}...(len=${base.riotApiKey.length})`);
+    } else {
+      console.warn('[ConfigStore] RIOT_API_KEY not set anywhere!');
     }
     return base;
   }
@@ -531,7 +537,7 @@ export class ConfigStore {
         ? Math.max(-720, Math.min(840, Math.round(Number(patch.dailyResetUtcOffset))))
         : (current.dailyResetUtcOffset ?? defaultConfig.dailyResetUtcOffset),
       riotApiKey: typeof patch.riotApiKey === 'string'
-        ? patch.riotApiKey.trim().slice(0, 60)
+        ? patch.riotApiKey.trim().slice(0, 100)
         : (current.riotApiKey ?? ''),
       dailySilverAmount: Math.max(0, Math.min(1000000, Number.parseInt(patch.dailySilverAmount, 10) || 0)),
       dailyGoldAmount: Math.max(0, Math.min(1000000, Number.parseInt(patch.dailyGoldAmount, 10) || 0)),
