@@ -92,11 +92,14 @@ const FIELDS = [
 const groupMap = {
   ping: 'general', help: 'general', custom: 'general', config: 'general',
   user: 'user', avatar: 'user', rank: 'user', leaderboard: 'user',
-  balance: 'user', daily: 'user', economyleaderboard: 'user', blackjack: 'user', poker: 'user', coinflip: 'user', dice: 'user', slots: 'user',
+  balance: 'user', daily: 'user', economyleaderboard: 'user',
+  blackjack: 'games', poker: 'games', coinflip: 'games', dice: 'games', slots: 'games',
   server: 'server', say: 'server', purge: 'server', announce: 'server',
   warn: 'moderation', kick: 'moderation', ban: 'moderation', timeout: 'moderation', warnings: 'moderation', clearwarns: 'moderation',
   ecoadd: 'moderation', ecoset: 'moderation', ecoremove: 'moderation',
   ticketpanel: 'interactions', rolepanel: 'interactions',
+  lsd: 'lol', lolprofile: 'lol', lolmatch: 'lol', lolchamp: 'lol',
+  lolitem: 'lol', lolrunes: 'lol', lolpatch: 'lol', lollink: 'lol', lolunlink: 'lol',
 };
 const commandLabels = {
   custom: 'Custom', ping: 'Ping', help: 'Help', config: 'Config', server: 'Server info',
@@ -106,9 +109,12 @@ const commandLabels = {
   economyleaderboard: 'Economy leaderboard', blackjack: 'Blackjack', poker: 'Poker', coinflip: 'Coinflip', dice: 'Dice', slots: 'Slots',
   ecoadd: 'Eco add', ecoset: 'Eco set', ecoremove: 'Eco remove',
   announce: 'Announce', ticketpanel: 'Ticket panel', rolepanel: 'Role panel',
+  lsd: 'Lịch sử đấu', lolprofile: 'Hồ sơ LoL', lolmatch: 'Chi tiết trận',
+  lolchamp: 'Thông tin tướng', lolitem: 'Trang bị', lolrunes: 'Bảng ngọc',
+  lolpatch: 'Phiên bản', lollink: 'Liên kết tài khoản', lolunlink: 'Bỏ liên kết',
 };
 
-const commandGroupOrder = ['general', 'user', 'server', 'moderation', 'interactions'];
+const commandGroupOrder = ['general', 'user', 'server', 'moderation', 'interactions', 'games', 'lol'];
 const commandGroupMeta = {
   general: {
     title: 'Lệnh chung',
@@ -139,6 +145,18 @@ const commandGroupMeta = {
     hint: 'Ticket panel và role panel',
     icon: 'ti ti-ticket',
     tone: 'teal',
+  },
+  games: {
+    title: '🎮 Trò Chơi',
+    hint: 'Blackjack, Poker, Coinflip, Dice, Slots',
+    icon: 'ti ti-cards',
+    tone: 'purple',
+  },
+  lol: {
+    title: '⚔️ League of Legends',
+    hint: 'Lịch sử đấu, hồ sơ, tướng, trang bị, bảng ngọc',
+    icon: 'ti ti-sword',
+    tone: 'orange',
   },
 };
 

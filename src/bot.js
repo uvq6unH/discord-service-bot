@@ -30,11 +30,11 @@ const groupMap = {
   balance: 'user',
   daily: 'user',
   economyleaderboard: 'user',
-  blackjack: 'user',
-  poker: 'user',
-  coinflip: 'user',
-  dice: 'user',
-  slots: 'user',
+  blackjack: 'games',
+  poker: 'games',
+  coinflip: 'games',
+  dice: 'games',
+  slots: 'games',
   server: 'server',
   say: 'server',
   purge: 'server',
@@ -81,6 +81,10 @@ const groupMetadata = {
   interactions: {
     title: '🔔 Tương Tác & Nút Bấm',
     description: 'Các lệnh đăng bảng chọn vai trò tự động và tạo kênh hỗ trợ (ticket).'
+  },
+  games: {
+    title: '🎮 Trò Chơi',
+    description: 'Blackjack, Poker, Coinflip, Dice và Slots — đặt cược bằng tiền ảo của server.'
   },
   lol: {
     title: '⚔️ League of Legends',
@@ -130,7 +134,19 @@ async function buildHelpPayload(client, config, guild, userId, selectedGroup = n
         .setValue('help_group:interactions')
         .setDescription('Đăng bảng ticket hỗ trợ và tự chọn role')
         .setEmoji('🔔')
-        .setDefault(selectedGroup === 'interactions')
+        .setDefault(selectedGroup === 'interactions'),
+      new StringSelectMenuOptionBuilder()
+        .setLabel('Trò Chơi')
+        .setValue('help_group:games')
+        .setDescription('Blackjack, Poker, Coinflip, Dice, Slots')
+        .setEmoji('🎮')
+        .setDefault(selectedGroup === 'games'),
+      new StringSelectMenuOptionBuilder()
+        .setLabel('League of Legends')
+        .setValue('help_group:lol')
+        .setDescription('Tra cứu đấu, hồ sơ, tướng, trang bị, bảng ngọc')
+        .setEmoji('⚔️')
+        .setDefault(selectedGroup === 'lol')
     );
 
   const row = new ActionRowBuilder().addComponents(selectMenu);
@@ -149,7 +165,9 @@ async function buildHelpPayload(client, config, guild, userId, selectedGroup = n
         `• 👤 **Thành Viên & Cấp Độ**: Thẻ thông tin, cấp độ XP.\n` +
         `• 🖥️ **Máy Chủ & Phát Thanh**: Thông tin server, gửi thông báo.\n` +
         `• 🛡️ **Kiểm Duyệt**: Ban, kick, dọn tin nhắn.\n` +
-        `• 🔔 **Tương Tác**: Tự nhận vai trò, kênh Ticket.`
+        `• 🔔 **Tương Tác**: Tự nhận vai trò, kênh Ticket.\n` +
+        `• 🎮 **Trò Chơi**: Blackjack, Poker, Coinflip, Dice, Slots.\n` +
+        `• ⚔️ **League of Legends**: Tra cứu hồ sơ, tướng, lịch sử đấu.`
       )
       .setFooter({ text: 'Sử dụng select menu bên dưới để duyệt lệnh' });
   } else {
@@ -636,17 +654,17 @@ function buildBlackjackPayload(config, session) {
 
   const components = canAct
     ? [
-        new ActionRowBuilder().addComponents(
-          new ButtonBuilder().setCustomId('bj:join').setLabel('Join').setStyle(ButtonStyle.Success),
-          new ButtonBuilder().setCustomId('bj:hit').setLabel('Hit').setStyle(ButtonStyle.Primary),
-          new ButtonBuilder().setCustomId('bj:stand').setLabel('Theo / Stand').setStyle(ButtonStyle.Secondary),
-          new ButtonBuilder().setCustomId('bj:double').setLabel('x2').setStyle(ButtonStyle.Success).setDisabled(!canDouble),
-          new ButtonBuilder().setCustomId('bj:split').setLabel('Split').setStyle(ButtonStyle.Success).setDisabled(!canSplit)
-        ),
-        new ActionRowBuilder().addComponents(
-          new ButtonBuilder().setCustomId('bj:cancel').setLabel('Huy').setStyle(ButtonStyle.Danger)
-        )
-      ]
+      new ActionRowBuilder().addComponents(
+        new ButtonBuilder().setCustomId('bj:join').setLabel('Join').setStyle(ButtonStyle.Success),
+        new ButtonBuilder().setCustomId('bj:hit').setLabel('Hit').setStyle(ButtonStyle.Primary),
+        new ButtonBuilder().setCustomId('bj:stand').setLabel('Theo / Stand').setStyle(ButtonStyle.Secondary),
+        new ButtonBuilder().setCustomId('bj:double').setLabel('x2').setStyle(ButtonStyle.Success).setDisabled(!canDouble),
+        new ButtonBuilder().setCustomId('bj:split').setLabel('Split').setStyle(ButtonStyle.Success).setDisabled(!canSplit)
+      ),
+      new ActionRowBuilder().addComponents(
+        new ButtonBuilder().setCustomId('bj:cancel').setLabel('Huy').setStyle(ButtonStyle.Danger)
+      )
+    ]
     : [];
 
   return { embeds: [embed], components };
@@ -722,19 +740,19 @@ function buildPokerPayload(config, session) {
   const components = finished
     ? []
     : [
-        new ActionRowBuilder().addComponents(
-          ...session.hand.map((card, index) =>
-            new ButtonBuilder()
-              .setCustomId(`vp:hold:${session.userId}:${index}`)
-              .setLabel(`${index + 1}${session.held.has(index) ? ' held' : ''}`)
-              .setStyle(session.held.has(index) ? ButtonStyle.Success : ButtonStyle.Secondary)
-          )
-        ),
-        new ActionRowBuilder().addComponents(
-          new ButtonBuilder().setCustomId(`vp:draw:${session.userId}`).setLabel('Draw').setStyle(ButtonStyle.Primary),
-          new ButtonBuilder().setCustomId(`vp:cancel:${session.userId}`).setLabel('Huy').setStyle(ButtonStyle.Danger)
+      new ActionRowBuilder().addComponents(
+        ...session.hand.map((card, index) =>
+          new ButtonBuilder()
+            .setCustomId(`vp:hold:${session.userId}:${index}`)
+            .setLabel(`${index + 1}${session.held.has(index) ? ' held' : ''}`)
+            .setStyle(session.held.has(index) ? ButtonStyle.Success : ButtonStyle.Secondary)
         )
-      ];
+      ),
+      new ActionRowBuilder().addComponents(
+        new ButtonBuilder().setCustomId(`vp:draw:${session.userId}`).setLabel('Draw').setStyle(ButtonStyle.Primary),
+        new ButtonBuilder().setCustomId(`vp:cancel:${session.userId}`).setLabel('Huy').setStyle(ButtonStyle.Danger)
+      )
+    ];
 
   return { embeds: [embed], components };
 }
@@ -1036,7 +1054,7 @@ function buildSlashOptions(command) {
   }
 
   // ── League of Legends ───────────────────────────────────────────────────
-  if (['lsd','lolprofile','lolmatch','lolchamp','lolitem','lolrunes','lolpatch','lollink','lolunlink'].includes(command.type)) {
+  if (['lsd', 'lolprofile', 'lolmatch', 'lolchamp', 'lolitem', 'lolrunes', 'lolpatch', 'lollink', 'lolunlink'].includes(command.type)) {
     return buildLolSlashOptions(command.type);
   }
 
@@ -1672,21 +1690,21 @@ async function runBuiltInCommand({ client, config, command, source, args }) {
   }
 
   // ── League of Legends commands ──────────────────────────────────────────────
-  const LOL_CMDS = ['lsd','lolprofile','lolmatch','lolchamp','lolitem','lolrunes','lolpatch','lollink','lolunlink'];
+  const LOL_CMDS = ['lsd', 'lolprofile', 'lolmatch', 'lolchamp', 'lolitem', 'lolrunes', 'lolpatch', 'lollink', 'lolunlink'];
   if (LOL_CMDS.includes(command.type)) {
     const lolArgs = isInteraction ? '' : args;
     // stateStore is not in scope of runBuiltInCommand — use client.stateStore (set in createBot)
     const ss = client.stateStore;
     const lolCtx = { source, args: lolArgs, isInteraction, stateStore: ss, guildId: guild.id, config, reply };
-    if (command.type === 'lsd')        return handleLsd(lolCtx);
+    if (command.type === 'lsd') return handleLsd(lolCtx);
     if (command.type === 'lolprofile') return handleLolProfile(lolCtx);
-    if (command.type === 'lolmatch')   return handleLolMatch(lolCtx);
-    if (command.type === 'lolchamp')   return handleLolChamp({ ...lolCtx });
-    if (command.type === 'lolitem')    return handleLolItem({ ...lolCtx });
-    if (command.type === 'lolrunes')   return handleLolRunes({ ...lolCtx });
-    if (command.type === 'lolpatch')   return handleLolPatch({ ...lolCtx });
-    if (command.type === 'lollink')    return handleLolLink(lolCtx);
-    if (command.type === 'lolunlink')  return handleLolUnlink({ source, isInteraction, stateStore: ss, guildId: guild.id, reply });
+    if (command.type === 'lolmatch') return handleLolMatch(lolCtx);
+    if (command.type === 'lolchamp') return handleLolChamp({ ...lolCtx });
+    if (command.type === 'lolitem') return handleLolItem({ ...lolCtx });
+    if (command.type === 'lolrunes') return handleLolRunes({ ...lolCtx });
+    if (command.type === 'lolpatch') return handleLolPatch({ ...lolCtx });
+    if (command.type === 'lollink') return handleLolLink(lolCtx);
+    if (command.type === 'lolunlink') return handleLolUnlink({ source, isInteraction, stateStore: ss, guildId: guild.id, reply });
   }
 
   return reply(renderCommandResponse(command.response, { client, context, config, args }));

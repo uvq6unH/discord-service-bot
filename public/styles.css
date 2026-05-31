@@ -1012,7 +1012,7 @@ select option {
 }
 
 .command-section:hover {
-  background   : var(--surface2);
+  background  : var(--surface2);
   border-color: var(--border2);
   transform   : translateY(-1px);
 }
@@ -1053,6 +1053,16 @@ select option {
 .command-section-icon.teal {
   background: rgba(45, 212, 191, .12);
   color     : #2dd4bf;
+}
+
+.command-section-icon.purple {
+  background: var(--purple-bg);
+  color     : var(--purple);
+}
+
+.command-section-icon.orange {
+  background: var(--orange-bg);
+  color     : var(--orange);
 }
 
 .command-section-title {
@@ -1139,7 +1149,7 @@ select option {
 }
 
 .command-group-action:hover {
-  background   : var(--accent-bg);
+  background  : var(--accent-bg);
   border-color: var(--accent);
   box-shadow  : 0 8px 24px rgba(0, 0, 0, .18);
 }
@@ -1191,14 +1201,14 @@ select option {
 }
 
 .command-panel-count {
-  flex-shrink   : 0;
-  padding       : 4px 9px;
-  border        : 1px solid var(--border2);
-  border-radius : 999px;
-  background    : var(--surface2);
-  color         : var(--muted);
-  font-size     : 12px;
-  font-weight   : 700;
+  flex-shrink  : 0;
+  padding      : 4px 9px;
+  border       : 1px solid var(--border2);
+  border-radius: 999px;
+  background   : var(--surface2);
+  color        : var(--muted);
+  font-size    : 12px;
+  font-weight  : 700;
 }
 
 /* Command list */
@@ -1260,18 +1270,18 @@ select option {
 }
 
 .command-name-pill {
-  min-width     : 0;
-  max-width     : 100%;
-  padding       : 3px 8px;
-  border-radius : 999px;
-  background    : var(--surface2);
-  border        : 1px solid var(--border2);
-  color         : var(--text);
-  font-size     : 11.5px;
-  font-weight   : 600;
-  overflow      : hidden;
-  text-overflow : ellipsis;
-  white-space   : nowrap;
+  min-width    : 0;
+  max-width    : 100%;
+  padding      : 3px 8px;
+  border-radius: 999px;
+  background   : var(--surface2);
+  border       : 1px solid var(--border2);
+  color        : var(--text);
+  font-size    : 11.5px;
+  font-weight  : 600;
+  overflow     : hidden;
+  text-overflow: ellipsis;
+  white-space  : nowrap;
 }
 
 .command-actions {
@@ -1289,11 +1299,11 @@ select option {
   flex                 : 1;
 }
 
-.command-fields > div {
-  min-width: 0;
-  display  : flex;
+.command-fields>div {
+  min-width     : 0;
+  display       : flex;
   flex-direction: column;
-  gap      : 6px;
+  gap           : 6px;
 }
 
 .command-response-wrap,
@@ -1327,33 +1337,33 @@ select option {
 }
 
 .roles-checkbox-grid {
-  display   : flex;
-  flex-wrap : wrap;
-  gap       : 8px;
-  margin-top: 6px;
-  max-height: 112px;
-  overflow-y: auto;
+  display      : flex;
+  flex-wrap    : wrap;
+  gap          : 8px;
+  margin-top   : 6px;
+  max-height   : 112px;
+  overflow-y   : auto;
   padding-right: 3px;
 }
 
 /* Role tag: full colored text, no dot */
 .role-checkbox-label {
-  display        : inline-flex;
-  align-items    : center;
-  gap            : 5px;
-  min-width      : 0;
-  width          : auto;
-  max-width      : none;
-  font-size      : 11px;
-  font-weight    : 600;
-  padding        : 5px 9px;
-  border-radius  : 5px;
-  cursor         : pointer;
-  border         : 1.5px solid transparent;
-  transition     : opacity .15s, border-color .15s;
-  overflow       : visible;
-  white-space    : nowrap;
-  flex           : 0 0 auto;
+  display      : inline-flex;
+  align-items  : center;
+  gap          : 5px;
+  min-width    : 0;
+  width        : auto;
+  max-width    : none;
+  font-size    : 11px;
+  font-weight  : 600;
+  padding      : 5px 9px;
+  border-radius: 5px;
+  cursor       : pointer;
+  border       : 1.5px solid transparent;
+  transition   : opacity .15s, border-color .15s;
+  overflow     : visible;
+  white-space  : nowrap;
+  flex         : 0 0 auto;
 }
 
 .role-checkbox-label input {
@@ -1516,11 +1526,11 @@ select option {
   }
 
   .server-list {
-    flex-direction: row;
-    align-items   : center;
+    flex-direction : row;
+    align-items    : center;
     justify-content: flex-start;
-    overflow-x    : auto;
-    overflow-y    : hidden;
+    overflow-x     : auto;
+    overflow-y     : hidden;
     padding-bottom : 2px;
   }
 
@@ -1532,8 +1542,8 @@ select option {
 
   .rail-bottom {
     width      : auto;
-    flex      : 0 0 auto;
-    padding   : 0;
+    flex       : 0 0 auto;
+    padding    : 0;
     margin-left: 8px;
   }
 
