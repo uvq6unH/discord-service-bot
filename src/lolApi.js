@@ -161,6 +161,9 @@ export async function getChampionData(lang = 'vi_VN') {
 
   // CommunityDragon champion-summary: always public, no IP restrictions
   const list = await httpGet(`${CDRAGON_BASE}/plugins/rcp-be-lol-game-data/global/${cdLang}/v1/champion-summary.json`);
+  // Debug: log first non-None champion to verify field names
+  const sample = list.find(c => c.id !== -1);
+  console.log('[cdragon] sample champion fields:', JSON.stringify(sample));
 
   // Normalize to DDragon-compatible shape: { data: { [key]: { key, name, ... } } }
   const data = { data: {} };
@@ -193,6 +196,8 @@ export async function getChampionDetail(champKey, lang = 'vi_VN') {
   let raw;
   try {
     raw = await httpGet(`${CDRAGON_BASE}/plugins/rcp-be-lol-game-data/global/${cdLang}/v1/champions/${numericId}.json`);
+    console.log(`[cdragon] champion ${champKey}(${numericId}) keys:`, Object.keys(raw).join(','));
+    if (raw.baseStats) console.log('[cdragon] baseStats keys:', Object.keys(raw.baseStats).join(','));
   } catch {
     // fallback to English
     raw = await httpGet(`${CDRAGON_BASE}/plugins/rcp-be-lol-game-data/global/en_us/v1/champions/${numericId}.json`);
