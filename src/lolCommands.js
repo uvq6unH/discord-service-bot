@@ -19,7 +19,7 @@ import {
   getMatchHistory, getMatchDetail, getTopMastery, findChampion,
   getChampionDetail, getChampionData, getItemData, getRuneData,
   getLatestPatch, formatRank, formatDuration, getQueueName,
-  getRegionChoices, RANK_EMOJIS
+  getRegionChoices, RANK_EMOJIS, REGIONS
 } from './lolApi.js';
 
 // ── Colours ───────────────────────────────────────────────────────────────────
@@ -82,7 +82,8 @@ export async function handleLsd({ source, args, isInteraction, stateStore, guild
     const { account, summoner, region } = await resolveSummoner(source, args, isInteraction, stateStore, guildId, apiKey);
     const patch = await getLatestPatch();
     const matchIds = await getMatchHistory(account.puuid, region, apiKey, 5);
-    if (!matchIds.length) return editOrReply(source, isInteraction, { content: 'Không tìm thấy lịch sử trận đấu.' });
+    console.log(`[lsd] puuid=${account.puuid} region=${region} routing=${REGIONS.routing[region]} matchIds=${JSON.stringify(matchIds)}`);
+    if (!matchIds.length) return editOrReply(source, isInteraction, { content: `Không tìm thấy lịch sử trận đấu cho **${account.gameName}#${account.tagLine}** (${region.toUpperCase()}). Tài khoản chưa chơi trận nào hoặc chế độ thi đấu bị ẩn.` });
 
     const matches = await Promise.all(matchIds.map((id) => getMatchDetail(id, region, apiKey)));
     const rankedEntries = await getRankedInfo(account.puuid, region, apiKey);
@@ -526,7 +527,11 @@ function noApiKeyMsg(isInteraction) {
 function formatError(err) {
   if (err.status === 404) return '❌ Không tìm thấy người chơi. Kiểm tra lại Riot ID và khu vực.';
   if (err.status === 429) return '❌ Đã vượt giới hạn API. Vui lòng thử lại sau vài giây.';
-  if (err.status === 403) return '❌ API Key không hợp lệ hoặc đã hết hạn.';
+  if (err.status === 403) {
+    const isRiotApi = err.body && err.body.includes('status_code');
+    if (isRiotApi) return '❌ API Key không hợp lệ hoặc đã hết hạn. Vui lòng refresh key tại developer.riotgames.com.';
+    return `❌ Lỗi dữ liệu (403): ${err.message}. Thử lại hoặc kiểm tra tên tướng/account.`;
+  }
   return `❌ Lỗi: ${err.message}`;
 }
 
