@@ -256,7 +256,8 @@ export async function handleLolChamp({ source, args, isInteraction, config, repl
     const s = detail.stats;
 
     // Use cdragon for images — DDragon CDN can block server IPs
-    const iconUrl = `https://raw.communitydragon.org/latest/plugins/rcp-be-lol-game-data/global/default/v1/champion-icons/${detail.id}.png`;
+    const iconUrl = found.iconUrl
+      ?? `https://raw.communitydragon.org/latest/plugins/rcp-be-lol-game-data/global/default/v1/champion-icons/${detail.id}.png`;
     const splashUrl = `https://raw.communitydragon.org/latest/plugins/rcp-be-lol-game-data/global/default/v1/champion-splashes/${detail.id}/${detail.id}000.jpg`;
 
     const stats = [

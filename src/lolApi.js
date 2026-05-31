@@ -170,11 +170,17 @@ export async function getChampionData(lang = 'vi_VN') {
   for (const c of list) {
     if (c.id === -1) continue; // skip "None"
     const champKey = c.alias; // e.g. "Vi", "Ahri"
+    // squarePortraitPath: "/lol-game-data/assets/v1/champion-icons/1.png"
+    // Full URL: CDRAGON_BASE + /plugins/rcp-be-lol-game-data/global/default + path.toLowerCase()
+    const iconPath = (c.squarePortraitPath ?? '').toLowerCase().replace('/lol-game-data/assets', '');
     data.data[champKey] = {
       key: String(c.id),   // numeric string like DDragon
-      id: champKey,
+      id: String(c.id),    // numeric id for image URLs
       name: c.name,
       tags: c.roles ?? [],
+      iconUrl: iconPath
+        ? `${CDRAGON_BASE}/plugins/rcp-be-lol-game-data/global/default${iconPath}`
+        : null,
     };
   }
   cache.set(cacheKey, data, TTL.ddragon);
@@ -208,11 +214,17 @@ export async function getChampionDetail(champKey, lang = 'vi_VN') {
     id: numericId,   // numeric id needed for image URLs
     name: raw.name,
     title: raw.title,
-    lore: raw.shortBio ?? raw.lore ?? '',
+    lore: raw.shortBio ?? '',
     blurb: raw.shortBio ?? '',
-    tags: raw.roles ?? [],
-    info: { difficulty: raw.difficulty ?? 1 },
-    allytips: raw.tips ?? [],
+    tags: (raw.roles ?? []).map(r => r.charAt(0).toUpperCase() + r.slice(1)), // capitalize: "mage" -> "Mage"
+    info: { difficulty: raw.tacticalInfo?.difficulty ?? raw.difficulty ?? 1 },
+    allytips: raw.playstyleInfo?.damage != null
+      ? [`Sát thương: ${raw.playstyleInfo.damage}/3 | Khả năng chịu đòn: ${raw.playstyleInfo.durability}/3 | Kiểm soát: ${raw.playstyleInfo.crowdControl}/3`]
+      : [],
+    // cdragon baseStats uses camelCase: hp, hpPerLevel, mp, mpPerLevel,
+    // armor, armorPerLevel, spellBlock, spellBlockPerLevel,
+    // attackDamage, attackDamagePerLevel, attackSpeed (base), attackSpeedRatio,
+    // moveSpeed, attackRange
     stats: {
       hp: raw.baseStats?.hp ?? 0,
       hpperlevel: raw.baseStats?.hpPerLevel ?? 0,
@@ -220,21 +232,23 @@ export async function getChampionDetail(champKey, lang = 'vi_VN') {
       mpperlevel: raw.baseStats?.mpPerLevel ?? 0,
       armor: raw.baseStats?.armor ?? 0,
       armorperlevel: raw.baseStats?.armorPerLevel ?? 0,
-      spellblock: raw.baseStats?.spellBlock ?? 0,
-      spellblockperlevel: raw.baseStats?.spellBlockPerLevel ?? 0,
-      attackdamage: raw.baseStats?.attackDamage ?? 0,
-      attackdamageperlevel: raw.baseStats?.attackDamagePerLevel ?? 0,
-      attackspeed: raw.baseStats?.attackSpeed ?? 0,
-      movespeed: raw.baseStats?.moveSpeed ?? 0,
-      attackrange: raw.baseStats?.attackRange ?? 0,
+      spellblock: raw.baseStats?.spellBlock ?? raw.baseStats?.spellblock ?? 0,
+      spellblockperlevel: raw.baseStats?.spellBlockPerLevel ?? raw.baseStats?.spellblockperlevel ?? 0,
+      attackdamage: raw.baseStats?.attackDamage ?? raw.baseStats?.attackdamage ?? 0,
+      attackdamageperlevel: raw.baseStats?.attackDamagePerLevel ?? raw.baseStats?.attackdamageperlevel ?? 0,
+      attackspeed: raw.baseStats?.attackSpeed ?? raw.baseStats?.attackSpeedRatio ?? 0,
+      movespeed: raw.baseStats?.moveSpeed ?? raw.baseStats?.movespeed ?? 0,
+      attackrange: raw.baseStats?.attackRange ?? raw.baseStats?.attackrange ?? 0,
     },
+    // cdragon: passive = { name, abilityIconPath, abilityVideoPath, description }
+    // spells = array of { spellKey, name, abilityIconPath, description, ... }
     passive: {
       name: raw.passive?.name ?? '',
-      description: raw.passive?.description ?? '',
+      description: (raw.passive?.description ?? '').replace(/<[^>]+>/g, ''),
     },
     spells: (raw.spells ?? []).map(sp => ({
-      name: sp.name,
-      description: sp.description,
+      name: sp.name ?? '',
+      description: (sp.description ?? '').replace(/<[^>]+>/g, ''),
     })),
   };
 
