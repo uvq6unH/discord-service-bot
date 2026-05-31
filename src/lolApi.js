@@ -189,64 +189,69 @@ export async function getChampionData(lang = 'vi_VN') {
 
 export async function getChampionDetail(champKey, lang = 'vi_VN') {
   const cdLang = lang === 'vi_VN' ? 'vi_vn' : 'en_us';
-  const cacheKey = `cdragon:champdetail:${champKey}:${cdLang}`;
+  const cacheKey = `champdetail:${champKey}:${cdLang}`;
   let cached = cache.get(cacheKey);
   if (cached) return cached;
 
-  // Get champion list first to resolve key -> numeric id
+  // Resolve alias -> numeric id
   const champData = await getChampionData(lang);
   const entry = champData.data[champKey];
   const numericId = entry ? entry.key : null;
   if (!numericId) throw Object.assign(new Error(`Champion not found: ${champKey}`), { status: 404 });
 
+  // ── Fetch DDragon for stats (authoritative, always has stats object) ──────
+  const patch = await getLatestPatch();
+  let dd;
+  try {
+    dd = await httpGet(`${DDRAGON_BASE}/cdn/${patch}/data/${lang}/champion/${champKey}.json`);
+  } catch {
+    dd = await httpGet(`${DDRAGON_BASE}/cdn/${patch}/data/en_US/champion/${champKey}.json`);
+  }
+  const ddChamp = dd?.data?.[champKey];
+  const ddStats = ddChamp?.stats ?? {};
+
+  // ── Fetch CDragon for localized lore + skill descriptions ─────────────────
   let raw;
   try {
     raw = await httpGet(`${CDRAGON_BASE}/plugins/rcp-be-lol-game-data/global/${cdLang}/v1/champions/${numericId}.json`);
     console.log(`[cdragon] champion ${champKey}(${numericId}) keys:`, Object.keys(raw).join(','));
-    if (raw.baseStats) console.log('[cdragon] baseStats keys:', Object.keys(raw.baseStats).join(','));
   } catch {
-    // fallback to English
     raw = await httpGet(`${CDRAGON_BASE}/plugins/rcp-be-lol-game-data/global/en_us/v1/champions/${numericId}.json`);
   }
 
-  // Normalize cdragon shape to match what lolCommands expects (DDragon-like)
   const detail = {
-    id: numericId,   // numeric id needed for image URLs
-    name: raw.name,
-    title: raw.title,
-    lore: raw.shortBio ?? '',
-    blurb: raw.shortBio ?? '',
-    tags: (raw.roles ?? []).map(r => r.charAt(0).toUpperCase() + r.slice(1)), // capitalize: "mage" -> "Mage"
-    info: { difficulty: raw.tacticalInfo?.difficulty ?? raw.difficulty ?? 1 },
+    id: numericId,
+    name: raw.name ?? ddChamp?.name ?? champKey,
+    title: raw.title ?? ddChamp?.title ?? '',
+    lore: raw.shortBio ?? ddChamp?.lore ?? '',
+    blurb: raw.shortBio ?? ddChamp?.blurb ?? '',
+    tags: (raw.roles ?? ddChamp?.tags ?? []).map(r => r.charAt(0).toUpperCase() + r.slice(1)),
+    info: { difficulty: raw.tacticalInfo?.difficulty ?? ddChamp?.info?.difficulty ?? 1 },
     allytips: raw.playstyleInfo?.damage != null
       ? [`Sát thương: ${raw.playstyleInfo.damage}/3 | Khả năng chịu đòn: ${raw.playstyleInfo.durability}/3 | Kiểm soát: ${raw.playstyleInfo.crowdControl}/3`]
-      : [],
-    // cdragon baseStats uses camelCase: hp, hpPerLevel, mp, mpPerLevel,
-    // armor, armorPerLevel, spellBlock, spellBlockPerLevel,
-    // attackDamage, attackDamagePerLevel, attackSpeed (base), attackSpeedRatio,
-    // moveSpeed, attackRange
+      : (ddChamp?.allytips ?? []),
+    // Stats come from DDragon — reliable, always present
     stats: {
-      hp: raw.baseStats?.hp ?? 0,
-      hpperlevel: raw.baseStats?.hpPerLevel ?? 0,
-      mp: raw.baseStats?.mp ?? 0,
-      mpperlevel: raw.baseStats?.mpPerLevel ?? 0,
-      armor: raw.baseStats?.armor ?? 0,
-      armorperlevel: raw.baseStats?.armorPerLevel ?? 0,
-      spellblock: raw.baseStats?.spellBlock ?? raw.baseStats?.spellblock ?? 0,
-      spellblockperlevel: raw.baseStats?.spellBlockPerLevel ?? raw.baseStats?.spellblockperlevel ?? 0,
-      attackdamage: raw.baseStats?.attackDamage ?? raw.baseStats?.attackdamage ?? 0,
-      attackdamageperlevel: raw.baseStats?.attackDamagePerLevel ?? raw.baseStats?.attackdamageperlevel ?? 0,
-      attackspeed: raw.baseStats?.attackSpeed ?? raw.baseStats?.attackSpeedRatio ?? 0,
-      movespeed: raw.baseStats?.moveSpeed ?? raw.baseStats?.movespeed ?? 0,
-      attackrange: raw.baseStats?.attackRange ?? raw.baseStats?.attackrange ?? 0,
+      hp: ddStats.hp ?? 0,
+      hpperlevel: ddStats.hpperlevel ?? 0,
+      mp: ddStats.mp ?? 0,
+      mpperlevel: ddStats.mpperlevel ?? 0,
+      armor: ddStats.armor ?? 0,
+      armorperlevel: ddStats.armorperlevel ?? 0,
+      spellblock: ddStats.spellblock ?? 0,
+      spellblockperlevel: ddStats.spellblockperlevel ?? 0,
+      attackdamage: ddStats.attackdamage ?? 0,
+      attackdamageperlevel: ddStats.attackdamageperlevel ?? 0,
+      attackspeed: ddStats.attackspeed ?? 0,
+      movespeed: ddStats.movespeed ?? 0,
+      attackrange: ddStats.attackrange ?? 0,
     },
-    // cdragon: passive = { name, abilityIconPath, abilityVideoPath, description }
-    // spells = array of { spellKey, name, abilityIconPath, description, ... }
+    // Skill descriptions from CDragon (localized) with DDragon fallback
     passive: {
-      name: raw.passive?.name ?? '',
-      description: (raw.passive?.description ?? '').replace(/<[^>]+>/g, ''),
+      name: raw.passive?.name ?? ddChamp?.passive?.name ?? '',
+      description: (raw.passive?.description ?? ddChamp?.passive?.description ?? '').replace(/<[^>]+>/g, ''),
     },
-    spells: (raw.spells ?? []).map(sp => ({
+    spells: (raw.spells?.length ? raw.spells : ddChamp?.spells ?? []).map(sp => ({
       name: sp.name ?? '',
       description: (sp.description ?? '').replace(/<[^>]+>/g, ''),
     })),
