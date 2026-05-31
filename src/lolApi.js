@@ -16,14 +16,23 @@ import { URL } from 'node:url';
 // ── Constants ────────────────────────────────────────────────────────────────
 
 export const REGIONS = {
-  // Routing (Match-v5 / Account-v1)
+  // Routing for Account-v1 (uses asia for VN2/SEA accounts)
+  accountRouting: {
+    br1: 'americas', eun1: 'europe', euw1: 'europe',
+    jp1: 'asia',     kr: 'asia',     la1: 'americas',
+    la2: 'americas', na1: 'americas', oc1: 'sea',
+    ph2: 'asia',     ru: 'europe',   sg2: 'asia',
+    th2: 'asia',     tr1: 'europe',  tw2: 'asia',
+    vn2: 'asia'
+  },
+  // Routing for Match-v5 (VN2 uses sea)
   routing: {
     br1: 'americas', eun1: 'europe', euw1: 'europe',
     jp1: 'asia',     kr: 'asia',     la1: 'americas',
     la2: 'americas', na1: 'americas', oc1: 'sea',
     ph2: 'sea',      ru: 'europe',   sg2: 'sea',
     th2: 'sea',      tr1: 'europe',  tw2: 'sea',
-    vn2: 'asia'
+    vn2: 'sea'
   },
   // Display names
   display: {
@@ -223,14 +232,14 @@ export async function findChampion(query) {
     .normalize('NFD').replace(/[\u0300-\u036f]/g, ''); // strip diacritics for accent-insensitive match
 
   // Exact key match first
-  for (const [key, champ] of Object.entries(data.data)) {
-    if (key.toLowerCase() === query) return { key, ...champ };
+  for (const [champKey, champ] of Object.entries(data.data)) {
+    if (champKey.toLowerCase() === query) return { key: champKey, ...champ };
   }
   // Partial name match
-  for (const [key, champ] of Object.entries(data.data)) {
+  for (const [champKey, champ] of Object.entries(data.data)) {
     const name = champ.name.toLowerCase()
       .normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-    if (name.includes(q) || key.toLowerCase().includes(q)) return { key, ...champ };
+    if (name.includes(q) || champKey.toLowerCase().includes(q)) return { key: champKey, ...champ };
   }
   return null;
 }
@@ -238,7 +247,7 @@ export async function findChampion(query) {
 // ── Riot API — Account / Summoner ────────────────────────────────────────────
 
 export async function getAccountByRiotId(gameName, tagLine, region, apiKey) {
-  const routing = REGIONS.routing[region] ?? 'sea';
+  const routing = REGIONS.accountRouting[region] ?? 'asia';
   const cacheKey = `account:${routing}:${gameName}:${tagLine}`;
   let data = cache.get(cacheKey);
   if (!data) {

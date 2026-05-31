@@ -82,8 +82,8 @@ export async function handleLsd({ source, args, isInteraction, stateStore, guild
     const { account, summoner, region } = await resolveSummoner(source, args, isInteraction, stateStore, guildId, apiKey);
     const patch = await getLatestPatch();
     const matchIds = await getMatchHistory(account.puuid, region, apiKey, 5);
-    console.log(`[lsd] puuid=${account.puuid} region=${region} routing=${REGIONS.routing[region]} matchIds=${JSON.stringify(matchIds)}`);
-    if (!matchIds.length) return editOrReply(source, isInteraction, { content: `Không tìm thấy lịch sử trận đấu cho **${account.gameName}#${account.tagLine}** (${region.toUpperCase()}). Tài khoản chưa chơi trận nào hoặc chế độ thi đấu bị ẩn.` });
+    console.log(`[lsd] puuid=${account.puuid} region=${region} matchRouting=${REGIONS.routing[region]} matchIds=${JSON.stringify(matchIds)}`);
+    if (!matchIds.length) return editOrReply(source, isInteraction, { content: `❌ Không tìm thấy lịch sử trận đấu cho **${account.gameName}#${account.tagLine}** (${region.toUpperCase()}).\n\n> Nguyên nhân có thể do:\n> • Development API key không có quyền truy cập match history\n> • Tài khoản chưa chơi trận nào gần đây\n\nThử dùng account khác hoặc nâng cấp lên Personal API key tại developer.riotgames.com` });
 
     const matches = await Promise.all(matchIds.map((id) => getMatchDetail(id, region, apiKey)));
     const rankedEntries = await getRankedInfo(account.puuid, region, apiKey);
