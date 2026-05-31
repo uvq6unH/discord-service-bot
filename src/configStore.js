@@ -475,7 +475,7 @@ export class ConfigStore {
   async getGuildConfig(guildId) {
     await this.ready;
     const stored = this.cache[guildId] ?? {};
-    return {
+    const base = {
       guildId,
       ...clone(defaultConfig),
       ...clone(stored),
@@ -484,6 +484,11 @@ export class ConfigStore {
       selfRoles: normalizeSelfRoles(stored.selfRoles ?? defaultConfig.selfRoles),
       autoReplies: normalizeAutoReplies(stored.autoReplies ?? defaultConfig.autoReplies)
     };
+    // Fall back to RIOT_API_KEY env var if not set in dashboard
+    if (!base.riotApiKey && process.env.RIOT_API_KEY) {
+      base.riotApiKey = process.env.RIOT_API_KEY.trim();
+    }
+    return base;
   }
 
   async updateGuildConfig(guildId, patch) {
