@@ -3,8 +3,27 @@
  */
 
 import { Router } from 'express';
+import crypto from 'node:crypto';
 
 const DISCORD_API = 'https://discord.com/api/v10';
+
+function safeReturnTo(value) {
+  const fallback = '/';
+  if (typeof value !== 'string') {
+    return fallback;
+  }
+
+  if (!value.startsWith('/') || value.startsWith('//') || value.includes('\\')) {
+    return fallback;
+  }
+
+  try {
+    const parsed = new URL(value, 'http://localhost');
+    return `${parsed.pathname}${parsed.search}${parsed.hash}`;
+  } catch {
+    return fallback;
+  }
+}
 
 export function createAuthRouter(botClient) {
   const clientId = process.env.DISCORD_CLIENT_ID;
@@ -52,9 +71,9 @@ export function createAuthRouter(botClient) {
 
   // GET /auth/login
   router.get('/auth/login', (req, res) => {
-    const state = Math.random().toString(36).slice(2);
+    const state = crypto.randomBytes(32).toString('base64url');
     req.session.oauthState = state;
-    req.session.returnTo = req.query.returnTo || '/';
+    req.session.returnTo = safeReturnTo(req.query.returnTo);
 
     const params = new URLSearchParams({
       client_id: clientId,
@@ -101,10 +120,9 @@ export function createAuthRouter(botClient) {
         id: user.id,
         username: user.username,
         avatar: user.avatar,
-        accessToken: tokens.access_token,
       };
 
-      const returnTo = req.session.returnTo || '/';
+      const returnTo = safeReturnTo(req.session.returnTo);
       req.session.returnTo = null;
       res.redirect(returnTo);
     } catch (err) {

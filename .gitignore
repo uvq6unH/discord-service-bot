@@ -1,5 +1,6 @@
 node_modules/
 .env
+data/configs.json
 data/state.json
 logs/*.log
 *.log

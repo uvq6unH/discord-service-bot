@@ -12,7 +12,7 @@
     "prod:logs": "pm2 logs discord-service-bot",
     "prod:status": "pm2 status",
     "keep-alive": "bash keep-alive.sh",
-    "check": "node --check src/index.js && node --check src/bot.js && node --check src/server.js && node --check src/configStore.js && node --check src/stateStore.js"
+    "check": "node --check src/index.js && node --check src/bot.js && node --check src/server.js && node --check src/configStore.js && node --check src/stateStore.js && node --check src/auth.js && node --check src/lolApi.js && node --check src/lolCommands.js && node --check src/tftApi.js && node --check src/tftCommands.js && node --check public/app.js"
   },
   "dependencies": {
     "@discordjs/voice": "^0.19.2",

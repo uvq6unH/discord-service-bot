@@ -2,10 +2,52 @@ import express from 'express';
 import cookieSession from 'cookie-session';
 import { createAuthRouter } from './auth.js';
 
+const snowflakePattern = /^\d{17,20}$/;
+
+function sanitizeConfigForClient(config) {
+  const { riotApiKey, tftApiKey, ...safeConfig } = config;
+  return {
+    ...safeConfig,
+    riotApiKey: '',
+    tftApiKey: '',
+    riotApiKeyConfigured: Boolean(riotApiKey),
+    tftApiKeyConfigured: Boolean(tftApiKey),
+  };
+}
+
+function createRateLimiter({ windowMs, max, keyPrefix = 'global' }) {
+  const hits = new Map();
+
+  return (req, res, next) => {
+    const now = Date.now();
+    const key = `${keyPrefix}:${req.ip}:${req.session?.user?.id ?? 'anon'}`;
+    const record = hits.get(key);
+
+    if (!record || record.resetAt <= now) {
+      hits.set(key, { count: 1, resetAt: now + windowMs });
+      next();
+      return;
+    }
+
+    record.count += 1;
+    if (record.count > max) {
+      res.set('Retry-After', String(Math.ceil((record.resetAt - now) / 1000)));
+      res.status(429).json({ error: 'Too many requests. Please try again later.' });
+      return;
+    }
+
+    next();
+  };
+}
+
 function requireGuildId(req, res, next) {
   const guildId = String(req.query.guildId ?? req.body.guildId ?? '').trim();
   if (!guildId) {
     res.status(400).json({ error: 'guildId is required' });
+    return;
+  }
+  if (!snowflakePattern.test(guildId)) {
+    res.status(400).json({ error: 'guildId must be a Discord snowflake' });
     return;
   }
   req.guildId = guildId;
@@ -45,6 +87,7 @@ export function createServer({ configStore, stateStore, botClient }) {
   });
 
   app.use(express.json({ limit: '128kb' }));
+  const writeRateLimit = createRateLimiter({ windowMs: 60_000, max: 20, keyPrefix: 'api-write' });
 
   // ── Auth routes ────────────────────────────────────────────────────────────
   const auth = createAuthRouter(botClient);
@@ -66,18 +109,18 @@ export function createServer({ configStore, stateStore, botClient }) {
 
   app.get('/api/config', auth.requireAuth, requireGuildId, auth.requireGuildAccess, async (req, res) => {
     const config = await configStore.getGuildConfig(req.guildId);
-    res.json(config);
+    res.json(sanitizeConfigForClient(config));
   });
 
-  app.put('/api/config', auth.requireAuth, requireGuildId, auth.requireGuildAccess, async (req, res) => {
+  app.put('/api/config', auth.requireAuth, writeRateLimit, requireGuildId, auth.requireGuildAccess, async (req, res) => {
     const config = await configStore.updateGuildConfig(req.guildId, req.body);
     const slashSync = botClient.user
       ? await botClient.syncGuildCommands(req.guildId, config).catch((e) => ({ synced: false, reason: e.message }))
       : { synced: false, reason: 'bot_not_ready' };
-    res.json({ ...config, slashSync });
+    res.json({ ...sanitizeConfigForClient(config), slashSync });
   });
 
-  app.post('/api/slash-sync', auth.requireAuth, requireGuildId, auth.requireGuildAccess, async (req, res) => {
+  app.post('/api/slash-sync', auth.requireAuth, writeRateLimit, requireGuildId, auth.requireGuildAccess, async (req, res) => {
     const config = await configStore.getGuildConfig(req.guildId);
     const slashSync = await botClient.syncGuildCommands(req.guildId, config);
     res.json(slashSync);
@@ -97,21 +140,28 @@ export function createServer({ configStore, stateStore, botClient }) {
     const configuredGuildIds = await configStore.listGuildIds();
     const userId = req.session?.user?.id;
     const guildsById = new Map();
+    const isDev = Boolean(req.session?.user?.dev);
 
-    for (const [id, guild] of botClient.guilds.cache) {
-      let canManage = Boolean(req.session?.user?.dev);
-      if (!canManage && userId) {
+    const manageableGuilds = await Promise.all([...botClient.guilds.cache].map(async ([id, guild]) => {
+      let canManage = isDev;
+      if (!canManage && userId && botClient.user) {
         const member = await guild.members.fetch(userId).catch(() => null);
         canManage = member?.permissions?.has('ManageGuild') || member?.permissions?.has('Administrator') || false;
       }
-      if (canManage) {
-        guildsById.set(id, { id, name: guild.name, icon: guild.iconURL({ size: 64 }), configured: configuredGuildIds.includes(id) });
-      }
+      return canManage
+        ? { id, name: guild.name, icon: guild.iconURL({ size: 64 }), configured: configuredGuildIds.includes(id) }
+        : null;
+    }));
+
+    for (const guild of manageableGuilds) {
+      if (guild) guildsById.set(guild.id, guild);
     }
 
-    for (const guildId of configuredGuildIds) {
-      if (!guildsById.has(guildId)) {
-        guildsById.set(guildId, { id: guildId, name: `Server ${guildId}`, icon: null, configured: true });
+    if (isDev) {
+      for (const guildId of configuredGuildIds) {
+        if (!guildsById.has(guildId)) {
+          guildsById.set(guildId, { id: guildId, name: `Server ${guildId}`, icon: null, configured: true });
+        }
       }
     }
 

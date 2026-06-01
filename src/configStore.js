@@ -430,6 +430,15 @@ function normalizeCommands(commands) {
     .slice(0, 100);
 }
 
+function resolveSecretPatch(patchValue, currentValue) {
+  if (typeof patchValue !== 'string') {
+    return currentValue ?? '';
+  }
+
+  const nextValue = patchValue.trim();
+  return nextValue ? nextValue.slice(0, 100) : (currentValue ?? '');
+}
+
 function mergeWithDefaultCommands(commands) {
   if (!Array.isArray(commands)) {
     return defaultConfig.commands;
@@ -507,24 +516,17 @@ export class ConfigStore {
     // Fall back to RIOT_API_KEY env var if not set in dashboard
     if (!base.riotApiKey && process.env.RIOT_API_KEY) {
       base.riotApiKey = process.env.RIOT_API_KEY.trim();
-      const kp = base.riotApiKey;
-      console.log(`[ConfigStore] RIOT_API_KEY from env: ${kp.slice(0,8)}...(len=${kp.length})`);
-    } else if (base.riotApiKey) {
-      console.log(`[ConfigStore] RIOT_API_KEY from dashboard: ${base.riotApiKey.slice(0,8)}...(len=${base.riotApiKey.length})`);
-    } else {
-      console.warn('[ConfigStore] RIOT_API_KEY not set anywhere!');
     }
     // Fall back to TFT_API_KEY env var if separately set (optional separate key for TFT)
     if (!base.tftApiKey && process.env.TFT_API_KEY) {
       base.tftApiKey = process.env.TFT_API_KEY.trim();
-      const kp = base.tftApiKey;
-      console.log(`[ConfigStore] TFT_API_KEY from env: ${kp.slice(0,8)}...(len=${kp.length})`);
     }
     return base;
   }
 
   async updateGuildConfig(guildId, patch) {
     await this.ready;
+    const storedCurrent = this.cache[guildId] ?? {};
     const current = await this.getGuildConfig(guildId);
     const next = {
       ...current,
@@ -562,12 +564,8 @@ export class ConfigStore {
       dailyResetUtcOffset: Number.isFinite(Number(patch.dailyResetUtcOffset))
         ? Math.max(-720, Math.min(840, Math.round(Number(patch.dailyResetUtcOffset))))
         : (current.dailyResetUtcOffset ?? defaultConfig.dailyResetUtcOffset),
-      riotApiKey: typeof patch.riotApiKey === 'string'
-        ? patch.riotApiKey.trim().slice(0, 100)
-        : (current.riotApiKey ?? ''),
-      tftApiKey: typeof patch.tftApiKey === 'string'
-        ? patch.tftApiKey.trim().slice(0, 100)
-        : (current.tftApiKey ?? ''),
+      riotApiKey: resolveSecretPatch(patch.riotApiKey, storedCurrent.riotApiKey),
+      tftApiKey: resolveSecretPatch(patch.tftApiKey, storedCurrent.tftApiKey),
       dailySilverAmount: Math.max(0, Math.min(1000000, Number.parseInt(patch.dailySilverAmount, 10) || 0)),
       dailyGoldAmount: Math.max(0, Math.min(1000000, Number.parseInt(patch.dailyGoldAmount, 10) || 0)),
       dailyDiamondAmount: Math.max(0, Math.min(1000000, Number.parseInt(patch.dailyDiamondAmount, 10) || 0)),

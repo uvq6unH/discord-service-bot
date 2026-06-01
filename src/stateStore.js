@@ -132,6 +132,7 @@ export class StateStore {
   // ── Redis key helpers ──────────────────────────────────────────────────────
 
   _guildKey(guildId) { return `guild:${guildId}`; }
+  _guildIndexKey() { return 'guild:index'; }
 
   async _redisGetGuild(guildId) {
     const data = await this._redis.get(this._guildKey(guildId));
@@ -139,7 +140,12 @@ export class StateStore {
   }
 
   async _redisSaveGuild(guildId, guild) {
+    await this._redis._request(['SADD', this._guildIndexKey(), guildId]);
     await this._redis.set(this._guildKey(guildId), guild);
+  }
+
+  async _redisListGuildIds() {
+    return await this._redis._request(['SMEMBERS', this._guildIndexKey()]) ?? [];
   }
 
   // ── File fallback ──────────────────────────────────────────────────────────
@@ -289,13 +295,14 @@ export class StateStore {
     };
 
     if (this._useRedis) {
-      // Redis: we don't have a list of all guild IDs, so skip bulk purge on startup
-      // Sessions will be cleaned up lazily when accessed
+      const guildIds = await this._redisListGuildIds();
+      const guildEntries = await Promise.all(guildIds.map(async (guildId) => [guildId, await this._redisGetGuild(guildId)]));
+      await processGuilds(guildEntries);
       return;
     }
 
     await processGuilds(Object.entries(this.cache.guilds ?? {}));
-    if (dirty && !this._useRedis) await this._save();
+    if (dirty) await this._save();
   }
 
   // ── Economy helpers ────────────────────────────────────────────────────────

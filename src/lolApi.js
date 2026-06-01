@@ -153,9 +153,6 @@ function httpGet(url, headers = {}) {
 
 function riotGet(path, platform, apiKey) {
   const url = `https://${platform}.api.riotgames.com${path}`;
-  // Debug: log key prefix and length so we can verify it's correct without exposing full key
-  const keyPreview = apiKey ? `${apiKey.slice(0, 8)}...(len=${apiKey.length})` : 'EMPTY';
-  console.log(`[RiotAPI] ${platform} ${path.split('?')[0]} | key: ${keyPreview}`);
   return httpGet(url, { 'X-Riot-Token': apiKey });
 }
 

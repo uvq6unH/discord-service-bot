@@ -811,8 +811,8 @@ function renderCommandResponse(template, { client, context, config, args }) {
   const commandCount = config.commands.filter((command) => command.enabled).length;
   const riotKey = config.riotApiKey;
   const tftKey = config.tftApiKey;
-  const riotKeyStatus = riotKey ? `✅ Đã cấu hình (${riotKey.slice(0, 8)}…)` : '❌ Chưa cấu hình';
-  const tftKeyStatus = tftKey ? `✅ Riêng (${tftKey.slice(0, 8)}…)` : (riotKey ? '♻️ Dùng chung LoL key' : '❌ Chưa cấu hình');
+  const riotKeyStatus = riotKey ? '✅ Đã cấu hình' : '❌ Chưa cấu hình';
+  const tftKeyStatus = tftKey ? '✅ Riêng' : (riotKey ? '♻️ Dùng chung LoL key' : '❌ Chưa cấu hình');
   return template
     .replaceAll('{args}', args)
     .replaceAll('{autoReplyStatus}', config.autoReplyEnabled ? 'on' : 'off')
@@ -1859,6 +1859,7 @@ export function createBot(configStore, stateStore) {
   });
 
   client.on(Events.InteractionCreate, async (interaction) => {
+    try {
     if (interaction.isStringSelectMenu() && interaction.guild) {
       if (interaction.customId.startsWith('help_select:')) {
         const targetUserId = interaction.customId.slice('help_select:'.length);
@@ -2110,9 +2111,21 @@ export function createBot(configStore, stateStore) {
       source: interaction,
       args
     });
+    } catch (error) {
+      console.error('[bot] Interaction handler error:', error);
+      const payload = { content: 'An unexpected error occurred while handling this interaction.', ephemeral: true };
+      if (interaction.isRepliable()) {
+        if (interaction.deferred || interaction.replied) {
+          await interaction.followUp(payload).catch(() => null);
+        } else {
+          await interaction.reply(payload).catch(() => null);
+        }
+      }
+    }
   });
 
   client.on(Events.MessageCreate, async (message) => {
+    try {
     if (!message.guild || message.author.bot) {
       return;
     }
@@ -2191,6 +2204,9 @@ export function createBot(configStore, stateStore) {
     const match = config.autoReplies.find((reply) => lowerContent.includes(reply.keyword.toLowerCase()));
     if (match) {
       await message.reply(match.response);
+    }
+    } catch (error) {
+      console.error('[bot] Message handler error:', error);
     }
   });
 
