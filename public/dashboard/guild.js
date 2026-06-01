@@ -1,6 +1,6 @@
 import { setDirty, showMsg } from './utils.js';
 import {
-  currentGuildId, emptyState, configForm, saveBar, accessBanner, accessBannerMsg,
+  currentGuildId, setCurrentGuildId, emptyState, configForm, saveBar, accessBanner, accessBannerMsg,
   guildNameEl, guildMetaEl, guildIconEl, mobileGuildNameEl, mobileGuildMetaEl,
   serverList, statusDot, statusText
 } from './state.js';
@@ -40,7 +40,7 @@ export function populateDropdowns() {
 
 // ── Select guild ─────────────────────────────────────────────────────────────
 export async function selectGuild(guild) {
-  currentGuildId = guild.id;
+  setCurrentGuildId(guild.id);
   guildNameEl.textContent = guild.name;
   guildMetaEl.textContent = guild.id;
   if (mobileGuildNameEl) mobileGuildNameEl.textContent = guild.name;

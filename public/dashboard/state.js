@@ -1,5 +1,6 @@
 // ── State ───────────────────────────────────────────────────────────────────
 export let currentGuildId = null;
+export function setCurrentGuildId(id) { currentGuildId = id; }
 window.currentGuildData = { channels: [], roles: [] };
 
 // ── DOM refs ────────────────────────────────────────────────────────────────
