@@ -15,6 +15,12 @@
 
 import { EmbedBuilder, ApplicationCommandOptionType } from 'discord.js';
 import {
+  editOrReply,
+  formatRiotError,
+  noApiKeyMsg,
+  resolveRiotSummonerInput
+} from './riot/helpers.js';
+import {
   parseRiotId, getAccountByRiotId, getSummonerByPuuid,
   getRegionChoices, formatDuration, REGIONS, batchFetch,
 } from './lolApi.js';
@@ -29,24 +35,18 @@ const C = { tft: 0xc89b3c, win: 0x3ba55d, lose: 0xed4245, info: 0x1a78c2 };
 
 // ── Summoner resolution ───────────────────────────────────────────────────────
 async function resolveSummoner(source, args, isInteraction, stateStore, guildId, apiKey) {
-  let riotIdStr, region;
-  if (isInteraction) {
-    riotIdStr = source.options.getString('summoner');
-    region = (source.options.getString('region') ?? 'vn2').toLowerCase();
-  } else {
-    const parts = args.trim().split(/\s+/);
-    const REGIONS_SET = new Set(['vn2','na1','euw1','kr','jp1','sg2','eun1','br1','la1','la2','oc1','ph2','ru','th2','tr1','tw2']);
-    region = REGIONS_SET.has(parts[parts.length - 1]?.toLowerCase()) ? parts.pop() : 'vn2';
-    riotIdStr = parts.join(' ');
-  }
+  const { riotIdStr, region } = await resolveRiotSummonerInput({
+    source,
+    args,
+    isInteraction,
+    stateStore,
+    guildId,
+    getLinkedAccount: (g, u) => stateStore.getLinkedTftAccount(g, u)
+  });
 
   if (!riotIdStr) {
-    const userId = isInteraction ? source.user.id : source.author.id;
-    const linked = await stateStore.getLinkedTftAccount(guildId, userId);
-    if (linked) { riotIdStr = linked.riotId; region = linked.region; }
+    throw new Error('Vui lòng nhập tên người chơi (VD: PlayerName#VN2) hoặc dùng `/tftlink` để liên kết tài khoản.');
   }
-
-  if (!riotIdStr) throw new Error('Vui lòng nhập tên người chơi (VD: PlayerName#VN2) hoặc dùng `/tftlink` để liên kết tài khoản.');
   const parsed = parseRiotId(riotIdStr);
   if (!parsed) throw new Error('Định dạng không hợp lệ. Dùng: `TênNgườiChơi#TAG`');
 
@@ -164,7 +164,7 @@ export async function handleTftLsd({ source, args, isInteraction, stateStore, gu
 
     return editOrReply(source, isInteraction, { embeds: [embed] });
   } catch (err) {
-    return editOrReply(source, isInteraction, { content: formatError(err), ephemeral: true });
+    return editOrReply(source, isInteraction, { content: formatRiotError(err), ephemeral: true });
   }
 }
 
@@ -231,7 +231,7 @@ export async function handleTftProfile({ source, args, isInteraction, stateStore
 
     return editOrReply(source, isInteraction, { embeds: [embed] });
   } catch (err) {
-    return editOrReply(source, isInteraction, { content: formatError(err), ephemeral: true });
+    return editOrReply(source, isInteraction, { content: formatRiotError(err), ephemeral: true });
   }
 }
 
@@ -343,7 +343,7 @@ export async function handleTftMatch({ source, args, isInteraction, stateStore, 
 
     return editOrReply(source, isInteraction, { embeds: [embed] });
   } catch (err) {
-    return editOrReply(source, isInteraction, { content: formatError(err), ephemeral: true });
+    return editOrReply(source, isInteraction, { content: formatRiotError(err), ephemeral: true });
   }
 }
 
@@ -379,7 +379,7 @@ export async function handleTftLink({ source, args, isInteraction, stateStore, g
       ephemeral: true,
     });
   } catch (err) {
-    return editOrReply(source, isInteraction, { content: formatError(err), ephemeral: true });
+    return editOrReply(source, isInteraction, { content: formatRiotError(err), ephemeral: true });
   }
 }
 
@@ -425,23 +425,3 @@ export function buildTftSlashOptions(commandType) {
   }
 }
 
-// ── Utilities ─────────────────────────────────────────────────────────────────
-function noApiKeyMsg(isInteraction) {
-  const msg = '❌ Bot chưa được cấu hình Riot API Key.';
-  return isInteraction ? { content: msg, ephemeral: true } : msg;
-}
-
-function formatError(err) {
-  if (err.status === 404) return '❌ Không tìm thấy người chơi. Kiểm tra lại Riot ID và khu vực.';
-  if (err.status === 429) return '❌ Đã vượt giới hạn API. Vui lòng thử lại sau vài giây.';
-  if (err.status === 403) return '❌ API Key không hợp lệ hoặc hết hạn. Refresh key tại developer.riotgames.com.';
-  return `❌ Lỗi: ${err.message}`;
-}
-
-async function editOrReply(source, isInteraction, payload) {
-  if (isInteraction) {
-    if (source.deferred || source.replied) return source.editReply(payload);
-    return source.reply(payload);
-  }
-  return source.reply(payload);
-}

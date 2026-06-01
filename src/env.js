@@ -55,6 +55,6 @@ export function validateEnvironment(env = process.env) {
   }
 
   if (isProduction && (isBlank(env.UPSTASH_REDIS_REST_URL) || isBlank(env.UPSTASH_REDIS_REST_TOKEN))) {
-    console.warn('[env] Upstash Redis is not fully configured. Render free redeploys may lose local state.');
+    throw new Error('UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN are required in production.');
   }
 }

@@ -1,8 +1,13 @@
 import express from 'express';
 import cookieSession from 'cookie-session';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { createAuthRouter } from './auth.js';
+import { createCsrfProtection } from './csrf.js';
+import { createRateLimiter } from './rateLimit.js';
 
 const snowflakePattern = /^\d{17,20}$/;
+const publicDir = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'public');
 
 function sanitizeConfigForClient(config) {
   const { riotApiKey, tftApiKey, ...safeConfig } = config;
@@ -13,42 +18,6 @@ function sanitizeConfigForClient(config) {
     riotApiKeyConfigured: Boolean(riotApiKey),
     tftApiKeyConfigured: Boolean(tftApiKey),
   };
-}
-
-function createRateLimiter({ windowMs, max, keyPrefix = 'global' }) {
-  const hits = new Map();
-
-  const cleanup = setInterval(() => {
-    const now = Date.now();
-    for (const [key, record] of hits.entries()) {
-      if (record.resetAt <= now) hits.delete(key);
-    }
-  }, Math.max(60_000, windowMs));
-  cleanup.unref?.();
-
-  const middleware = (req, res, next) => {
-    const now = Date.now();
-    const key = `${keyPrefix}:${req.ip}:${req.session?.user?.id ?? 'anon'}`;
-    const record = hits.get(key);
-
-    if (!record || record.resetAt <= now) {
-      hits.set(key, { count: 1, resetAt: now + windowMs });
-      next();
-      return;
-    }
-
-    record.count += 1;
-    if (record.count > max) {
-      res.set('Retry-After', String(Math.ceil((record.resetAt - now) / 1000)));
-      res.status(429).json({ error: 'Too many requests. Please try again later.' });
-      return;
-    }
-
-    next();
-  };
-
-  middleware.clear = () => hits.clear();
-  return middleware;
 }
 
 async function mapWithConcurrency(items, limit, mapper) {
@@ -79,20 +48,18 @@ function requireGuildId(req, res, next) {
   next();
 }
 
-export function createServer({ configStore, stateStore, botClient }) {
+export function createServer({ configStore, stateStore, botClient, redis = null }) {
   const app = express();
   const isProduction = process.env.NODE_ENV === 'production';
   const sessionSecret = process.env.SESSION_SECRET;
+  const csrf = createCsrfProtection();
 
   if (isProduction && !sessionSecret) {
     throw new Error('Missing SESSION_SECRET in production.');
   }
 
-  // Render (và hầu hết cloud) chạy sau reverse proxy — phải trust proxy
-  // để cookie secure hoạt động đúng với HTTPS
   app.set('trust proxy', 1);
 
-  // ── Session ────────────────────────────────────────────────────────────────
   app.use(cookieSession({
     name: 'dsession',
     keys: [sessionSecret || 'dev-secret-change-me'],
@@ -102,7 +69,6 @@ export function createServer({ configStore, stateStore, botClient }) {
     sameSite: 'lax',
   }));
 
-  // cookie-session cần middleware này để hoạt động đúng với req.session = null
   app.use((req, _res, next) => {
     if (req.session && !req.session.regenerate) {
       req.session.regenerate = (cb) => { cb?.(); };
@@ -112,16 +78,42 @@ export function createServer({ configStore, stateStore, botClient }) {
   });
 
   app.use(express.json({ limit: '128kb' }));
-  const writeRateLimit = createRateLimiter({ windowMs: 60_000, max: 20, keyPrefix: 'api-write' });
+  const writeRateLimit = createRateLimiter({
+    windowMs: 60_000,
+    max: 20,
+    keyPrefix: 'api-write',
+    redis
+  });
 
-  // ── Auth routes ────────────────────────────────────────────────────────────
   const auth = createAuthRouter(botClient);
   if (auth.attachTo) auth.attachTo(app);
 
-  // ── Static ─────────────────────────────────────────────────────────────────
-  app.use(express.static('public'));
+  app.get('/health', (_req, res) => {
+    if (isProduction) {
+      res.json({ status: 'ok' });
+      return;
+    }
+    res.json({ status: 'ok', uptime: process.uptime(), bot: Boolean(botClient.user) });
+  });
 
-  // ── API routes ─────────────────────────────────────────────────────────────
+  app.get('/login.html', (_req, res) => {
+    res.sendFile(path.join(publicDir, 'login.html'));
+  });
+
+  app.get('/', auth.requirePage, (_req, res) => {
+    res.sendFile(path.join(publicDir, 'index.html'));
+  });
+
+  app.get('/index.html', auth.requirePage, (_req, res) => {
+    res.sendFile(path.join(publicDir, 'index.html'));
+  });
+
+  app.use(express.static(publicDir, { index: false }));
+
+  app.use('/api', csrf.validate);
+
+  app.get('/api/csrf-token', auth.requireAuth, (req, res) => csrf.issueToken(req, res));
+
   app.get('/api/status', auth.requireAuth, async (_req, res) => {
     const guildIds = await configStore.listGuildIds();
     res.json({
@@ -217,12 +209,6 @@ export function createServer({ configStore, stateStore, botClient }) {
     }
   });
 
-  app.get('/health', (_req, res) => {
-    res.json({ status: 'ok', uptime: process.uptime(), bot: Boolean(botClient.user) });
-  });
-
-  // ── Keepalive config API ──────────────────────────────────────────────────
-  // Trả về danh sách text channels của tất cả guilds để chọn keepalive channel
   app.get('/api/keepalive-status', auth.requireAuth, (_req, res) => {
     const channelId = process.env.KEEPALIVE_CHANNEL_ID ?? null;
     let channelName = null;

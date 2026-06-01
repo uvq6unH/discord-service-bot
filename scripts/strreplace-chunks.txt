@@ -1,0 +1,66 @@
+=== CHUNK 0 len=1063 ===
+function canModerateMember(actorMember, targetMember) {
+  if (!targetMember) {
+    return { ok: true };
+  }
+  if (!actorMember) {
+    return { ok: false, reason: 'Could not verify your server membership.' };
+  }
+  if (targetMember.id === actorMember.id) {
+    return { ok: false, reason: 'You cannot moderate yourself.' };
+  }
+  if (targetMember.id === targetMember.guild.ownerId) {
+    return { ok: false, reason: 'Cannot moderate the server owner.' };
+  }
+  if (actorMember.id === actorMember.guild.ownerId) {
+    return { ok: true };
+  }
+  if (targetMember.roles.highest.position >= actorMember.roles.highest.position) {
+    return { ok: false, reason: 'You cannot moderate a member with an equal or higher role.' };
+  }
+  const botMember = targetMember.guild.members.me;
+  if (botMember && targetMember.roles.highest.position >= botMember.roles.highest.position) {
+    return { ok: false, reason: 'Bot cannot moderate this member (role hierarchy).' };
+  }
+  return { ok: true };
+}
+
+async function runBuiltInCommand({ client, config, command, source, args }) {
+
+=== CHUNK 1 len=749 ===
+function hasModerationPermission(permissions, commandType) {
+  if (!permissions) {
+    return false;
+  }
+  switch (commandType) {
+    case 'warn':
+    case 'warnings':
+      return permissions.has(PermissionFlagsBits.ManageMessages)
+        || permissions.has(PermissionFlagsBits.ModerateMembers);
+    case 'clearwarns':
+      return permissions.has(PermissionFlagsBits.ManageMessages);
+    case 'kick':
+      return permissions.has(PermissionFlagsBits.KickMembers);
+    case 'ban':
+      return permissions.has(PermissionFlagsBits.BanMembers);
+    case 'timeout':
+      return permissions.has(PermissionFlagsBits.ModerateMembers);
+    default:
+      return false;
+  }
+}
+
+async function runBuiltInCommand({ client, config, command, source, args }) {
+
+=== CHUNK 2 len=264 ===
+    if (command.type === 'clearwarns') {
+      if (!permissions?.has(PermissionFlagsBits.ManageMessages)) {
+        return reply(isInteraction ? { content: 'You need Manage Messages permission.', ephemeral: true } : 'You need Manage Messages permission.');
+      }
+
+=== CHUNK 3 len=217 ===
+    if (!target.member && command.type !== 'warn') {
+      return reply(isInteraction ? { content: 'Target member not found.', ephemeral: true } : 'Target member not found.');
+    }
+
+    if (command.type === 'kick') {

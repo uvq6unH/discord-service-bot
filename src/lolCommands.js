@@ -15,6 +15,12 @@
 
 import { EmbedBuilder, ApplicationCommandOptionType } from 'discord.js';
 import {
+  editOrReply,
+  formatRiotError,
+  noApiKeyMsg,
+  resolveRiotSummonerInput
+} from './riot/helpers.js';
+import {
   parseRiotId, getAccountByRiotId, getSummonerByPuuid, getRankedInfo,
   getMatchHistory, getMatchDetail, getTopMastery, findChampion,
   getChampionDetail, getChampionData, getItemData, getRuneData,
@@ -38,30 +44,18 @@ const DD = (patch) => `https://ddragon.leagueoflegends.com/cdn/${patch}`;
 
 // ── Summoner resolution with linked account fallback ─────────────────────────
 async function resolveSummoner(source, args, isInteraction, stateStore, guildId, apiKey) {
-  let riotIdStr, region;
+  const { riotIdStr, region } = await resolveRiotSummonerInput({
+    source,
+    args,
+    isInteraction,
+    stateStore,
+    guildId,
+    getLinkedAccount: (g, u) => stateStore.getLinkedLolAccount(g, u)
+  });
 
-  if (isInteraction) {
-    riotIdStr = source.options.getString('summoner');
-    region = (source.options.getString('region') ?? 'vn2').toLowerCase();
-  } else {
-    const parts = args.trim().split(/\s+/);
-    region = (parts[parts.length - 1]?.toLowerCase() in ({ vn2: 1, na1: 1, euw1: 1, kr: 1, jp1: 1, sg2: 1, eun1: 1, br1: 1, la1: 1, la2: 1, oc1: 1, ph2: 1, ru: 1, th2: 1, tr1: 1, tw2: 1 }))
-      ? parts.pop()
-      : 'vn2';
-    riotIdStr = parts.join(' ');
-  }
-
-  // If no summoner given, try linked account
   if (!riotIdStr) {
-    const userId = isInteraction ? source.user.id : source.author.id;
-    const linked = await stateStore.getLinkedLolAccount(guildId, userId);
-    if (linked) {
-      riotIdStr = linked.riotId;
-      region = linked.region;
-    }
+    throw new Error('Vui lòng nhập tên người chơi (VD: PlayerName#VN2) hoặc dùng `/lollink` để liên kết tài khoản.');
   }
-
-  if (!riotIdStr) throw new Error('Vui lòng nhập tên người chơi (VD: PlayerName#VN2) hoặc dùng `/lollink` để liên kết tài khoản.');
 
   const parsed = parseRiotId(riotIdStr);
   if (!parsed) throw new Error('Định dạng không hợp lệ. Dùng: `TênNgườiChơi#TAG` (VD: `Faker#KR1`)');
@@ -74,7 +68,9 @@ async function resolveSummoner(source, args, isInteraction, stateStore, guildId,
 // ── /lsd — Match history list ─────────────────────────────────────────────────
 export async function handleLsd({ source, args, isInteraction, stateStore, guildId, config, reply }) {
   const apiKey = config.riotApiKey;
-  if (!apiKey) return reply(noApiKeyMsg(isInteraction));
+  if (!apiKey) {
+    return reply(noApiKeyMsg(isInteraction, '❌ Bot chưa được cấu hình Riot API Key. Admin cần thêm `RIOT_API_KEY` vào cài đặt.'));
+  }
 
   if (isInteraction) await source.deferReply();
 
@@ -135,14 +131,16 @@ export async function handleLsd({ source, args, isInteraction, stateStore, guild
 
     return editOrReply(source, isInteraction, { embeds: [embed] });
   } catch (err) {
-    return editOrReply(source, isInteraction, { content: formatError(err), ephemeral: true });
+    return editOrReply(source, isInteraction, { content: formatRiotError(err), ephemeral: true });
   }
 }
 
 // ── /lol — Full profile ───────────────────────────────────────────────────────
 export async function handleLolProfile({ source, args, isInteraction, stateStore, guildId, config, reply }) {
   const apiKey = config.riotApiKey;
-  if (!apiKey) return reply(noApiKeyMsg(isInteraction));
+  if (!apiKey) {
+    return reply(noApiKeyMsg(isInteraction, '❌ Bot chưa được cấu hình Riot API Key. Admin cần thêm `RIOT_API_KEY` vào cài đặt.'));
+  }
 
   if (isInteraction) await source.deferReply();
 
@@ -190,14 +188,16 @@ export async function handleLolProfile({ source, args, isInteraction, stateStore
 
     return editOrReply(source, isInteraction, { embeds: [embed] });
   } catch (err) {
-    return editOrReply(source, isInteraction, { content: formatError(err), ephemeral: true });
+    return editOrReply(source, isInteraction, { content: formatRiotError(err), ephemeral: true });
   }
 }
 
 // ── /lolmatch — Single match detail ──────────────────────────────────────────
 export async function handleLolMatch({ source, args, isInteraction, stateStore, guildId, config, reply }) {
   const apiKey = config.riotApiKey;
-  if (!apiKey) return reply(noApiKeyMsg(isInteraction));
+  if (!apiKey) {
+    return reply(noApiKeyMsg(isInteraction, '❌ Bot chưa được cấu hình Riot API Key. Admin cần thêm `RIOT_API_KEY` vào cài đặt.'));
+  }
 
   if (isInteraction) await source.deferReply();
 
@@ -264,7 +264,7 @@ export async function handleLolMatch({ source, args, isInteraction, stateStore, 
 
     return editOrReply(source, isInteraction, { embeds: [embed] });
   } catch (err) {
-    return editOrReply(source, isInteraction, { content: formatError(err), ephemeral: true });
+    return editOrReply(source, isInteraction, { content: formatRiotError(err), ephemeral: true });
   }
 }
 
@@ -326,7 +326,7 @@ export async function handleLolChamp({ source, args, isInteraction, config, repl
 
     return editOrReply(source, isInteraction, { embeds: [embed] });
   } catch (err) {
-    return editOrReply(source, isInteraction, { content: formatError(err), ephemeral: true });
+    return editOrReply(source, isInteraction, { content: formatRiotError(err), ephemeral: true });
   }
 }
 
@@ -370,7 +370,7 @@ export async function handleLolItem({ source, args, isInteraction, config, reply
 
     return editOrReply(source, isInteraction, { embeds: [embed] });
   } catch (err) {
-    return editOrReply(source, isInteraction, { content: formatError(err), ephemeral: true });
+    return editOrReply(source, isInteraction, { content: formatRiotError(err), ephemeral: true });
   }
 }
 
@@ -424,7 +424,7 @@ export async function handleLolRunes({ source, args, isInteraction, config, repl
 
     return editOrReply(source, isInteraction, { embeds: [embed] });
   } catch (err) {
-    return editOrReply(source, isInteraction, { content: formatError(err), ephemeral: true });
+    return editOrReply(source, isInteraction, { content: formatRiotError(err), ephemeral: true });
   }
 }
 
@@ -457,14 +457,16 @@ export async function handleLolPatch({ source, isInteraction, config, reply }) {
 
     return editOrReply(source, isInteraction, { embeds: [embed] });
   } catch (err) {
-    return editOrReply(source, isInteraction, { content: formatError(err), ephemeral: true });
+    return editOrReply(source, isInteraction, { content: formatRiotError(err), ephemeral: true });
   }
 }
 
 // ── /lollink — Link Discord ↔ Riot account ────────────────────────────────────
 export async function handleLolLink({ source, args, isInteraction, stateStore, guildId, config, reply }) {
   const apiKey = config.riotApiKey;
-  if (!apiKey) return reply(noApiKeyMsg(isInteraction));
+  if (!apiKey) {
+    return reply(noApiKeyMsg(isInteraction, '❌ Bot chưa được cấu hình Riot API Key. Admin cần thêm `RIOT_API_KEY` vào cài đặt.'));
+  }
 
   const riotIdStr = (isInteraction ? source.options.getString('summoner') : args).trim();
   const region = ((isInteraction ? source.options.getString('region') : null) ?? 'vn2').toLowerCase();
@@ -494,7 +496,7 @@ export async function handleLolLink({ source, args, isInteraction, stateStore, g
       ephemeral: true
     });
   } catch (err) {
-    return editOrReply(source, isInteraction, { content: formatError(err), ephemeral: true });
+    return editOrReply(source, isInteraction, { content: formatRiotError(err), ephemeral: true });
   }
 }
 
@@ -546,35 +548,4 @@ export function buildLolSlashOptions(commandType) {
     case 'lolunlink': return [];
     default: return [];
   }
-}
-
-// ── Utilities ─────────────────────────────────────────────────────────────────
-function noApiKeyMsg(isInteraction) {
-  const msg = '❌ Bot chưa được cấu hình Riot API Key. Admin cần thêm `RIOT_API_KEY` vào cài đặt.';
-  return isInteraction ? { content: msg, ephemeral: true } : msg;
-}
-
-function formatError(err) {
-  if (err.status === 404) {
-    // Champion/item/static data not found vs summoner not found
-    if (err.message && (err.message.startsWith('Champion not found') || err.message.startsWith('Not found'))) {
-      return `❌ Không tìm thấy dữ liệu: ${err.message}`;
-    }
-    return '❌ Không tìm thấy người chơi. Kiểm tra lại Riot ID và khu vực.';
-  }
-  if (err.status === 429) return '❌ Đã vượt giới hạn API. Vui lòng thử lại sau vài giây.';
-  if (err.status === 403) {
-    const isRiotApi = err.body && err.body.includes('status_code');
-    if (isRiotApi) return '❌ API Key không hợp lệ hoặc đã hết hạn. Vui lòng refresh key tại developer.riotgames.com.';
-    return `❌ Lỗi dữ liệu (403): ${err.message}. Thử lại hoặc kiểm tra tên tướng/account.`;
-  }
-  return `❌ Lỗi: ${err.message}`;
-}
-
-async function editOrReply(source, isInteraction, payload) {
-  if (isInteraction) {
-    if (source.deferred || source.replied) return source.editReply(payload);
-    return source.reply(payload);
-  }
-  return source.reply(payload);
 }

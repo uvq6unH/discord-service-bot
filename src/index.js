@@ -4,6 +4,7 @@ import { StateStore } from './stateStore.js';
 import { createBot } from './bot.js';
 import { createServer } from './server.js';
 import { validateEnvironment } from './env.js';
+import { createUpstashFromEnv } from './upstash.js';
 
 const token = process.env.DISCORD_TOKEN;
 const port = Number(process.env.PORT ?? 10000);
@@ -50,10 +51,11 @@ process.on('SIGINT',  () => shutdown('SIGINT'));
 process.on('SIGTERM', () => shutdown('SIGTERM'));
 
 // ── Boot ─────────────────────────────────────────────────────────────────────
+const sharedRedis = createUpstashFromEnv();
 const configStore = new ConfigStore(configPath);
-const stateStore  = new StateStore(statePath);
+const stateStore  = new StateStore(statePath, { redis: sharedRedis });
 const botClient   = createBot(configStore, stateStore);
-const app         = createServer({ configStore, stateStore, botClient });
+const app         = createServer({ configStore, stateStore, botClient, redis: sharedRedis });
 
 app.listen(port, () => {
   console.log(`[server] Dashboard running at http://localhost:${port}`);

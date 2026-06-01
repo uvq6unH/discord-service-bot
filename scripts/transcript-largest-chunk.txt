@@ -1,0 +1,27 @@
+function canModerateMember(actorMember, targetMember) {
+  if (!targetMember) {
+    return { ok: true };
+  }
+  if (!actorMember) {
+    return { ok: false, reason: 'Could not verify your server membership.' };
+  }
+  if (targetMember.id === actorMember.id) {
+    return { ok: false, reason: 'You cannot moderate yourself.' };
+  }
+  if (targetMember.id === targetMember.guild.ownerId) {
+    return { ok: false, reason: 'Cannot moderate the server owner.' };
+  }
+  if (actorMember.id === actorMember.guild.ownerId) {
+    return { ok: true };
+  }
+  if (targetMember.roles.highest.position >= actorMember.roles.highest.position) {
+    return { ok: false, reason: 'You cannot moderate a member with an equal or higher role.' };
+  }
+  const botMember = targetMember.guild.members.me;
+  if (botMember && targetMember.roles.highest.position >= botMember.roles.highest.position) {
+    return { ok: false, reason: 'Bot cannot moderate this member (role hierarchy).' };
+  }
+  return { ok: true };
+}
+
+async function runBuiltInCommand({ client, config, command, source, args }) {

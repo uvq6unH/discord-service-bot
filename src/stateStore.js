@@ -12,94 +12,12 @@
  * The API is identical in both cases so the rest of the bot is unaffected.
  */
 
-import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
-import https from 'node:https';
+import { mkdir, rename, writeFile } from 'node:fs/promises';
 import path from 'node:path';
-
-// ── Upstash Redis REST client (no extra npm packages needed) ─────────────────
-
-class UpstashClient {
-  constructor(url, token) {
-    this.url   = url.replace(/\/$/, '');
-    this.token = token;
-  }
-
-  _request(body) {
-    return new Promise((resolve, reject) => {
-      const parsed  = new URL(this.url);
-      const payload = JSON.stringify(body);
-      const req = https.request({
-        hostname: parsed.hostname,
-        path:     parsed.pathname + parsed.search,
-        method:   'POST',
-        headers: {
-          Authorization:  `Bearer ${this.token}`,
-          'Content-Type': 'application/json',
-          'Content-Length': Buffer.byteLength(payload)
-        }
-      }, (res) => {
-        const chunks = [];
-        res.on('data', c => chunks.push(c));
-        res.on('end', () => {
-          try {
-            const data = JSON.parse(Buffer.concat(chunks).toString());
-            if (data.error) return reject(new Error(data.error));
-            resolve(data.result);
-          } catch (e) { reject(e); }
-        });
-      });
-      req.on('error', reject);
-      req.setTimeout(8000, () => { req.destroy(); reject(new Error('Upstash timeout')); });
-      req.write(payload);
-      req.end();
-    });
-  }
-
-  async get(key) {
-    const result = await this._request(['GET', key]);
-    return result == null ? null : JSON.parse(result);
-  }
-
-  async set(key, value) {
-    await this._request(['SET', key, JSON.stringify(value)]);
-  }
-
-  // Batch pipeline — array of [cmd, ...args]
-  async pipeline(commands) {
-    return new Promise((resolve, reject) => {
-      const parsed  = new URL(this.url + '/pipeline');
-      const payload = JSON.stringify(commands.map(cmd => cmd));
-      const req = https.request({
-        hostname: parsed.hostname,
-        path:     parsed.pathname + parsed.search,
-        method:   'POST',
-        headers: {
-          Authorization:  `Bearer ${this.token}`,
-          'Content-Type': 'application/json',
-          'Content-Length': Buffer.byteLength(payload)
-        }
-      }, (res) => {
-        const chunks = [];
-        res.on('data', c => chunks.push(c));
-        res.on('end', () => {
-          try {
-            const data = JSON.parse(Buffer.concat(chunks).toString());
-            if (data.error) return reject(new Error(data.error));
-            const failed = Array.isArray(data)
-              ? data.find((item) => item?.error)
-              : null;
-            if (failed) return reject(new Error(failed.error));
-            resolve(data);
-          } catch (e) { reject(e); }
-        });
-      });
-      req.on('error', reject);
-      req.setTimeout(8000, () => { req.destroy(); reject(new Error('Upstash pipeline timeout')); });
-      req.write(payload);
-      req.end();
-    });
-  }
-}
+import { createMutexPool } from './asyncMutex.js';
+import { withRedisLock } from './distributedLock.js';
+import { readJsonFile } from './safeJson.js';
+import { createUpstashFromEnv } from './upstash.js';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -116,14 +34,13 @@ function nextDayStartForOffset(dayKey, utcOffsetMinutes) {
 // ── StateStore ────────────────────────────────────────────────────────────────
 
 export class StateStore {
-  constructor(filePath) {
+  constructor(filePath, { redis = null } = {}) {
     this.filePath = path.resolve(filePath);
+    this._economyMutex = createMutexPool();
+    this._gameSessionMutex = createMutexPool();
+    this._redis = redis ?? createUpstashFromEnv();
 
-    const upstashUrl   = process.env.UPSTASH_REDIS_REST_URL;
-    const upstashToken = process.env.UPSTASH_REDIS_REST_TOKEN;
-
-    if (upstashUrl && upstashToken) {
-      this._redis  = new UpstashClient(upstashUrl, upstashToken);
+    if (this._redis) {
       this._useRedis = true;
       console.log('[StateStore] Using Upstash Redis for persistent storage.');
       this.ready = Promise.resolve();
@@ -142,7 +59,8 @@ export class StateStore {
   _guildIndexKey() { return 'guild:index'; }
 
   async _redisGetGuild(guildId) {
-    const data = await this._redis.get(this._guildKey(guildId));
+    const raw = await this._redis.get(this._guildKey(guildId));
+    const data = raw == null ? null : JSON.parse(raw);
     return data ?? { warnings: {}, levels: {}, tickets: { nextNumber: 1 }, economy: { users: {} }, gameSessions: { blackjack: {}, poker: {} }, lolAccounts: {}, tftAccounts: {} };
   }
 
@@ -154,7 +72,7 @@ export class StateStore {
   }
 
   async _redisListGuildIds() {
-    return await this._redis._request(['SMEMBERS', this._guildIndexKey()]) ?? [];
+    return await this._redis.smembers(this._guildIndexKey()) ?? [];
   }
 
   // ── File fallback ──────────────────────────────────────────────────────────
@@ -162,7 +80,7 @@ export class StateStore {
   async _loadFile() {
     await mkdir(path.dirname(this.filePath), { recursive: true });
     try {
-      this.cache = JSON.parse(await readFile(this.filePath, 'utf8'));
+      this.cache = await readJsonFile(this.filePath);
     } catch (error) {
       if (error.code !== 'ENOENT') {
         console.warn(`[StateStore] Could not read state file. Starting fresh. ${error.message}`);
@@ -341,6 +259,23 @@ export class StateStore {
 
   // ── Economy helpers ────────────────────────────────────────────────────────
 
+  async _withEconomyLock(guildId, userId, fn) {
+    const lockKey = `lock:economy:${guildId}:${userId}`;
+    if (this._useRedis) {
+      return withRedisLock(this._redis, lockKey, 15, fn);
+    }
+    return this._economyMutex(lockKey, fn);
+  }
+
+  /** Game button handlers (blackjack/poker) — distributed when Redis is configured. */
+  async withGameSessionLock(guildId, gameType, messageId, fn) {
+    const lockKey = `lock:game:${gameType}:${guildId}:${messageId}`;
+    if (this._useRedis) {
+      return withRedisLock(this._redis, lockKey, 30, fn);
+    }
+    return this._gameSessionMutex(lockKey, fn);
+  }
+
   _getEconomyUser(guild, userId) {
     guild.economy.users[userId] ??= { silver: 0, gold: 0, diamond: 0, lastDailyAt: 0, lastDailyDay: null };
     guild.economy.users[userId].silver      ??= 0;
@@ -357,40 +292,69 @@ export class StateStore {
   }
 
   async adjustBalance(guildId, userId, currency, amount) {
-    const guild = await this.getGuild(guildId);
-    const user  = this._getEconomyUser(guild, userId);
-    user[currency] = Math.max(0, Math.floor((user[currency] ?? 0) + amount));
-    await this._saveGuild(guildId, guild);
-    return { ...user };
+    return this._withEconomyLock(guildId, userId, async () => {
+      const guild = await this.getGuild(guildId);
+      const user  = this._getEconomyUser(guild, userId);
+      user[currency] = Math.max(0, Math.floor((user[currency] ?? 0) + amount));
+      await this._saveGuild(guildId, guild);
+      return { ...user };
+    });
+  }
+
+  /**
+   * Atomically debit currency if the user has enough balance.
+   * Prevents race conditions when multiple game commands run in parallel.
+   */
+  async tryDebitBalance(guildId, userId, currency, amount) {
+    const debit = Math.floor(amount);
+    if (!Number.isFinite(debit) || debit <= 0) {
+      return { ok: false, balance: await this.getBalance(guildId, userId) };
+    }
+
+    return this._withEconomyLock(guildId, userId, async () => {
+      const guild = await this.getGuild(guildId);
+      const user  = this._getEconomyUser(guild, userId);
+      const current = user[currency] ?? 0;
+      if (current < debit) {
+        return { ok: false, balance: { ...user } };
+      }
+      user[currency] = Math.max(0, Math.floor(current - debit));
+      await this._saveGuild(guildId, guild);
+      return { ok: true, balance: { ...user } };
+    });
   }
 
   async setBalance(guildId, userId, currency, amount) {
-    const guild = await this.getGuild(guildId);
-    const user  = this._getEconomyUser(guild, userId);
-    user[currency] = Math.max(0, Math.floor(amount));
-    await this._saveGuild(guildId, guild);
-    return { ...user };
+    return this._withEconomyLock(guildId, userId, async () => {
+      const guild = await this.getGuild(guildId);
+      const user  = this._getEconomyUser(guild, userId);
+      user[currency] = Math.max(0, Math.floor(amount));
+      await this._saveGuild(guildId, guild);
+      return { ...user };
+    });
   }
 
   async claimDaily(guildId, userId, rewards, options = {}) {
-    const guild = await this.getGuild(guildId);
-    const user  = this._getEconomyUser(guild, userId);
-    const now   = Date.now();
-    const utcOffsetMinutes = Number.isFinite(options.utcOffsetMinutes) ? options.utcOffsetMinutes : 420;
-    const todayKey = dayKeyForOffset(now, utcOffsetMinutes);
-    const nextAt   = nextDayStartForOffset(todayKey, utcOffsetMinutes);
+    return this._withEconomyLock(guildId, userId, async () => {
+      const guild = await this.getGuild(guildId);
+      const user  = this._getEconomyUser(guild, userId);
+      const now   = Date.now();
+      const utcOffsetMinutes = Number.isFinite(options.utcOffsetMinutes) ? options.utcOffsetMinutes : 420;
+      const todayKey = dayKeyForOffset(now, utcOffsetMinutes);
+      const nextAt   = nextDayStartForOffset(todayKey, utcOffsetMinutes);
 
-    if (user.lastDailyDay === todayKey) {
-      return { claimed: false, nextAt, balance: { ...user } };
-    }
+      if (user.lastDailyDay === todayKey) {
+        return { claimed: false, nextAt, balance: { ...user } };
+      }
 
-    user.silver       += rewards.silver  ?? 0;
-    user.gold         += rewards.gold    ?? 0;
-    user.diamond      += rewards.diamond ?? 0;
-    user.lastDailyAt   = now;
-    user.lastDailyDay  = todayKey;
-    await this._saveGuild(guildId, guild);
-    return { claimed: true, nextAt, balance: { ...user } };
+      user.silver       += rewards.silver  ?? 0;
+      user.gold         += rewards.gold    ?? 0;
+      user.diamond      += rewards.diamond ?? 0;
+      user.lastDailyAt   = now;
+      user.lastDailyDay  = todayKey;
+      await this._saveGuild(guildId, guild);
+      return { claimed: true, nextAt, balance: { ...user } };
+    });
   }
 
   async getEconomyLeaderboard(guildId, currency, limit = 10) {

@@ -31,12 +31,21 @@ export function createAuthRouter(botClient) {
   const redirectUri = process.env.DISCORD_REDIRECT_URI;
   const isProduction = process.env.NODE_ENV === 'production';
 
+  const allowDevAuth = process.env.ALLOW_DEV_AUTH === 'true';
+  const hostedRuntime = Boolean(process.env.RENDER) || Boolean(process.env.RAILWAY_ENVIRONMENT);
+
   if (!clientId || !clientSecret || !redirectUri) {
-    if (isProduction) {
+    if (isProduction || hostedRuntime) {
       throw new Error('Missing Discord OAuth env vars in production: DISCORD_CLIENT_ID, DISCORD_CLIENT_SECRET, DISCORD_REDIRECT_URI.');
     }
 
-    console.warn('[auth] OAuth env vars not set — dashboard is UNPROTECTED.');
+    if (!allowDevAuth) {
+      throw new Error(
+        'Discord OAuth is not configured. Set DISCORD_CLIENT_ID, DISCORD_CLIENT_SECRET, DISCORD_REDIRECT_URI, or set ALLOW_DEV_AUTH=true for local development only.'
+      );
+    }
+
+    console.warn('[auth] ALLOW_DEV_AUTH=true — dashboard is UNPROTECTED (local dev only).');
     const devRouter = Router();
     const devUser = {
       id: process.env.DEV_USER_ID || botClient.user?.id || 'dev-user',

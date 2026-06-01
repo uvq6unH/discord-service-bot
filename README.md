@@ -124,6 +124,15 @@ Trong Discord Developer Portal:
 - Auto reply theo keyword.
 - Web API + dashboard để sửa config.
 
+## Security (production)
+
+- Discord OAuth + `SESSION_SECRET` (≥32 chars) are required when `NODE_ENV=production`.
+- Upstash Redis (`UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN`) is required in production for persistent state and distributed locks.
+- Riot API keys: prefer `RIOT_API_KEY` / `TFT_API_KEY` env vars; dashboard keys are kept in memory only (not written to disk).
+- Local dev without OAuth: set `ALLOW_DEV_AUTH=true` in `.env` only on your machine — never on Render.
+
+See [SECURITY_AUDIT.md](SECURITY_AUDIT.md) for the full audit log and [ARCHITECTURE.md](ARCHITECTURE.md) for module layout and refactor roadmap.
+
 ## Command variables
 
 Trong response của command có thể dùng:

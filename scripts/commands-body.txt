@@ -1,0 +1,595 @@
+  if (command.type === 'help') {
+    let selectedGroup = null;
+    if (isInteraction) {
+      selectedGroup = source.options.getString('group');
+    } else {
+      const lowerArgs = args?.trim().toLowerCase();
+      if (['chung', 'general', 'custom', 'lệnh chung'].includes(lowerArgs)) {
+        selectedGroup = 'general';
+      } else if (['thành viên', 'user', 'member', 'levels', 'xp', 'rank', 'cấp độ'].includes(lowerArgs)) {
+        selectedGroup = 'user';
+      } else if (['máy chủ', 'server', 'broadcast', 'phát thanh', 'announcement'].includes(lowerArgs)) {
+        selectedGroup = 'server';
+      } else if (['kiểm duyệt', 'moderation', 'mod', 'security', 'bảo mật'].includes(lowerArgs)) {
+        selectedGroup = 'moderation';
+      } else if (['tương tác', 'interactions', 'role', 'ticket', 'nút bấm'].includes(lowerArgs)) {
+        selectedGroup = 'interactions';
+      } else if (['lol', 'league', 'liên minh', 'lsd', 'tướng', 'tft', 'teamfight', 'tactics', 'tftlsd', 'đấu trường'].includes(lowerArgs)) {
+        selectedGroup = 'lol';
+      }
+    }
+
+    const payload = await buildHelpPayload(client, config, guild, user.id, selectedGroup);
+    return reply(payload);
+  }
+
+  if (['custom', 'ping', 'config'].includes(command.type)) {
+    return reply(renderCommandResponse(command.response, { client, context, config, args }));
+  }
+
+  if (command.type === 'server') {
+    return reply({ embeds: [buildServerEmbed(guild)] });
+  }
+
+  if (command.type === 'user' || command.type === 'avatar') {
+    const selectedUser = isInteraction ? source.options.getUser('target') ?? user : null;
+    const target = selectedUser
+      ? { user: selectedUser, member: await guild.members.fetch(selectedUser.id).catch(() => null) }
+      : await resolveMentionedUser(client, guild, args, user);
+    const embed = command.type === 'avatar' ? buildAvatarEmbed(target.user) : buildUserEmbed(target.user, target.member);
+    return reply({ embeds: [embed] });
+  }
+
+  if (command.type === 'say') {
+    if (!permissions?.has(PermissionFlagsBits.ManageMessages) && !permissions?.has(PermissionFlagsBits.ManageGuild)) {
+      return reply(isInteraction ? { content: 'You need Manage Messages or Manage Server permission.', ephemeral: true } : 'You need Manage Messages or Manage Server permission.');
+    }
+
+    const messageText = isInteraction ? source.options.getString('message') : args;
+    if (!messageText?.trim()) {
+      return reply(isInteraction ? { content: 'Missing message.', ephemeral: true } : 'Missing message.');
+    }
+    if (isInteraction) {
+      await source.reply({ content: 'Sent.', ephemeral: true });
+      return channel.send(messageText);
+    }
+    if (!channel.permissionsFor(client.user)?.has(PermissionFlagsBits.ManageMessages)) {
+      return reply('Bot needs Manage Messages permission to remove the original command message.');
+    }
+    try {
+      await source.delete();
+    } catch {
+      return reply('Could not delete the original command message. Check bot permissions and channel overrides.');
+    }
+    return channel.send(messageText);
+  }
+
+  if (command.type === 'purge') {
+    const amount = isInteraction ? source.options.getInteger('amount') : Number.parseInt(args, 10);
+    if (!Number.isInteger(amount) || amount < 1 || amount > 100) {
+      return reply(isInteraction ? { content: 'Amount must be between 1 and 100.', ephemeral: true } : 'Amount must be between 1 and 100.');
+    }
+    if (!permissions?.has(PermissionFlagsBits.ManageMessages)) {
+      return reply(isInteraction ? { content: 'You need Manage Messages permission.', ephemeral: true } : 'You need Manage Messages permission.');
+    }
+    if (!channel.permissionsFor(client.user)?.has(PermissionFlagsBits.ManageMessages)) {
+      return reply(isInteraction ? { content: 'Bot needs Manage Messages permission in this channel.', ephemeral: true } : 'Bot needs Manage Messages permission in this channel.');
+    }
+    const deleted = await channel.bulkDelete(amount, true);
+    const skipped = amount - deleted.size;
+    const content = renderCommandResponse(command.response, {
+      client,
+      context,
+      config,
+      args: String(amount)
+    }).replaceAll('{count}', String(deleted.size)) +
+      (skipped > 0 ? ` Skipped ${skipped} message(s) that were older than 14 days or unavailable.` : '');
+    return reply(isInteraction ? { content, ephemeral: true } : content);
+  }
+
+  if (['warn', 'kick', 'ban', 'timeout'].includes(command.type)) {
+    if (!config.moderationEnabled) {
+      return reply(isInteraction ? { content: 'Moderation is disabled.', ephemeral: true } : 'Moderation is disabled.');
+    }
+
+    const targetUser = isInteraction ? source.options.getUser('target') : null;
+    const target = targetUser
+      ? { user: targetUser, member: await guild.members.fetch(targetUser.id).catch(() => null) }
+      : await resolveMentionedUser(client, guild, args, user);
+    const reason = isInteraction
+      ? source.options.getString('reason') ?? 'No reason provided'
+      : args.replace(/<@!?\d{17,20}>/, '').replace(/\b\d+\b/, '').trim() || 'No reason provided';
+
+    if (!target.member && command.type !== 'warn') {
+      return reply(isInteraction ? { content: 'Target member not found.', ephemeral: true } : 'Target member not found.');
+    }
+
+    if (command.type === 'kick') {
+      if (!permissions?.has(PermissionFlagsBits.KickMembers)) {
+        return reply(isInteraction ? { content: 'You need Kick Members permission.', ephemeral: true } : 'You need Kick Members permission.');
+      }
+      if (!guild.members.me?.permissions.has(PermissionFlagsBits.KickMembers)) {
+        return reply(isInteraction ? { content: 'Bot needs Kick Members permission.', ephemeral: true } : 'Bot needs Kick Members permission.');
+      }
+      await target.member.kick(reason);
+    }
+
+    if (command.type === 'ban') {
+      if (!permissions?.has(PermissionFlagsBits.BanMembers)) {
+        return reply(isInteraction ? { content: 'You need Ban Members permission.', ephemeral: true } : 'You need Ban Members permission.');
+      }
+      if (!guild.members.me?.permissions.has(PermissionFlagsBits.BanMembers)) {
+        return reply(isInteraction ? { content: 'Bot needs Ban Members permission.', ephemeral: true } : 'Bot needs Ban Members permission.');
+      }
+      await target.member.ban({ reason });
+    }
+
+    if (command.type === 'timeout') {
+      if (!permissions?.has(PermissionFlagsBits.ModerateMembers)) {
+        return reply(isInteraction ? { content: 'You need Moderate Members permission.', ephemeral: true } : 'You need Moderate Members permission.');
+      }
+      if (!guild.members.me?.permissions.has(PermissionFlagsBits.ModerateMembers)) {
+        return reply(isInteraction ? { content: 'Bot needs Moderate Members permission.', ephemeral: true } : 'Bot needs Moderate Members permission.');
+      }
+      const minutes = isInteraction ? source.options.getInteger('minutes') : Number.parseInt(args.match(/\b\d+\b/)?.[0] ?? '10', 10);
+      await target.member.timeout(Math.min(minutes, 10080) * 60 * 1000, reason);
+      const content = command.response
+        .replaceAll('{target}', `<@${target.user.id}>`)
+        .replaceAll('{reason}', reason)
+        .replaceAll('{minutes}', String(minutes));
+      await sendLog(guild, config, content);
+      return reply(isInteraction ? { content, ephemeral: true } : content);
+    }
+
+    const content = command.response.replaceAll('{target}', `<@${target.user.id}>`).replaceAll('{reason}', reason);
+    if (command.type === 'warn') {
+      await client.stateStore.addWarning(guild.id, target.user.id, user.id, reason);
+    }
+    await sendLog(guild, config, content);
+    return reply(isInteraction ? { content, ephemeral: true } : content);
+  }
+
+  if (['warnings', 'clearwarns'].includes(command.type)) {
+    if (!config.moderationEnabled) {
+      return reply(isInteraction ? { content: 'Moderation is disabled.', ephemeral: true } : 'Moderation is disabled.');
+    }
+    const targetUser = isInteraction ? source.options.getUser('target') : null;
+    const target = targetUser
+      ? { user: targetUser, member: await guild.members.fetch(targetUser.id).catch(() => null) }
+      : await resolveMentionedUser(client, guild, args, user);
+
+    if (command.type === 'clearwarns') {
+      if (!permissions?.has(PermissionFlagsBits.ManageMessages)) {
+        return reply(isInteraction ? { content: 'You need Manage Messages permission.', ephemeral: true } : 'You need Manage Messages permission.');
+      }
+      const count = await client.stateStore.clearWarnings(guild.id, target.user.id);
+      const content = command.response.replaceAll('{target}', `<@${target.user.id}>`).replaceAll('{count}', String(count));
+      await sendLog(guild, config, content);
+      return reply(isInteraction ? { content, ephemeral: true } : content);
+    }
+
+    const warnings = await client.stateStore.getWarnings(guild.id, target.user.id);
+    const embed = new EmbedBuilder()
+      .setTitle(`Warnings for ${target.user.username}`)
+      .setColor(0xd88928)
+      .setDescription(
+        warnings.length
+          ? warnings
+            .slice(-10)
+            .map((warning, index) => `${index + 1}. <t:${Math.floor(new Date(warning.createdAt).getTime() / 1000)}:R> by <@${warning.moderatorId}> - ${warning.reason}`)
+            .join('\n')
+          : 'No warnings.'
+      );
+    return reply({ embeds: [embed], ephemeral: isInteraction });
+  }
+
+  if (command.type === 'rank') {
+    if (!config.levelsEnabled) {
+      return reply(isInteraction ? { content: 'Levels are disabled.', ephemeral: true } : 'Levels are disabled.');
+    }
+    const targetUser = isInteraction ? source.options.getUser('target') ?? user : null;
+    const target = targetUser
+      ? { user: targetUser, member: await guild.members.fetch(targetUser.id).catch(() => null) }
+      : await resolveMentionedUser(client, guild, args, user);
+    const rank = await client.stateStore.getRank(guild.id, target.user.id);
+    return reply({
+      embeds: [
+        new EmbedBuilder()
+          .setTitle(`${target.user.username}'s rank`)
+          .addFields({ name: 'Level', value: String(rank.level), inline: true }, { name: 'XP', value: String(rank.xp), inline: true })
+          .setColor(0x2864d8)
+      ]
+    });
+  }
+
+  if (command.type === 'leaderboard') {
+    if (!config.levelsEnabled) {
+      return reply(isInteraction ? { content: 'Levels are disabled.', ephemeral: true } : 'Levels are disabled.');
+    }
+    const top = await client.stateStore.getLeaderboard(guild.id, 10);
+    const description = top.length
+      ? top.map((entry, index) => `${index + 1}. <@${entry.userId}> - level ${entry.level}, ${entry.xp} XP`).join('\n')
+      : 'No XP yet.';
+    return reply({ embeds: [new EmbedBuilder().setTitle('Leaderboard').setDescription(description).setColor(0x2864d8)] });
+  }
+
+  if (command.type === 'balance') {
+    if (!config.economyEnabled) {
+      return reply(isInteraction ? { content: 'Economy is disabled.', ephemeral: true } : 'Economy is disabled.');
+    }
+    const targetUser = isInteraction ? source.options.getUser('target') ?? user : null;
+    const target = targetUser
+      ? { user: targetUser, member: await guild.members.fetch(targetUser.id).catch(() => null) }
+      : await resolveMentionedUser(client, guild, args, user);
+    const balance = await client.stateStore.getBalance(guild.id, target.user.id);
+    return reply({
+      embeds: [
+        new EmbedBuilder()
+          .setTitle(`${target.user.username}'s balance`)
+          .setDescription(CURRENCIES.map((currency) => formatCurrency(config, currency, balance[currency] ?? 0)).join('\n'))
+          .setColor(0xd8b428)
+      ]
+    });
+  }
+
+  if (command.type === 'daily') {
+    if (!config.economyEnabled || !config.dailyEnabled) {
+      return reply(isInteraction ? { content: 'Daily rewards are disabled.', ephemeral: true } : 'Daily rewards are disabled.');
+    }
+    const rewards = {
+      silver: config.dailySilverAmount,
+      gold: config.dailyGoldAmount,
+      diamond: config.dailyDiamondAmount
+    };
+    // dailyResetUtcOffset from config (minutes, e.g. 420 = UTC+7).
+    // Falls back to DAILY_RESET_UTC_OFFSET_MINUTES env var, then UTC+7.
+    const utcOffset =
+      Number.isFinite(config.dailyResetUtcOffset)
+        ? config.dailyResetUtcOffset
+        : (Number.parseInt(process.env.DAILY_RESET_UTC_OFFSET_MINUTES, 10) || 420);
+    const result = await client.stateStore.claimDaily(guild.id, user.id, rewards, {
+      utcOffsetMinutes: utcOffset
+    });
+    if (!result.claimed) {
+      return reply(isInteraction ? { content: `You can claim daily again <t:${Math.floor(result.nextAt / 1000)}:R>.`, ephemeral: true } : `You can claim daily again <t:${Math.floor(result.nextAt / 1000)}:R>.`);
+    }
+    const claimed = CURRENCIES
+      .filter((currency) => rewards[currency] > 0)
+      .map((currency) => formatCurrency(config, currency, rewards[currency]))
+      .join('\n') || 'No rewards configured.';
+    return reply({ embeds: [new EmbedBuilder().setTitle('Daily claimed').setDescription(claimed).setColor(0x3ba55d)] });
+  }
+
+  if (command.type === 'economyleaderboard') {
+    if (!config.economyEnabled) {
+      return reply(isInteraction ? { content: 'Economy is disabled.', ephemeral: true } : 'Economy is disabled.');
+    }
+    const currency = normalizeCurrency(isInteraction ? source.options.getString('currency') : args.split(/\s+/)[0]);
+    const top = await client.stateStore.getEconomyLeaderboard(guild.id, currency, 10);
+    const meta = currencyMeta(config, currency);
+    const description = top.length
+      ? top.map((entry, index) => `${index + 1}. <@${entry.userId}> - ${formatCurrency(config, currency, entry.amount)}`).join('\n')
+      : `No ${meta.name} yet.`;
+    return reply({ embeds: [new EmbedBuilder().setTitle(`${meta.icon} ${meta.name} leaderboard`).setDescription(description).setColor(0xd8b428)] });
+  }
+
+  if (command.type === 'blackjack') {
+    const { bet, currency } = parseBetCommand({ isInteraction, source, args });
+    const balance = await validateGameBet({
+      client,
+      guildId: guild.id,
+      userId: user.id,
+      config,
+      currency,
+      bet,
+      game: 'blackjack',
+      disabledMessage: 'Blackjack is disabled.',
+      reply,
+      isInteraction
+    });
+    if (!balance) return;
+    const reserved = await client.stateStore.adjustBalance(guild.id, user.id, currency, -bet);
+    const deck = createDeck();
+    const session = {
+      guildId: guild.id,
+      currency,
+      bet,
+      deck,
+      dealer: [deck.pop(), deck.pop()],
+      players: [createBlackjackPlayer(user, bet, deck, reserved[currency] ?? 0)],
+      activePlayerIndex: 0,
+      status: 'active',
+      createdAt: Date.now()
+    };
+
+    const sent = await reply(buildBlackjackPayload(config, session));
+    const message = isInteraction ? await source.fetchReply().catch(() => null) : sent;
+    if (message?.id) {
+      session.messageId = message.id;
+      session.timeout = scheduleSessionExpiry(client, 'blackjack', blackjackSessions, message.id);
+      blackjackSessions.set(message.id, session);
+      await persistGameSession(client, 'blackjack', message.id, session);
+    }
+    return;
+  }
+
+  if (command.type === 'poker') {
+    const { bet, currency } = parseBetCommand({ isInteraction, source, args });
+    const balance = await validateGameBet({
+      client,
+      guildId: guild.id,
+      userId: user.id,
+      config,
+      currency,
+      bet,
+      game: 'poker',
+      disabledMessage: 'Poker is disabled.',
+      reply,
+      isInteraction
+    });
+    if (!balance) return;
+
+    await client.stateStore.adjustBalance(guild.id, user.id, currency, -bet);
+    const deck = createDeck();
+    const session = {
+      guildId: guild.id,
+      userId: user.id,
+      currency,
+      bet,
+      deck,
+      hand: [deck.pop(), deck.pop(), deck.pop(), deck.pop(), deck.pop()],
+      held: new Set(),
+      status: 'active',
+      createdAt: Date.now()
+    };
+    const sent = await reply(buildPokerPayload(config, session));
+    const message = isInteraction ? await source.fetchReply().catch(() => null) : sent;
+    if (message?.id) {
+      session.messageId = message.id;
+      session.timeout = scheduleSessionExpiry(client, 'poker', pokerSessions, message.id);
+      pokerSessions.set(message.id, session);
+      await persistGameSession(client, 'poker', message.id, session);
+    }
+    return;
+  }
+
+  if (command.type === 'coinflip') {
+    const parts = args.split(/\s+/).filter(Boolean);
+    const bet = isInteraction ? source.options.getInteger('bet') : parseBet(parts[0]);
+    const sideArg = isInteraction ? source.options.getString('side') : parts[1];
+    const currency = GAME_CURRENCY;
+    const balance = await validateGameBet({
+      client,
+      guildId: guild.id,
+      userId: user.id,
+      config,
+      currency,
+      bet,
+      game: 'coinflip',
+      disabledMessage: 'Coinflip is disabled.',
+      reply,
+      isInteraction
+    });
+    if (!balance) return;
+
+    const game = playCoinflip(sideArg);
+    const delta = game.outcome === 'win' ? bet : -bet;
+    const nextBalance = await client.stateStore.adjustBalance(guild.id, user.id, currency, delta);
+    return reply({
+      embeds: [
+        new EmbedBuilder()
+          .setTitle(game.outcome === 'win' ? 'Coinflip - won' : 'Coinflip - lost')
+          .setDescription([
+            `Bet: ${formatCurrency(config, currency, bet)}`,
+            `Pick: ${game.choice}`,
+            `Result: ${game.result}`,
+            `Balance: ${formatCurrency(config, currency, nextBalance[currency] ?? balance[currency])}`
+          ].join('\n'))
+          .setColor(game.outcome === 'win' ? 0x3ba55d : 0xed4245)
+      ]
+    });
+  }
+
+  if (command.type === 'dice') {
+    const { parts, bet, currency } = parseBetCommand({ isInteraction, source, args, defaultCurrencyIndex: 2 });
+    const balance = await validateGameBet({
+      client,
+      guildId: guild.id,
+      userId: user.id,
+      config,
+      currency,
+      bet,
+      game: 'dice',
+      disabledMessage: 'Dice is disabled.',
+      reply,
+      isInteraction
+    });
+    if (!balance) return;
+
+    const target = isInteraction ? source.options.getInteger('number') : parts[1];
+    const game = playDice(target);
+    const delta = game.outcome === 'win' ? bet * 5 : -bet;
+    const nextBalance = await client.stateStore.adjustBalance(guild.id, user.id, currency, delta);
+    return reply({
+      embeds: [
+        new EmbedBuilder()
+          .setTitle(game.outcome === 'win' ? 'Dice - won' : 'Dice - lost')
+          .setDescription([
+            `Bet: ${formatCurrency(config, currency, bet)}`,
+            `Pick: ${game.target}`,
+            `Roll: ${game.roll}`,
+            `Payout: ${game.outcome === 'win' ? '6x' : '0x'}`,
+            `Balance: ${formatCurrency(config, currency, nextBalance[currency] ?? balance[currency])}`
+          ].join('\n'))
+          .setColor(game.outcome === 'win' ? 0x3ba55d : 0xed4245)
+      ]
+    });
+  }
+
+  if (command.type === 'slots') {
+    const { bet, currency } = parseBetCommand({ isInteraction, source, args });
+    const balance = await validateGameBet({
+      client,
+      guildId: guild.id,
+      userId: user.id,
+      config,
+      currency,
+      bet,
+      game: 'slots',
+      disabledMessage: 'Slots is disabled.',
+      reply,
+      isInteraction
+    });
+    if (!balance) return;
+
+    const game = playSlots();
+    const delta = game.multiplier > 0 ? bet * (game.multiplier - 1) : -bet;
+    const nextBalance = await client.stateStore.adjustBalance(guild.id, user.id, currency, delta);
+    return reply({
+      embeds: [
+        new EmbedBuilder()
+          .setTitle(game.outcome === 'win' ? 'Slots - won' : 'Slots - lost')
+          .setDescription([
+            `Bet: ${formatCurrency(config, currency, bet)}`,
+            `Reels: ${game.reels.join(' | ')}`,
+            `Payout: ${game.multiplier}x`,
+            `Balance: ${formatCurrency(config, currency, nextBalance[currency] ?? balance[currency])}`
+          ].join('\n'))
+          .setColor(game.outcome === 'win' ? 0x3ba55d : 0xed4245)
+      ]
+    });
+  }
+
+  if (['ecoadd', 'ecoset', 'ecoremove'].includes(command.type)) {
+    if (!config.economyEnabled) {
+      return reply(isInteraction ? { content: 'Economy is disabled.', ephemeral: true } : 'Economy is disabled.');
+    }
+    if (!permissions?.has(PermissionFlagsBits.ManageGuild)) {
+      return reply(isInteraction ? { content: 'You need Manage Server permission.', ephemeral: true } : 'You need Manage Server permission.');
+    }
+    const parts = args.split(/\s+/).filter(Boolean);
+    const targetUser = isInteraction ? source.options.getUser('target') : null;
+    const target = targetUser
+      ? { user: targetUser, member: await guild.members.fetch(targetUser.id).catch(() => null) }
+      : await resolveMentionedUser(client, guild, args, user);
+    const currency = normalizeCurrency(isInteraction ? source.options.getString('currency') : parts.find(isCurrencyToken) ?? 'silver');
+    const amount = isInteraction ? source.options.getInteger('amount') : parseBet(parts.find((part) => /^\d+$/.test(part)));
+    if (!Number.isInteger(amount) || amount < 0) {
+      return reply(isInteraction ? { content: 'Amount must be a positive number.', ephemeral: true } : 'Amount must be a positive number.');
+    }
+    const next = command.type === 'ecoset'
+      ? await client.stateStore.setBalance(guild.id, target.user.id, currency, amount)
+      : await client.stateStore.adjustBalance(guild.id, target.user.id, currency, command.type === 'ecoremove' ? -amount : amount);
+    const content = command.response
+      .replaceAll('{target}', `<@${target.user.id}>`)
+      .replaceAll('{amount}', String(amount))
+      .replaceAll('{currency}', currencyMeta(config, currency).name);
+    await sendLog(guild, config, content);
+    return reply(isInteraction ? { content: `${content} Balance: ${formatCurrency(config, currency, next[currency])}`, ephemeral: true } : `${content} Balance: ${formatCurrency(config, currency, next[currency])}`);
+  }
+
+  if (command.type === 'announce') {
+    if (!config.announcementsEnabled || !config.announcementChannelId) {
+      return reply(isInteraction ? { content: 'Announcements are not configured.', ephemeral: true } : 'Announcements are not configured.');
+    }
+    if (!permissions?.has(PermissionFlagsBits.ManageGuild)) {
+      return reply(isInteraction ? { content: 'You need Manage Server permission.', ephemeral: true } : 'You need Manage Server permission.');
+    }
+    const announcement = sanitizeAnnouncementText(isInteraction ? source.options.getString('message') : args);
+    const targetChannel = await guild.channels.fetch(config.announcementChannelId).catch(() => null);
+    if (!targetChannel?.isTextBased()) {
+      return reply(isInteraction ? { content: 'Announcement channel not found.', ephemeral: true } : 'Announcement channel not found.');
+    }
+    const mentionPrefix = String(config.announcementMention ?? '').trim();
+    if (/@(?:everyone|here)\b/.test(mentionPrefix) &&
+        !guild.members.me?.permissions.has(PermissionFlagsBits.MentionEveryone)) {
+      return reply(isInteraction ? { content: 'Bot needs Mention Everyone permission for @everyone/@here announcements.', ephemeral: true } : 'Bot needs Mention Everyone permission for @everyone/@here announcements.');
+    }
+    await targetChannel.send({
+      content: mentionPrefix || undefined,
+      embeds: [new EmbedBuilder().setTitle('Announcement').setDescription(announcement).setColor(0x2864d8)]
+    });
+    return reply(isInteraction ? { content: 'Announcement sent.', ephemeral: true } : 'Announcement sent.');
+  }
+
+  if (command.type === 'ticketpanel') {
+    if (!config.ticketsEnabled) {
+      return reply(isInteraction ? { content: 'Tickets are disabled.', ephemeral: true } : 'Tickets are disabled.');
+    }
+    if (!permissions?.has(PermissionFlagsBits.ManageGuild)) {
+      return reply(isInteraction ? { content: 'You need Manage Server permission.', ephemeral: true } : 'You need Manage Server permission.');
+    }
+    if (!guild.members.me?.permissions.has(PermissionFlagsBits.ManageChannels)) {
+      return reply(isInteraction ? { content: 'Bot needs Manage Channels permission.', ephemeral: true } : 'Bot needs Manage Channels permission.');
+    }
+    const row = new ActionRowBuilder().addComponents(
+      new ButtonBuilder().setCustomId('ticket:create').setLabel('Open ticket').setStyle(ButtonStyle.Primary)
+    );
+    await channel.send({
+      embeds: [new EmbedBuilder().setTitle(config.ticketPanelTitle).setDescription(config.ticketPanelMessage).setColor(0x2864d8)],
+      components: [row]
+    });
+    return reply(isInteraction ? { content: 'Ticket panel posted.', ephemeral: true } : 'Ticket panel posted.');
+  }
+
+  if (command.type === 'rolepanel') {
+    if (!config.rolesEnabled || config.selfRoles.length === 0) {
+      return reply(isInteraction ? { content: 'Self roles are not configured.', ephemeral: true } : 'Self roles are not configured.');
+    }
+    if (!permissions?.has(PermissionFlagsBits.ManageGuild)) {
+      return reply(isInteraction ? { content: 'You need Manage Server permission.', ephemeral: true } : 'You need Manage Server permission.');
+    }
+    if (!guild.members.me?.permissions.has(PermissionFlagsBits.ManageRoles)) {
+      return reply(isInteraction ? { content: 'Bot needs Manage Roles permission.', ephemeral: true } : 'Bot needs Manage Roles permission.');
+    }
+    const rows = [];
+    for (let i = 0; i < config.selfRoles.length; i += 5) {
+      rows.push(
+        new ActionRowBuilder().addComponents(
+          config.selfRoles.slice(i, i + 5).map((role) =>
+            new ButtonBuilder()
+              .setCustomId(`selfrole:${role.roleId}`)
+              .setLabel(role.label)
+              .setStyle(ButtonStyle.Secondary)
+          )
+        )
+      );
+    }
+    await channel.send({
+      embeds: [new EmbedBuilder().setTitle(config.selfRolePanelTitle).setDescription(config.selfRolePanelMessage).setColor(0x2864d8)],
+      components: rows
+    });
+    return reply(isInteraction ? { content: 'Role panel posted.', ephemeral: true } : 'Role panel posted.');
+  }
+
+  // ΓöÇΓöÇ League of Legends commands ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+  const LOL_CMDS = ['lsd', 'lolprofile', 'lolmatch', 'lolchamp', 'lolitem', 'lolrunes', 'lolpatch', 'lollink', 'lolunlink'];
+  if (LOL_CMDS.includes(command.type)) {
+    const lolArgs = isInteraction ? '' : args;
+    // stateStore is not in scope of runBuiltInCommand ΓÇö use client.stateStore (set in createBot)
+    const ss = client.stateStore;
+    const lolCtx = { source, args: lolArgs, isInteraction, stateStore: ss, guildId: guild.id, config, reply };
+    if (command.type === 'lsd') return handleLsd(lolCtx);
+    if (command.type === 'lolprofile') return handleLolProfile(lolCtx);
+    if (command.type === 'lolmatch') return handleLolMatch(lolCtx);
+    if (command.type === 'lolchamp') return handleLolChamp({ ...lolCtx });
+    if (command.type === 'lolitem') return handleLolItem({ ...lolCtx });
+    if (command.type === 'lolrunes') return handleLolRunes({ ...lolCtx });
+    if (command.type === 'lolpatch') return handleLolPatch({ ...lolCtx });
+    if (command.type === 'lollink') return handleLolLink(lolCtx);
+    if (command.type === 'lolunlink') return handleLolUnlink({ source, isInteraction, stateStore: ss, guildId: guild.id, reply });
+  }
+
+  // ΓöÇΓöÇ Teamfight Tactics commands ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+  const TFT_CMDS = ['tftlsd', 'tftprofile', 'tftmatch', 'tftlink', 'tftunlink'];
+  if (TFT_CMDS.includes(command.type)) {
+    const ss = client.stateStore;
+    const tftArgs = isInteraction ? '' : args;
+    const tftCtx = { source, args: tftArgs, isInteraction, stateStore: ss, guildId: guild.id, config, reply };
+    if (command.type === 'tftlsd')     return handleTftLsd(tftCtx);
+    if (command.type === 'tftprofile') return handleTftProfile(tftCtx);
+    if (command.type === 'tftmatch')   return handleTftMatch(tftCtx);
+    if (command.type === 'tftlink')    return handleTftLink(tftCtx);
+    if (command.type === 'tftunlink')  return handleTftUnlink({ source, isInteraction, stateStore: ss, guildId: guild.id, reply });
+  }
+

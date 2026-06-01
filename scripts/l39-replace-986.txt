@@ -1,0 +1,11 @@
+    const announcement = isInteraction ? source.options.getString('message') : args;
+    const targetChannel = await guild.channels.fetch(config.announcementChannelId).catch(() => null);
+    if (!targetChannel?.isTextBased()) {
+      return reply(isInteraction ? { content: 'Announcement channel not found.', ephemeral: true } : 'Announcement channel not found.');
+    }
+    if (/@(?:everyone|here)\b/.test(config.announcementMention) &&
+        !guild.members.me?.permissions.has(PermissionFlagsBits.MentionEveryone)) {
+      return reply(isInteraction ? { content: 'Bot needs Mention Everyone permission for @everyone/@here announcements.', ephemeral: true } : 'Bot needs Mention Everyone permission for @everyone/@here announcements.');
+    }
+    const content = `${config.announcementMention ? `${config.announcementMention}\n` : ''}${announcement}`;
+    await targetChannel.send({ embeds: [new EmbedBuilder().setTitle('Announcement').setDescription(content).setColor(0x2864d8)] });
