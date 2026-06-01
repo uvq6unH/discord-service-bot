@@ -136,12 +136,14 @@ export class StateStore {
 
   async _redisGetGuild(guildId) {
     const data = await this._redis.get(this._guildKey(guildId));
-    return data ?? { warnings: {}, levels: {}, tickets: { nextNumber: 1 }, economy: { users: {} }, gameSessions: { blackjack: {}, poker: {} }, lolAccounts: {} };
+    return data ?? { warnings: {}, levels: {}, tickets: { nextNumber: 1 }, economy: { users: {} }, gameSessions: { blackjack: {}, poker: {} }, lolAccounts: {}, tftAccounts: {} };
   }
 
   async _redisSaveGuild(guildId, guild) {
-    await this._redis._request(['SADD', this._guildIndexKey(), guildId]);
-    await this._redis.set(this._guildKey(guildId), guild);
+    await this._redis.pipeline([
+      ['SADD', this._guildIndexKey(), guildId],
+      ['SET', this._guildKey(guildId), JSON.stringify(guild)]
+    ]);
   }
 
   async _redisListGuildIds() {
@@ -192,6 +194,7 @@ export class StateStore {
       guild.gameSessions.blackjack ??= {};
       guild.gameSessions.poker     ??= {};
       guild.lolAccounts   ??= {};
+      guild.tftAccounts   ??= {};
       return guild;
     }
 
@@ -207,6 +210,7 @@ export class StateStore {
     g.gameSessions.blackjack ??= {};
     g.gameSessions.poker     ??= {};
     g.lolAccounts   ??= {};
+    g.tftAccounts   ??= {};
     return g;
   }
 
@@ -241,6 +245,49 @@ export class StateStore {
     }
   }
 
+  _refundGameSessionInGuild(guild, type, messageId) {
+    const session = guild.gameSessions?.[type]?.[messageId];
+    if (!session || session.status !== 'active') {
+      if (guild.gameSessions?.[type]?.[messageId]) {
+        delete guild.gameSessions[type][messageId];
+        return { refunded: false, deleted: true };
+      }
+      return { refunded: false, deleted: false };
+    }
+
+    let refunded = false;
+    if (type === 'blackjack' && Array.isArray(session.players)) {
+      for (const player of session.players) {
+        const totalBet = player.hands
+          ? player.hands.reduce((sum, h) => sum + (h.bet ?? 0), 0)
+          : (player.bet ?? 0);
+        if (totalBet > 0 && player.userId && session.currency) {
+          this._getEconomyUser(guild, player.userId);
+          guild.economy.users[player.userId][session.currency] = Math.max(0,
+            Math.floor((guild.economy.users[player.userId][session.currency] ?? 0) + totalBet));
+          refunded = true;
+        }
+      }
+    } else if (type === 'poker' && session.userId && session.bet > 0 && session.currency) {
+      this._getEconomyUser(guild, session.userId);
+      guild.economy.users[session.userId][session.currency] = Math.max(0,
+        Math.floor((guild.economy.users[session.userId][session.currency] ?? 0) + session.bet));
+      refunded = true;
+    }
+
+    delete guild.gameSessions[type][messageId];
+    return { refunded, deleted: true };
+  }
+
+  async refundAndDeleteGameSession(guildId, type, messageId) {
+    const guild = await this.getGuild(guildId);
+    const result = this._refundGameSessionInGuild(guild, type, messageId);
+    if (result.deleted || result.refunded) {
+      await this._saveGuild(guildId, guild);
+    }
+    return result;
+  }
+
   async purgeStaleGameSessions(maxAgeMs = 6 * 60 * 60 * 1000) {
     // For Redis: load all guild keys and check each
     // For file: iterate cache
@@ -264,24 +311,7 @@ export class StateStore {
             const age = session.createdAt ? now - session.createdAt : maxAgeMs + 1;
             if (age < maxAgeMs) continue;
 
-            if (type === 'blackjack' && Array.isArray(session.players)) {
-              for (const player of session.players) {
-                const totalBet = player.hands
-                  ? player.hands.reduce((sum, h) => sum + (h.bet ?? 0), 0)
-                  : (player.bet ?? 0);
-                if (totalBet > 0 && player.userId && session.currency) {
-                  this._getEconomyUser(guild, player.userId);
-                  guild.economy.users[player.userId][session.currency] = Math.max(0,
-                    Math.floor((guild.economy.users[player.userId][session.currency] ?? 0) + totalBet));
-                }
-              }
-            } else if (type === 'poker' && session.userId && session.bet > 0 && session.currency) {
-              this._getEconomyUser(guild, session.userId);
-              guild.economy.users[session.userId][session.currency] = Math.max(0,
-                Math.floor((guild.economy.users[session.userId][session.currency] ?? 0) + session.bet));
-            }
-
-            delete guild.gameSessions[type][messageId];
+            this._refundGameSessionInGuild(guild, type, messageId);
             guildDirty = true;
             console.log(`[StateStore] Purged stale ${type} session ${messageId} in guild ${guildId}`);
           }
@@ -455,5 +485,25 @@ export class StateStore {
   async getLinkedLolAccount(guildId, userId) {
     const guild = await this.getGuild(guildId);
     return guild.lolAccounts?.[userId] ?? null;
+  }
+
+  async linkTftAccount(guildId, userId, data) {
+    const guild = await this.getGuild(guildId);
+    guild.tftAccounts[userId] = {
+      riotId: data.riotId, puuid: data.puuid, region: data.region,
+      linkedAt: new Date().toISOString()
+    };
+    await this._saveGuild(guildId, guild);
+  }
+
+  async unlinkTftAccount(guildId, userId) {
+    const guild = await this.getGuild(guildId);
+    delete guild.tftAccounts[userId];
+    await this._saveGuild(guildId, guild);
+  }
+
+  async getLinkedTftAccount(guildId, userId) {
+    const guild = await this.getGuild(guildId);
+    return guild.tftAccounts?.[userId] ?? null;
   }
 }

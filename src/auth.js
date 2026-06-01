@@ -127,7 +127,7 @@ export function createAuthRouter(botClient) {
       res.redirect(returnTo);
     } catch (err) {
       console.error('[auth] callback error:', err.message);
-      res.status(500).send(`Login failed: ${err.message}`);
+      res.status(500).send('Login failed. Please try again later.');
     }
   });
 

@@ -403,6 +403,7 @@ function normalizeCommandName(name) {
 function normalizeCommands(commands) {
   const source = Array.isArray(commands) ? commands : defaultConfig.commands;
   const seen = new Set();
+  const seenBuiltInTypes = new Set();
 
   return source
     .map((item) => {
@@ -423,6 +424,10 @@ function normalizeCommands(commands) {
       // custom commands require a response; built-in types (including LoL) do not
       if (!item.name || (item.type === 'custom' && !item.response) || seen.has(item.name)) {
         return false;
+      }
+      if (item.type !== 'custom') {
+        if (seenBuiltInTypes.has(item.type)) return false;
+        seenBuiltInTypes.add(item.type);
       }
       seen.add(item.name);
       return true;

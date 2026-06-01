@@ -254,6 +254,7 @@ const currencies = ['silver', 'gold', 'diamond'];
 const gameCurrency = 'silver';
 const blackjackSessions = new Map();
 const pokerSessions = new Map();
+const gameSessionLocks = new Map();
 const gameSessionTtlMs = 2 * 60 * 60 * 1000;
 
 function normalizeCurrency(value) {
@@ -413,22 +414,9 @@ async function expireSessionWithRefund(client, type, map, id) {
 
   if (session.status !== 'active') return;
 
-  // Refund bets for sessions abandoned via TTL
   try {
-    if (type === 'blackjack' && Array.isArray(session.players)) {
-      for (const player of session.players) {
-        const totalBet = player.hands
-          ? player.hands.reduce((sum, h) => sum + (h.bet ?? 0), 0)
-          : (player.bet ?? 0);
-        if (totalBet > 0 && player.userId && session.currency) {
-          await client.stateStore.adjustBalance(session.guildId, player.userId, session.currency, totalBet);
-        }
-      }
-    } else if (type === 'poker' && session.userId && session.bet > 0 && session.currency) {
-      await client.stateStore.adjustBalance(session.guildId, session.userId, session.currency, session.bet);
-    }
-    await client.stateStore.deleteGameSession(session.guildId, type, id).catch(() => null);
-    console.log(`[game] Refunded expired ${type} session ${id}`);
+    const result = await client.stateStore.refundAndDeleteGameSession(session.guildId, type, id);
+    console.log(`[game] Expired ${type} session ${id}${result.refunded ? ' and refunded bet(s)' : ''}`);
   } catch (err) {
     console.error(`[game] Failed to refund expired ${type} session ${id}:`, err.message);
   }
@@ -465,28 +453,52 @@ async function persistGameSession(client, type, messageId, session) {
   await client.stateStore.setGameSession(session.guildId, type, messageId, serializeSession(session));
 }
 
+async function withGameSessionLock(key, fn) {
+  const previous = gameSessionLocks.get(key) ?? Promise.resolve();
+  let release;
+  const lock = new Promise((resolve) => { release = resolve; });
+  const tail = previous.catch(() => null).then(() => lock);
+  gameSessionLocks.set(key, tail);
+
+  await previous.catch(() => null);
+  try {
+    return await fn();
+  } finally {
+    release();
+    if (gameSessionLocks.get(key) === tail) {
+      gameSessionLocks.delete(key);
+    }
+  }
+}
+
 async function getGameSession(client, type, map, guildId, messageId) {
   let session = map.get(messageId);
   if (!session) {
     session = await client.stateStore.getGameSession(guildId, type, messageId);
     if (type === 'poker') revivePokerSession(session);
     if (session?.status === 'active') {
-      session.timeout = scheduleSessionExpiry(client, type, map, messageId);
+      session.timeout = scheduleSessionExpiry(client, type, map, messageId, session);
       map.set(messageId, session);
     }
   }
   return session;
 }
 
-function scheduleSessionExpiry(client, type, map, id) {
-  return setTimeout(() => expireSessionWithRefund(client, type, map, id), gameSessionTtlMs);
+function remainingSessionTtl(session) {
+  const createdAt = Number(session?.createdAt);
+  if (!Number.isFinite(createdAt) || createdAt <= 0) return gameSessionTtlMs;
+  return Math.max(0, createdAt + gameSessionTtlMs - Date.now());
+}
+
+function scheduleSessionExpiry(client, type, map, id, session = map.get(id)) {
+  return setTimeout(() => expireSessionWithRefund(client, type, map, id), remainingSessionTtl(session));
 }
 
 function refreshSessionExpiry(client, type, map, id) {
   const session = map.get(id);
   if (!session) return;
   if (session.timeout) clearTimeout(session.timeout);
-  session.timeout = scheduleSessionExpiry(client, type, map, id);
+  session.timeout = scheduleSessionExpiry(client, type, map, id, session);
 }
 
 function visibleDealerHand(session, reveal = false) {
@@ -1217,7 +1229,14 @@ async function runBuiltInCommand({ client, config, command, source, args }) {
       await source.reply({ content: 'Sent.', ephemeral: true });
       return channel.send(messageText);
     }
-    await source.delete().catch(() => null);
+    if (!channel.permissionsFor(client.user)?.has(PermissionFlagsBits.ManageMessages)) {
+      return reply('Bot needs Manage Messages permission to remove the original command message.');
+    }
+    try {
+      await source.delete();
+    } catch {
+      return reply('Could not delete the original command message. Check bot permissions and channel overrides.');
+    }
     return channel.send(messageText);
   }
 
@@ -1233,12 +1252,14 @@ async function runBuiltInCommand({ client, config, command, source, args }) {
       return reply(isInteraction ? { content: 'Bot needs Manage Messages permission in this channel.', ephemeral: true } : 'Bot needs Manage Messages permission in this channel.');
     }
     const deleted = await channel.bulkDelete(amount, true);
+    const skipped = amount - deleted.size;
     const content = renderCommandResponse(command.response, {
       client,
       context,
       config,
       args: String(amount)
-    }).replaceAll('{count}', String(deleted.size));
+    }).replaceAll('{count}', String(deleted.size)) +
+      (skipped > 0 ? ` Skipped ${skipped} message(s) that were older than 14 days or unavailable.` : '');
     return reply(isInteraction ? { content, ephemeral: true } : content);
   }
 
@@ -1655,6 +1676,10 @@ async function runBuiltInCommand({ client, config, command, source, args }) {
     if (!targetChannel?.isTextBased()) {
       return reply(isInteraction ? { content: 'Announcement channel not found.', ephemeral: true } : 'Announcement channel not found.');
     }
+    if (/@(?:everyone|here)\b/.test(config.announcementMention) &&
+        !guild.members.me?.permissions.has(PermissionFlagsBits.MentionEveryone)) {
+      return reply(isInteraction ? { content: 'Bot needs Mention Everyone permission for @everyone/@here announcements.', ephemeral: true } : 'Bot needs Mention Everyone permission for @everyone/@here announcements.');
+    }
     const content = `${config.announcementMention ? `${config.announcementMention}\n` : ''}${announcement}`;
     await targetChannel.send({ embeds: [new EmbedBuilder().setTitle('Announcement').setDescription(content).setColor(0x2864d8)] });
     return reply(isInteraction ? { content: 'Announcement sent.', ephemeral: true } : 'Announcement sent.');
@@ -1884,6 +1909,7 @@ export function createBot(configStore, stateStore) {
     if (interaction.isButton() && interaction.guild) {
       const config = await configStore.getGuildConfig(interaction.guild.id);
       if (interaction.customId.startsWith('bj:')) {
+        return withGameSessionLock(`blackjack:${interaction.guild.id}:${interaction.message.id}`, async () => {
         const [, action] = interaction.customId.split(':');
         const session = await getGameSession(client, 'blackjack', blackjackSessions, interaction.guild.id, interaction.message.id);
         if (!session || session.status !== 'active') {
@@ -1982,9 +2008,11 @@ export function createBot(configStore, stateStore) {
         }
         await interaction.update(payload);
         return;
+        });
       }
 
       if (interaction.customId.startsWith('vp:')) {
+        return withGameSessionLock(`poker:${interaction.guild.id}:${interaction.message.id}`, async () => {
         const [, action, targetUserId, indexValue] = interaction.customId.split(':');
         const session = await getGameSession(client, 'poker', pokerSessions, interaction.guild.id, interaction.message.id);
         if (!session || session.status !== 'active') {
@@ -2013,6 +2041,7 @@ export function createBot(configStore, stateStore) {
           await interaction.update(payload);
           return;
         }
+        });
       }
 
       if (interaction.customId === 'ticket:create') {

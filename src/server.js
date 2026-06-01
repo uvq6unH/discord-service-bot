@@ -18,7 +18,15 @@ function sanitizeConfigForClient(config) {
 function createRateLimiter({ windowMs, max, keyPrefix = 'global' }) {
   const hits = new Map();
 
-  return (req, res, next) => {
+  const cleanup = setInterval(() => {
+    const now = Date.now();
+    for (const [key, record] of hits.entries()) {
+      if (record.resetAt <= now) hits.delete(key);
+    }
+  }, Math.max(60_000, windowMs));
+  cleanup.unref?.();
+
+  const middleware = (req, res, next) => {
     const now = Date.now();
     const key = `${keyPrefix}:${req.ip}:${req.session?.user?.id ?? 'anon'}`;
     const record = hits.get(key);
@@ -38,6 +46,23 @@ function createRateLimiter({ windowMs, max, keyPrefix = 'global' }) {
 
     next();
   };
+
+  middleware.clear = () => hits.clear();
+  return middleware;
+}
+
+async function mapWithConcurrency(items, limit, mapper) {
+  const results = new Array(items.length);
+  let nextIndex = 0;
+  const workers = Array.from({ length: Math.min(limit, items.length) }, async () => {
+    while (nextIndex < items.length) {
+      const index = nextIndex;
+      nextIndex += 1;
+      results[index] = await mapper(items[index], index);
+    }
+  });
+  await Promise.all(workers);
+  return results;
 }
 
 function requireGuildId(req, res, next) {
@@ -97,7 +122,7 @@ export function createServer({ configStore, stateStore, botClient }) {
   app.use(express.static('public'));
 
   // ── API routes ─────────────────────────────────────────────────────────────
-  app.get('/api/status', async (_req, res) => {
+  app.get('/api/status', auth.requireAuth, async (_req, res) => {
     const guildIds = await configStore.listGuildIds();
     res.json({
       botReady: Boolean(botClient.user),
@@ -142,7 +167,8 @@ export function createServer({ configStore, stateStore, botClient }) {
     const guildsById = new Map();
     const isDev = Boolean(req.session?.user?.dev);
 
-    const manageableGuilds = await Promise.all([...botClient.guilds.cache].map(async ([id, guild]) => {
+    const guildEntries = [...botClient.guilds.cache];
+    const manageableGuilds = await mapWithConcurrency(guildEntries, 5, async ([id, guild]) => {
       let canManage = isDev;
       if (!canManage && userId && botClient.user) {
         const member = await guild.members.fetch(userId).catch(() => null);
@@ -151,7 +177,7 @@ export function createServer({ configStore, stateStore, botClient }) {
       return canManage
         ? { id, name: guild.name, icon: guild.iconURL({ size: 64 }), configured: configuredGuildIds.includes(id) }
         : null;
-    }));
+    });
 
     for (const guild of manageableGuilds) {
       if (guild) guildsById.set(guild.id, guild);

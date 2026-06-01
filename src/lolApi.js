@@ -64,7 +64,10 @@ const RANK_EMOJIS = {
 // ── Simple in-memory cache ────────────────────────────────────────────────────
 
 class Cache {
-  constructor() { this._store = new Map(); }
+  constructor(maxEntries = 500) {
+    this._store = new Map();
+    this.maxEntries = maxEntries;
+  }
 
   get(key) {
     const entry = this._store.get(key);
@@ -74,7 +77,12 @@ class Cache {
   }
 
   set(key, value, ttlMs) {
+    if (this._store.has(key)) this._store.delete(key);
     this._store.set(key, { value, expiresAt: Date.now() + ttlMs });
+    while (this._store.size > this.maxEntries) {
+      const oldestKey = this._store.keys().next().value;
+      this._store.delete(oldestKey);
+    }
   }
 
   delete(key) { this._store.delete(key); }

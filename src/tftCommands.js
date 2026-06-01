@@ -42,7 +42,7 @@ async function resolveSummoner(source, args, isInteraction, stateStore, guildId,
 
   if (!riotIdStr) {
     const userId = isInteraction ? source.user.id : source.author.id;
-    const linked = await stateStore.getLinkedLolAccount(guildId, userId);
+    const linked = await stateStore.getLinkedTftAccount(guildId, userId);
     if (linked) { riotIdStr = linked.riotId; region = linked.region; }
   }
 
@@ -368,14 +368,14 @@ export async function handleTftLink({ source, args, isInteraction, stateStore, g
     const account = await getAccountByRiotId(parsed.gameName, parsed.tagLine, region, apiKey);
     const userId = isInteraction ? source.user.id : source.author.id;
 
-    await stateStore.linkLolAccount(guildId, userId, {
+    await stateStore.linkTftAccount(guildId, userId, {
       riotId: `${account.gameName}#${account.tagLine}`,
       puuid: account.puuid,
       region,
     });
 
     return editOrReply(source, isInteraction, {
-      content: `✅ Đã liên kết **${account.gameName}#${account.tagLine}** (${region.toUpperCase()})!\nBạn có thể dùng **/tftlsd**, **/tft**, **/tftmatch** (và **/lsd**, **/lol**) không cần nhập tên.`,
+      content: `✅ Đã liên kết TFT **${account.gameName}#${account.tagLine}** (${region.toUpperCase()})!\nBạn có thể dùng **/tftlsd**, **/tft**, **/tftmatch** không cần nhập tên.`,
       ephemeral: true,
     });
   } catch (err) {
@@ -386,8 +386,8 @@ export async function handleTftLink({ source, args, isInteraction, stateStore, g
 // ── /tftunlink ────────────────────────────────────────────────────────────────
 export async function handleTftUnlink({ source, isInteraction, stateStore, guildId, reply }) {
   const userId = isInteraction ? source.user.id : source.author.id;
-  await stateStore.unlinkLolAccount(guildId, userId);
-  const msg = '✅ Đã xoá liên kết tài khoản (TFT + LoL).';
+  await stateStore.unlinkTftAccount(guildId, userId);
+  const msg = '✅ Đã xoá liên kết tài khoản TFT.';
   return reply(isInteraction ? { content: msg, ephemeral: true } : msg);
 }
 
