@@ -38,6 +38,7 @@ export class StateStore {
     this.filePath = path.resolve(filePath);
     this._economyMutex = createMutexPool();
     this._gameSessionMutex = createMutexPool();
+    this._warningsMutex = createMutexPool();
     this._redis = redis ?? createUpstashFromEnv();
 
     if (this._redis) {
@@ -110,32 +111,32 @@ export class StateStore {
     if (this._useRedis) {
       // For Redis we return a live object; caller must call _redisSaveGuild to persist
       const guild = await this._redisGetGuild(guildId);
-      guild.warnings      ??= {};
-      guild.levels        ??= {};
-      guild.tickets       ??= { nextNumber: 1 };
-      guild.economy       ??= { users: {} };
+      guild.warnings ??= {};
+      guild.levels ??= {};
+      guild.tickets ??= { nextNumber: 1 };
+      guild.economy ??= { users: {} };
       guild.economy.users ??= {};
-      guild.gameSessions  ??= { blackjack: {}, poker: {} };
+      guild.gameSessions ??= { blackjack: {}, poker: {} };
       guild.gameSessions.blackjack ??= {};
-      guild.gameSessions.poker     ??= {};
-      guild.lolAccounts   ??= {};
-      guild.tftAccounts   ??= {};
+      guild.gameSessions.poker ??= {};
+      guild.lolAccounts ??= {};
+      guild.tftAccounts ??= {};
       return guild;
     }
 
     await this.ready;
     this.cache.guilds[guildId] ??= {};
     const g = this.cache.guilds[guildId];
-    g.warnings      ??= {};
-    g.levels        ??= {};
-    g.tickets       ??= { nextNumber: 1 };
-    g.economy       ??= { users: {} };
+    g.warnings ??= {};
+    g.levels ??= {};
+    g.tickets ??= { nextNumber: 1 };
+    g.economy ??= { users: {} };
     g.economy.users ??= {};
-    g.gameSessions  ??= { blackjack: {}, poker: {} };
+    g.gameSessions ??= { blackjack: {}, poker: {} };
     g.gameSessions.blackjack ??= {};
-    g.gameSessions.poker     ??= {};
-    g.lolAccounts   ??= {};
-    g.tftAccounts   ??= {};
+    g.gameSessions.poker ??= {};
+    g.lolAccounts ??= {};
+    g.tftAccounts ??= {};
     return g;
   }
 
@@ -278,9 +279,9 @@ export class StateStore {
 
   _getEconomyUser(guild, userId) {
     guild.economy.users[userId] ??= { silver: 0, gold: 0, diamond: 0, lastDailyAt: 0, lastDailyDay: null };
-    guild.economy.users[userId].silver      ??= 0;
-    guild.economy.users[userId].gold        ??= 0;
-    guild.economy.users[userId].diamond     ??= 0;
+    guild.economy.users[userId].silver ??= 0;
+    guild.economy.users[userId].gold ??= 0;
+    guild.economy.users[userId].diamond ??= 0;
     guild.economy.users[userId].lastDailyAt ??= 0;
     guild.economy.users[userId].lastDailyDay ??= null;
     return guild.economy.users[userId];
@@ -294,7 +295,7 @@ export class StateStore {
   async adjustBalance(guildId, userId, currency, amount) {
     return this._withEconomyLock(guildId, userId, async () => {
       const guild = await this.getGuild(guildId);
-      const user  = this._getEconomyUser(guild, userId);
+      const user = this._getEconomyUser(guild, userId);
       user[currency] = Math.max(0, Math.floor((user[currency] ?? 0) + amount));
       await this._saveGuild(guildId, guild);
       return { ...user };
@@ -313,7 +314,7 @@ export class StateStore {
 
     return this._withEconomyLock(guildId, userId, async () => {
       const guild = await this.getGuild(guildId);
-      const user  = this._getEconomyUser(guild, userId);
+      const user = this._getEconomyUser(guild, userId);
       const current = user[currency] ?? 0;
       if (current < debit) {
         return { ok: false, balance: { ...user } };
@@ -327,7 +328,7 @@ export class StateStore {
   async setBalance(guildId, userId, currency, amount) {
     return this._withEconomyLock(guildId, userId, async () => {
       const guild = await this.getGuild(guildId);
-      const user  = this._getEconomyUser(guild, userId);
+      const user = this._getEconomyUser(guild, userId);
       user[currency] = Math.max(0, Math.floor(amount));
       await this._saveGuild(guildId, guild);
       return { ...user };
@@ -337,21 +338,21 @@ export class StateStore {
   async claimDaily(guildId, userId, rewards, options = {}) {
     return this._withEconomyLock(guildId, userId, async () => {
       const guild = await this.getGuild(guildId);
-      const user  = this._getEconomyUser(guild, userId);
-      const now   = Date.now();
+      const user = this._getEconomyUser(guild, userId);
+      const now = Date.now();
       const utcOffsetMinutes = Number.isFinite(options.utcOffsetMinutes) ? options.utcOffsetMinutes : 420;
       const todayKey = dayKeyForOffset(now, utcOffsetMinutes);
-      const nextAt   = nextDayStartForOffset(todayKey, utcOffsetMinutes);
+      const nextAt = nextDayStartForOffset(todayKey, utcOffsetMinutes);
 
       if (user.lastDailyDay === todayKey) {
         return { claimed: false, nextAt, balance: { ...user } };
       }
 
-      user.silver       += rewards.silver  ?? 0;
-      user.gold         += rewards.gold    ?? 0;
-      user.diamond      += rewards.diamond ?? 0;
-      user.lastDailyAt   = now;
-      user.lastDailyDay  = todayKey;
+      user.silver += rewards.silver ?? 0;
+      user.gold += rewards.gold ?? 0;
+      user.diamond += rewards.diamond ?? 0;
+      user.lastDailyAt = now;
+      user.lastDailyDay = todayKey;
       await this._saveGuild(guildId, guild);
       return { claimed: true, nextAt, balance: { ...user } };
     });
@@ -369,12 +370,14 @@ export class StateStore {
   // ── Warnings ───────────────────────────────────────────────────────────────
 
   async addWarning(guildId, userId, moderatorId, reason) {
-    const guild = await this.getGuild(guildId);
-    guild.warnings[userId] ??= [];
-    const warning = { id: `${Date.now()}`, moderatorId, reason, createdAt: new Date().toISOString() };
-    guild.warnings[userId].push(warning);
-    await this._saveGuild(guildId, guild);
-    return warning;
+    return this._warningsMutex(`${guildId}:${userId}`, async () => {
+      const guild = await this.getGuild(guildId);
+      guild.warnings[userId] ??= [];
+      const warning = { id: `${Date.now()}`, moderatorId, reason, createdAt: new Date().toISOString() };
+      guild.warnings[userId].push(warning);
+      await this._saveGuild(guildId, guild);
+      return warning;
+    });
   }
 
   async getWarnings(guildId, userId) {
@@ -383,11 +386,13 @@ export class StateStore {
   }
 
   async clearWarnings(guildId, userId) {
-    const guild = await this.getGuild(guildId);
-    const count = guild.warnings[userId]?.length ?? 0;
-    guild.warnings[userId] = [];
-    await this._saveGuild(guildId, guild);
-    return count;
+    return this._warningsMutex(`${guildId}:${userId}`, async () => {
+      const guild = await this.getGuild(guildId);
+      const count = guild.warnings[userId]?.length ?? 0;
+      guild.warnings[userId] = [];
+      await this._saveGuild(guildId, guild);
+      return count;
+    });
   }
 
   // ── Levels / XP ───────────────────────────────────────────────────────────
@@ -404,7 +409,7 @@ export class StateStore {
     current.xp += amount;
     const nextLevel = Math.floor(Math.sqrt(current.xp / 100));
     const leveledUp = nextLevel > current.level;
-    current.level   = Math.max(current.level, nextLevel);
+    current.level = Math.max(current.level, nextLevel);
     await this._saveGuild(guildId, guild);
     return { ...current, changed: true, leveledUp };
   }

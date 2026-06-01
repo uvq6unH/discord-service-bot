@@ -14,7 +14,7 @@ export async function handleEconomy(ctx) {
     client, config, command, source, args, isInteraction, guild, channel, user, permissions,
     reply, context, actorMember
   } = ctx;
-  const _eco = new Set(['balance','daily','economyleaderboard','blackjack','poker','coinflip','dice','slots','ecoadd','ecoset','ecoremove']);
+  const _eco = new Set(['balance', 'daily', 'economyleaderboard', 'blackjack', 'poker', 'coinflip', 'dice', 'slots', 'ecoadd', 'ecoset', 'ecoremove']);
   if (!_eco.has(command.type)) return;
 
   if (command.type === 'balance') {
@@ -92,7 +92,7 @@ export async function handleEconomy(ctx) {
       isInteraction
     });
     if (!balance) return;
-    const reserved = await client.stateStore.adjustBalance(guild.id, user.id, currency, -bet);
+    // validateGameBet already deducted bet via tryDebitBalance -- do NOT deduct again
     const deck = createDeck();
     const session = {
       guildId: guild.id,
@@ -100,7 +100,7 @@ export async function handleEconomy(ctx) {
       bet,
       deck,
       dealer: [deck.pop(), deck.pop()],
-      players: [createBlackjackPlayer(user, bet, deck, reserved[currency] ?? 0)],
+      players: [createBlackjackPlayer(user, bet, deck, balance[currency] ?? 0)],
       activePlayerIndex: 0,
       status: 'active',
       createdAt: Date.now()
@@ -133,7 +133,7 @@ export async function handleEconomy(ctx) {
     });
     if (!balance) return;
 
-    await client.stateStore.adjustBalance(guild.id, user.id, currency, -bet);
+    // validateGameBet already deducted bet via tryDebitBalance -- do NOT deduct again
     const deck = createDeck();
     const session = {
       guildId: guild.id,
@@ -177,7 +177,8 @@ export async function handleEconomy(ctx) {
     if (!balance) return;
 
     const game = playCoinflip(sideArg);
-    const delta = game.outcome === 'win' ? bet : -bet;
+    // tryDebitBalance already deducted bet; on win return 2x stake, on loss do nothing
+    const delta = game.outcome === 'win' ? bet * 2 : 0;
     const nextBalance = await client.stateStore.adjustBalance(guild.id, user.id, currency, delta);
     return reply({
       embeds: [
@@ -212,7 +213,8 @@ export async function handleEconomy(ctx) {
 
     const target = isInteraction ? source.options.getInteger('number') : parts[1];
     const game = playDice(target);
-    const delta = game.outcome === 'win' ? bet * 5 : -bet;
+    // tryDebitBalance already deducted bet; on win return 6x stake, on loss do nothing
+    const delta = game.outcome === 'win' ? bet * 6 : 0;
     const nextBalance = await client.stateStore.adjustBalance(guild.id, user.id, currency, delta);
     return reply({
       embeds: [
@@ -247,7 +249,8 @@ export async function handleEconomy(ctx) {
     if (!balance) return;
 
     const game = playSlots();
-    const delta = game.multiplier > 0 ? bet * (game.multiplier - 1) : -bet;
+    // tryDebitBalance already deducted bet; on win return multiplier * stake, on loss do nothing
+    const delta = game.multiplier > 0 ? bet * game.multiplier : 0;
     const nextBalance = await client.stateStore.adjustBalance(guild.id, user.id, currency, delta);
     return reply({
       embeds: [

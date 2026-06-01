@@ -16,6 +16,13 @@ import { sanitizeAnnouncementText } from './commandAccess.js';
 // Key: `guildId:userId`, Value: timestamp of last XP grant
 const xpCache = new Map();
 const XP_COOLDOWN_MS = 60_000;
+// Prune expired entries every 5 minutes to prevent memory leak on long-running instances
+setInterval(() => {
+  const now = Date.now();
+  for (const [key, ts] of xpCache.entries()) {
+    if (now - ts >= XP_COOLDOWN_MS) xpCache.delete(key);
+  }
+}, 5 * 60 * 1000).unref();
 import { handleComponentInteraction } from './bot/interactions.js';
 
 const commandCooldowns = new CommandCooldowns();

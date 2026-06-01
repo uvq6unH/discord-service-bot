@@ -1,6 +1,7 @@
 import { PermissionFlagsBits } from 'discord.js';
 import { buildServerEmbed, buildUserEmbed, buildAvatarEmbed, resolveMentionedUser } from '../../embeds.js';
 import { renderCommandResponse } from '../../responses.js';
+import { sanitizeAnnouncementText } from '../../../commandAccess.js';
 
 /** @returns {Promise<unknown>|undefined} */
 export async function handleGeneral(ctx) {
@@ -8,7 +9,7 @@ export async function handleGeneral(ctx) {
     client, config, command, source, args, isInteraction, guild, channel, user, permissions,
     reply, context, actorMember
   } = ctx;
-  const _general = new Set(['custom','ping','config','server','user','avatar','say']);
+  const _general = new Set(['custom', 'ping', 'config', 'server', 'user', 'avatar', 'say']);
   if (!_general.has(command.type)) return;
 
   if (['custom', 'ping', 'config'].includes(command.type)) {
@@ -39,7 +40,7 @@ export async function handleGeneral(ctx) {
     }
     if (isInteraction) {
       await source.reply({ content: 'Sent.', ephemeral: true });
-      return channel.send(messageText);
+      return channel.send(sanitizeAnnouncementText(messageText));
     }
     if (!channel.permissionsFor(client.user)?.has(PermissionFlagsBits.ManageMessages)) {
       return reply('Bot needs Manage Messages permission to remove the original command message.');
@@ -49,6 +50,6 @@ export async function handleGeneral(ctx) {
     } catch {
       return reply('Could not delete the original command message. Check bot permissions and channel overrides.');
     }
-    return channel.send(messageText);
+    return channel.send(sanitizeAnnouncementText(messageText));
   }
 }

@@ -258,7 +258,15 @@ export class ConfigStore {
   }
 
   async updateGuildConfig(guildId, patch) {
+    // Guard against prototype pollution from JSON body
+    if (!patch || typeof patch !== 'object' || Array.isArray(patch)) {
+      throw new Error('Invalid patch');
+    }
+    const safePatch = Object.fromEntries(
+      Object.entries(patch).filter(([k]) => !['__proto__', 'constructor', 'prototype'].includes(k))
+    );
     return this._withLock(guildId, async () => {
+      patch = safePatch;
       await this.ready;
       const runtimeCurrent = this._runtimeSecrets.get(guildId) ?? {};
       const current = await this.getGuildConfig(guildId);

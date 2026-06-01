@@ -224,10 +224,18 @@ export function createServer({ configStore, stateStore, botClient, redis = null 
     }
     res.json({
       enabled: Boolean(channelId),
-      channelId,
+      // channelId intentionally omitted — internal Discord snowflake not needed by client
       channelName,
       intervalMinutes: 14,
     });
+  });
+
+  // Central error handler — catches unhandled async errors in Express 5 routes
+  app.use((err, req, res, _next) => {
+    console.error('[server] Unhandled error:', err?.message ?? err);
+    if (!res.headersSent) {
+      res.status(500).json({ error: 'Internal server error' });
+    }
   });
 
   return app;

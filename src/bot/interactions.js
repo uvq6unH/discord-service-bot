@@ -77,8 +77,16 @@ export async function handleComponentInteraction(interaction, { client, config, 
   }
 
   if (interaction.customId === 'ticket:close') {
-    if (!interaction.memberPermissions?.has(PermissionFlagsBits.ManageChannels)) {
-      await interaction.reply({ content: 'You need Manage Channels permission.', ephemeral: true });
+    // Guard: only valid inside actual ticket channels
+    if (!interaction.channel?.name?.startsWith('ticket-')) {
+      await interaction.reply({ content: 'This button can only be used in ticket channels.', ephemeral: true });
+      return;
+    }
+    // Allow: staff with ManageChannels, OR the ticket opener (channel name contains their username)
+    const isStaff = interaction.memberPermissions?.has(PermissionFlagsBits.ManageChannels);
+    const isOpener = interaction.channel.name.includes(interaction.user.username.toLowerCase().replace(/[^a-z0-9-]/g, '-').slice(0, 32));
+    if (!isStaff && !isOpener) {
+      await interaction.reply({ content: 'You do not have permission to close this ticket.', ephemeral: true });
       return;
     }
     try {
