@@ -3,6 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
+  "packageManager": "pnpm@11.1.3",
   "scripts": {
     "start": "node src/index.js",
     "dev": "node --watch src/index.js",
@@ -12,7 +13,7 @@
     "prod:logs": "pm2 logs discord-service-bot",
     "prod:status": "pm2 status",
     "keep-alive": "bash keep-alive.sh",
-    "check": "node --check src/index.js && node --check src/bot.js && node --check src/server.js && node --check src/configStore.js && node --check src/stateStore.js && node --check src/auth.js && node --check src/lolApi.js && node --check src/lolCommands.js && node --check src/tftApi.js && node --check src/tftCommands.js && node --check public/app.js"
+    "check": "node --check src/index.js && node --check src/env.js && node --check src/cooldowns.js && node --check src/bot.js && node --check src/server.js && node --check src/configStore.js && node --check src/stateStore.js && node --check src/auth.js && node --check src/lolApi.js && node --check src/lolCommands.js && node --check src/tftApi.js && node --check src/tftCommands.js && node --check public/app.js"
   },
   "dependencies": {
     "cookie-session": "^2.1.0",

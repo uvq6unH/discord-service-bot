@@ -82,8 +82,15 @@ class UpstashClient {
         const chunks = [];
         res.on('data', c => chunks.push(c));
         res.on('end', () => {
-          try { resolve(JSON.parse(Buffer.concat(chunks).toString())); }
-          catch (e) { reject(e); }
+          try {
+            const data = JSON.parse(Buffer.concat(chunks).toString());
+            if (data.error) return reject(new Error(data.error));
+            const failed = Array.isArray(data)
+              ? data.find((item) => item?.error)
+              : null;
+            if (failed) return reject(new Error(failed.error));
+            resolve(data);
+          } catch (e) { reject(e); }
         });
       });
       req.on('error', reject);
@@ -293,7 +300,6 @@ export class StateStore {
     // For file: iterate cache
     await this.ready;
     const now = Date.now();
-    let dirty = false;
 
     const processGuilds = async (guildEntries) => {
       for (const [guildId, guild] of guildEntries) {
@@ -319,7 +325,6 @@ export class StateStore {
 
         if (guildDirty) {
           await this._saveGuild(guildId, guild);
-          dirty = true;
         }
       }
     };
@@ -332,7 +337,6 @@ export class StateStore {
     }
 
     await processGuilds(Object.entries(this.cache.guilds ?? {}));
-    if (dirty) await this._save();
   }
 
   // ── Economy helpers ────────────────────────────────────────────────────────

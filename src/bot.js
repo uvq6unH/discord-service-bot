@@ -22,6 +22,7 @@ import {
   handleTftLsd, handleTftProfile, handleTftMatch,
   handleTftLink, handleTftUnlink, buildTftSlashOptions
 } from './tftCommands.js';
+import { CommandCooldowns, formatRetryAfter } from './cooldowns.js';
 
 const groupMap = {
   ping: 'general',
@@ -256,6 +257,11 @@ const blackjackSessions = new Map();
 const pokerSessions = new Map();
 const gameSessionLocks = new Map();
 const gameSessionTtlMs = 2 * 60 * 60 * 1000;
+const commandCooldowns = new CommandCooldowns();
+const autoDeferCommandTypes = new Set([
+  'help', 'warnings', 'clearwarns', 'rank', 'leaderboard', 'balance', 'daily', 'economyleaderboard',
+  'blackjack', 'poker', 'coinflip', 'dice', 'slots'
+]);
 
 function normalizeCurrency(value) {
   const input = String(value ?? '').trim().toLowerCase();
@@ -1154,7 +1160,12 @@ async function runBuiltInCommand({ client, config, command, source, args }) {
 
   const reply = async (payload) => {
     if (isInteraction) {
-      if (source.deferred || source.replied) {
+      if (source.deferred && !source.replied) {
+        if (typeof payload === 'string') return source.editReply(payload);
+        const { ephemeral, ...editablePayload } = payload;
+        return source.editReply(editablePayload);
+      }
+      if (source.replied) {
         return source.followUp(payload);
       }
       return source.reply(payload);
@@ -1172,6 +1183,10 @@ async function runBuiltInCommand({ client, config, command, source, args }) {
   const hasCommandAccess = await hasAllowedRole(guild, user.id, command);
   if (!hasCommandAccess) {
     return reply(isInteraction ? { content: 'You do not have permission to use this command.', ephemeral: true } : 'You do not have permission to use this command.');
+  }
+
+  if (isInteraction && autoDeferCommandTypes.has(command.type) && !source.deferred && !source.replied) {
+    await source.deferReply();
   }
 
   if (command.type === 'help') {
@@ -2132,6 +2147,23 @@ export function createBot(configStore, stateStore) {
       return;
     }
 
+    const bypassCooldown =
+      interaction.memberPermissions?.has(PermissionFlagsBits.Administrator) ||
+      interaction.memberPermissions?.has(PermissionFlagsBits.ManageGuild);
+    const cooldown = commandCooldowns.check({
+      guildId: interaction.guild.id,
+      userId: interaction.user.id,
+      commandType: command.type,
+      bypass: bypassCooldown
+    });
+    if (!cooldown.allowed) {
+      await interaction.reply({
+        content: `Please wait ${formatRetryAfter(cooldown.retryAfterMs)} before using this command again.`,
+        ephemeral: true
+      });
+      return;
+    }
+
     const args = interaction.options.getString('args') ?? '';
     await runBuiltInCommand({
       client,
@@ -2200,6 +2232,19 @@ export function createBot(configStore, stateStore) {
       const command = config.commands.find((item) => item.enabled && item.name === commandName?.toLowerCase());
 
       if (command) {
+        const bypassCooldown =
+          message.member?.permissions?.has(PermissionFlagsBits.Administrator) ||
+          message.member?.permissions?.has(PermissionFlagsBits.ManageGuild);
+        const cooldown = commandCooldowns.check({
+          guildId: message.guild.id,
+          userId: message.author.id,
+          commandType: command.type,
+          bypass: bypassCooldown
+        });
+        if (!cooldown.allowed) {
+          await message.reply(`Please wait ${formatRetryAfter(cooldown.retryAfterMs)} before using this command again.`).catch(() => null);
+          return;
+        }
         await runBuiltInCommand({
           client,
           config,

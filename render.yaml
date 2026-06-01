@@ -3,8 +3,8 @@ services:
     name: discord-service-bot
     runtime: node
     plan: free
-    buildCommand: npm install --legacy-peer-deps
-    startCommand: node src/index.js
+    buildCommand: corepack enable && pnpm install --frozen-lockfile
+    startCommand: pnpm start
     disk:
       name: bot-data
       mountPath: /var/data
@@ -20,6 +20,12 @@ services:
         value: /var/data/state.json
       - key: DAILY_RESET_UTC_OFFSET_MINUTES
         value: 420
+      - key: COMMAND_COOLDOWN_MS
+        value: 3000
+      - key: RIOT_COMMAND_COOLDOWN_MS
+        value: 15000
+      - key: GAME_COMMAND_COOLDOWN_MS
+        value: 5000
       - key: DISCORD_TOKEN
         sync: false
       - key: DISCORD_CLIENT_ID
@@ -32,8 +38,12 @@ services:
         sync: false
       - key: RIOT_API_KEY
         sync: false
+      - key: TFT_API_KEY
+        sync: false
       - key: UPSTASH_REDIS_REST_URL
         sync: false
       - key: UPSTASH_REDIS_REST_TOKEN
+        sync: false
+      - key: KEEPALIVE_CHANNEL_ID
         sync: false
     healthCheckPath: /health

@@ -349,6 +349,7 @@ const commandTypes = new Set([
 const builtInTypesByName = new Map(
   defaultConfig.commands.filter((command) => command.type !== 'custom').map((command) => [command.name, command.type])
 );
+const snowflakePattern = /^\d{17,20}$/;
 
 function clone(value) {
   return JSON.parse(JSON.stringify(value));
@@ -376,6 +377,11 @@ function normalizeStringList(items, limit = 100) {
   return items.map((item) => String(item ?? '').trim()).filter(Boolean).slice(0, limit);
 }
 
+function normalizeSnowflakeId(value) {
+  const id = String(value ?? '').trim();
+  return snowflakePattern.test(id) ? id : '';
+}
+
 function normalizeSelfRoles(items) {
   if (!Array.isArray(items)) {
     return [];
@@ -384,7 +390,7 @@ function normalizeSelfRoles(items) {
   return items
     .map((item) => ({
       label: String(item?.label ?? '').trim().slice(0, 80),
-      roleId: String(item?.roleId ?? '').trim()
+      roleId: normalizeSnowflakeId(item?.roleId)
     }))
     .filter((item) => item.label && item.roleId)
     .slice(0, 25);
@@ -545,13 +551,13 @@ export class ConfigStore {
       badWords: normalizeStringList(patch.badWords ?? current.badWords),
       blockedMessage: String(patch.blockedMessage ?? '').trim().slice(0, 500) || defaultConfig.blockedMessage,
       rolesEnabled: Boolean(patch.rolesEnabled),
-      autoRoleId: String(patch.autoRoleId ?? '').trim(),
+      autoRoleId: normalizeSnowflakeId(patch.autoRoleId),
       selfRolePanelTitle: String(patch.selfRolePanelTitle ?? '').trim().slice(0, 100) || defaultConfig.selfRolePanelTitle,
       selfRolePanelMessage: String(patch.selfRolePanelMessage ?? '').trim().slice(0, 1000) || defaultConfig.selfRolePanelMessage,
       selfRoles: normalizeSelfRoles(patch.selfRoles ?? current.selfRoles),
       ticketsEnabled: Boolean(patch.ticketsEnabled),
-      ticketCategoryId: String(patch.ticketCategoryId ?? '').trim(),
-      ticketLogChannelId: String(patch.ticketLogChannelId ?? '').trim(),
+      ticketCategoryId: normalizeSnowflakeId(patch.ticketCategoryId),
+      ticketLogChannelId: normalizeSnowflakeId(patch.ticketLogChannelId),
       ticketPanelTitle: String(patch.ticketPanelTitle ?? '').trim().slice(0, 100) || defaultConfig.ticketPanelTitle,
       ticketPanelMessage: String(patch.ticketPanelMessage ?? '').trim().slice(0, 1000) || defaultConfig.ticketPanelMessage,
       levelsEnabled: Boolean(patch.levelsEnabled),
@@ -590,12 +596,12 @@ export class ConfigStore {
       slotsMinBet: Math.max(1, Math.min(1000000, Number.parseInt(patch.slotsMinBet, 10) || defaultConfig.slotsMinBet)),
       slotsMaxBet: Math.max(1, Math.min(1000000, Number.parseInt(patch.slotsMaxBet, 10) || defaultConfig.slotsMaxBet)),
       announcementsEnabled: Boolean(patch.announcementsEnabled),
-      announcementChannelId: String(patch.announcementChannelId ?? '').trim(),
+      announcementChannelId: normalizeSnowflakeId(patch.announcementChannelId),
       announcementMention: String(patch.announcementMention ?? '').trim().slice(0, 100),
       welcomeEnabled: Boolean(patch.welcomeEnabled),
-      welcomeChannelId: String(patch.welcomeChannelId ?? '').trim(),
+      welcomeChannelId: normalizeSnowflakeId(patch.welcomeChannelId),
       welcomeMessage: String(patch.welcomeMessage ?? '').trim().slice(0, 500) || defaultConfig.welcomeMessage,
-      logChannelId: String(patch.logChannelId ?? '').trim(),
+      logChannelId: normalizeSnowflakeId(patch.logChannelId),
       autoReplyEnabled: Boolean(patch.autoReplyEnabled),
       autoReplies: normalizeAutoReplies(patch.autoReplies ?? current.autoReplies)
     };

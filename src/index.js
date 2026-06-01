@@ -3,14 +3,18 @@ import { ConfigStore } from './configStore.js';
 import { StateStore } from './stateStore.js';
 import { createBot } from './bot.js';
 import { createServer } from './server.js';
+import { validateEnvironment } from './env.js';
 
 const token = process.env.DISCORD_TOKEN;
 const port = Number(process.env.PORT ?? 10000);
 const configPath = process.env.CONFIG_PATH ?? './data/configs.json';
 const statePath = process.env.STATE_PATH ?? './data/state.json';
 
-if (!token) {
-  console.error('Missing DISCORD_TOKEN. Copy .env.example to .env and add your bot token.');
+try {
+  validateEnvironment();
+} catch (error) {
+  console.error(error.message);
+  console.error('Copy .env.example to .env for local development, or set the missing variables in your host dashboard.');
   process.exit(1);
 }
 
