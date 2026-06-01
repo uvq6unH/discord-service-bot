@@ -213,21 +213,21 @@ export const defaultConfig = {
       response: 'Choose your roles.'
     },
     // ── League of Legends ───────────────────────────────────────────────────
-    { enabled: true,  type: 'lsd',        name: 'lsd',       description: 'Lịch sử 5 trận đấu gần nhất' },
-    { enabled: true,  type: 'lolprofile', name: 'lol',       description: 'Hồ sơ người chơi LoL (rank, mastery)' },
-    { enabled: true,  type: 'lolmatch',   name: 'lolmatch',  description: 'Chi tiết một trận đấu cụ thể' },
-    { enabled: true,  type: 'lolchamp',   name: 'lolchamp',  description: 'Thông tin tướng LoL' },
-    { enabled: true,  type: 'lolitem',    name: 'lolitem',   description: 'Thông tin trang bị LoL' },
-    { enabled: true,  type: 'lolrunes',   name: 'lolrunes',  description: 'Bảng ngọc LoL' },
-    { enabled: true,  type: 'lolpatch',   name: 'lolpatch',  description: 'Phiên bản LoL mới nhất' },
-    { enabled: true,  type: 'lollink',    name: 'lollink',   description: 'Liên kết tài khoản LoL với Discord' },
-    { enabled: true,  type: 'lolunlink',  name: 'lolunlink', description: 'Bỏ liên kết tài khoản LoL' },
+    { enabled: true, type: 'lsd', name: 'lsd', description: 'Lịch sử 5 trận đấu gần nhất' },
+    { enabled: true, type: 'lolprofile', name: 'lol', description: 'Hồ sơ người chơi LoL (rank, mastery)' },
+    { enabled: true, type: 'lolmatch', name: 'lolmatch', description: 'Chi tiết một trận đấu cụ thể' },
+    { enabled: true, type: 'lolchamp', name: 'lolchamp', description: 'Thông tin tướng LoL' },
+    { enabled: true, type: 'lolitem', name: 'lolitem', description: 'Thông tin trang bị LoL' },
+    { enabled: true, type: 'lolrunes', name: 'lolrunes', description: 'Bảng ngọc LoL' },
+    { enabled: true, type: 'lolpatch', name: 'lolpatch', description: 'Phiên bản LoL mới nhất' },
+    { enabled: true, type: 'lollink', name: 'lollink', description: 'Liên kết tài khoản LoL với Discord' },
+    { enabled: true, type: 'lolunlink', name: 'lolunlink', description: 'Bỏ liên kết tài khoản LoL' },
     // ── Teamfight Tactics ────────────────────────────────────────────────────
-    { enabled: true,  type: 'tftlsd',     name: 'tftlsd',    description: 'Lịch sử 5 trận TFT gần nhất (hạng, bài, con, đồ)' },
-    { enabled: true,  type: 'tftprofile', name: 'tft',       description: 'Hồ sơ TFT (rank, avg placement, traits)' },
-    { enabled: true,  type: 'tftmatch',   name: 'tftmatch',  description: 'Chi tiết trận TFT (bài chơi, con, đồ, augment)' },
-    { enabled: true,  type: 'tftlink',    name: 'tftlink',   description: 'Liên kết tài khoản TFT với Discord' },
-    { enabled: true,  type: 'tftunlink',  name: 'tftunlink', description: 'Bỏ liên kết tài khoản TFT' }
+    { enabled: true, type: 'tftlsd', name: 'tftlsd', description: 'Lịch sử 5 trận TFT gần nhất (hạng, bài, con, đồ)' },
+    { enabled: true, type: 'tftprofile', name: 'tft', description: 'Hồ sơ TFT (rank, avg placement, traits)' },
+    { enabled: true, type: 'tftmatch', name: 'tftmatch', description: 'Chi tiết trận TFT (bài chơi, con, đồ, augment)' },
+    { enabled: true, type: 'tftlink', name: 'tftlink', description: 'Liên kết tài khoản TFT với Discord' },
+    { enabled: true, type: 'tftunlink', name: 'tftunlink', description: 'Bỏ liên kết tài khoản TFT' }
   ],
   moderationEnabled: true,
   autoModEnabled: false,
@@ -294,7 +294,7 @@ export const defaultConfig = {
   ]
 };
 
-const commandTypes = new Set([
+export const COMMAND_TYPES = new Set([
   'custom',
   'ping',
   'help',
@@ -343,6 +343,6 @@ const commandTypes = new Set([
   'tftlink',
   'tftunlink'
 ]);
-const builtInTypesByName = new Map(
+export const builtInTypesByName = new Map(
   defaultConfig.commands.filter((command) => command.type !== 'custom').map((command) => [command.name, command.type])
 );
