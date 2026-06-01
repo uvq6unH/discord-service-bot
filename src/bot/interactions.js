@@ -47,27 +47,32 @@ export async function handleComponentInteraction(interaction, { client, config, 
       await interaction.reply({ content: 'Bot needs Manage Channels permission.', ephemeral: true });
       return;
     }
-    const number = await stateStore.nextTicketNumber(interaction.guild.id);
-    const channel = await interaction.guild.channels.create({
-      name: `ticket-${number}-${interaction.user.username}`.toLowerCase().replace(/[^a-z0-9-]/g, '-').slice(0, 90),
-      type: ChannelType.GuildText,
-      parent: config.ticketCategoryId || undefined,
-      permissionOverwrites: [
-        { id: interaction.guild.roles.everyone.id, deny: [PermissionFlagsBits.ViewChannel] },
-        { id: interaction.user.id, allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.ReadMessageHistory] },
-        { id: interaction.client.user.id, allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.ManageChannels] }
-      ]
-    });
-    const row = new ActionRowBuilder().addComponents(
-      new ButtonBuilder().setCustomId('ticket:close').setLabel('Close ticket').setStyle(ButtonStyle.Danger)
-    );
-    await channel.send({
-      content: `<@${interaction.user.id}>`,
-      embeds: [new EmbedBuilder().setTitle(`Ticket #${number}`).setDescription('Support will respond here.').setColor(0x2864d8)],
-      components: [row]
-    });
-    await interaction.reply({ content: `Ticket created: <#${channel.id}>`, ephemeral: true });
-    await sendTicketLog(interaction.guild, config, `Ticket #${number} opened by ${interaction.user.tag}.`);
+    try {
+      const number = await stateStore.nextTicketNumber(interaction.guild.id);
+      const channel = await interaction.guild.channels.create({
+        name: `ticket-${number}-${interaction.user.username}`.toLowerCase().replace(/[^a-z0-9-]/g, '-').slice(0, 90),
+        type: ChannelType.GuildText,
+        parent: config.ticketCategoryId || undefined,
+        permissionOverwrites: [
+          { id: interaction.guild.roles.everyone.id, deny: [PermissionFlagsBits.ViewChannel] },
+          { id: interaction.user.id, allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.ReadMessageHistory] },
+          { id: interaction.client.user.id, allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.ManageChannels] }
+        ]
+      });
+      const row = new ActionRowBuilder().addComponents(
+        new ButtonBuilder().setCustomId('ticket:close').setLabel('Close ticket').setStyle(ButtonStyle.Danger)
+      );
+      await channel.send({
+        content: `<@${interaction.user.id}>`,
+        embeds: [new EmbedBuilder().setTitle(`Ticket #${number}`).setDescription('Support will respond here.').setColor(0x2864d8)],
+        components: [row]
+      });
+      await interaction.reply({ content: `Ticket created: <#${channel.id}>`, ephemeral: true });
+      await sendTicketLog(interaction.guild, config, `Ticket #${number} opened by ${interaction.user.tag}.`);
+    } catch (err) {
+      console.error('[ticket] Failed to create ticket channel:', err.message);
+      await interaction.reply({ content: 'Failed to create ticket. Check bot permissions.', ephemeral: true }).catch(() => null);
+    }
     return;
   }
 
@@ -76,9 +81,14 @@ export async function handleComponentInteraction(interaction, { client, config, 
       await interaction.reply({ content: 'You need Manage Channels permission.', ephemeral: true });
       return;
     }
-    await interaction.reply({ content: 'Closing ticket in 3 seconds.', ephemeral: true });
-    await sendTicketLog(interaction.guild, config, `Ticket closed: ${interaction.channel.name}`);
-    setTimeout(() => interaction.channel.delete().catch(() => null), 3000);
+    try {
+      await interaction.reply({ content: 'Closing ticket in 3 seconds.', ephemeral: true });
+      await sendTicketLog(interaction.guild, config, `Ticket closed: ${interaction.channel.name}`);
+      setTimeout(() => interaction.channel.delete().catch(() => null), 3000);
+    } catch (err) {
+      console.error('[ticket] Failed to close ticket:', err.message);
+      await interaction.reply({ content: 'Failed to close ticket. Check bot permissions.', ephemeral: true }).catch(() => null);
+    }
     return;
   }
 

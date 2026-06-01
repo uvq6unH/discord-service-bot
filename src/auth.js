@@ -105,23 +105,47 @@ export function createAuthRouter(botClient) {
     req.session.oauthState = null;
 
     try {
-      const tokenRes = await fetch(`${DISCORD_API}/oauth2/token`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: new URLSearchParams({
-          client_id: clientId,
-          client_secret: clientSecret,
-          grant_type: 'authorization_code',
-          code,
-          redirect_uri: redirectUri,
-        }),
-      });
+      const tokenController = new AbortController();
+      const tokenTimeout = setTimeout(() => tokenController.abort(), 10_000);
+      let tokenRes;
+      try {
+        tokenRes = await fetch(`${DISCORD_API}/oauth2/token`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: new URLSearchParams({
+            client_id: clientId,
+            client_secret: clientSecret,
+            grant_type: 'authorization_code',
+            code,
+            redirect_uri: redirectUri,
+          }),
+          signal: tokenController.signal,
+        });
+      } finally {
+        clearTimeout(tokenTimeout);
+      }
+      const tokenCt = tokenRes.headers.get('content-type') ?? '';
+      if (!tokenCt.includes('application/json')) {
+        throw new Error(`Unexpected response from Discord token endpoint: ${tokenRes.status} ${tokenRes.statusText}`);
+      }
       const tokens = await tokenRes.json();
       if (!tokenRes.ok) throw new Error(tokens.error_description ?? 'Token exchange failed');
 
-      const userRes = await fetch(`${DISCORD_API}/users/@me`, {
-        headers: { Authorization: `Bearer ${tokens.access_token}` },
-      });
+      const userController = new AbortController();
+      const userTimeout = setTimeout(() => userController.abort(), 10_000);
+      let userRes;
+      try {
+        userRes = await fetch(`${DISCORD_API}/users/@me`, {
+          headers: { Authorization: `Bearer ${tokens.access_token}` },
+          signal: userController.signal,
+        });
+      } finally {
+        clearTimeout(userTimeout);
+      }
+      const userCt = userRes.headers.get('content-type') ?? '';
+      if (!userCt.includes('application/json')) {
+        throw new Error(`Unexpected response from Discord users endpoint: ${userRes.status} ${userRes.statusText}`);
+      }
       const user = await userRes.json();
       if (!userRes.ok) throw new Error('Failed to fetch user info');
 

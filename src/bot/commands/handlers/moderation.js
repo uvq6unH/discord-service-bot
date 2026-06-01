@@ -10,7 +10,7 @@ export async function handleModeration(ctx) {
     client, config, command, source, args, isInteraction, guild, channel, user, permissions,
     reply, context, actorMember
   } = ctx;
-  const _mod = new Set(['purge','warn','kick','ban','timeout','warnings','clearwarns']);
+  const _mod = new Set(['purge', 'warn', 'kick', 'ban', 'timeout', 'warnings', 'clearwarns']);
   if (!_mod.has(command.type)) return;
 
   if (command.type === 'purge') {
@@ -51,6 +51,11 @@ export async function handleModeration(ctx) {
 
     if (!target.member && command.type !== 'warn') {
       return reply(isInteraction ? { content: 'Target member not found.', ephemeral: true } : 'Target member not found.');
+    }
+
+    const modCheck = canModerateMember(actorMember, target.member);
+    if (!modCheck.ok) {
+      return reply(isInteraction ? { content: modCheck.reason, ephemeral: true } : modCheck.reason);
     }
 
     if (command.type === 'kick') {

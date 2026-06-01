@@ -84,6 +84,12 @@ export function createServer({ configStore, stateStore, botClient, redis = null 
     keyPrefix: 'api-write',
     redis
   });
+  const readRateLimit = createRateLimiter({
+    windowMs: 60_000,
+    max: 60,
+    keyPrefix: 'api-read',
+    redis
+  });
 
   const auth = createAuthRouter(botClient);
   if (auth.attachTo) auth.attachTo(app);
@@ -124,7 +130,7 @@ export function createServer({ configStore, stateStore, botClient, redis = null 
     });
   });
 
-  app.get('/api/config', auth.requireAuth, requireGuildId, auth.requireGuildAccess, async (req, res) => {
+  app.get('/api/config', auth.requireAuth, readRateLimit, requireGuildId, auth.requireGuildAccess, async (req, res) => {
     const config = await configStore.getGuildConfig(req.guildId);
     res.json(sanitizeConfigForClient(config));
   });
@@ -143,7 +149,7 @@ export function createServer({ configStore, stateStore, botClient, redis = null 
     res.json(slashSync);
   });
 
-  app.get('/api/state', auth.requireAuth, requireGuildId, auth.requireGuildAccess, async (req, res) => {
+  app.get('/api/state', auth.requireAuth, readRateLimit, requireGuildId, auth.requireGuildAccess, async (req, res) => {
     if (!botClient.stateStore) { res.json({ warnings: 0, rankedUsers: 0 }); return; }
     const state = await botClient.stateStore.getGuild(req.guildId);
     res.json({
@@ -153,7 +159,7 @@ export function createServer({ configStore, stateStore, botClient, redis = null 
     });
   });
 
-  app.get('/api/guilds', auth.requireAuth, async (req, res) => {
+  app.get('/api/guilds', auth.requireAuth, readRateLimit, async (req, res) => {
     const configuredGuildIds = await configStore.listGuildIds();
     const userId = req.session?.user?.id;
     const guildsById = new Map();
@@ -190,7 +196,7 @@ export function createServer({ configStore, stateStore, botClient, redis = null 
     res.json({ guilds });
   });
 
-  app.get('/api/guild-data', auth.requireAuth, requireGuildId, auth.requireGuildAccess, async (req, res) => {
+  app.get('/api/guild-data', auth.requireAuth, readRateLimit, requireGuildId, auth.requireGuildAccess, async (req, res) => {
     const guild = botClient.guilds.cache.get(req.guildId);
     if (!guild) { res.status(404).json({ error: 'Guild not found' }); return; }
     try {

@@ -4,6 +4,7 @@ import { readJsonFile } from './safeJson.js';
 import { pickBoolean, pickFlag } from './configPatch.js';
 
 import { defaultConfig, COMMAND_TYPES, builtInTypesByName } from './configDefaults.js';
+import { createMutexPool } from './asyncMutex.js';
 const snowflakePattern = /^\d{17,20}$/;
 
 function clone(value) {
@@ -146,6 +147,7 @@ export class ConfigStore {
     /** @type {Map<string, { riotApiKey?: string, tftApiKey?: string }>} */
     this._runtimeSecrets = new Map();
     this._saveQueue = Promise.resolve();
+    this._withLock = createMutexPool();
     this.ready = this.load();
   }
 
@@ -256,97 +258,99 @@ export class ConfigStore {
   }
 
   async updateGuildConfig(guildId, patch) {
-    await this.ready;
-    const runtimeCurrent = this._runtimeSecrets.get(guildId) ?? {};
-    const current = await this.getGuildConfig(guildId);
-    const nextRiotKey = resolveSecretPatch(patch.riotApiKey, runtimeCurrent.riotApiKey ?? '');
-    const nextTftKey = resolveSecretPatch(patch.tftApiKey, runtimeCurrent.tftApiKey ?? '');
-    const runtimeNext = { ...runtimeCurrent };
-    if (typeof patch.riotApiKey === 'string') {
-      if (nextRiotKey) runtimeNext.riotApiKey = nextRiotKey;
-      else delete runtimeNext.riotApiKey;
-    }
-    if (typeof patch.tftApiKey === 'string') {
-      if (nextTftKey) runtimeNext.tftApiKey = nextTftKey;
-      else delete runtimeNext.tftApiKey;
-    }
-    if (Object.keys(runtimeNext).length) {
-      this._runtimeSecrets.set(guildId, runtimeNext);
-    } else {
-      this._runtimeSecrets.delete(guildId);
-    }
+    return this._withLock(guildId, async () => {
+      await this.ready;
+      const runtimeCurrent = this._runtimeSecrets.get(guildId) ?? {};
+      const current = await this.getGuildConfig(guildId);
+      const nextRiotKey = resolveSecretPatch(patch.riotApiKey, runtimeCurrent.riotApiKey ?? '');
+      const nextTftKey = resolveSecretPatch(patch.tftApiKey, runtimeCurrent.tftApiKey ?? '');
+      const runtimeNext = { ...runtimeCurrent };
+      if (typeof patch.riotApiKey === 'string') {
+        if (nextRiotKey) runtimeNext.riotApiKey = nextRiotKey;
+        else delete runtimeNext.riotApiKey;
+      }
+      if (typeof patch.tftApiKey === 'string') {
+        if (nextTftKey) runtimeNext.tftApiKey = nextTftKey;
+        else delete runtimeNext.tftApiKey;
+      }
+      if (Object.keys(runtimeNext).length) {
+        this._runtimeSecrets.set(guildId, runtimeNext);
+      } else {
+        this._runtimeSecrets.delete(guildId);
+      }
 
-    const next = {
-      ...current,
-      enabled: pickBoolean(patch, 'enabled', current),
-      prefix: String(patch.prefix ?? current.prefix).trim().slice(0, 5) || '!',
-      commands: normalizeCommands(patch.commands ?? current.commands),
-      moderationEnabled: pickBoolean(patch, 'moderationEnabled', current),
-      autoModEnabled: pickBoolean(patch, 'autoModEnabled', current),
-      deleteBlockedMessages: pickFlag(patch, 'deleteBlockedMessages', current),
-      antiLinkEnabled: pickBoolean(patch, 'antiLinkEnabled', current),
-      badWords: normalizeStringList(patch.badWords ?? current.badWords),
-      blockedMessage: String(patch.blockedMessage ?? '').trim().slice(0, 500) || defaultConfig.blockedMessage,
-      rolesEnabled: pickBoolean(patch, 'rolesEnabled', current),
-      autoRoleId: normalizeSnowflakeId(patch.autoRoleId),
-      selfRolePanelTitle: String(patch.selfRolePanelTitle ?? '').trim().slice(0, 100) || defaultConfig.selfRolePanelTitle,
-      selfRolePanelMessage: String(patch.selfRolePanelMessage ?? '').trim().slice(0, 1000) || defaultConfig.selfRolePanelMessage,
-      selfRoles: normalizeSelfRoles(patch.selfRoles ?? current.selfRoles),
-      ticketsEnabled: pickBoolean(patch, 'ticketsEnabled', current),
-      ticketCategoryId: normalizeSnowflakeId(patch.ticketCategoryId),
-      ticketLogChannelId: normalizeSnowflakeId(patch.ticketLogChannelId),
-      ticketPanelTitle: String(patch.ticketPanelTitle ?? '').trim().slice(0, 100) || defaultConfig.ticketPanelTitle,
-      ticketPanelMessage: String(patch.ticketPanelMessage ?? '').trim().slice(0, 1000) || defaultConfig.ticketPanelMessage,
-      levelsEnabled: pickBoolean(patch, 'levelsEnabled', current),
-      xpPerMessage: Math.max(1, Math.min(100, Number.parseInt(patch.xpPerMessage, 10) || defaultConfig.xpPerMessage)),
-      levelUpMessage: String(patch.levelUpMessage ?? '').trim().slice(0, 500) || defaultConfig.levelUpMessage,
-      economyEnabled: pickBoolean(patch, 'economyEnabled', current),
-      currencySilverName: String(patch.currencySilverName ?? '').trim().slice(0, 40) || defaultConfig.currencySilverName,
-      currencySilverIcon: String(patch.currencySilverIcon ?? '').trim().slice(0, 8) || defaultConfig.currencySilverIcon,
-      currencyGoldName: String(patch.currencyGoldName ?? '').trim().slice(0, 40) || defaultConfig.currencyGoldName,
-      currencyGoldIcon: String(patch.currencyGoldIcon ?? '').trim().slice(0, 8) || defaultConfig.currencyGoldIcon,
-      currencyDiamondName: String(patch.currencyDiamondName ?? '').trim().slice(0, 40) || defaultConfig.currencyDiamondName,
-      currencyDiamondIcon: String(patch.currencyDiamondIcon ?? '').trim().slice(0, 8) || defaultConfig.currencyDiamondIcon,
-      dailyEnabled: pickFlag(patch, 'dailyEnabled', current),
-      dailyCooldownHours: Math.max(1, Math.min(168, Number.parseInt(patch.dailyCooldownHours, 10) || defaultConfig.dailyCooldownHours)),
-      dailyResetUtcOffset: Number.isFinite(Number(patch.dailyResetUtcOffset))
-        ? Math.max(-720, Math.min(840, Math.round(Number(patch.dailyResetUtcOffset))))
-        : (current.dailyResetUtcOffset ?? defaultConfig.dailyResetUtcOffset),
-      dailySilverAmount: Math.max(0, Math.min(1000000, Number.parseInt(patch.dailySilverAmount, 10) || 0)),
-      dailyGoldAmount: Math.max(0, Math.min(1000000, Number.parseInt(patch.dailyGoldAmount, 10) || 0)),
-      dailyDiamondAmount: Math.max(0, Math.min(1000000, Number.parseInt(patch.dailyDiamondAmount, 10) || 0)),
-      blackjackEnabled: pickFlag(patch, 'blackjackEnabled', current),
-      blackjackMinBet: Math.max(1, Math.min(1000000, Number.parseInt(patch.blackjackMinBet, 10) || defaultConfig.blackjackMinBet)),
-      blackjackMaxBet: Math.max(1, Math.min(1000000, Number.parseInt(patch.blackjackMaxBet, 10) || defaultConfig.blackjackMaxBet)),
-      pokerEnabled: pickFlag(patch, 'pokerEnabled', current),
-      pokerMinBet: Math.max(1, Math.min(1000000, Number.parseInt(patch.pokerMinBet, 10) || defaultConfig.pokerMinBet)),
-      pokerMaxBet: Math.max(1, Math.min(1000000, Number.parseInt(patch.pokerMaxBet, 10) || defaultConfig.pokerMaxBet)),
-      coinflipEnabled: pickFlag(patch, 'coinflipEnabled', current),
-      coinflipMinBet: Math.max(1, Math.min(1000000, Number.parseInt(patch.coinflipMinBet, 10) || defaultConfig.coinflipMinBet)),
-      coinflipMaxBet: Math.max(1, Math.min(1000000, Number.parseInt(patch.coinflipMaxBet, 10) || defaultConfig.coinflipMaxBet)),
-      diceEnabled: pickFlag(patch, 'diceEnabled', current),
-      diceMinBet: Math.max(1, Math.min(1000000, Number.parseInt(patch.diceMinBet, 10) || defaultConfig.diceMinBet)),
-      diceMaxBet: Math.max(1, Math.min(1000000, Number.parseInt(patch.diceMaxBet, 10) || defaultConfig.diceMaxBet)),
-      slotsEnabled: pickFlag(patch, 'slotsEnabled', current),
-      slotsMinBet: Math.max(1, Math.min(1000000, Number.parseInt(patch.slotsMinBet, 10) || defaultConfig.slotsMinBet)),
-      slotsMaxBet: Math.max(1, Math.min(1000000, Number.parseInt(patch.slotsMaxBet, 10) || defaultConfig.slotsMaxBet)),
-      announcementsEnabled: pickBoolean(patch, 'announcementsEnabled', current),
-      announcementChannelId: normalizeSnowflakeId(patch.announcementChannelId),
-      announcementMention: String(patch.announcementMention ?? '').trim().slice(0, 100),
-      welcomeEnabled: pickBoolean(patch, 'welcomeEnabled', current),
-      welcomeChannelId: normalizeSnowflakeId(patch.welcomeChannelId),
-      welcomeMessage: String(patch.welcomeMessage ?? '').trim().slice(0, 500) || defaultConfig.welcomeMessage,
-      logChannelId: normalizeSnowflakeId(patch.logChannelId),
-      autoReplyEnabled: pickBoolean(patch, 'autoReplyEnabled', current),
-      autoReplies: normalizeAutoReplies(patch.autoReplies ?? current.autoReplies)
-    };
+      const next = {
+        ...current,
+        enabled: pickBoolean(patch, 'enabled', current),
+        prefix: String(patch.prefix ?? current.prefix).trim().slice(0, 5) || '!',
+        commands: normalizeCommands(patch.commands ?? current.commands),
+        moderationEnabled: pickBoolean(patch, 'moderationEnabled', current),
+        autoModEnabled: pickBoolean(patch, 'autoModEnabled', current),
+        deleteBlockedMessages: pickFlag(patch, 'deleteBlockedMessages', current),
+        antiLinkEnabled: pickBoolean(patch, 'antiLinkEnabled', current),
+        badWords: normalizeStringList(patch.badWords ?? current.badWords),
+        blockedMessage: String(patch.blockedMessage ?? '').trim().slice(0, 500) || defaultConfig.blockedMessage,
+        rolesEnabled: pickBoolean(patch, 'rolesEnabled', current),
+        autoRoleId: normalizeSnowflakeId(patch.autoRoleId),
+        selfRolePanelTitle: String(patch.selfRolePanelTitle ?? '').trim().slice(0, 100) || defaultConfig.selfRolePanelTitle,
+        selfRolePanelMessage: String(patch.selfRolePanelMessage ?? '').trim().slice(0, 1000) || defaultConfig.selfRolePanelMessage,
+        selfRoles: normalizeSelfRoles(patch.selfRoles ?? current.selfRoles),
+        ticketsEnabled: pickBoolean(patch, 'ticketsEnabled', current),
+        ticketCategoryId: normalizeSnowflakeId(patch.ticketCategoryId),
+        ticketLogChannelId: normalizeSnowflakeId(patch.ticketLogChannelId),
+        ticketPanelTitle: String(patch.ticketPanelTitle ?? '').trim().slice(0, 100) || defaultConfig.ticketPanelTitle,
+        ticketPanelMessage: String(patch.ticketPanelMessage ?? '').trim().slice(0, 1000) || defaultConfig.ticketPanelMessage,
+        levelsEnabled: pickBoolean(patch, 'levelsEnabled', current),
+        xpPerMessage: Math.max(1, Math.min(100, Number.parseInt(patch.xpPerMessage, 10) || defaultConfig.xpPerMessage)),
+        levelUpMessage: String(patch.levelUpMessage ?? '').trim().slice(0, 500) || defaultConfig.levelUpMessage,
+        economyEnabled: pickBoolean(patch, 'economyEnabled', current),
+        currencySilverName: String(patch.currencySilverName ?? '').trim().slice(0, 40) || defaultConfig.currencySilverName,
+        currencySilverIcon: String(patch.currencySilverIcon ?? '').trim().slice(0, 8) || defaultConfig.currencySilverIcon,
+        currencyGoldName: String(patch.currencyGoldName ?? '').trim().slice(0, 40) || defaultConfig.currencyGoldName,
+        currencyGoldIcon: String(patch.currencyGoldIcon ?? '').trim().slice(0, 8) || defaultConfig.currencyGoldIcon,
+        currencyDiamondName: String(patch.currencyDiamondName ?? '').trim().slice(0, 40) || defaultConfig.currencyDiamondName,
+        currencyDiamondIcon: String(patch.currencyDiamondIcon ?? '').trim().slice(0, 8) || defaultConfig.currencyDiamondIcon,
+        dailyEnabled: pickFlag(patch, 'dailyEnabled', current),
+        dailyCooldownHours: Math.max(1, Math.min(168, Number.parseInt(patch.dailyCooldownHours, 10) || defaultConfig.dailyCooldownHours)),
+        dailyResetUtcOffset: Number.isFinite(Number(patch.dailyResetUtcOffset))
+          ? Math.max(-720, Math.min(840, Math.round(Number(patch.dailyResetUtcOffset))))
+          : (current.dailyResetUtcOffset ?? defaultConfig.dailyResetUtcOffset),
+        dailySilverAmount: Math.max(0, Math.min(1000000, Number.parseInt(patch.dailySilverAmount, 10) || 0)),
+        dailyGoldAmount: Math.max(0, Math.min(1000000, Number.parseInt(patch.dailyGoldAmount, 10) || 0)),
+        dailyDiamondAmount: Math.max(0, Math.min(1000000, Number.parseInt(patch.dailyDiamondAmount, 10) || 0)),
+        blackjackEnabled: pickFlag(patch, 'blackjackEnabled', current),
+        blackjackMinBet: Math.max(1, Math.min(1000000, Number.parseInt(patch.blackjackMinBet, 10) || defaultConfig.blackjackMinBet)),
+        blackjackMaxBet: Math.max(1, Math.min(1000000, Number.parseInt(patch.blackjackMaxBet, 10) || defaultConfig.blackjackMaxBet)),
+        pokerEnabled: pickFlag(patch, 'pokerEnabled', current),
+        pokerMinBet: Math.max(1, Math.min(1000000, Number.parseInt(patch.pokerMinBet, 10) || defaultConfig.pokerMinBet)),
+        pokerMaxBet: Math.max(1, Math.min(1000000, Number.parseInt(patch.pokerMaxBet, 10) || defaultConfig.pokerMaxBet)),
+        coinflipEnabled: pickFlag(patch, 'coinflipEnabled', current),
+        coinflipMinBet: Math.max(1, Math.min(1000000, Number.parseInt(patch.coinflipMinBet, 10) || defaultConfig.coinflipMinBet)),
+        coinflipMaxBet: Math.max(1, Math.min(1000000, Number.parseInt(patch.coinflipMaxBet, 10) || defaultConfig.coinflipMaxBet)),
+        diceEnabled: pickFlag(patch, 'diceEnabled', current),
+        diceMinBet: Math.max(1, Math.min(1000000, Number.parseInt(patch.diceMinBet, 10) || defaultConfig.diceMinBet)),
+        diceMaxBet: Math.max(1, Math.min(1000000, Number.parseInt(patch.diceMaxBet, 10) || defaultConfig.diceMaxBet)),
+        slotsEnabled: pickFlag(patch, 'slotsEnabled', current),
+        slotsMinBet: Math.max(1, Math.min(1000000, Number.parseInt(patch.slotsMinBet, 10) || defaultConfig.slotsMinBet)),
+        slotsMaxBet: Math.max(1, Math.min(1000000, Number.parseInt(patch.slotsMaxBet, 10) || defaultConfig.slotsMaxBet)),
+        announcementsEnabled: pickBoolean(patch, 'announcementsEnabled', current),
+        announcementChannelId: normalizeSnowflakeId(patch.announcementChannelId),
+        announcementMention: String(patch.announcementMention ?? '').trim().slice(0, 100),
+        welcomeEnabled: pickBoolean(patch, 'welcomeEnabled', current),
+        welcomeChannelId: normalizeSnowflakeId(patch.welcomeChannelId),
+        welcomeMessage: String(patch.welcomeMessage ?? '').trim().slice(0, 500) || defaultConfig.welcomeMessage,
+        logChannelId: normalizeSnowflakeId(patch.logChannelId),
+        autoReplyEnabled: pickBoolean(patch, 'autoReplyEnabled', current),
+        autoReplies: normalizeAutoReplies(patch.autoReplies ?? current.autoReplies)
+      };
 
-    delete next.guildId;
-    delete next.riotApiKey;
-    delete next.tftApiKey;
-    this.cache[guildId] = next;
-    await this.save();
-    return this.getGuildConfig(guildId);
+      delete next.guildId;
+      delete next.riotApiKey;
+      delete next.tftApiKey;
+      this.cache[guildId] = next;
+      await this.save();
+      return this.getGuildConfig(guildId);
+    }); // end _withLock
   }
 
   async listGuildIds() {

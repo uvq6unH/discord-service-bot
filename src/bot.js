@@ -10,6 +10,12 @@ import { buildSlashCommands } from './bot/slash.js';
 import { renderCommandResponse } from './bot/responses.js';
 import { formatMessage, sendLog } from './bot/logging.js';
 import { runBuiltInCommand } from './bot/commands.js';
+import { sanitizeAnnouncementText } from './commandAccess.js';
+
+// In-memory XP cooldown cache — prevents redundant Redis reads when levelsEnabled
+// Key: `guildId:userId`, Value: timestamp of last XP grant
+const xpCache = new Map();
+const XP_COOLDOWN_MS = 60_000;
 import { handleComponentInteraction } from './bot/interactions.js';
 
 const commandCooldowns = new CommandCooldowns();
@@ -130,53 +136,53 @@ export function createBot(configStore, stateStore) {
 
   client.on(Events.InteractionCreate, async (interaction) => {
     try {
-    if ((interaction.isStringSelectMenu() || interaction.isButton()) && interaction.guild) {
+      if ((interaction.isStringSelectMenu() || interaction.isButton()) && interaction.guild) {
+        const config = await configStore.getGuildConfig(interaction.guild.id);
+        await handleComponentInteraction(interaction, { client, config, stateStore });
+        return;
+      }
+
+      if (!interaction.isChatInputCommand() || !interaction.guild) {
+        return;
+      }
+
       const config = await configStore.getGuildConfig(interaction.guild.id);
-      await handleComponentInteraction(interaction, { client, config, stateStore });
-      return;
-    }
+      if (!config.enabled) {
+        await interaction.reply({ content: 'Bot is disabled for this server.', ephemeral: true });
+        return;
+      }
 
-    if (!interaction.isChatInputCommand() || !interaction.guild) {
-      return;
-    }
+      const command = config.commands.find((item) => item.enabled && item.name === interaction.commandName);
+      if (!command) {
+        await interaction.reply({ content: 'Command is not enabled.', ephemeral: true });
+        return;
+      }
 
-    const config = await configStore.getGuildConfig(interaction.guild.id);
-    if (!config.enabled) {
-      await interaction.reply({ content: 'Bot is disabled for this server.', ephemeral: true });
-      return;
-    }
-
-    const command = config.commands.find((item) => item.enabled && item.name === interaction.commandName);
-    if (!command) {
-      await interaction.reply({ content: 'Command is not enabled.', ephemeral: true });
-      return;
-    }
-
-    const bypassCooldown =
-      interaction.memberPermissions?.has(PermissionFlagsBits.Administrator) ||
-      interaction.memberPermissions?.has(PermissionFlagsBits.ManageGuild);
-    const cooldown = commandCooldowns.check({
-      guildId: interaction.guild.id,
-      userId: interaction.user.id,
-      commandType: command.type,
-      bypass: bypassCooldown
-    });
-    if (!cooldown.allowed) {
-      await interaction.reply({
-        content: `Please wait ${formatRetryAfter(cooldown.retryAfterMs)} before using this command again.`,
-        ephemeral: true
+      const bypassCooldown =
+        interaction.memberPermissions?.has(PermissionFlagsBits.Administrator) ||
+        interaction.memberPermissions?.has(PermissionFlagsBits.ManageGuild);
+      const cooldown = commandCooldowns.check({
+        guildId: interaction.guild.id,
+        userId: interaction.user.id,
+        commandType: command.type,
+        bypass: bypassCooldown
       });
-      return;
-    }
+      if (!cooldown.allowed) {
+        await interaction.reply({
+          content: `Please wait ${formatRetryAfter(cooldown.retryAfterMs)} before using this command again.`,
+          ephemeral: true
+        });
+        return;
+      }
 
-    const args = interaction.options.getString('args') ?? '';
-    await runBuiltInCommand({
-      client,
-      config,
-      command,
-      source: interaction,
-      args
-    });
+      const args = interaction.options.getString('args') ?? '';
+      await runBuiltInCommand({
+        client,
+        config,
+        command,
+        source: interaction,
+        args
+      });
     } catch (error) {
       console.error('[bot] Interaction handler error:', error);
       const payload = { content: 'An unexpected error occurred while handling this interaction.', ephemeral: true };
@@ -192,98 +198,102 @@ export function createBot(configStore, stateStore) {
 
   client.on(Events.MessageCreate, async (message) => {
     try {
-    if (!message.guild || message.author.bot) {
-      return;
-    }
-
-    const config = await configStore.getGuildConfig(message.guild.id);
-    if (!config.enabled) {
-      return;
-    }
-
-    const content = message.content.trim();
-    const prefix = config.prefix || '!';
-
-    if (config.autoModEnabled && !message.member?.permissions?.has(PermissionFlagsBits.ManageMessages)) {
-      const lowerContent = content.toLowerCase();
-      const hasBadWord = config.badWords.some((word) => lowerContent.includes(word.toLowerCase()));
-      const hasBlockedLink = config.antiLinkEnabled && /https?:\/\/|discord\.gg\//i.test(content);
-
-      if (hasBadWord || hasBlockedLink) {
-        if (config.deleteBlockedMessages) {
-          await message.delete().catch(() => null);
-        }
-
-        const blocked = renderCommandResponse(config.blockedMessage, {
-          client,
-          config,
-          args: '',
-          context: {
-            channelId: message.channel.id,
-            guildName: message.guild.name,
-            userId: message.author.id,
-            username: message.author.username
-          }
-        });
-        await message.channel.send(blocked).catch(() => null);
-        await sendLog(message.guild, config, `AutoMod blocked ${message.author.tag}: ${hasBlockedLink ? 'link' : 'bad word'}`);
+      if (!message.guild || message.author.bot) {
         return;
       }
-    }
 
-    if (content.startsWith(prefix)) {
-      const body = content.slice(prefix.length).trim();
-      const [commandName, ...argParts] = body.split(/\s+/);
-      const command = config.commands.find((item) => item.enabled && item.name === commandName?.toLowerCase());
+      const config = await configStore.getGuildConfig(message.guild.id);
+      if (!config.enabled) {
+        return;
+      }
 
-      if (command) {
-        const bypassCooldown =
-          message.member?.permissions?.has(PermissionFlagsBits.Administrator) ||
-          message.member?.permissions?.has(PermissionFlagsBits.ManageGuild);
-        const cooldown = commandCooldowns.check({
-          guildId: message.guild.id,
-          userId: message.author.id,
-          commandType: command.type,
-          bypass: bypassCooldown
-        });
-        if (!cooldown.allowed) {
-          await message.reply(`Please wait ${formatRetryAfter(cooldown.retryAfterMs)} before using this command again.`).catch(() => null);
+      const content = message.content.trim();
+      const prefix = config.prefix || '!';
+
+      if (config.autoModEnabled && !message.member?.permissions?.has(PermissionFlagsBits.ManageMessages)) {
+        const lowerContent = content.toLowerCase();
+        const hasBadWord = config.badWords.some((word) => lowerContent.includes(word.toLowerCase()));
+        const hasBlockedLink = config.antiLinkEnabled && /https?:\/\/|discord\.gg\//i.test(content);
+
+        if (hasBadWord || hasBlockedLink) {
+          if (config.deleteBlockedMessages) {
+            await message.delete().catch(() => null);
+          }
+
+          const blocked = renderCommandResponse(config.blockedMessage, {
+            client,
+            config,
+            args: '',
+            context: {
+              channelId: message.channel.id,
+              guildName: message.guild.name,
+              userId: message.author.id,
+              username: message.author.username
+            }
+          });
+          await message.channel.send(blocked).catch(() => null);
+          await sendLog(message.guild, config, `AutoMod blocked ${message.author.tag}: ${hasBlockedLink ? 'link' : 'bad word'}`);
           return;
         }
-        await runBuiltInCommand({
-          client,
-          config,
-          command,
-          source: message,
-          args: argParts.join(' ')
-        });
+      }
+
+      if (content.startsWith(prefix)) {
+        const body = content.slice(prefix.length).trim();
+        const [commandName, ...argParts] = body.split(/\s+/);
+        const command = config.commands.find((item) => item.enabled && item.name === commandName?.toLowerCase());
+
+        if (command) {
+          const bypassCooldown =
+            message.member?.permissions?.has(PermissionFlagsBits.Administrator) ||
+            message.member?.permissions?.has(PermissionFlagsBits.ManageGuild);
+          const cooldown = commandCooldowns.check({
+            guildId: message.guild.id,
+            userId: message.author.id,
+            commandType: command.type,
+            bypass: bypassCooldown
+          });
+          if (!cooldown.allowed) {
+            await message.reply(`Please wait ${formatRetryAfter(cooldown.retryAfterMs)} before using this command again.`).catch(() => null);
+            return;
+          }
+          await runBuiltInCommand({
+            client,
+            config,
+            command,
+            source: message,
+            args: argParts.join(' ')
+          });
+          return;
+        }
+
         return;
       }
 
-      return;
-    }
-
-    if (config.levelsEnabled) {
-      const rank = await stateStore.addXp(message.guild.id, message.author.id, config.xpPerMessage);
-      if (rank.leveledUp) {
-        const levelMessage = config.levelUpMessage
-          .replaceAll('{user}', `<@${message.author.id}>`)
-          .replaceAll('{username}', message.author.username)
-          .replaceAll('{level}', String(rank.level))
-          .replaceAll('{xp}', String(rank.xp));
-        await message.channel.send(levelMessage).catch(() => null);
+      if (config.levelsEnabled) {
+        const xpKey = `${message.guild.id}:${message.author.id}`;
+        const lastXp = xpCache.get(xpKey) ?? 0;
+        if (Date.now() - lastXp < XP_COOLDOWN_MS) return;
+        xpCache.set(xpKey, Date.now());
+        const rank = await stateStore.addXp(message.guild.id, message.author.id, config.xpPerMessage);
+        if (rank.leveledUp) {
+          const levelMessage = config.levelUpMessage
+            .replaceAll('{user}', `<@${message.author.id}>`)
+            .replaceAll('{username}', message.author.username)
+            .replaceAll('{level}', String(rank.level))
+            .replaceAll('{xp}', String(rank.xp));
+          await message.channel.send(levelMessage).catch(() => null);
+        }
       }
-    }
 
-    if (!config.autoReplyEnabled) {
-      return;
-    }
+      if (!config.autoReplyEnabled) {
+        return;
+      }
 
-    const lowerContent = content.toLowerCase();
-    const match = config.autoReplies.find((reply) => lowerContent.includes(reply.keyword.toLowerCase()));
-    if (match) {
-      await message.reply(match.response);
-    }
+      const lowerContent = content.toLowerCase();
+      const match = config.autoReplies.find((reply) => lowerContent.includes(reply.keyword.toLowerCase()));
+      if (match) {
+        await message.reply(sanitizeAnnouncementText(match.response));
+      }
     } catch (error) {
       console.error('[bot] Message handler error:', error);
     }
