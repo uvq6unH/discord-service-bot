@@ -1,7 +1,5 @@
-import { mkdir, rename, writeFile } from 'node:fs/promises';
-import path from 'node:path';
-import { readJsonFile } from './safeJson.js';
 import { pickBoolean, pickFlag } from './configPatch.js';
+import { createUpstashFromEnv } from './upstash.js';
 
 import { defaultConfig, COMMAND_TYPES, builtInTypesByName } from './configDefaults.js';
 import { createMutexPool } from './asyncMutex.js';
@@ -141,8 +139,14 @@ function readStoredApiSecrets(stored) {
 }
 
 export class ConfigStore {
-  constructor(filePath) {
-    this.filePath = path.resolve(filePath);
+  constructor(_filePath) {
+    // _filePath kept for API compat but ignored — storage is Upstash Redis.
+    this._redis = createUpstashFromEnv();
+    if (!this._redis) {
+      throw new Error('ConfigStore requires UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN.');
+    }
+    this._KEY_INDEX = 'config:_index';        // SET of guildIds
+    this._keyFor = (guildId) => `config:guild:${guildId}`;
     this.cache = {};
     /** @type {Map<string, { riotApiKey?: string, tftApiKey?: string }>} */
     this._runtimeSecrets = new Map();
@@ -190,52 +194,70 @@ export class ConfigStore {
     return migrated;
   }
 
-  _cacheForDisk() {
-    const diskCache = {};
-    for (const [guildId, stored] of Object.entries(this.cache)) {
-      const { riotApiKey, tftApiKey, ...rest } = stored;
-      diskCache[guildId] = {
-        ...rest,
-        riotApiKeyConfigured: Boolean(this._runtimeSecrets.get(guildId)?.riotApiKey ?? riotApiKey),
-        tftApiKeyConfigured: Boolean(this._runtimeSecrets.get(guildId)?.tftApiKey ?? tftApiKey)
-      };
-      delete diskCache[guildId].riotApiKey;
-      delete diskCache[guildId].tftApiKey;
-    }
-    return diskCache;
+  // Serialize one guild's config for storage (strip secrets, add status flags)
+  _serializeForStorage(guildId, stored) {
+    const { riotApiKey, tftApiKey, ...rest } = stored;
+    return {
+      ...rest,
+      riotApiKeyConfigured: Boolean(this._runtimeSecrets.get(guildId)?.riotApiKey ?? riotApiKey),
+      tftApiKeyConfigured: Boolean(this._runtimeSecrets.get(guildId)?.tftApiKey ?? tftApiKey)
+    };
   }
 
   async load() {
-    await mkdir(path.dirname(this.filePath), { recursive: true });
-
     try {
-      this.cache = await readJsonFile(this.filePath);
-      for (const stored of Object.values(this.cache)) {
-        delete stored.riotApiKeyConfigured;
-        delete stored.tftApiKeyConfigured;
-      }
+      // Load the index of all known guild IDs
+      const raw = await this._redis.get(this._KEY_INDEX).catch(() => null);
+      const guildIds = raw ? JSON.parse(raw) : [];
+
+      // Fetch all guild configs in parallel
+      const entries = await Promise.all(
+        guildIds.map(async (guildId) => {
+          const val = await this._redis.get(this._keyFor(guildId)).catch(() => null);
+          if (!val) return null;
+          const stored = JSON.parse(val);
+          delete stored.riotApiKeyConfigured;
+          delete stored.tftApiKeyConfigured;
+          return [guildId, stored];
+        })
+      );
+
+      this.cache = Object.fromEntries(entries.filter(Boolean));
       if (this._migrateSecretsOffDisk()) {
-        await this._writeToDisk();
+        await this._flushAll();
       }
+      console.log(`[ConfigStore] Loaded ${Object.keys(this.cache).length} guild config(s) from Redis.`);
     } catch (error) {
-      if (error.code !== 'ENOENT') {
-        console.warn(`Config file could not be read. Starting with empty config. ${error.message}`);
-      }
+      console.warn(`[ConfigStore] Failed to load from Redis, starting empty. ${error.message}`);
       this.cache = {};
-      await this.save();
     }
   }
 
-  async _writeToDisk() {
-    const tmp = `${this.filePath}.tmp`;
-    await mkdir(path.dirname(this.filePath), { recursive: true });
-    await writeFile(tmp, `${JSON.stringify(this._cacheForDisk(), null, 2)}\n`, 'utf8');
-    await rename(tmp, this.filePath);
+  async _flushAll() {
+    const guildIds = Object.keys(this.cache);
+    await Promise.all(
+      guildIds.map((guildId) =>
+        this._redis.set(this._keyFor(guildId), JSON.stringify(this._serializeForStorage(guildId, this.cache[guildId])))
+      )
+    );
+    await this._redis.set(this._KEY_INDEX, JSON.stringify(guildIds));
   }
 
-  save() {
+  // Save a single guild config to Redis (much cheaper than flushing all)
+  async _saveGuild(guildId) {
+    const stored = this.cache[guildId];
+    if (!stored) return;
+    await this._redis.set(this._keyFor(guildId), JSON.stringify(this._serializeForStorage(guildId, stored)));
+    // Update index (re-read to avoid racing on multi-guild concurrent saves)
+    const raw = await this._redis.get(this._KEY_INDEX).catch(() => null);
+    const ids = new Set(raw ? JSON.parse(raw) : []);
+    ids.add(guildId);
+    await this._redis.set(this._KEY_INDEX, JSON.stringify([...ids]));
+  }
+
+  save(guildId) {
     this._saveQueue = this._saveQueue
-      .then(() => this._writeToDisk())
+      .then(() => (guildId ? this._saveGuild(guildId) : this._flushAll()))
       .catch((err) => console.error('[ConfigStore] Save error:', err));
     return this._saveQueue;
   }
@@ -357,7 +379,7 @@ export class ConfigStore {
       delete next.riotApiKey;
       delete next.tftApiKey;
       this.cache[guildId] = next;
-      await this.save();
+      await this.save(guildId);
       return this.getGuildConfig(guildId);
     }); // end _withLock
   }
