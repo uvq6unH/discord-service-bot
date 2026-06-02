@@ -5,7 +5,7 @@ import {
   Partials,
   PermissionFlagsBits
 } from 'discord.js';
-import { CommandCooldowns, formatRetryAfter } from './cooldowns.js';
+import { CommandCooldowns, formatRetryAfter } from '../../../cooldowns.js';
 import { buildSlashCommands } from './bot/slash.js';
 import { renderCommandResponse } from './bot/responses.js';
 import { formatMessage, sendLog } from './bot/logging.js';
