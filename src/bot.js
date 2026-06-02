@@ -299,7 +299,7 @@ export function createBot(configStore, stateStore) {
       const lowerContent = content.toLowerCase();
       const match = config.autoReplies.find((reply) => lowerContent.includes(reply.keyword.toLowerCase()));
       if (match) {
-        await message.reply(sanitizeAnnouncementText(match.response));
+        await message.reply({ content: sanitizeAnnouncementText(match.response), allowedMentions: { parse: [] } });
       }
     } catch (error) {
       console.error('[bot] Message handler error:', error);

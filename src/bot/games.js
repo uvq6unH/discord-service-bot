@@ -201,6 +201,7 @@ export function withGameSessionLock(client, gameType, guildId, messageId, fn) {
 
 export async function getGameSession(client, type, map, guildId, messageId) {
   let session = map.get(messageId);
+  if (session && session.guildId !== guildId) return null;
   if (!session) {
     session = await client.stateStore.getGameSession(guildId, type, messageId);
     if (type === 'poker') revivePokerSession(session);

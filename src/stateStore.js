@@ -398,20 +398,22 @@ export class StateStore {
   // ── Levels / XP ───────────────────────────────────────────────────────────
 
   async addXp(guildId, userId, amount) {
-    const guild = await this.getGuild(guildId);
-    guild.levels[userId] ??= { xp: 0, level: 0, lastMessageAt: 0 };
-    const current = guild.levels[userId];
-    const now = Date.now();
-    if (now - current.lastMessageAt < 60_000) {
-      return { ...current, changed: false, leveledUp: false };
-    }
-    current.lastMessageAt = now;
-    current.xp += amount;
-    const nextLevel = Math.floor(Math.sqrt(current.xp / 100));
-    const leveledUp = nextLevel > current.level;
-    current.level = Math.max(current.level, nextLevel);
-    await this._saveGuild(guildId, guild);
-    return { ...current, changed: true, leveledUp };
+    return this._withEconomyLock(guildId, userId, async () => {
+      const guild = await this.getGuild(guildId);
+      guild.levels[userId] ??= { xp: 0, level: 0, lastMessageAt: 0 };
+      const current = guild.levels[userId];
+      const now = Date.now();
+      if (now - current.lastMessageAt < 60_000) {
+        return { ...current, changed: false, leveledUp: false };
+      }
+      current.lastMessageAt = now;
+      current.xp += amount;
+      const nextLevel = Math.floor(Math.sqrt(current.xp / 100));
+      const leveledUp = nextLevel > current.level;
+      current.level = Math.max(current.level, nextLevel);
+      await this._saveGuild(guildId, guild);
+      return { ...current, changed: true, leveledUp };
+    });
   }
 
   async getRank(guildId, userId) {

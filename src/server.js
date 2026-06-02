@@ -60,6 +60,15 @@ export function createServer({ configStore, stateStore, botClient, redis = null 
 
   app.set('trust proxy', 1);
 
+  // Content-Security-Policy
+  app.use((_req, res, next) => {
+    res.setHeader(
+      'Content-Security-Policy',
+      "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; font-src 'self' https://cdn.jsdelivr.net; img-src 'self' https://cdn.discordapp.com data:"
+    );
+    next();
+  });
+
   app.use(cookieSession({
     name: 'dsession',
     keys: [sessionSecret || 'dev-secret-change-me'],
@@ -96,7 +105,7 @@ export function createServer({ configStore, stateStore, botClient, redis = null 
 
   app.get('/health', (_req, res) => {
     if (isProduction) {
-      res.json({ status: 'ok' });
+      res.json({ status: 'ok', botConnected: Boolean(botClient.user) });
       return;
     }
     res.json({ status: 'ok', uptime: process.uptime(), bot: Boolean(botClient.user) });

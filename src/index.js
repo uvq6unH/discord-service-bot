@@ -39,7 +39,7 @@ async function shutdown(signal) {
   isShuttingDown = true;
   console.log(`[shutdown] Received ${signal}, shutting down gracefully…`);
   try {
-    botClient.destroy();
+    botClient?.destroy();
     console.log('[shutdown] Discord client destroyed.');
   } catch (err) {
     console.error('[shutdown] Error during destroy:', err);
@@ -80,7 +80,7 @@ async function loginWithRetry(maxRetries = 10, baseDelay = 5000) {
         process.exit(1);
       }
 
-      const delay = baseDelay * Math.min(attempt, 6); // cap at 30s
+      const delay = Math.min(baseDelay * Math.pow(2, attempt - 1), 30_000); // exponential backoff, cap at 30s
       console.warn(`[login] Attempt ${attempt} failed (${err.message}). Retrying in ${delay / 1000}s…`);
       await new Promise((r) => setTimeout(r, delay));
     }

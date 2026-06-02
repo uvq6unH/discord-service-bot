@@ -266,7 +266,7 @@ export class ConfigStore {
       Object.entries(patch).filter(([k]) => !['__proto__', 'constructor', 'prototype'].includes(k))
     );
     return this._withLock(guildId, async () => {
-      patch = safePatch;
+      patch = safePatch; // use safe filtered patch (no prototype pollution keys)
       await this.ready;
       const runtimeCurrent = this._runtimeSecrets.get(guildId) ?? {};
       const current = await this.getGuildConfig(guildId);

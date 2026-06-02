@@ -245,7 +245,7 @@ export function addCommandRow(cmd = { enabled: true, type: 'custom', name: '', d
 
   const isCustom = cmd.type === 'custom';
   const badgeClass = isCustom ? 'custom' : 'system';
-  const label = commandLabels[cmd.type] || cmd.type;
+  const label = commandLabels[cmd.type] || esc(cmd.type);
 
   row.innerHTML = `
     <div class="command-top">
