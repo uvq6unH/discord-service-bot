@@ -112,28 +112,101 @@ export function addReminderRow(reminder = { id: '', userIds: [], channelId: '', 
     ? reminder.userIds
     : (reminder.userId ? [reminder.userId] : []);
 
-  // ── Multi-select user ──
-  const userSelect = document.createElement('select');
-  userSelect.className = 'reminder-user-ids';
-  userSelect.multiple = true;
-  userSelect.size = Math.min(5, Math.max(3, (window.currentGuildData?.members ?? []).length));
-  userSelect.style.minHeight = '80px';
-
+  // ── Member checkbox grid (giống command-roles-wrap) ──
   const members = window.currentGuildData?.members ?? [];
-  for (const m of members) {
-    const opt = document.createElement('option');
-    opt.value = m.id;
-    opt.textContent = m.displayName + (m.name !== m.displayName ? ` (${m.name})` : '');
-    if (selectedIds.includes(m.id)) opt.selected = true;
-    userSelect.append(opt);
+
+  const userWrap = document.createElement('div');
+  userWrap.className = 'command-roles-wrap reminder-user-wrap';
+
+  const userHead = document.createElement('div');
+  userHead.className = 'command-roles-head';
+
+  const userLabel = document.createElement('label');
+  userLabel.textContent = 'Thành viên';
+
+  const userCount = document.createElement('span');
+  userCount.className = 'command-roles-count';
+
+  // Search input để filter member nhanh
+  const memberSearch = document.createElement('input');
+  memberSearch.type = 'text';
+  memberSearch.placeholder = 'Tìm thành viên...';
+  memberSearch.className = 'reminder-member-search';
+
+  userHead.append(userLabel, userCount);
+  userWrap.append(userHead, memberSearch);
+
+  const grid = document.createElement('div');
+  grid.className = 'roles-checkbox-grid reminder-member-grid';
+
+  const updateMemberCount = () => {
+    const checked = grid.querySelectorAll('.reminder-member-chk:checked').length;
+    userCount.textContent = checked ? `${checked} thành viên` : 'Chưa chọn';
+  };
+
+  const applyMemberSearch = () => {
+    const q = memberSearch.value.trim().toLowerCase();
+    for (const lbl of grid.querySelectorAll('.role-checkbox-label')) {
+      lbl.style.display = !q || lbl.textContent.toLowerCase().includes(q) ? '' : 'none';
+    }
+  };
+
+  memberSearch.addEventListener('input', applyMemberSearch);
+
+  if (members.length === 0) {
+    grid.innerHTML = '<span class="no-roles-hint">Tải cấu hình server để hiển thị thành viên.</span>';
+  } else {
+    for (const m of members) {
+      const lbl = document.createElement('label');
+      lbl.className = 'role-checkbox-label';
+      const displayText = m.displayName + (m.name && m.name !== m.displayName ? ` (${m.name})` : '');
+      lbl.title = displayText;
+      // Dùng màu accent mặc định (không có màu role riêng cho member)
+      lbl.style.color = '#8b9cf4';
+      lbl.style.background = '#8b9cf422';
+      lbl.style.borderColor = '#8b9cf455';
+
+      const chk = document.createElement('input');
+      chk.type = 'checkbox';
+      chk.className = 'reminder-member-chk';
+      chk.value = m.id;
+      const isChecked = selectedIds.includes(m.id);
+      chk.checked = isChecked;
+      if (isChecked) lbl.classList.add('checked');
+
+      chk.addEventListener('change', () => {
+        lbl.classList.toggle('checked', chk.checked);
+        updateMemberCount();
+        setDirty();
+      });
+
+      lbl.append(chk, document.createTextNode(displayText));
+      grid.append(lbl);
+    }
   }
+
   // Preserve any saved IDs not in member list
   for (const uid of selectedIds) {
     if (!members.some(m => m.id === uid)) {
-      const opt = document.createElement('option'); opt.value = uid; opt.textContent = `ID: ${uid}`; opt.selected = true;
-      userSelect.append(opt);
+      const lbl = document.createElement('label');
+      lbl.className = 'role-checkbox-label checked';
+      lbl.style.color = '#8b9cf4';
+      lbl.style.background = '#8b9cf422';
+      lbl.style.borderColor = '#8b9cf4';
+      const chk = document.createElement('input');
+      chk.type = 'checkbox'; chk.className = 'reminder-member-chk'; chk.value = uid; chk.checked = true;
+      chk.addEventListener('change', () => {
+        lbl.classList.toggle('checked', chk.checked);
+        updateMemberCount();
+        setDirty();
+      });
+      lbl.append(chk, document.createTextNode(`ID: ${uid}`));
+      grid.append(lbl);
     }
   }
+
+  userWrap.append(grid);
+  updateMemberCount();
 
   // ── Channel select ──
   const channelSelect = document.createElement('select');
@@ -163,22 +236,16 @@ export function addReminderRow(reminder = { id: '', userIds: [], channelId: '', 
 
   // ── Layout ──
   const topRow = document.createElement('div');
-  topRow.style.display = 'flex'; topRow.style.gap = '1rem';
+  topRow.style.display = 'flex'; topRow.style.gap = '1rem'; topRow.style.flexWrap = 'wrap';
 
-  const userWrap = document.createElement('div'); userWrap.style.flex = '1';
-  const userLabel = document.createElement('label');
-  userLabel.textContent = 'Thành viên (giữ Ctrl/⌘ để chọn nhiều)';
-  userLabel.style.display = 'block';
-  userWrap.append(userLabel, userSelect);
-
-  const channelWrap = document.createElement('div'); channelWrap.style.flex = '1';
+  const channelWrap = document.createElement('div'); channelWrap.style.flex = '1'; channelWrap.style.minWidth = '160px';
   channelWrap.innerHTML = '<label>Kênh</label>'; channelWrap.append(channelSelect);
 
-  const timeWrap = document.createElement('div'); timeWrap.style.flex = '1';
+  const timeWrap = document.createElement('div'); timeWrap.style.flex = '1'; timeWrap.style.minWidth = '180px';
   timeWrap.innerHTML = '<label>Thời gian</label>';
   timeWrap.append(timeDL, timeInput);
 
-  topRow.append(userWrap, channelWrap, timeWrap);
+  topRow.append(channelWrap, timeWrap);
 
   const bottomRow = document.createElement('div');
   bottomRow.style.display = 'flex'; bottomRow.style.gap = '1rem';
@@ -193,7 +260,7 @@ export function addReminderRow(reminder = { id: '', userIds: [], channelId: '', 
   bottomRow.append(msgWrap, removeBtn);
 
   row.dataset.id = rowId;
-  row.append(topRow, bottomRow);
+  row.append(userWrap, topRow, bottomRow);
   row.addEventListener('input', setDirty);
   row.addEventListener('change', setDirty);
   remindersEl.append(row);
@@ -201,7 +268,7 @@ export function addReminderRow(reminder = { id: '', userIds: [], channelId: '', 
 
 export function readReminders() {
   return [...remindersEl.querySelectorAll('.reply-item')].map(row => {
-    const userIdsSelected = [...row.querySelector('.reminder-user-ids').selectedOptions].map(o => o.value).filter(Boolean);
+    const userIdsSelected = [...row.querySelectorAll('.reminder-member-chk:checked')].map(c => c.value).filter(Boolean);
     return {
       id: row.dataset.id,
       userIds: userIdsSelected,

@@ -1380,6 +1380,31 @@ select option {
   font-style: italic;
 }
 
+/* Reminder member grid */
+.reminder-user-wrap {
+  grid-column: 1 / -1;
+}
+
+.reminder-member-search {
+  margin-top  : 6px;
+  width       : 100%;
+  font-size   : 12px;
+  padding     : 4px 8px;
+  border      : 1px solid var(--border);
+  border-radius: var(--r);
+  background  : var(--surface);
+  color       : var(--text);
+  box-sizing  : border-box;
+}
+
+.reminder-member-search::placeholder {
+  color: var(--hint);
+}
+
+.reminder-member-grid {
+  max-height: 130px;
+}
+
 /* Reply & self-role list */
 .reply-list {
   display       : flex;
