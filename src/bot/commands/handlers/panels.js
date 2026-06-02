@@ -6,11 +6,11 @@ import {
   PermissionFlagsBits
 } from 'discord.js';
 import { CommandCooldowns, formatRetryAfter } from '../../../cooldowns.js';
-import { buildSlashCommands } from './bot/slash.js';
-import { renderCommandResponse } from './bot/responses.js';
-import { formatMessage, sendLog } from './bot/logging.js';
-import { runBuiltInCommand } from './bot/commands.js';
-import { sanitizeAnnouncementText } from './commandAccess.js';
+import { buildSlashCommands } from '../../slash.js';
+import { renderCommandResponse } from '../../responses.js';
+import { formatMessage, sendLog } from '../../logging.js';
+import { runBuiltInCommand } from '../../commands.js';
+import { sanitizeAnnouncementText } from '../../../commandAccess.js';
 
 // In-memory XP cooldown cache — prevents redundant Redis reads when levelsEnabled
 // Key: `guildId:userId`, Value: timestamp of last XP grant
@@ -23,7 +23,7 @@ setInterval(() => {
     if (now - ts >= XP_COOLDOWN_MS) xpCache.delete(key);
   }
 }, 5 * 60 * 1000).unref();
-import { handleComponentInteraction } from './bot/interactions.js';
+import { handleComponentInteraction } from '../../interactions.js';
 
 const commandCooldowns = new CommandCooldowns();
 
