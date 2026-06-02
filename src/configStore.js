@@ -29,14 +29,26 @@ function normalizeReminders(reminders) {
   }
 
   return reminders
-    .map((item) => ({
-      id: String(item?.id ?? '').trim(),
-      userId: normalizeSnowflakeId(item?.userId),
-      channelId: normalizeSnowflakeId(item?.channelId),
-      message: String(item?.message ?? '').trim(),
-      time: String(item?.time ?? '').trim()
-    }))
-    .filter((item) => item.id && item.userId && item.channelId && item.message && item.time)
+    .map((item) => {
+      // Backward-compat: migrate legacy single userId → userIds array
+      let userIds;
+      if (Array.isArray(item?.userIds)) {
+        userIds = item.userIds.map(normalizeSnowflakeId).filter(Boolean);
+      } else if (item?.userId) {
+        const single = normalizeSnowflakeId(item.userId);
+        userIds = single ? [single] : [];
+      } else {
+        userIds = [];
+      }
+      return {
+        id: String(item?.id ?? '').trim(),
+        userIds,
+        channelId: normalizeSnowflakeId(item?.channelId),
+        message: String(item?.message ?? '').trim(),
+        time: String(item?.time ?? '').trim()
+      };
+    })
+    .filter((item) => item.id && item.userIds.length && item.channelId && item.message && item.time)
     .slice(0, 50);
 }
 

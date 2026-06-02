@@ -87,7 +87,12 @@ export function createBot(configStore, stateStore) {
                 if (guild) {
                   const channel = await guild.channels.fetch(reminder.channelId).catch(() => null);
                   if (channel?.isTextBased()) {
-                    await channel.send(`🔔 Nhắc nhở cho <@${reminder.userId}>: ${reminder.message}`).catch(() => null);
+                    // Support both legacy userId and new userIds array
+                    const ids = Array.isArray(reminder.userIds) && reminder.userIds.length
+                      ? reminder.userIds
+                      : (reminder.userId ? [reminder.userId] : []);
+                    const mentions = ids.map(id => `<@${id}>`).join(' ');
+                    await channel.send(`🔔 Nhắc nhở cho ${mentions}: ${reminder.message}`).catch(() => null);
                   }
                 }
               } else {
