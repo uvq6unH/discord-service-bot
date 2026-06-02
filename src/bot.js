@@ -253,9 +253,20 @@ export function createBot(configStore, stateStore) {
           ? message.mentions.roles.some((r) => botRoles.has(r.id))
           : false;
         if (mentionedBot || mentionedViaRole) {
-          console.log(`[mention-react] triggered | emoji: ${config.mentionReactEmoji} | user: ${message.author.tag} | guild: ${message.guild.id}`);
-          await message.react(config.mentionReactEmoji).catch((err) => {
-            console.error('[mention-react] Failed:', err.message);
+          // Resolve emoji: accept unicode, full <:name:id>, or just name / :name:
+          const resolveEmoji = (raw, guild) => {
+            const s = raw.trim();
+            if (/^<a?:\w+:\d+>$/.test(s)) return s;          // already <:name:id>
+            const name = s.replace(/^:(.+):$/, '$1');           // strip colons
+            const found = guild.emojis.cache.find(
+              (e) => e.name.toLowerCase() === name.toLowerCase()
+            );
+            if (found) return found;                             // GuildEmoji object
+            return s;                                            // unicode fallback
+          };
+          const emoji = resolveEmoji(config.mentionReactEmoji, message.guild);
+          await message.react(emoji).catch((err) => {
+            console.error('[mention-react] Failed:', err.message, '| raw:', config.mentionReactEmoji);
           });
         }
       }
