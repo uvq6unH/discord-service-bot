@@ -9,7 +9,7 @@ export async function handleGeneral(ctx) {
     client, config, command, source, args, isInteraction, guild, channel, user, permissions,
     reply, context, actorMember
   } = ctx;
-  const _general = new Set(['custom', 'ping', 'config', 'server', 'user', 'avatar', 'say']);
+  const _general = new Set(['custom', 'ping', 'config', 'server', 'user', 'avatar', 'say', 'announce']);
   if (!_general.has(command.type)) return;
 
   if (['custom', 'ping', 'config'].includes(command.type)) {
@@ -51,5 +51,29 @@ export async function handleGeneral(ctx) {
       return reply('Could not delete the original command message. Check bot permissions and channel overrides.');
     }
     return channel.send(sanitizeAnnouncementText(messageText));
+  }
+
+  if (command.type === 'announce') {
+    if (!permissions?.has(PermissionFlagsBits.ManageGuild)) {
+      return reply(isInteraction ? { content: 'You need Manage Server permission.', ephemeral: true } : 'You need Manage Server permission.');
+    }
+    if (!config.announcementsEnabled || !config.announcementChannelId) {
+      return reply(isInteraction ? { content: 'Announcements are not configured. Set a channel in the dashboard.', ephemeral: true } : 'Announcements are not configured.');
+    }
+    const messageText = isInteraction ? source.options.getString('message') : args;
+    if (!messageText?.trim()) {
+      return reply(isInteraction ? { content: 'Missing announcement message.', ephemeral: true } : 'Missing announcement message.');
+    }
+    const announcementChannel = await guild.channels.fetch(config.announcementChannelId).catch(() => null);
+    if (!announcementChannel?.isTextBased()) {
+      return reply(isInteraction ? { content: 'Announcement channel not found or invalid.', ephemeral: true } : 'Announcement channel not found.');
+    }
+    const mention = config.announcementMention
+      ? sanitizeAnnouncementText(config.announcementMention) + ' '
+      : '';
+    await announcementChannel.send(mention + sanitizeAnnouncementText(messageText));
+    return reply(isInteraction
+      ? { content: `Announcement sent to <#${config.announcementChannelId}>.`, ephemeral: true }
+      : `Announcement sent to <#${config.announcementChannelId}>.`);
   }
 }

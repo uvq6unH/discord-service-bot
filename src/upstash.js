@@ -53,38 +53,48 @@ export class UpstashClient {
     });
   }
 
-  pipeline(commands) {
+  pipeline(commands, retries = 2) {
     return new Promise((resolve, reject) => {
-      const parsed = new URL(`${this.url}/pipeline`);
-      const payload = JSON.stringify(commands.map((cmd) => cmd));
-      const req = https.request({
-        hostname: parsed.hostname,
-        path: parsed.pathname + parsed.search,
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${this.token}`,
-          'Content-Type': 'application/json',
-          'Content-Length': Buffer.byteLength(payload)
-        }
-      }, (res) => {
-        const chunks = [];
-        res.on('data', (c) => chunks.push(c));
-        res.on('end', () => {
-          try {
-            const data = JSON.parse(Buffer.concat(chunks).toString());
-            if (data.error) return reject(new Error(data.error));
-            const failed = Array.isArray(data) ? data.find((item) => item?.error) : null;
-            if (failed) return reject(new Error(failed.error));
-            resolve(data);
-          } catch (e) {
-            reject(e);
+      const attempt = () => {
+        const parsed = new URL(`${this.url}/pipeline`);
+        const payload = JSON.stringify(commands.map((cmd) => cmd));
+        const req = https.request({
+          hostname: parsed.hostname,
+          path: parsed.pathname + parsed.search,
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${this.token}`,
+            'Content-Type': 'application/json',
+            'Content-Length': Buffer.byteLength(payload)
+          }
+        }, (res) => {
+          const chunks = [];
+          res.on('data', (c) => chunks.push(c));
+          res.on('end', () => {
+            try {
+              const data = JSON.parse(Buffer.concat(chunks).toString());
+              if (data.error) return reject(new Error(data.error));
+              const failed = Array.isArray(data) ? data.find((item) => item?.error) : null;
+              if (failed) return reject(new Error(failed.error));
+              resolve(data);
+            } catch (e) {
+              reject(e);
+            }
+          });
+        });
+        req.on('error', (err) => {
+          if (retries > 0) {
+            const delay = 200 * (3 - retries);
+            setTimeout(() => { retries--; attempt(); }, delay);
+          } else {
+            reject(err);
           }
         });
-      });
-      req.on('error', reject);
-      req.setTimeout(8000, () => { req.destroy(); reject(new Error('Upstash pipeline timeout')); });
-      req.write(payload);
-      req.end();
+        req.setTimeout(8000, () => { req.destroy(); reject(new Error('Upstash pipeline timeout')); });
+        req.write(payload);
+        req.end();
+      };
+      attempt();
     });
   }
 
@@ -110,6 +120,10 @@ export class UpstashClient {
 
   smembers(key) {
     return this._request(['SMEMBERS', key]);
+  }
+
+  sadd(key, ...members) {
+    return this._request(['SADD', key, ...members]);
   }
 }
 

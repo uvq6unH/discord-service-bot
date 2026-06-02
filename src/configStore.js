@@ -207,8 +207,8 @@ export class ConfigStore {
   async load() {
     try {
       // Load the index of all known guild IDs
-      const raw = await this._redis.get(this._KEY_INDEX).catch(() => null);
-      const guildIds = raw ? JSON.parse(raw) : [];
+      // SMEMBERS is atomic — no race condition unlike GET+JSON.parse
+      const guildIds = await this._redis.smembers(this._KEY_INDEX).catch(() => []) ?? [];
 
       // Fetch all guild configs in parallel
       const entries = await Promise.all(
@@ -240,19 +240,21 @@ export class ConfigStore {
         this._redis.set(this._keyFor(guildId), JSON.stringify(this._serializeForStorage(guildId, this.cache[guildId])))
       )
     );
-    await this._redis.set(this._KEY_INDEX, JSON.stringify(guildIds));
+    // Use SADD for atomic index update (no race on concurrent guild saves)
+    if (guildIds.length > 0) {
+      await this._redis.sadd(this._KEY_INDEX, ...guildIds);
+    }
   }
 
   // Save a single guild config to Redis (much cheaper than flushing all)
   async _saveGuild(guildId) {
     const stored = this.cache[guildId];
     if (!stored) return;
-    await this._redis.set(this._keyFor(guildId), JSON.stringify(this._serializeForStorage(guildId, stored)));
-    // Update index (re-read to avoid racing on multi-guild concurrent saves)
-    const raw = await this._redis.get(this._KEY_INDEX).catch(() => null);
-    const ids = new Set(raw ? JSON.parse(raw) : []);
-    ids.add(guildId);
-    await this._redis.set(this._KEY_INDEX, JSON.stringify([...ids]));
+    // Pipeline: save config + SADD to index atomically (SADD is idempotent, no GET+SET race)
+    await this._redis.pipeline([
+      ['SET', this._keyFor(guildId), JSON.stringify(this._serializeForStorage(guildId, stored))],
+      ['SADD', this._KEY_INDEX, guildId]
+    ]);
   }
 
   save(guildId) {

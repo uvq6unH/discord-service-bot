@@ -39,6 +39,8 @@ export class StateStore {
     this._economyMutex = createMutexPool();
     this._gameSessionMutex = createMutexPool();
     this._warningsMutex = createMutexPool();
+    this._lolMutex = createMutexPool();
+    this._ticketMutex = createMutexPool();
     this._redis = redis ?? createUpstashFromEnv();
 
     if (this._redis) {
@@ -440,7 +442,7 @@ export class StateStore {
   // ── Tickets ────────────────────────────────────────────────────────────────
 
   async nextTicketNumber(guildId) {
-    return this._warningsMutex(`${guildId}:tickets`, async () => {
+    return this._ticketMutex(`${guildId}`, async () => {
       const guild = await this.getGuild(guildId);
       guild.tickets.nextNumber ??= 1;
       const number = guild.tickets.nextNumber;
@@ -453,18 +455,22 @@ export class StateStore {
   // ── LoL linked accounts ────────────────────────────────────────────────────
 
   async linkLolAccount(guildId, userId, data) {
-    const guild = await this.getGuild(guildId);
-    guild.lolAccounts[userId] = {
-      riotId: data.riotId, puuid: data.puuid, region: data.region,
-      linkedAt: new Date().toISOString()
-    };
-    await this._saveGuild(guildId, guild);
+    return this._lolMutex(`lol:${guildId}:${userId}`, async () => {
+      const guild = await this.getGuild(guildId);
+      guild.lolAccounts[userId] = {
+        riotId: data.riotId, puuid: data.puuid, region: data.region,
+        linkedAt: new Date().toISOString()
+      };
+      await this._saveGuild(guildId, guild);
+    });
   }
 
   async unlinkLolAccount(guildId, userId) {
-    const guild = await this.getGuild(guildId);
-    delete guild.lolAccounts[userId];
-    await this._saveGuild(guildId, guild);
+    return this._lolMutex(`lol:${guildId}:${userId}`, async () => {
+      const guild = await this.getGuild(guildId);
+      delete guild.lolAccounts[userId];
+      await this._saveGuild(guildId, guild);
+    });
   }
 
   async getLinkedLolAccount(guildId, userId) {
@@ -473,18 +479,22 @@ export class StateStore {
   }
 
   async linkTftAccount(guildId, userId, data) {
-    const guild = await this.getGuild(guildId);
-    guild.tftAccounts[userId] = {
-      riotId: data.riotId, puuid: data.puuid, region: data.region,
-      linkedAt: new Date().toISOString()
-    };
-    await this._saveGuild(guildId, guild);
+    return this._lolMutex(`tft:${guildId}:${userId}`, async () => {
+      const guild = await this.getGuild(guildId);
+      guild.tftAccounts[userId] = {
+        riotId: data.riotId, puuid: data.puuid, region: data.region,
+        linkedAt: new Date().toISOString()
+      };
+      await this._saveGuild(guildId, guild);
+    });
   }
 
   async unlinkTftAccount(guildId, userId) {
-    const guild = await this.getGuild(guildId);
-    delete guild.tftAccounts[userId];
-    await this._saveGuild(guildId, guild);
+    return this._lolMutex(`tft:${guildId}:${userId}`, async () => {
+      const guild = await this.getGuild(guildId);
+      delete guild.tftAccounts[userId];
+      await this._saveGuild(guildId, guild);
+    });
   }
 
   async getLinkedTftAccount(guildId, userId) {

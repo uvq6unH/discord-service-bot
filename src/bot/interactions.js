@@ -50,7 +50,7 @@ export async function handleComponentInteraction(interaction, { client, config, 
     try {
       const number = await stateStore.nextTicketNumber(interaction.guild.id);
       const channel = await interaction.guild.channels.create({
-        name: `ticket-${number}-${interaction.user.username}`.toLowerCase().replace(/[^a-z0-9-]/g, '-').slice(0, 90),
+        name: `ticket-${number}--${interaction.user.id}`.slice(0, 90),
         type: ChannelType.GuildText,
         parent: config.ticketCategoryId || undefined,
         permissionOverwrites: [
@@ -82,9 +82,9 @@ export async function handleComponentInteraction(interaction, { client, config, 
       await interaction.reply({ content: 'This button can only be used in ticket channels.', ephemeral: true });
       return;
     }
-    // Allow: staff with ManageChannels, OR the ticket opener (channel name contains their username)
+    // Allow: staff with ManageChannels, OR the ticket opener (userId in channel name -- no substring collision)
     const isStaff = interaction.memberPermissions?.has(PermissionFlagsBits.ManageChannels);
-    const isOpener = interaction.channel.name.includes(interaction.user.username.toLowerCase().replace(/[^a-z0-9-]/g, '-').slice(0, 32));
+    const isOpener = interaction.channel.name.includes(`--${interaction.user.id}`);
     if (!isStaff && !isOpener) {
       await interaction.reply({ content: 'You do not have permission to close this ticket.', ephemeral: true });
       return;
