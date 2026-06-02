@@ -244,6 +244,19 @@ export function createBot(configStore, stateStore) {
         }
       }
 
+      // ── Mention react ────────────────────────────────────────────────────
+      // Chạy trước mọi early-return để mention luôn được xử lý
+      if (config.mentionReactEnabled && config.mentionReactEmoji) {
+        const botRoles = message.guild.members.me?.roles.cache;
+        const mentionedBot = message.mentions.has(client.user);
+        const mentionedViaRole = botRoles
+          ? message.mentions.roles.some((r) => botRoles.has(r.id))
+          : false;
+        if (mentionedBot || mentionedViaRole) {
+          await message.react(config.mentionReactEmoji).catch(() => null);
+        }
+      }
+
       if (content.startsWith(prefix)) {
         const body = content.slice(prefix.length).trim();
         const [commandName, ...argParts] = body.split(/\s+/);
@@ -289,20 +302,6 @@ export function createBot(configStore, stateStore) {
             .replaceAll('{level}', String(rank.level))
             .replaceAll('{xp}', String(rank.xp));
           await message.channel.send(levelMessage).catch(() => null);
-        }
-      }
-
-      // ── Mention react ────────────────────────────────────────────────────
-      // React emoji khi bot bị mention qua username hoặc role
-      if (config.mentionReactEnabled && config.mentionReactEmoji) {
-        const botId = client.user.id;
-        const botRoles = message.guild.members.me?.roles.cache;
-        const mentionedBot = message.mentions.has(client.user);
-        const mentionedViaRole = botRoles
-          ? message.mentions.roles.some((r) => botRoles.has(r.id))
-          : false;
-        if (mentionedBot || mentionedViaRole) {
-          await message.react(config.mentionReactEmoji).catch(() => null);
         }
       }
 
