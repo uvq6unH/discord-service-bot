@@ -61,11 +61,25 @@ export function createServer({ configStore, stateStore, botClient, redis = null 
   app.set('trust proxy', 1);
 
   // Content-Security-Policy
+  // Allowlist:
+  //   style-src  : self + jsdelivr (Tabler icons) + Google Fonts CSS
+  //   font-src   : self + gstatic (Google Fonts files) + jsdelivr
+  //   img-src    : self + Discord CDN (avatars) + data URIs
+  //   connect-src: self only (all fetch() goes to our API; jsdelivr .map blocked in prod is fine)
+  //   script-src : self (ES modules)
+  //   frame-src  : none
   app.use((_req, res, next) => {
-    res.setHeader(
-      'Content-Security-Policy',
-      "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; font-src 'self' https://cdn.jsdelivr.net; img-src 'self' https://cdn.discordapp.com data:"
-    );
+    res.setHeader('Content-Security-Policy', [
+      "default-src 'self'",
+      "script-src 'self'",
+      "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://fonts.googleapis.com",
+      "font-src 'self' https://fonts.gstatic.com https://cdn.jsdelivr.net",
+      "img-src 'self' https://cdn.discordapp.com data:",
+      "connect-src 'self'",
+      "frame-src 'none'",
+      "object-src 'none'",
+      "base-uri 'self'",
+    ].join('; '));
     next();
   });
 
