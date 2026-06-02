@@ -247,22 +247,24 @@ export function createBot(configStore, stateStore) {
       // ── Mention react ────────────────────────────────────────────────────
       // Chạy trước mọi early-return để mention luôn được xử lý
       if (config.mentionReactEnabled && config.mentionReactEmoji) {
+        const botId = client.user.id;
         const botRoles = message.guild.members.me?.roles.cache;
-        const mentionedBot = message.mentions.has(client.user);
+        const mentionedBot =
+          message.mentions.users.has(botId) ||
+          content.includes(`<@${botId}>`) ||
+          content.includes(`<@!${botId}>`);
         const mentionedViaRole = botRoles
           ? message.mentions.roles.some((r) => botRoles.has(r.id))
           : false;
         if (mentionedBot || mentionedViaRole) {
-          // Resolve emoji: accept unicode, full <:name:id>, or just name / :name:
           const resolveEmoji = (raw, guild) => {
             const s = raw.trim();
-            if (/^<a?:\w+:\d+>$/.test(s)) return s;          // already <:name:id>
-            const name = s.replace(/^:(.+):$/, '$1');           // strip colons
+            if (/^<a?:\w+:\d+>$/.test(s)) return s;
+            const name = s.replace(/^:(.+):$/, '$1');
             const found = guild.emojis.cache.find(
               (e) => e.name.toLowerCase() === name.toLowerCase()
             );
-            if (found) return found;                             // GuildEmoji object
-            return s;                                            // unicode fallback
+            return found ?? s;
           };
           const emoji = resolveEmoji(config.mentionReactEmoji, message.guild);
           await message.react(emoji).catch((err) => {
@@ -337,17 +339,27 @@ export function createBot(configStore, stateStore) {
   // Render free tier spin down sau 15 phút không có HTTP traffic.
   // Tự gọi /health mỗi 14 phút để giữ process sống — không cần gửi message Discord.
   (function startKeepalive() {
-    const INTERVAL_MS = 14 * 60 * 1000;
+    const INTERVAL_MS = 5 * 60 * 1000;
+    const RETRY_DELAY_MS = 10_000;
+    const MAX_RETRIES = 3;
     const port = process.env.PORT ?? 10000;
 
-    setInterval(async () => {
+    async function ping(attempt = 1) {
       try {
         const res = await fetch(`http://localhost:${port}/health`);
-        console.log(`[keepalive] ping /health → ${res.status}, uptime ${Math.floor(process.uptime())}s`);
+        console.log(`[keepalive] /health → ${res.status}, uptime ${Math.floor(process.uptime())}s`);
+        if (!res.ok && attempt < MAX_RETRIES) {
+          setTimeout(() => ping(attempt + 1), RETRY_DELAY_MS);
+        }
       } catch (err) {
-        console.warn('[keepalive] self-ping failed:', err.message);
+        console.warn(`[keepalive] attempt ${attempt} failed: ${err.message}`);
+        if (attempt < MAX_RETRIES) {
+          setTimeout(() => ping(attempt + 1), RETRY_DELAY_MS);
+        }
       }
-    }, INTERVAL_MS).unref();
+    }
+
+    setInterval(() => ping(), INTERVAL_MS).unref();
   })();
 
   return client;
