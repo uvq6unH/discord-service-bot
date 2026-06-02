@@ -204,29 +204,52 @@ export class ConfigStore {
     };
   }
 
+  async _fetchGuildWithRetry(guildId, attempts = 3) {
+    for (let i = 0; i < attempts; i++) {
+      try {
+        const val = await this._redis.get(this._keyFor(guildId));
+        if (!val) return null;
+        const stored = JSON.parse(val);
+        delete stored.riotApiKeyConfigured;
+        delete stored.tftApiKeyConfigured;
+        return [guildId, stored];
+      } catch (err) {
+        if (i < attempts - 1) {
+          const delay = 500 * (i + 1);
+          console.warn(`[ConfigStore] Retrying guild ${guildId} load (attempt ${i + 2}/${attempts}) after ${delay}ms: ${err.message}`);
+          await new Promise((r) => setTimeout(r, delay));
+        } else {
+          console.error(`[ConfigStore] Failed to load guild ${guildId} after ${attempts} attempts: ${err.message}`);
+        }
+      }
+    }
+    return null;
+  }
+
   async load() {
     try {
       // Load the index of all known guild IDs
-      // SMEMBERS is atomic — no race condition unlike GET+JSON.parse
-      const guildIds = await this._redis.smembers(this._KEY_INDEX).catch(() => []) ?? [];
+      const raw = await this._redis.get(this._KEY_INDEX).catch(() => null);
+      const guildIds = raw ? JSON.parse(raw) : [];
 
-      // Fetch all guild configs in parallel
-      const entries = await Promise.all(
-        guildIds.map(async (guildId) => {
-          const val = await this._redis.get(this._keyFor(guildId)).catch(() => null);
-          if (!val) return null;
-          const stored = JSON.parse(val);
-          delete stored.riotApiKeyConfigured;
-          delete stored.tftApiKeyConfigured;
-          return [guildId, stored];
-        })
-      );
+      if (guildIds.length === 0) {
+        console.log('[ConfigStore] No guild configs in index — fresh start.');
+        this.cache = {};
+        return;
+      }
 
-      this.cache = Object.fromEntries(entries.filter(Boolean));
+      // Fetch each guild config with retry (sequential to avoid overwhelming cold Upstash)
+      const entries = [];
+      for (const guildId of guildIds) {
+        const entry = await this._fetchGuildWithRetry(guildId);
+        if (entry) entries.push(entry);
+      }
+
+      this.cache = Object.fromEntries(entries);
       if (this._migrateSecretsOffDisk()) {
         await this._flushAll();
       }
-      console.log(`[ConfigStore] Loaded ${Object.keys(this.cache).length} guild config(s) from Redis.`);
+      console.log(`[ConfigStore] Loaded ${Object.keys(this.cache).length}/${guildIds.length} guild config(s) from Redis.`);
     } catch (error) {
       console.warn(`[ConfigStore] Failed to load from Redis, starting empty. ${error.message}`);
       this.cache = {};
@@ -240,21 +263,19 @@ export class ConfigStore {
         this._redis.set(this._keyFor(guildId), JSON.stringify(this._serializeForStorage(guildId, this.cache[guildId])))
       )
     );
-    // Use SADD for atomic index update (no race on concurrent guild saves)
-    if (guildIds.length > 0) {
-      await this._redis.sadd(this._KEY_INDEX, ...guildIds);
-    }
+    await this._redis.set(this._KEY_INDEX, JSON.stringify(guildIds));
   }
 
   // Save a single guild config to Redis (much cheaper than flushing all)
   async _saveGuild(guildId) {
     const stored = this.cache[guildId];
     if (!stored) return;
-    // Pipeline: save config + SADD to index atomically (SADD is idempotent, no GET+SET race)
-    await this._redis.pipeline([
-      ['SET', this._keyFor(guildId), JSON.stringify(this._serializeForStorage(guildId, stored))],
-      ['SADD', this._KEY_INDEX, guildId]
-    ]);
+    await this._redis.set(this._keyFor(guildId), JSON.stringify(this._serializeForStorage(guildId, stored)));
+    // Update index (re-read to avoid racing on multi-guild concurrent saves)
+    const raw = await this._redis.get(this._KEY_INDEX).catch(() => null);
+    const ids = new Set(raw ? JSON.parse(raw) : []);
+    ids.add(guildId);
+    await this._redis.set(this._KEY_INDEX, JSON.stringify([...ids]));
   }
 
   save(guildId) {
