@@ -92,9 +92,26 @@ export function createBot(configStore, stateStore) {
                       ? reminder.userIds
                       : (reminder.userId ? [reminder.userId] : []);
                     const mentions = ids.map(id => `<@${id}>`).join(' ');
-                    await channel.send(`🔔 Nhắc nhở cho ${mentions}: ${reminder.message}`).catch(() => null);
+                    const repeatLabel = { hourly: ' 🔁 (mỗi giờ)', daily: ' 🔁 (mỗi ngày)', weekly: ' 🔁 (mỗi tuần)' }[reminder.repeat] ?? '';
+                    await channel.send(`🔔 Nhắc nhở cho ${mentions}: ${reminder.message}${repeatLabel}`).catch(() => null);
                   }
                 }
+                // ── Reschedule if repeat is set ──
+                const repeat = reminder.repeat || 'none';
+                if (repeat !== 'none') {
+                  const intervals = { hourly: 60 * 60 * 1000, daily: 24 * 60 * 60 * 1000, weekly: 7 * 24 * 60 * 60 * 1000 };
+                  const ms = intervals[repeat];
+                  if (ms) {
+                    // Advance time by N intervals so next fire is always in the future
+                    let nextTime = time.getTime() + ms;
+                    while (nextTime <= now.getTime()) nextTime += ms;
+                    const pad = n => String(n).padStart(2, '0');
+                    const d = new Date(nextTime);
+                    const nextTimeStr = `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+                    nextReminders.push({ ...reminder, time: nextTimeStr });
+                  }
+                }
+                // If repeat === 'none', we don't push → reminder is consumed and removed
               } else {
                 nextReminders.push(reminder);
               }
