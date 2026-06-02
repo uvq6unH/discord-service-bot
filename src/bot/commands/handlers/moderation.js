@@ -33,6 +33,22 @@ export async function handleModeration(ctx) {
       args: String(amount)
     }).replaceAll('{count}', String(deleted.size)) +
       (skipped > 0 ? ` Skipped ${skipped} message(s) that were older than 14 days or unavailable.` : '');
+
+    // Audit log — ghi snapshot nội dung từng message bị xóa
+    if (config.logChannelId && deleted.size > 0) {
+      const lines = [...deleted.values()]
+        .sort((a, b) => a.createdTimestamp - b.createdTimestamp)
+        .map((m) => {
+          const ts = new Date(m.createdTimestamp).toISOString();
+          const author = m.author?.tag ?? 'Unknown';
+          const text = (m.content ?? '').slice(0, 120) || '[no text content]';
+          return `[${ts}] ${author}: ${text}`;
+        });
+      const logHeader = `🗑️ **Purge** by ${user.tag} in <#${channel.id}> — ${deleted.size} messages deleted`;
+      const logBody = lines.join('\n').slice(0, 1800);
+      await sendLog(guild, config, `${logHeader}\n\`\`\`\n${logBody}\n\`\`\``);
+    }
+
     return reply(isInteraction ? { content, ephemeral: true } : content);
   }
 

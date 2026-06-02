@@ -31,5 +31,21 @@ window.addEventListener('hashchange', () => {
 window.addEventListener('beforeunload', (e) => { if (isDirty) { e.preventDefault(); e.returnValue = ''; } });
 
 refreshStatus();
-setInterval(refreshStatus, 15000);
+
+// Poll bot status mỗi 60 giây, pause khi tab không active để tiết kiệm requests
+let _statusInterval = null;
+function _startStatusPoll() {
+  if (_statusInterval) return;
+  _statusInterval = setInterval(refreshStatus, 60_000);
+}
+function _stopStatusPoll() {
+  clearInterval(_statusInterval);
+  _statusInterval = null;
+}
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) _stopStatusPoll();
+  else { refreshStatus(); _startStatusPoll(); }
+});
+_startStatusPoll();
+
 loadServers();

@@ -292,6 +292,20 @@ export function createBot(configStore, stateStore) {
         }
       }
 
+      // ── Mention react ────────────────────────────────────────────────────
+      // React emoji khi bot bị mention qua username hoặc role
+      if (config.mentionReactEnabled && config.mentionReactEmoji) {
+        const botId = client.user.id;
+        const botRoles = message.guild.members.me?.roles.cache;
+        const mentionedBot = message.mentions.has(client.user);
+        const mentionedViaRole = botRoles
+          ? message.mentions.roles.some((r) => botRoles.has(r.id))
+          : false;
+        if (mentionedBot || mentionedViaRole) {
+          await message.react(config.mentionReactEmoji).catch(() => null);
+        }
+      }
+
       if (!config.autoReplyEnabled) {
         return;
       }
@@ -307,27 +321,18 @@ export function createBot(configStore, stateStore) {
   });
 
   // ── Self-ping keepalive ──────────────────────────────────────────────────
-  // Thay thế UptimeRobot: bot tự gửi tin nhắn vào channel keepalive mỗi 14 phút
-  // để Render không spin down process. Channel ID set qua env KEEPALIVE_CHANNEL_ID.
-  // Nếu không có channel ID, chỉ log heartbeat để giữ event loop active.
+  // Render free tier spin down sau 15 phút không có HTTP traffic.
+  // Tự gọi /health mỗi 14 phút để giữ process sống — không cần gửi message Discord.
   (function startKeepalive() {
-    const INTERVAL_MS = 14 * 60 * 1000; // 14 phút — Render spin down sau 15 phút
+    const INTERVAL_MS = 14 * 60 * 1000;
+    const port = process.env.PORT ?? 10000;
 
     setInterval(async () => {
-      const channelId = process.env.KEEPALIVE_CHANNEL_ID;
-      if (!channelId) {
-        // Không có channel → chỉ log để event loop không idle
-        console.log(`[keepalive] heartbeat — uptime ${Math.floor(process.uptime())}s, ws.ping ${client.ws.ping}ms`);
-        return;
-      }
       try {
-        const ch = await client.channels.fetch(channelId).catch(() => null);
-        if (!ch?.isTextBased()) return;
-        // Gửi tin nhắn invisible (zero-width space) để không spam visible
-        await ch.send('\u200b').catch(() => null);
-        console.log(`[keepalive] sent heartbeat to #${ch.name ?? channelId}`);
+        const res = await fetch(`http://localhost:${port}/health`);
+        console.log(`[keepalive] ping /health → ${res.status}, uptime ${Math.floor(process.uptime())}s`);
       } catch (err) {
-        console.warn('[keepalive] error:', err.message);
+        console.warn('[keepalive] self-ping failed:', err.message);
       }
     }, INTERVAL_MS).unref();
   })();

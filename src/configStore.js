@@ -348,7 +348,9 @@ export class ConfigStore {
         welcomeMessage: String(patch.welcomeMessage ?? '').trim().slice(0, 500) || defaultConfig.welcomeMessage,
         logChannelId: normalizeSnowflakeId(patch.logChannelId),
         autoReplyEnabled: pickBoolean(patch, 'autoReplyEnabled', current),
-        autoReplies: normalizeAutoReplies(patch.autoReplies ?? current.autoReplies)
+        autoReplies: normalizeAutoReplies(patch.autoReplies ?? current.autoReplies),
+        mentionReactEnabled: pickBoolean(patch, 'mentionReactEnabled', current),
+        mentionReactEmoji: String(patch.mentionReactEmoji ?? current.mentionReactEmoji ?? '👋').trim().slice(0, 32) || '👋'
       };
 
       delete next.guildId;

@@ -71,5 +71,6 @@ export const FIELDS = [
   'announcementsEnabled', 'announcementChannelId', 'announcementMention',
   'welcomeEnabled', 'welcomeChannelId', 'welcomeMessage',
   'autoReplyEnabled',
+  'mentionReactEnabled', 'mentionReactEmoji',
   'riotApiKey', 'tftApiKey',
 ];

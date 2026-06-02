@@ -286,6 +286,8 @@ export const defaultConfig = {
   welcomeMessage: 'Welcome {user} to {server}.',
   logChannelId: '',
   autoReplyEnabled: false,
+  mentionReactEnabled: false,
+  mentionReactEmoji: '👋',
   autoReplies: [
     {
       keyword: 'hello bot',
