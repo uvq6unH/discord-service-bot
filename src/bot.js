@@ -253,7 +253,10 @@ export function createBot(configStore, stateStore) {
           ? message.mentions.roles.some((r) => botRoles.has(r.id))
           : false;
         if (mentionedBot || mentionedViaRole) {
-          await message.react(config.mentionReactEmoji).catch(() => null);
+          console.log(`[mention-react] triggered | emoji: ${config.mentionReactEmoji} | user: ${message.author.tag} | guild: ${message.guild.id}`);
+          await message.react(config.mentionReactEmoji).catch((err) => {
+            console.error('[mention-react] Failed:', err.message);
+          });
         }
       }
 
