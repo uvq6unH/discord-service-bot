@@ -10,36 +10,46 @@ export class UpstashClient {
     this.token = token;
   }
 
-  _request(body) {
+  _request(body, retries = 2) {
     return new Promise((resolve, reject) => {
-      const parsed = new URL(this.url);
-      const payload = JSON.stringify(body);
-      const req = https.request({
-        hostname: parsed.hostname,
-        path: parsed.pathname + parsed.search,
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${this.token}`,
-          'Content-Type': 'application/json',
-          'Content-Length': Buffer.byteLength(payload)
-        }
-      }, (res) => {
-        const chunks = [];
-        res.on('data', (c) => chunks.push(c));
-        res.on('end', () => {
-          try {
-            const data = JSON.parse(Buffer.concat(chunks).toString());
-            if (data.error) return reject(new Error(data.error));
-            resolve(data.result);
-          } catch (e) {
-            reject(e);
+      const attempt = () => {
+        const parsed = new URL(this.url);
+        const payload = JSON.stringify(body);
+        const req = https.request({
+          hostname: parsed.hostname,
+          path: parsed.pathname + parsed.search,
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${this.token}`,
+            'Content-Type': 'application/json',
+            'Content-Length': Buffer.byteLength(payload)
+          }
+        }, (res) => {
+          const chunks = [];
+          res.on('data', (c) => chunks.push(c));
+          res.on('end', () => {
+            try {
+              const data = JSON.parse(Buffer.concat(chunks).toString());
+              if (data.error) return reject(new Error(data.error));
+              resolve(data.result);
+            } catch (e) {
+              reject(e);
+            }
+          });
+        });
+        req.on('error', (err) => {
+          if (retries > 0) {
+            const delay = 200 * (3 - retries);
+            setTimeout(() => { retries--; attempt(); }, delay);
+          } else {
+            reject(err);
           }
         });
-      });
-      req.on('error', reject);
-      req.setTimeout(8000, () => { req.destroy(); reject(new Error('Upstash timeout')); });
-      req.write(payload);
-      req.end();
+        req.setTimeout(8000, () => { req.destroy(); reject(new Error('Upstash timeout')); });
+        req.write(payload);
+        req.end();
+      };
+      attempt();
     });
   }
 

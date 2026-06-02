@@ -369,8 +369,16 @@ export class StateStore {
 
   // ── Warnings ───────────────────────────────────────────────────────────────
 
+  async _withWarningsLock(guildId, userId, fn) {
+    const lockKey = `lock:warnings:${guildId}:${userId}`;
+    if (this._useRedis) {
+      return withRedisLock(this._redis, lockKey, 15, fn);
+    }
+    return this._warningsMutex(lockKey, fn);
+  }
+
   async addWarning(guildId, userId, moderatorId, reason) {
-    return this._warningsMutex(`${guildId}:${userId}`, async () => {
+    return this._withWarningsLock(guildId, userId, async () => {
       const guild = await this.getGuild(guildId);
       guild.warnings[userId] ??= [];
       const warning = { id: `${Date.now()}`, moderatorId, reason, createdAt: new Date().toISOString() };
@@ -386,7 +394,7 @@ export class StateStore {
   }
 
   async clearWarnings(guildId, userId) {
-    return this._warningsMutex(`${guildId}:${userId}`, async () => {
+    return this._withWarningsLock(guildId, userId, async () => {
       const guild = await this.getGuild(guildId);
       const count = guild.warnings[userId]?.length ?? 0;
       guild.warnings[userId] = [];
@@ -432,12 +440,14 @@ export class StateStore {
   // ── Tickets ────────────────────────────────────────────────────────────────
 
   async nextTicketNumber(guildId) {
-    const guild = await this.getGuild(guildId);
-    guild.tickets.nextNumber ??= 1;
-    const number = guild.tickets.nextNumber;
-    guild.tickets.nextNumber += 1;
-    await this._saveGuild(guildId, guild);
-    return number;
+    return this._warningsMutex(`${guildId}:tickets`, async () => {
+      const guild = await this.getGuild(guildId);
+      guild.tickets.nextNumber ??= 1;
+      const number = guild.tickets.nextNumber;
+      guild.tickets.nextNumber += 1;
+      await this._saveGuild(guildId, guild);
+      return number;
+    });
   }
 
   // ── LoL linked accounts ────────────────────────────────────────────────────

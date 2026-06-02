@@ -329,7 +329,7 @@ export function createBot(configStore, stateStore) {
       } catch (err) {
         console.warn('[keepalive] error:', err.message);
       }
-    }, INTERVAL_MS);
+    }, INTERVAL_MS).unref();
   })();
 
   return client;

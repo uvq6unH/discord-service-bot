@@ -257,16 +257,15 @@ export class ConfigStore {
     return this._applyRuntimeSecrets(guildId, base);
   }
 
-  async updateGuildConfig(guildId, patch) {
+  async updateGuildConfig(guildId, rawPatch) {
     // Guard against prototype pollution from JSON body
-    if (!patch || typeof patch !== 'object' || Array.isArray(patch)) {
+    if (!rawPatch || typeof rawPatch !== 'object' || Array.isArray(rawPatch)) {
       throw new Error('Invalid patch');
     }
-    const safePatch = Object.fromEntries(
-      Object.entries(patch).filter(([k]) => !['__proto__', 'constructor', 'prototype'].includes(k))
+    const patch = Object.fromEntries(
+      Object.entries(rawPatch).filter(([k]) => !['__proto__', 'constructor', 'prototype'].includes(k))
     );
     return this._withLock(guildId, async () => {
-      patch = safePatch; // use safe filtered patch (no prototype pollution keys)
       await this.ready;
       const runtimeCurrent = this._runtimeSecrets.get(guildId) ?? {};
       const current = await this.getGuildConfig(guildId);

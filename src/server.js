@@ -143,7 +143,7 @@ export function createServer({ configStore, stateStore, botClient, redis = null 
 
   app.get('/api/csrf-token', auth.requireAuth, (req, res) => csrf.issueToken(req, res));
 
-  app.get('/api/status', auth.requireAuth, async (_req, res) => {
+  app.get('/api/status', auth.requireAuth, readRateLimit, async (_req, res) => {
     const guildIds = await configStore.listGuildIds();
     res.json({
       botReady: Boolean(botClient.user),
