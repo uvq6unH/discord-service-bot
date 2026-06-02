@@ -232,7 +232,15 @@ export function createServer({ configStore, stateStore, botClient, redis = null 
           color: r.color ? `#${r.color.toString(16).padStart(6, '0')}` : null,
         }))
         .sort((a, b) => b.rawPosition - a.rawPosition);
-      res.json({ channels, roles });
+      
+      const membersFetched = await guild.members.fetch();
+      const members = membersFetched.map((m) => ({
+        id: m.user.id,
+        name: m.user.tag,
+        displayName: m.displayName
+      })).sort((a, b) => a.displayName.localeCompare(b.displayName));
+
+      res.json({ channels, roles, members });
     } catch (error) {
       res.status(500).json({ error: error.message });
     }

@@ -75,6 +75,9 @@
       <button class="nav-item" data-page="interactions">
         <i class="ti ti-click"></i><span>Ticket & Roles</span>
       </button>
+      <button class="nav-item" data-page="reminders">
+        <i class="ti ti-bell"></i><span>Nhắc nhở (Reminders)</span>
+      </button>
     </div>
 
     <div class="nav-group">
@@ -205,6 +208,9 @@
             </button>
             <button type="button" class="module-card" data-page-jump="auto-replies">
               <i class="ti ti-message-reply"></i><span>Auto replies</span><strong id="moduleAutoReplies">—</strong>
+            </button>
+            <button type="button" class="module-card" data-page-jump="reminders">
+              <i class="ti ti-bell"></i><span>Reminders</span><strong id="moduleReminders">—</strong>
             </button>
           </div>
         </section>
@@ -513,6 +519,31 @@
                 </div>
                 <p class="field-hint">Hỗ trợ emoji Unicode và custom emoji Discord (<code>&lt;:name:id&gt;</code>). Bot
                   cần có quyền Add Reactions trong kênh tương ứng.</p>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- ── PAGE: REMINDERS ── -->
+        <section class="page" data-page-panel="reminders">
+          <div class="plugin-grid">
+            <div class="plugin-card wide">
+              <div class="plugin-card-header">
+                <div class="plugin-icon bg-blue"><i class="ti ti-bell"></i></div>
+                <div>
+                  <h3>Nhắc nhở (Reminders)</h3>
+                  <p>Lên lịch nhắc nhở thành viên trong server</p>
+                </div>
+                <label class="toggle ml-auto">
+                  <input type="checkbox" id="remindersEnabled" name="remindersEnabled">
+                  <span class="toggle-track"></span>
+                </label>
+              </div>
+              <div class="plugin-card-body">
+                <div id="reminders" class="reply-list"></div>
+                <button id="addReminderBtn" class="btn btn-secondary mt-2" type="button">
+                  <i class="ti ti-plus"></i> Thêm nhắc nhở
+                </button>
               </div>
             </div>
           </div>

@@ -68,6 +68,40 @@ export function createBot(configStore, stateStore) {
         }
       }
       console.log(`[bot] Command sync complete: ${synced}/${guilds.length} guilds OK`);
+      // 4. Start reminder worker
+      setInterval(async () => {
+        const now = new Date();
+        const guildIds = await configStore.listGuildIds();
+        for (const guildId of guildIds) {
+          try {
+            const config = await configStore.getGuildConfig(guildId);
+            if (!config.enabled || !config.remindersEnabled || !config.reminders?.length) continue;
+            
+            let modified = false;
+            const nextReminders = [];
+            for (const reminder of config.reminders) {
+              const time = new Date(reminder.time);
+              if (!isNaN(time) && time <= now) {
+                modified = true;
+                const guild = await readyClient.guilds.fetch(guildId).catch(() => null);
+                if (guild) {
+                  const channel = await guild.channels.fetch(reminder.channelId).catch(() => null);
+                  if (channel?.isTextBased()) {
+                    await channel.send(`🔔 Nhắc nhở cho <@${reminder.userId}>: ${reminder.message}`).catch(() => null);
+                  }
+                }
+              } else {
+                nextReminders.push(reminder);
+              }
+            }
+            if (modified) {
+              await configStore.updateGuildConfig(guildId, { reminders: nextReminders });
+            }
+          } catch (err) {
+            console.error(`[reminder] Error processing guild ${guildId}:`, err.message);
+          }
+        }
+      }, 60 * 1000).unref();
     })().catch((err) => console.error('[bot] Startup error:', err));
   });
 

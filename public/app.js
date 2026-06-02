@@ -3,7 +3,7 @@ import { saveBtnBar, configForm, commandSearchEl, commandFilterEl } from './dash
 import { isDirty, setDirty } from './dashboard/utils.js';
 import { showPage } from './dashboard/nav.js';
 import { addCommandRow, applyCommandFilter, ensureCommandSections, activateCommandSection, showCommandSections, getCommandGroupFromHash } from './dashboard/commands.js';
-import { addReplyRow, addSelfRoleRow } from './dashboard/form.js';
+import { addReplyRow, addSelfRoleRow, addReminderRow } from './dashboard/form.js';
 import { bindNavigation } from './dashboard/nav.js';
 import { loadServers, refreshStatus, saveConfig, syncSlash } from './dashboard/guild.js';
 
@@ -13,6 +13,7 @@ saveBtnBar.addEventListener('click', saveConfig);
 document.querySelector('#addCommandBtn')?.addEventListener('click', () => { addCommandRow(); setDirty(); });
 document.querySelector('#addReplyBtn')?.addEventListener('click', () => { addReplyRow(); setDirty(); });
 document.querySelector('#addSelfRoleBtn')?.addEventListener('click', () => { addSelfRoleRow(); setDirty(); });
+document.querySelector('#addReminderBtn')?.addEventListener('click', () => { addReminderRow(); setDirty(); });
 document.querySelector('#syncSlashBtn')?.addEventListener('click', syncSlash);
 commandSearchEl?.addEventListener('input', applyCommandFilter);
 commandFilterEl?.addEventListener('change', applyCommandFilter);

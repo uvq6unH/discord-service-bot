@@ -288,6 +288,8 @@ export const defaultConfig = {
   autoReplyEnabled: false,
   mentionReactEnabled: false,
   mentionReactEmoji: '👋',
+  remindersEnabled: false,
+  reminders: [],
   autoReplies: [
     {
       keyword: 'hello bot',

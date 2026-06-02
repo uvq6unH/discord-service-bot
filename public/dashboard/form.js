@@ -1,6 +1,6 @@
 import { esc, setDirty } from './utils.js';
 import {
-  currentGuildId, configForm, autoRepliesEl, selfRolesEl, FIELDS
+  currentGuildId, configForm, autoRepliesEl, selfRolesEl, remindersEl, FIELDS
 } from './state.js';
 import {
   ensureCommandSections, activateCommandSection, showCommandSections, addCommandRow,
@@ -67,6 +67,85 @@ export function readSelfRoles() {
   })).filter(r => r.label && r.roleId);
 }
 
+// ── Reminder helpers ─────────────────────────────────────────────────────────
+export function addReminderRow(reminder = { id: '', userId: '', channelId: '', message: '', time: '' }) {
+  const row = document.createElement('div');
+  row.className = 'reply-item';
+  row.style.flexDirection = 'column';
+  row.style.alignItems = 'stretch';
+  row.style.gap = '0.5rem';
+
+  const rowId = reminder.id || Date.now().toString();
+
+  const userSelect = document.createElement('select');
+  userSelect.className = 'reminder-user-id';
+  const blankUser = document.createElement('option'); blankUser.value = ''; blankUser.textContent = '-- Chọn thành viên --';
+  userSelect.append(blankUser);
+  for (const m of (window.currentGuildData?.members ?? [])) {
+    const opt = document.createElement('option');
+    opt.value = m.id; opt.textContent = m.displayName + (m.name !== m.displayName ? ` (${m.name})` : '');
+    if (m.id === reminder.userId) opt.selected = true;
+    userSelect.append(opt);
+  }
+  if (reminder.userId && !(window.currentGuildData?.members ?? []).some(m => m.id === reminder.userId)) {
+    const opt = document.createElement('option'); opt.value = reminder.userId; opt.textContent = `ID: ${reminder.userId}`; opt.selected = true;
+    userSelect.append(opt);
+  }
+
+  const channelSelect = document.createElement('select');
+  channelSelect.className = 'reminder-channel-id';
+  const blankChannel = document.createElement('option'); blankChannel.value = ''; blankChannel.textContent = '-- Chọn kênh --';
+  channelSelect.append(blankChannel);
+  for (const c of (window.currentGuildData?.channels ?? []).filter(c => c.type === 0 || c.type === 5)) {
+    const opt = document.createElement('option');
+    opt.value = c.id; opt.textContent = c.name;
+    if (c.id === reminder.channelId) opt.selected = true;
+    channelSelect.append(opt);
+  }
+
+  const topRow = document.createElement('div');
+  topRow.style.display = 'flex'; topRow.style.gap = '1rem';
+  
+  const userWrap = document.createElement('div'); userWrap.style.flex = '1';
+  userWrap.innerHTML = '<label>Thành viên</label>'; userWrap.append(userSelect);
+  
+  const channelWrap = document.createElement('div'); channelWrap.style.flex = '1';
+  channelWrap.innerHTML = '<label>Kênh</label>'; channelWrap.append(channelSelect);
+  
+  const timeWrap = document.createElement('div'); timeWrap.style.flex = '1';
+  timeWrap.innerHTML = `<label>Thời gian</label><input type="datetime-local" class="reminder-time" value="${reminder.time}" />`;
+  
+  topRow.append(userWrap, channelWrap, timeWrap);
+
+  const bottomRow = document.createElement('div');
+  bottomRow.style.display = 'flex'; bottomRow.style.gap = '1rem';
+  const msgWrap = document.createElement('div'); msgWrap.style.flex = '1';
+  msgWrap.innerHTML = `<label>Nội dung nhắc nhở</label><input class="reminder-message" value="${esc(reminder.message)}" placeholder="Nhớ tham gia event nhé!" />`;
+  
+  const removeBtn = document.createElement('button');
+  removeBtn.className = 'btn btn-xs btn-danger'; removeBtn.type = 'button'; removeBtn.textContent = 'Xóa';
+  removeBtn.style.alignSelf = 'flex-end';
+  removeBtn.addEventListener('click', () => { row.remove(); setDirty(); });
+  
+  bottomRow.append(msgWrap, removeBtn);
+
+  row.dataset.id = rowId;
+  row.append(topRow, bottomRow);
+  row.addEventListener('input', setDirty);
+  row.addEventListener('change', setDirty);
+  remindersEl.append(row);
+}
+
+export function readReminders() {
+  return [...remindersEl.querySelectorAll('.reply-item')].map(row => ({
+    id: row.dataset.id,
+    userId: row.querySelector('.reminder-user-id').value.trim(),
+    channelId: row.querySelector('.reminder-channel-id').value.trim(),
+    message: row.querySelector('.reminder-message').value.trim(),
+    time: row.querySelector('.reminder-time').value.trim()
+  })).filter(r => r.userId && r.channelId && r.message && r.time);
+}
+
 // ── Fill / read form ─────────────────────────────────────────────────────────
 export function fillForm(config) {
   for (const f of FIELDS) {
@@ -89,6 +168,9 @@ export function fillForm(config) {
 
   selfRolesEl.replaceChildren();
   for (const r of config.selfRoles ?? []) addSelfRoleRow(r);
+
+  remindersEl.replaceChildren();
+  for (const r of config.reminders ?? []) addReminderRow(r);
 
   // Stats
   const enabledCmds = (config.commands ?? []).filter(c => c.enabled).length;
@@ -114,10 +196,11 @@ export function updateModuleSummary(config, enabledCmds) {
   const activeGames = ['blackjackEnabled', 'pokerEnabled', 'coinflipEnabled', 'diceEnabled', 'slotsEnabled'].filter((field) => config[field] !== false).length;
   setModuleStatus('moduleEconomy', config.economyEnabled, activeGames ? `${activeGames} games` : 'On');
   setModuleStatus('moduleAutoReplies', config.autoReplyEnabled, config.autoReplies?.length ? `${config.autoReplies.length}` : 'On');
+  setModuleStatus('moduleReminders', config.remindersEnabled, config.reminders?.length ? `${config.reminders.length}` : 'On');
 }
 
 export function readForm() {
-  const payload = { guildId: currentGuildId, commands: readCommands(), autoReplies: readAutoReplies(), selfRoles: readSelfRoles() };
+  const payload = { guildId: currentGuildId, commands: readCommands(), autoReplies: readAutoReplies(), selfRoles: readSelfRoles(), reminders: readReminders() };
   const bwEl = document.querySelector('#badWords');
   payload.badWords = bwEl ? bwEl.value.split(/\r?\n/).map(s => s.trim()).filter(Boolean) : [];
   for (const f of FIELDS) {

@@ -23,6 +23,23 @@ function normalizeAutoReplies(autoReplies) {
     .slice(0, 50);
 }
 
+function normalizeReminders(reminders) {
+  if (!Array.isArray(reminders)) {
+    return [];
+  }
+
+  return reminders
+    .map((item) => ({
+      id: String(item?.id ?? '').trim(),
+      userId: normalizeSnowflakeId(item?.userId),
+      channelId: normalizeSnowflakeId(item?.channelId),
+      message: String(item?.message ?? '').trim(),
+      time: String(item?.time ?? '').trim()
+    }))
+    .filter((item) => item.id && item.userId && item.channelId && item.message && item.time)
+    .slice(0, 50);
+}
+
 function normalizeStringList(items, limit = 100) {
   if (!Array.isArray(items)) {
     return [];
@@ -296,6 +313,7 @@ export class ConfigStore {
       badWords: normalizeStringList(stored.badWords ?? defaultConfig.badWords),
       selfRoles: normalizeSelfRoles(stored.selfRoles ?? defaultConfig.selfRoles),
       autoReplies: normalizeAutoReplies(stored.autoReplies ?? defaultConfig.autoReplies),
+      reminders: normalizeReminders(stored.reminders ?? defaultConfig.reminders),
       riotApiKey: '',
       tftApiKey: ''
     };
@@ -395,7 +413,9 @@ export class ConfigStore {
         autoReplyEnabled: pickBoolean(patch, 'autoReplyEnabled', current),
         autoReplies: normalizeAutoReplies(patch.autoReplies ?? current.autoReplies),
         mentionReactEnabled: pickBoolean(patch, 'mentionReactEnabled', current),
-        mentionReactEmoji: String(patch.mentionReactEmoji ?? current.mentionReactEmoji ?? '👋').trim().slice(0, 32) || '👋'
+        mentionReactEmoji: String(patch.mentionReactEmoji ?? current.mentionReactEmoji ?? '👋').trim().slice(0, 32) || '👋',
+        remindersEnabled: pickBoolean(patch, 'remindersEnabled', current),
+        reminders: normalizeReminders(patch.reminders ?? current.reminders)
       };
 
       delete next.guildId;

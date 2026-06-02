@@ -23,6 +23,7 @@ export const accessBannerMsg = document.querySelector('#accessBannerMsg');
 export const serverList = document.querySelector('#serverList');
 export const autoRepliesEl = document.querySelector('#autoReplies');
 export const selfRolesEl = document.querySelector('#selfRoles');
+export const remindersEl = document.querySelector('#reminders');
 export const commandSearchEl = document.querySelector('#commandSearch');
 export const commandFilterEl = document.querySelector('#commandFilter');
 
@@ -35,6 +36,7 @@ export const pageTitles = {
   'user-levels': 'Cấp độ & XP',
   economy: 'Tiền ảo',
   'auto-replies': 'Tự động trả lời',
+  reminders: 'Nhắc nhở',
   'moderation-automod': 'Kiểm duyệt',
   'server-broadcast': 'Thông báo',
   interactions: 'Ticket & Roles',
@@ -48,6 +50,7 @@ export const pageOrder = [
   'user-levels',
   'economy',
   'auto-replies',
+  'reminders',
   'moderation-automod',
   'server-broadcast',
   'interactions',
@@ -70,7 +73,7 @@ export const FIELDS = [
   'slotsEnabled', 'slotsMinBet', 'slotsMaxBet',
   'announcementsEnabled', 'announcementChannelId', 'announcementMention',
   'welcomeEnabled', 'welcomeChannelId', 'welcomeMessage',
-  'autoReplyEnabled',
+  'autoReplyEnabled', 'remindersEnabled',
   'mentionReactEnabled', 'mentionReactEmoji',
   'riotApiKey', 'tftApiKey',
 ];
