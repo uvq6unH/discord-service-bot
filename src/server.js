@@ -233,7 +233,18 @@ export function createServer({ configStore, stateStore, botClient, redis = null 
         }))
         .sort((a, b) => b.rawPosition - a.rawPosition);
       
-      const membersFetched = await guild.members.fetch();
+      // Fetch members with timeout — fall back to cache if Discord API is slow or unavailable
+      let membersFetched;
+      try {
+        const fetchPromise = guild.members.fetch();
+        const timeoutPromise = new Promise((_, reject) =>
+          setTimeout(() => reject(new Error('members.fetch timeout')), 8000)
+        );
+        membersFetched = await Promise.race([fetchPromise, timeoutPromise]);
+      } catch (fetchErr) {
+        console.warn(`[guild-data] members.fetch failed (${fetchErr.message}), falling back to cache`);
+        membersFetched = guild.members.cache;
+      }
       const members = membersFetched.map((m) => ({
         id: m.user.id,
         name: m.user.tag,
