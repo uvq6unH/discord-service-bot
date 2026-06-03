@@ -1,11 +1,11 @@
+import { createRateLimiter } from './rateLimit.js';
+import helmet from 'helmet';
 import express from 'express';
 import cookieSession from 'cookie-session';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createAuthRouter } from './auth.js';
 import { createCsrfProtection } from './csrf.js';
-import { createRateLimiter } from './rateLimit.js';
-
 const snowflakePattern = /^\d{17,20}$/;
 const publicDir = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'public');
 
@@ -68,20 +68,12 @@ export function createServer({ configStore, stateStore, botClient, redis = null 
   //   connect-src: self only (all fetch() goes to our API; jsdelivr .map blocked in prod is fine)
   //   script-src : self (ES modules)
   //   frame-src  : none
-  app.use((_req, res, next) => {
-    res.setHeader('Content-Security-Policy', [
-      "default-src 'self'",
-      "script-src 'self'",
-      "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://fonts.googleapis.com",
-      "font-src 'self' https://fonts.gstatic.com https://cdn.jsdelivr.net",
-      "img-src 'self' https://cdn.discordapp.com data:",
-      "connect-src 'self'",
-      "frame-src 'none'",
-      "object-src 'none'",
-      "base-uri 'self'",
-    ].join('; '));
-    next();
-  });
+
+
+// Apply security headers
+app.use(helmet({
+  contentSecurityPolicy: false, // CSP already set manually
+}));
 
   app.use(cookieSession({
     name: 'dsession',
@@ -89,7 +81,7 @@ export function createServer({ configStore, stateStore, botClient, redis = null 
     maxAge: 7 * 24 * 60 * 60 * 1000,
     secure: isProduction,
     httpOnly: true,
-    sameSite: 'lax',
+    sameSite: isProduction ? 'strict' : 'lax',
   }));
 
   app.use((req, _res, next) => {
