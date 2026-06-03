@@ -75,27 +75,32 @@ function roundUpToStep(date, stepMin) {
   return new Date(Math.ceil(date.getTime() / ms) * ms);
 }
 
-/** Format a Date as "YYYY-MM-DDTHH:MM" for datetime-local inputs */
-function toDatetimeLocal(date) {
+/** Format a Date as "HH:MM" for time inputs */
+function toTimeLocal(date) {
   const pad = n => String(n).padStart(2, '0');
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+  return `${pad(date.getHours())}:${pad(date.getMinutes())}`;
 }
 
-/** Build a <datalist> with every 15-min slot for today + tomorrow */
-function buildTimeDatalist(id) {
-  const dl = document.createElement('datalist');
-  dl.id = id;
+/** Convert a "HH:MM" time string to an ISO UTC string for today (or tomorrow if past) */
+function timeLocalToISO(hhmm) {
+  if (!hhmm) return '';
+  const [h, m] = hhmm.split(':').map(Number);
   const now = new Date();
-  const startDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  for (let dayOffset = 0; dayOffset <= 1; dayOffset++) {
-    for (let slot = 0; slot < 96; slot++) { // 96 × 15 min = 24 h
-      const d = new Date(startDay.getTime() + dayOffset * 86400000 + slot * 15 * 60000);
-      const opt = document.createElement('option');
-      opt.value = toDatetimeLocal(d);
-      dl.append(opt);
-    }
+  const candidate = new Date(now.getFullYear(), now.getMonth(), now.getDate(), h, m, 0, 0);
+  // If already past today, schedule for tomorrow
+  if (candidate.getTime() <= now.getTime()) {
+    candidate.setDate(candidate.getDate() + 1);
   }
-  return dl;
+  return candidate.toISOString();
+}
+
+/** Convert an ISO/datetime-local string → "HH:MM" for display in time input */
+function isoToTimeLocal(isoOrDatetimeLocal) {
+  if (!isoOrDatetimeLocal) return '';
+  const d = new Date(isoOrDatetimeLocal);
+  if (isNaN(d)) return isoOrDatetimeLocal.slice(11, 16) || ''; // fallback for "2026-06-03T14:30" format
+  const pad = n => String(n).padStart(2, '0');
+  return `${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
 /** Build a member chip element with avatar initial + checkmark */
@@ -235,19 +240,15 @@ export function addReminderRow(reminder = { id: '', userIds: [], channelId: '', 
     channelSelect.append(opt);
   }
 
-  // ── Time input: step 15 min + datalist suggestions ──
-  const datalistId = `reminder-times-${rowId}`;
-  const timeDL = buildTimeDatalist(datalistId);
-
-  // Default time = next 15-min boundary from now
-  const defaultTime = reminder.time || toDatetimeLocal(roundUpToStep(new Date(), 15));
+  // ── Time input: 24h time-only (HH:MM), no date picker ──
+  // Default = next 15-min boundary from now
+  const defaultTime = isoToTimeLocal(reminder.time) || toTimeLocal(roundUpToStep(new Date(), 15));
 
   const timeInput = document.createElement('input');
-  timeInput.type = 'datetime-local';
+  timeInput.type = 'time';
   timeInput.className = 'reminder-time';
   timeInput.value = defaultTime;
   timeInput.step = String(15 * 60);
-  timeInput.setAttribute('list', datalistId);
 
   // ── Repeat select ──
   const repeatSelect = document.createElement('select');
@@ -274,7 +275,7 @@ export function addReminderRow(reminder = { id: '', userIds: [], channelId: '', 
 
   const timeWrap = document.createElement('div'); timeWrap.style.flex = '1'; timeWrap.style.minWidth = '180px';
   timeWrap.innerHTML = '<label>Thời gian</label>';
-  timeWrap.append(timeDL, timeInput);
+  timeWrap.append(timeInput);
 
   const repeatWrap = document.createElement('div'); repeatWrap.style.flex = '1'; repeatWrap.style.minWidth = '140px';
   repeatWrap.innerHTML = '<label>Lặp lại</label>'; repeatWrap.append(repeatSelect);
@@ -308,7 +309,7 @@ export function readReminders() {
       userIds: userIdsSelected,
       channelId: row.querySelector('.reminder-channel-id').value.trim(),
       message: row.querySelector('.reminder-message').value.trim(),
-      time: row.querySelector('.reminder-time').value.trim(),
+      time: timeLocalToISO(row.querySelector('.reminder-time').value.trim()),
       repeat: row.querySelector('.reminder-repeat')?.value || 'none',
     };
   }).filter(r => r.userIds.length && r.channelId && r.message && r.time);

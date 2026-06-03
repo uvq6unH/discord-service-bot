@@ -105,9 +105,7 @@ export function createBot(configStore, stateStore) {
                     // Advance time by N intervals so next fire is always in the future
                     let nextTime = time.getTime() + ms;
                     while (nextTime <= now.getTime()) nextTime += ms;
-                    const pad = n => String(n).padStart(2, '0');
-                    const d = new Date(nextTime);
-                    const nextTimeStr = `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+                    const nextTimeStr = new Date(nextTime).toISOString();
                     nextReminders.push({ ...reminder, time: nextTimeStr });
                   }
                 }

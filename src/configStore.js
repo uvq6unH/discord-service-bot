@@ -45,7 +45,8 @@ function normalizeReminders(reminders) {
         userIds,
         channelId: normalizeSnowflakeId(item?.channelId),
         message: String(item?.message ?? '').trim(),
-        time: String(item?.time ?? '').trim()
+        time: String(item?.time ?? '').trim(),
+        repeat: ['none', 'hourly', 'daily', 'weekly'].includes(item?.repeat) ? item.repeat : 'none',
       };
     })
     .filter((item) => item.id && item.userIds.length && item.channelId && item.message && item.time)
