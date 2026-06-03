@@ -32,6 +32,7 @@ export const pages = [...document.querySelectorAll('.page')];
 
 export const pageTitles = {
   overview: 'Dashboard',
+  members: 'Thành viên',
   'commands-general': 'Lệnh & Custom',
   'user-levels': 'Cấp độ & XP',
   economy: 'Tiền ảo',
@@ -46,6 +47,7 @@ export const pageTitles = {
 
 export const pageOrder = [
   'overview',
+  'members',
   'commands-general',
   'user-levels',
   'economy',

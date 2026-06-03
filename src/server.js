@@ -255,7 +255,10 @@ export function createServer({ configStore, stateStore, botClient, redis = null 
       const members = membersFetched.map((m) => ({
         id: m.user.id,
         name: m.user.tag,
-        displayName: m.displayName
+        displayName: m.displayName,
+        avatar: m.user.displayAvatarURL ? m.user.displayAvatarURL({ size: 64 }) : null,
+        roles: m.roles.cache.map((r) => r.id),
+        joinedAt: m.joinedAt ? m.joinedAt.toISOString() : null
       })).sort((a, b) => a.displayName.localeCompare(b.displayName));
 
       res.json({ channels, roles, members });

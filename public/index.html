@@ -50,6 +50,9 @@
       <button class="nav-item active" data-page="overview">
         <i class="ti ti-layout-dashboard"></i><span>Dashboard</span>
       </button>
+      <button class="nav-item" data-page="members">
+        <i class="ti ti-users"></i><span>Thành viên</span>
+      </button>
     </div>
 
     <div class="nav-group">
@@ -212,6 +215,38 @@
             <button type="button" class="module-card" data-page-jump="reminders">
               <i class="ti ti-bell"></i><span>Reminders</span><strong id="moduleReminders">—</strong>
             </button>
+          </div>
+        </section>
+
+        <!-- ── PAGE: MEMBERS ── -->
+        <section class="page" data-page-panel="members">
+          <div class="member-header">
+            <div class="member-stats">
+              <i class="ti ti-users stat-icon"></i>
+              <div>
+                <h3>Danh sách thành viên</h3>
+                <p>Tổng số: <strong id="memberTotalCount">0</strong> thành viên</p>
+              </div>
+            </div>
+          </div>
+          
+          <div class="member-toolbar">
+            <div class="search-box">
+              <i class="ti ti-search search-icon"></i>
+              <input id="memberSearchInput" type="search" placeholder="Tìm kiếm theo tên, nickname hoặc ID..." />
+            </div>
+            <div class="filter-box">
+              <i class="ti ti-filter filter-icon"></i>
+              <select id="memberRoleFilter">
+                <option value="all">Tất cả vai trò</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="member-list-container">
+            <div id="memberGrid" class="member-grid-list">
+              <!-- Cards rendered dynamically by JS -->
+            </div>
           </div>
         </section>
 

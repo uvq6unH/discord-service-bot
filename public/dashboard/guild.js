@@ -5,6 +5,7 @@ import {
   serverList, statusDot, statusText
 } from './state.js';
 import { fillForm, readForm } from './form.js';
+import { renderMembersPage } from './members.js';
 
 // ── Load guild data ──────────────────────────────────────────────────────────
 export async function fetchGuildData(guildId) {
@@ -68,6 +69,7 @@ export async function selectGuild(guild) {
   }
   const config = await res.json();
   fillForm(config);
+  renderMembersPage();
 
   // Stats
   const state = await fetch(`/api/state?guildId=${encodeURIComponent(guild.id)}`).then(r => r.json()).catch(() => ({}));

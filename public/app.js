@@ -6,8 +6,10 @@ import { addCommandRow, applyCommandFilter, ensureCommandSections, activateComma
 import { addReplyRow, addSelfRoleRow, addReminderRow } from './dashboard/form.js';
 import { bindNavigation } from './dashboard/nav.js';
 import { loadServers, refreshStatus, saveConfig, syncSlash } from './dashboard/guild.js';
+import { initMembersPage } from './dashboard/members.js';
 
 bindNavigation();
+initMembersPage();
 
 saveBtnBar.addEventListener('click', saveConfig);
 document.querySelector('#addCommandBtn')?.addEventListener('click', () => { addCommandRow(); setDirty(); });

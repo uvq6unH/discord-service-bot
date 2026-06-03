@@ -104,7 +104,15 @@ function isoToTimeLocal(isoOrDatetimeLocal) {
 }
 
 /** Build a member chip element with avatar initial + checkmark */
-function buildMemberChip(displayText, id, isChecked, onChangeCallback) {
+function buildMemberChip(displayText, id, isChecked, avatarUrlOrCallback, onChangeCallback) {
+  let avatarUrl = null;
+  let callback = onChangeCallback;
+  if (typeof avatarUrlOrCallback === 'function') {
+    callback = avatarUrlOrCallback;
+  } else {
+    avatarUrl = avatarUrlOrCallback;
+  }
+
   const lbl = document.createElement('label');
   lbl.className = 'reminder-member-chip' + (isChecked ? ' checked' : '');
   lbl.title = displayText;
@@ -115,10 +123,25 @@ function buildMemberChip(displayText, id, isChecked, onChangeCallback) {
   chk.value = id;
   chk.checked = isChecked;
 
-  // Avatar initial circle
-  const avatar = document.createElement('span');
-  avatar.className = 'member-chip-avatar';
-  avatar.textContent = displayText.charAt(0).toUpperCase();
+  // Avatar (image or initial fallback)
+  let avatar;
+  if (avatarUrl) {
+    avatar = document.createElement('img');
+    avatar.className = 'member-chip-avatar';
+    avatar.src = avatarUrl;
+    avatar.alt = displayText.charAt(0).toUpperCase();
+    avatar.style.objectFit = 'cover';
+    avatar.onerror = () => {
+      const spanFallback = document.createElement('span');
+      spanFallback.className = 'member-chip-avatar';
+      spanFallback.textContent = displayText.charAt(0).toUpperCase();
+      avatar.replaceWith(spanFallback);
+    };
+  } else {
+    avatar = document.createElement('span');
+    avatar.className = 'member-chip-avatar';
+    avatar.textContent = displayText.charAt(0).toUpperCase();
+  }
 
   // Checkmark icon (only visible when checked)
   const checkIcon = document.createElement('span');
@@ -132,7 +155,7 @@ function buildMemberChip(displayText, id, isChecked, onChangeCallback) {
 
   chk.addEventListener('change', () => {
     lbl.classList.toggle('checked', chk.checked);
-    onChangeCallback();
+    callback();
   });
 
   lbl.append(chk, avatar, nameSpan, checkIcon);
@@ -206,7 +229,7 @@ export function addReminderRow(reminder = { id: '', userIds: [], channelId: '', 
     for (const m of members) {
       const displayText = m.displayName + (m.name && m.name !== m.displayName ? ` (${m.name})` : '');
       const isChecked = selectedIds.includes(m.id);
-      const chip = buildMemberChip(displayText, m.id, isChecked, () => {
+      const chip = buildMemberChip(displayText, m.id, isChecked, m.avatar, () => {
         updateMemberCount();
         setDirty();
       });
