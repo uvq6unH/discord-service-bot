@@ -54,8 +54,8 @@ export function createServer({ configStore, stateStore, botClient, redis = null 
   const sessionSecret = process.env.SESSION_SECRET;
   const csrf = createCsrfProtection();
 
-  if (isProduction && !sessionSecret) {
-    throw new Error('Missing SESSION_SECRET in production.');
+  if (!sessionSecret) {
+    throw new Error('SESSION_SECRET is required.');
   }
 
   app.set('trust proxy', 1);
@@ -85,7 +85,7 @@ export function createServer({ configStore, stateStore, botClient, redis = null 
 
   app.use(cookieSession({
     name: 'dsession',
-    keys: [sessionSecret || 'dev-secret-change-me'],
+    keys: [sessionSecret],
     maxAge: 7 * 24 * 60 * 60 * 1000,
     secure: isProduction,
     httpOnly: true,
@@ -119,7 +119,7 @@ export function createServer({ configStore, stateStore, botClient, redis = null 
 
   app.get('/health', (_req, res) => {
     if (isProduction) {
-      res.json({ status: 'ok', botConnected: Boolean(botClient.user) });
+      res.json({ status: 'ok' });
       return;
     }
     res.json({ status: 'ok', uptime: process.uptime(), bot: Boolean(botClient.user) });
@@ -159,6 +159,13 @@ export function createServer({ configStore, stateStore, botClient, redis = null 
   });
 
   app.put('/api/config', auth.requireAuth, writeRateLimit, requireGuildId, auth.requireGuildAccess, async (req, res) => {
+    const limits = { commands: 100, autoReplies: 100, reminders: 100 };
+    for (const [key, limit] of Object.entries(limits)) {
+      if (Array.isArray(req.body?.[key]) && req.body[key].length > limit) {
+        return res.status(400).json({ error: `${key} exceeds limit ${limit}` });
+      }
+    }
+
     const config = await configStore.updateGuildConfig(req.guildId, req.body);
     const slashSync = botClient.user
       ? await botClient.syncGuildCommands(req.guildId, config).catch((e) => ({ synced: false, reason: e.message }))

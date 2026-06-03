@@ -6,7 +6,7 @@ import { createMutexPool } from './asyncMutex.js';
 const snowflakePattern = /^\d{17,20}$/;
 
 function clone(value) {
-  return JSON.parse(JSON.stringify(value));
+  return structuredClone(value);
 }
 
 function normalizeAutoReplies(autoReplies) {
