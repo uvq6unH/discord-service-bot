@@ -9,8 +9,7 @@ import { getMusicPlayer, buildSearchQuery, fmt } from '../../music/resolver.js';
 
 function sourceLabel(extractor) {
   if (!extractor) return '🎵';
-  // discord-player v7 returns the extractor as an object with an `identifier`
-  // property; older versions / some tracks pass a plain string.
+  // discord-player v7 trả extractor là object có .identifier, không phải string
   const id = (typeof extractor === 'string'
     ? extractor
     : extractor?.identifier ?? extractor?.constructor?.name ?? String(extractor)
@@ -30,11 +29,22 @@ function trackEmbed(track, title, color) {
     .addFields(
       { name: 'Duration', value: track.duration || '?:??', inline: true },
       { name: 'Source', value: sourceLabel(track.extractor), inline: true },
-      { name: 'Requested by', value: `<@${track.requestedBy ?? track.requestedBy}>`, inline: true }
+      { name: 'Requested by', value: `<@${track.requestedBy?.id ?? '?'}>`, inline: true }
     );
   if (track.thumbnail) embed.setThumbnail(track.thumbnail);
   return embed;
 }
+
+// nodeOptions dùng chung — leaveOnEnd/leaveOnEmpty luôn bật
+const NODE_OPTIONS = (textChannel) => ({
+  metadata: { textChannel },
+  volume: 80,
+  leaveOnEmpty: true,
+  leaveOnEmptyCooldown: 5000,
+  leaveOnEnd: true,
+  leaveOnEndCooldown: 30000,   // 30s trước khi rời sau khi hết nhạc
+  selfDeaf: true,
+});
 
 // ── Main export ───────────────────────────────────────────────────────────────
 
@@ -62,27 +72,9 @@ export async function handleMusicCommand({ message, subcommand, args, config }) 
 
     const loadingMsg = await message.reply('🔍 Đang tìm kiếm bài nhạc...').catch(() => null);
 
-    // ── playWithQuery ─────────────────────────────────────────────────────────
-    // Extracted so we can call it twice: once with the YouTube URL, then again
-    // with a SoundCloud title-search if the first attempt is blocked.
-    const playOptions = (searchEngine) => ({
-      nodeOptions: {
-        metadata: { textChannel: message.channel },
-        volume: 80,
-        leaveOnEmpty: true,
-        leaveOnEmptyCooldown: 5000,
-        leaveOnEnd: true,
-        leaveOnEndCooldown: 10000,
-        selfDeaf: true,
-      },
-      requestedBy: message.author,
-      searchEngine,
-    });
-
     try {
       const { query, source, fallbackTitle } = await buildSearchQuery(input);
 
-      // Determine initial search engine
       const initialEngine = (source === 'youtube' || source === 'soundcloud' || source === 'direct')
         ? QueryType.AUTO
         : QueryType.SOUNDCLOUD_SEARCH;
@@ -91,24 +83,44 @@ export async function handleMusicCommand({ message, subcommand, args, config }) 
       let usedFallback = false;
 
       try {
-        ({ track } = await player.play(voiceChannel, query, playOptions(initialEngine)));
+        ({ track } = await player.play(voiceChannel, query, {
+          nodeOptions: NODE_OPTIONS(message.channel),
+          requestedBy: message.author,
+          searchEngine: initialEngine,
+        }));
       } catch (firstErr) {
-        // YouTube block detection: "No results found", "Sign in", "bot", etc.
+        // ── YouTube bị chặn → fallback SoundCloud ──────────────────────────
+        // QUAN TRỌNG: discord-player có thể đã join voice và tạo queue trước
+        // khi throw. Phải destroy queue đó trước khi retry, nếu không queue rỗng
+        // sẽ trigger leaveOnEnd và bot sẽ disconnect ngay sau khi vào lại.
+        const existingQueue = useQueue(guildId);
+        if (existingQueue) {
+          existingQueue.delete();
+          // Chờ một tick để voice connection được giải phóng
+          await new Promise(r => setTimeout(r, 300));
+        }
+
         const isYtBlock = source === 'youtube' && (
           firstErr.message?.toLowerCase().includes('no results') ||
           firstErr.message?.toLowerCase().includes('sign in') ||
           firstErr.message?.toLowerCase().includes('bot') ||
-          firstErr.message?.toLowerCase().includes('not available')
+          firstErr.message?.toLowerCase().includes('not available') ||
+          firstErr.message?.toLowerCase().includes('unavailable')
         );
 
         if (isYtBlock && fallbackTitle) {
-          // Re-try with a SoundCloud title search
-          console.warn(`[music] YouTube blocked, falling back to SoundCloud search: "${fallbackTitle}"`);
-          if (loadingMsg) await loadingMsg.edit(`🔍 YouTube bị chặn — đang tìm **"${fallbackTitle}"** trên SoundCloud...`).catch(() => null);
-          ({ track } = await player.play(voiceChannel, fallbackTitle, playOptions(QueryType.SOUNDCLOUD_SEARCH)));
+          console.warn(`[music] YouTube blocked → SoundCloud fallback: "${fallbackTitle}"`);
+          if (loadingMsg) {
+            await loadingMsg.edit(`🔍 YouTube bị chặn — đang tìm **"${fallbackTitle}"** trên SoundCloud...`).catch(() => null);
+          }
+          ({ track } = await player.play(voiceChannel, fallbackTitle, {
+            nodeOptions: NODE_OPTIONS(message.channel),
+            requestedBy: message.author,
+            searchEngine: QueryType.SOUNDCLOUD_SEARCH,
+          }));
           usedFallback = true;
         } else {
-          throw firstErr; // not a YouTube block, or no title to fall back to
+          throw firstErr;
         }
       }
 
@@ -133,6 +145,8 @@ export async function handleMusicCommand({ message, subcommand, args, config }) 
 
     } catch (err) {
       console.error('[music] play error:', err.message);
+      // Nếu còn queue treo thì dọn luôn
+      useQueue(guildId)?.delete();
       const isYtBlock = err.message?.toLowerCase().includes('sign in') ||
                         err.message?.toLowerCase().includes('bot') ||
                         err.message?.toLowerCase().includes('no results');
