@@ -1,18 +1,15 @@
 /**
  * express-session store backed by Upstash Redis REST API.
- * Must extend EventEmitter — express-session calls store.on('disconnect') etc.
+ * Extends expressSession.Store so all required methods (createSession, etc.)
+ * are inherited correctly — no manual EventEmitter wiring needed.
  */
 
-import { EventEmitter } from 'node:events';
+import expressSession from 'express-session';
 
 const SESSION_PREFIX = 'sess:';
 const DEFAULT_TTL    = 7 * 24 * 60 * 60; // 7 days in seconds
 
-export class UpstashSessionStore extends EventEmitter {
-  /**
-   * @param {import('./upstash.js').UpstashClient} client
-   * @param {{ ttl?: number }} [opts]
-   */
+export class UpstashSessionStore extends expressSession.Store {
   constructor(client, opts = {}) {
     super();
     this.client = client;
@@ -21,7 +18,6 @@ export class UpstashSessionStore extends EventEmitter {
 
   _key(sid) { return `${SESSION_PREFIX}${sid}`; }
 
-  /** express-session: load session */
   get(sid, cb) {
     this.client.get(this._key(sid))
       .then((raw) => {
@@ -32,7 +28,6 @@ export class UpstashSessionStore extends EventEmitter {
       .catch(cb);
   }
 
-  /** express-session: save/update session */
   set(sid, session, cb) {
     const ttl = this._getTTL(session);
     this.client.set(this._key(sid), JSON.stringify(session), 'EX', ttl)
@@ -40,14 +35,12 @@ export class UpstashSessionStore extends EventEmitter {
       .catch(cb);
   }
 
-  /** express-session: destroy session */
   destroy(sid, cb) {
     this.client.del(this._key(sid))
       .then(() => cb(null))
       .catch(cb);
   }
 
-  /** express-session: refresh TTL without resaving full data */
   touch(sid, session, cb) {
     const ttl = this._getTTL(session);
     this.client.expire(this._key(sid), ttl)
