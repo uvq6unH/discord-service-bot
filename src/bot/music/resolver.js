@@ -85,10 +85,108 @@ export async function initMusicPlayer(client) {
     console.error('[music] ⚠️ ffmpeg probe failed:', e.message);
   }
 
-  // Load all built-in extractors.
-  // SoundCloud extractor works without credentials.
-  // YouTube extractor is included but will be skipped if bot-detection fires.
+  // Load extractors — chỉ load SoundCloud + Attachment, bỏ YouTube (bị block)
+  // play-dl sẽ xử lý stream trực tiếp qua custom extractor bên dưới
   await _player.extractors.loadMulti(DefaultExtractors);
+
+  // ── play-dl based YouTube extractor ──────────────────────────────────────
+  // Dùng play-dl để stream YouTube/SoundCloud vì nó ổn định hơn built-in extractor
+  try {
+    const playdl = await import('play-dl');
+    // Authorize SoundCloud để lấy client_id tự động
+    if (playdl.setToken) {
+      await playdl.setToken({ soundcloud: { client_id: 'auto' } }).catch(() => null);
+    }
+
+    const { BaseExtractor, Track } = await import('discord-player');
+
+    class PlayDlExtractor extends BaseExtractor {
+      static identifier = 'com.custom.playdl-extractor';
+
+      async validate(query) {
+        // Nhận tất cả — là safety net sau khi extractors khác fail
+        return typeof query === 'string' && query.length > 0;
+      }
+
+      async handle(query, context) {
+        try {
+          let streamInfo, trackMeta;
+
+          const isYt = /youtu\.be|youtube\.com/i.test(query);
+          const isSc = /soundcloud\.com/i.test(query);
+
+          if (isYt || isSc) {
+            // URL trực tiếp
+            const info = await playdl.video_info(query).catch(() => null)
+                      ?? await playdl.soundcloud(query).catch(() => null);
+            if (!info) throw new Error('Could not fetch info for URL');
+
+            const details = info.video_details ?? info;
+            trackMeta = {
+              title: details.title ?? 'Unknown',
+              url: query,
+              duration: Math.floor((details.durationInSec ?? details.duration ?? 0) * 1000),
+              thumbnail: details.thumbnails?.[0]?.url ?? details.thumbnail?.url ?? null,
+            };
+
+            streamInfo = await playdl.stream(query, { quality: 2 });
+          } else {
+            // Text search — thử SoundCloud trước
+            const results = await playdl.search(query, { source: { soundcloud: 'tracks' }, limit: 1 })
+                         .catch(() => []);
+            const hit = results[0];
+            if (!hit) throw new Error(`No results for: ${query}`);
+
+            trackMeta = {
+              title: hit.name ?? hit.title ?? 'Unknown',
+              url: hit.url,
+              duration: Math.floor((hit.durationInSec ?? 0) * 1000),
+              thumbnail: hit.thumbnail?.url ?? null,
+            };
+            streamInfo = await playdl.stream(hit.url, { quality: 2 });
+          }
+
+          const track = new Track(this.player, {
+            title: trackMeta.title,
+            url: trackMeta.url,
+            duration: trackMeta.duration ? String(Math.floor(trackMeta.duration / 1000 / 60)) + ':' + String(Math.floor(trackMeta.duration / 1000 % 60)).padStart(2,'0') : '0:00',
+            thumbnail: trackMeta.thumbnail,
+            author: 'play-dl',
+            requestedBy: context.requestedBy,
+            extractor: this,
+          });
+
+          return this.createResponse(context.playlist ?? null, [track], {
+            stream: {
+              stream: streamInfo.stream,
+              type: streamInfo.type,
+            },
+          });
+        } catch (err) {
+          console.error('[playdl-extractor] handle error:', err.message);
+          return this.createResponse(null, []);
+        }
+      }
+
+      async stream(track) {
+        const playdl = await import('play-dl');
+        const info = await playdl.stream(track.url, { quality: 2 });
+        return {
+          stream: info.stream,
+          type: info.type,
+        };
+      }
+
+      emptyResponse() {
+        return this.createResponse(null, []);
+      }
+    }
+
+    await _player.extractors.register(PlayDlExtractor, {});
+    console.log('[music] play-dl extractor registered');
+  } catch (e) {
+    console.warn('[music] play-dl extractor failed to load:', e.message);
+  }
 
   _player.events.on('playerError', (queue, error) => {
     console.error('[discord-player] playerError:', error?.message, error?.stack);

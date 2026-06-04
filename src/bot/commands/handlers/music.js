@@ -79,9 +79,9 @@ export async function handleMusicCommand({ message, subcommand, args, config }) 
     try {
       const { query, source, fallbackTitle } = await buildSearchQuery(input);
 
-      const initialEngine = (source === 'youtube' || source === 'soundcloud' || source === 'direct')
-        ? QueryType.AUTO
-        : QueryType.SOUNDCLOUD_SEARCH;
+      // AUTO để discord-player thử từng extractor theo thứ tự đăng ký
+      // play-dl extractor được register sau cùng — là fallback cuối
+      const initialEngine = QueryType.AUTO;
 
       let track;
       let usedFallback = false;
