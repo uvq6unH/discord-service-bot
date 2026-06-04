@@ -221,6 +221,7 @@ export function createAuthRouter(botClient) {
   function hasManagePermission(userGuilds, guildId) {
     const g = userGuilds?.find(g => g.id === guildId);
     if (!g) return false;
+    if (g.owner) return true; // server owner luôn có toàn quyền
     const perms = BigInt(g.permissions ?? 0);
     const ADMINISTRATOR = 0x8n;
     const MANAGE_GUILD   = 0x20n;

@@ -75,13 +75,15 @@ app.use(helmet({
   contentSecurityPolicy: false, // CSP already set manually
 }));
 
+  // Render terminates TLS at the proxy layer — req.secure may be false even on HTTPS.
+  // cookie-session needs secure:false here; the proxy already enforces HTTPS externally.
   app.use(cookieSession({
     name: 'dsession',
     keys: [sessionSecret],
     maxAge: 7 * 24 * 60 * 60 * 1000,
-    secure: isProduction,
+    secure: false,
     httpOnly: true,
-    sameSite: 'lax', // 'strict' blocks cookie on OAuth redirect (cross-site navigation)
+    sameSite: 'lax',
   }));
 
   app.use((req, _res, next) => {
@@ -227,6 +229,7 @@ app.use(helmet({
     const manageableIds = new Set(
       (userGuilds ?? [])
         .filter(g => {
+          if (g.owner) return true; // server owner
           const p = BigInt(g.permissions ?? 0);
           return (p & ADMINISTRATOR) === ADMINISTRATOR || (p & MANAGE_GUILD) === MANAGE_GUILD;
         })
@@ -245,7 +248,7 @@ app.use(helmet({
     for (const g of (userGuilds ?? [])) {
       if (guildsById.has(g.id)) continue; // đã có rồi
       const p = BigInt(g.permissions ?? 0);
-      const canManage = (p & ADMINISTRATOR) === ADMINISTRATOR || (p & MANAGE_GUILD) === MANAGE_GUILD;
+      const canManage = g.owner || (p & ADMINISTRATOR) === ADMINISTRATOR || (p & MANAGE_GUILD) === MANAGE_GUILD;
       if (canManage) {
         guildsById.set(g.id, { id: g.id, name: g.name, icon: g.icon ? `https://cdn.discordapp.com/icons/${g.id}/${g.icon}.png?size=64` : null, configured: false, botPresent: false });
       }
