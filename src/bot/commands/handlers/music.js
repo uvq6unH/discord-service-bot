@@ -57,25 +57,55 @@ export async function handleMusicCommand({ message, subcommand, args, config }) 
 
     const loadingMsg = await message.reply('🔍 Đang tìm kiếm bài nhạc...').catch(() => null);
 
-    try {
-      const { query, source } = await buildSearchQuery(input);
+    // ── playWithQuery ─────────────────────────────────────────────────────────
+    // Extracted so we can call it twice: once with the YouTube URL, then again
+    // with a SoundCloud title-search if the first attempt is blocked.
+    const playOptions = (searchEngine) => ({
+      nodeOptions: {
+        metadata: { textChannel: message.channel },
+        volume: 80,
+        leaveOnEmpty: true,
+        leaveOnEmptyCooldown: 5000,
+        leaveOnEnd: true,
+        leaveOnEndCooldown: 10000,
+        selfDeaf: true,
+      },
+      requestedBy: message.author,
+      searchEngine,
+    });
 
-      const { track } = await player.play(voiceChannel, query, {
-        nodeOptions: {
-          metadata: { textChannel: message.channel },
-          volume: 80,
-          leaveOnEmpty: true,
-          leaveOnEmptyCooldown: 5000,
-          leaveOnEnd: true,
-          leaveOnEndCooldown: 10000,
-          selfDeaf: true,
-        },
-        requestedBy: message.author,
-        // Prefer SoundCloud for plain searches to avoid YouTube bot-detection
-        searchEngine: (source === 'youtube' || source === 'soundcloud' || source === 'direct')
-          ? QueryType.AUTO
-          : QueryType.SOUNDCLOUD_SEARCH,
-      });
+    try {
+      const { query, source, fallbackTitle } = await buildSearchQuery(input);
+
+      // Determine initial search engine
+      const initialEngine = (source === 'youtube' || source === 'soundcloud' || source === 'direct')
+        ? QueryType.AUTO
+        : QueryType.SOUNDCLOUD_SEARCH;
+
+      let track;
+      let usedFallback = false;
+
+      try {
+        ({ track } = await player.play(voiceChannel, query, playOptions(initialEngine)));
+      } catch (firstErr) {
+        // YouTube block detection: "No results found", "Sign in", "bot", etc.
+        const isYtBlock = source === 'youtube' && (
+          firstErr.message?.toLowerCase().includes('no results') ||
+          firstErr.message?.toLowerCase().includes('sign in') ||
+          firstErr.message?.toLowerCase().includes('bot') ||
+          firstErr.message?.toLowerCase().includes('not available')
+        );
+
+        if (isYtBlock && fallbackTitle) {
+          // Re-try with a SoundCloud title search
+          console.warn(`[music] YouTube blocked, falling back to SoundCloud search: "${fallbackTitle}"`);
+          if (loadingMsg) await loadingMsg.edit(`🔍 YouTube bị chặn — đang tìm **"${fallbackTitle}"** trên SoundCloud...`).catch(() => null);
+          ({ track } = await player.play(voiceChannel, fallbackTitle, playOptions(QueryType.SOUNDCLOUD_SEARCH)));
+          usedFallback = true;
+        } else {
+          throw firstErr; // not a YouTube block, or no title to fall back to
+        }
+      }
 
       const queue = useQueue(guildId);
       const isFirst = !queue || queue.size <= 1;
@@ -90,6 +120,7 @@ export async function handleMusicCommand({ message, subcommand, args, config }) 
           { name: 'Requested by', value: `<@${message.author.id}>`, inline: true }
         );
       if (track.thumbnail) embed.setThumbnail(track.thumbnail);
+      if (usedFallback) embed.setFooter({ text: '⚠️ YouTube bị chặn — đã tìm qua SoundCloud' });
 
       return loadingMsg
         ? loadingMsg.edit({ content: '', embeds: [embed] })
@@ -97,8 +128,11 @@ export async function handleMusicCommand({ message, subcommand, args, config }) 
 
     } catch (err) {
       console.error('[music] play error:', err.message);
-      const errMsg = err.message?.includes('Sign in') || err.message?.includes('bot')
-        ? '❌ YouTube đang chặn bot. Hãy thử link **SoundCloud** hoặc tìm bằng tên bài.'
+      const isYtBlock = err.message?.toLowerCase().includes('sign in') ||
+                        err.message?.toLowerCase().includes('bot') ||
+                        err.message?.toLowerCase().includes('no results');
+      const errMsg = isYtBlock
+        ? '❌ Không tìm thấy bài nhạc. YouTube đang chặn bot và không có kết quả SoundCloud thay thế.\n💡 Thử: tên bài nhạc, link SoundCloud, hoặc Spotify.'
         : `❌ Không tìm thấy: ${err.message}`;
       return loadingMsg
         ? loadingMsg.edit(errMsg)

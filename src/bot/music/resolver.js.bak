@@ -72,23 +72,6 @@ async function spotifyTitle(url) {
   return (await res.json()).title;
 }
 
-// ── YouTube oEmbed title fetch ────────────────────────────────────────────────
-// Uses YouTube's public oEmbed endpoint — no scraping, no auth.
-// Returns null on failure (private/age-gated/deleted videos).
-
-async function youtubeTitle(url) {
-  try {
-    const res = await fetch(
-      `https://www.youtube.com/oembed?url=${encodeURIComponent(url)}&format=json`,
-      { headers: { 'User-Agent': 'Mozilla/5.0' }, signal: AbortSignal.timeout(5000) }
-    );
-    if (!res.ok) return null;
-    return (await res.json()).title ?? null;
-  } catch {
-    return null;
-  }
-}
-
 // ── detectSource ──────────────────────────────────────────────────────────────
 
 export function detectSource(input) {
@@ -101,11 +84,8 @@ export function detectSource(input) {
 
 // ── buildSearchQuery ──────────────────────────────────────────────────────────
 // Converts any user input into a query string discord-player can search.
-//
-// YouTube URLs: pass direct URL to discord-player (may work on some IPs), but
-//   also pre-fetch the video title via oEmbed so music.js can do a SoundCloud
-//   title-search fallback without an extra HTTP round-trip.
-// Spotify URLs: resolve title via oEmbed → search SoundCloud.
+// For YouTube URLs we still attempt them (discord-player may succeed on some
+// regions/IPs); Spotify is converted to a title search on SoundCloud.
 
 export async function buildSearchQuery(input) {
   const source = detectSource(input.trim());
@@ -117,11 +97,6 @@ export async function buildSearchQuery(input) {
     } catch {
       return { query: input.trim(), source: 'spotify', originalUrl: input.trim() };
     }
-  }
-
-  if (source === 'youtube') {
-    const fallbackTitle = await youtubeTitle(input.trim()); // null if unavailable
-    return { query: input.trim(), source: 'youtube', originalUrl: input.trim(), fallbackTitle };
   }
 
   return { query: input.trim(), source, originalUrl: input.trim() };
