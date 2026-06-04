@@ -3,7 +3,12 @@ services:
     name: discord-service-bot
     runtime: node
     plan: free
-    buildCommand: corepack enable && pnpm install --frozen-lockfile
+    buildCommand: >-
+      corepack enable &&
+      pnpm install --frozen-lockfile &&
+      curl -fsSL https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp -o /usr/local/bin/yt-dlp &&
+      chmod +x /usr/local/bin/yt-dlp &&
+      yt-dlp --version
     startCommand: pnpm start
     disk:
       name: bot-data
