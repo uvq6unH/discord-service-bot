@@ -81,6 +81,9 @@
       <button class="nav-item" data-page="reminders">
         <i class="ti ti-bell"></i><span>Nhắc nhở (Reminders)</span>
       </button>
+      <button class="nav-item" data-page="music">
+        <i class="ti ti-music"></i><span>Music 🎵</span>
+      </button>
     </div>
 
     <div class="nav-group">
@@ -226,6 +229,9 @@
             </button>
             <button type="button" class="module-card" data-page-jump="reminders">
               <i class="ti ti-bell"></i><span>Reminders</span><strong id="moduleReminders">—</strong>
+            </button>
+            <button type="button" class="module-card" data-page-jump="music">
+              <i class="ti ti-music"></i><span>Music</span><strong id="moduleMusic">—</strong>
             </button>
           </div>
         </section>
@@ -591,6 +597,65 @@
                 <button id="addReminderBtn" class="btn btn-secondary mt-2" type="button">
                   <i class="ti ti-plus"></i> Thêm nhắc nhở
                 </button>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        </section>
+
+        <!-- ── PAGE: MUSIC ── -->
+        <section class="page" data-page-panel="music">
+          <div class="plugin-grid">
+            <div class="plugin-card wide">
+              <div class="plugin-card-header">
+                <div class="plugin-icon bg-purple"><i class="ti ti-music"></i></div>
+                <div>
+                  <h3>Music 🎵</h3>
+                  <p>Phát nhạc từ YouTube, Spotify, SoundCloud hoặc URL trực tiếp</p>
+                </div>
+                <label class="toggle ml-auto">
+                  <input type="checkbox" id="musicEnabled" name="musicEnabled">
+                  <span class="toggle-track"></span>
+                </label>
+              </div>
+              <div class="plugin-card-body">
+                <div class="field-row">
+                  <label class="field-label" for="musicPrefix">Music Prefix</label>
+                  <input class="field-input" type="text" id="musicPrefix" name="musicPrefix"
+                    placeholder="hb" maxlength="10" style="max-width:120px">
+                  <p class="field-hint">Prefix riêng cho lệnh nhạc. Ví dụ: prefix là <code>hb</code> → gõ <code>hb play link</code></p>
+                </div>
+
+                <div class="section-subhead" style="margin-top:1.5rem">Danh sách lệnh</div>
+                <div class="help-table" style="margin-top:.5rem">
+                  <table class="cmd-table" style="width:100%;border-collapse:collapse;font-size:.875rem">
+                    <thead>
+                      <tr style="text-align:left;border-bottom:1px solid var(--border)">
+                        <th style="padding:.4rem .6rem">Lệnh</th>
+                        <th style="padding:.4rem .6rem">Mô tả</th>
+                      </tr>
+                    </thead>
+                    <tbody id="musicCmdTable">
+                      <tr><td style="padding:.35rem .6rem"><code id="mc-play">hb play &lt;link/tên&gt;</code></td><td style="padding:.35rem .6rem">Phát nhạc — YT / Spotify / SC / URL</td></tr>
+                      <tr><td style="padding:.35rem .6rem"><code id="mc-skip">hb skip</code></td><td style="padding:.35rem .6rem">Bỏ qua bài hiện tại</td></tr>
+                      <tr><td style="padding:.35rem .6rem"><code id="mc-stop">hb stop</code></td><td style="padding:.35rem .6rem">Dừng phát &amp; rời Voice Channel</td></tr>
+                      <tr><td style="padding:.35rem .6rem"><code id="mc-pause">hb pause / hb resume</code></td><td style="padding:.35rem .6rem">Tạm dừng / tiếp tục</td></tr>
+                      <tr><td style="padding:.35rem .6rem"><code id="mc-queue">hb queue</code></td><td style="padding:.35rem .6rem">Xem hàng nhạc</td></tr>
+                      <tr><td style="padding:.35rem .6rem"><code id="mc-np">hb np</code></td><td style="padding:.35rem .6rem">Bài đang phát (Now Playing)</td></tr>
+                      <tr><td style="padding:.35rem .6rem"><code id="mc-loop">hb loop</code></td><td style="padding:.35rem .6rem">Bật/tắt lặp lại bài hiện tại</td></tr>
+                      <tr><td style="padding:.35rem .6rem"><code id="mc-vol">hb volume &lt;0–200&gt;</code></td><td style="padding:.35rem .6rem">Điều chỉnh âm lượng</td></tr>
+                    </tbody>
+                  </table>
+                </div>
+
+                <div class="info-box" style="margin-top:1.25rem;padding:.75rem 1rem;background:var(--bg-2);border-radius:8px;border-left:3px solid var(--accent)">
+                  <p style="margin:0;font-size:.85rem">
+                    <strong>💡 Lưu ý:</strong> Bot cần quyền <strong>Connect</strong> và <strong>Speak</strong> trong Voice Channel.
+                    Thành viên phải đang trong Voice Channel để sử dụng lệnh nhạc.
+                    Spotify chỉ hỗ trợ link track đơn lẻ (không hỗ trợ playlist/album).
+                  </p>
+                </div>
               </div>
             </div>
           </div>

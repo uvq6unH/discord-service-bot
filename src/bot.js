@@ -94,6 +94,7 @@ setInterval(() => {
   }
 }, 5 * 60 * 1000).unref();
 import { handleComponentInteraction } from './bot/interactions.js';
+import { handleMusicCommand } from './bot/commands/handlers/music.js';
 
 const commandCooldowns = new CommandCooldowns();
 
@@ -103,6 +104,7 @@ export function createBot(configStore, stateStore) {
       GatewayIntentBits.Guilds,
       GatewayIntentBits.GuildMessages,
       GatewayIntentBits.GuildMembers,
+      GatewayIntentBits.GuildVoiceStates,
       GatewayIntentBits.MessageContent
     ],
     partials: [Partials.Channel]
@@ -395,6 +397,23 @@ export function createBot(configStore, stateStore) {
           await message.react(emoji).catch((err) => {
             console.error('[mention-react] Failed:', err.message, '| raw:', config.mentionReactEmoji);
           });
+        }
+      }
+
+      // ── Music prefix ───────────────────────────────────────────────────────
+      if (config.musicEnabled) {
+        const mPrefix = (config.musicPrefix || 'hb').toLowerCase();
+        const lc = content.toLowerCase();
+        if (lc === mPrefix || lc.startsWith(mPrefix + ' ')) {
+          const musicBody = content.slice(mPrefix.length).trim();
+          const [subcommand, ...musicArgParts] = musicBody.split(/\s+/);
+          await handleMusicCommand({
+            message,
+            subcommand: (subcommand || '').toLowerCase(),
+            args: musicArgParts.join(' '),
+            config
+          });
+          return;
         }
       }
 

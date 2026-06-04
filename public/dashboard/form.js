@@ -398,6 +398,7 @@ export function updateModuleSummary(config, enabledCmds) {
   setModuleStatus('moduleEconomy', config.economyEnabled, activeGames ? `${activeGames} games` : 'On');
   setModuleStatus('moduleAutoReplies', config.autoReplyEnabled, config.autoReplies?.length ? `${config.autoReplies.length}` : 'On');
   setModuleStatus('moduleReminders', config.remindersEnabled, config.reminders?.length ? `${config.reminders.length}` : 'On');
+  setModuleStatus('moduleMusic', config.musicEnabled, config.musicPrefix ? config.musicPrefix : 'On');
 }
 
 export function readForm() {

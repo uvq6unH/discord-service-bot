@@ -52,3 +52,25 @@ document.addEventListener('visibilitychange', () => {
 _startStatusPoll();
 
 loadServers();
+
+// ── Music prefix live preview ─────────────────────────────────────────────────
+// Updates the command table in the Music section whenever the prefix input changes.
+function updateMusicCmdTable() {
+  const el = document.querySelector('#musicPrefix');
+  const p = el?.value?.trim() || 'hb';
+  const rows = [
+    ['mc-play',  `${p} play &lt;link/tên&gt;`],
+    ['mc-skip',  `${p} skip`],
+    ['mc-stop',  `${p} stop`],
+    ['mc-pause', `${p} pause / ${p} resume`],
+    ['mc-queue', `${p} queue`],
+    ['mc-np',    `${p} np`],
+    ['mc-loop',  `${p} loop`],
+    ['mc-vol',   `${p} volume &lt;0–200&gt;`],
+  ];
+  for (const [id, html] of rows) {
+    const cell = document.querySelector(`#${id}`);
+    if (cell) cell.innerHTML = html;
+  }
+}
+document.querySelector('#musicPrefix')?.addEventListener('input', updateMusicCmdTable);
