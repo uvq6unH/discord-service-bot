@@ -1,7 +1,8 @@
 import { createRateLimiter } from './rateLimit.js';
 import helmet from 'helmet';
 import express from 'express';
-import cookieSession from 'cookie-session';
+import expressSession from 'express-session';
+import { UpstashSessionStore } from './sessionStore.js';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createAuthRouter } from './auth.js';
@@ -75,37 +76,24 @@ app.use(helmet({
   contentSecurityPolicy: false, // CSP already set manually
 }));
 
-  // Render terminates TLS at the proxy layer — req.secure may be false even on HTTPS.
-  // cookie-session needs secure:false here; the proxy already enforces HTTPS externally.
-  app.use(cookieSession({
+  // Session: server-side store in Upstash Redis (when available) so the session
+  // data is never serialised into the cookie. Falls back to in-memory MemoryStore
+  // for local dev (no Redis configured). Render terminates TLS at the proxy layer
+  // so cookie.secure is set to false here; the proxy enforces HTTPS externally.
+  const sessionStore = redis ? new UpstashSessionStore(redis) : undefined;
+  app.use(expressSession({
     name: 'dsession',
-    keys: [sessionSecret],
-    maxAge: 7 * 24 * 60 * 60 * 1000,
-    secure: false,
-    httpOnly: true,
-    sameSite: 'lax',
+    secret: sessionSecret,
+    resave: false,
+    saveUninitialized: false,
+    store: sessionStore,
+    cookie: {
+      maxAge: 7 * 24 * 60 * 60 * 1000,
+      secure: false,
+      httpOnly: true,
+      sameSite: 'lax',
+    },
   }));
-
-  // Shim regenerate/save for compatibility with middlewares that expect express-session API.
-  // IMPORTANT: must use non-enumerable properties so cookie-session does NOT serialize these
-  // functions into the cookie — serializing functions corrupts the session after the first request.
-  app.use((req, _res, next) => {
-    if (req.session && !Object.prototype.hasOwnProperty.call(req.session, 'regenerate')) {
-      Object.defineProperty(req.session, 'regenerate', {
-        value: (cb) => { cb?.(); },
-        enumerable: false,
-        configurable: true,
-        writable: true,
-      });
-      Object.defineProperty(req.session, 'save', {
-        value: (cb) => { cb?.(); },
-        enumerable: false,
-        configurable: true,
-        writable: true,
-      });
-    }
-    next();
-  });
 
   app.use(express.json({ limit: '128kb' }));
   const writeRateLimit = createRateLimiter({
