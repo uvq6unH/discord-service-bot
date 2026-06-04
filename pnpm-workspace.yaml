@@ -3,6 +3,3 @@ allowBuilds:
   esbuild: true
   opusscript: true
   libsodium-wrappers: true
-
-overrides:
-  discord-api-types: "0.37.119"
