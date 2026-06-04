@@ -4,11 +4,7 @@ services:
     runtime: node
     plan: free
     buildCommand: corepack enable && pnpm install --frozen-lockfile
-    startCommand: >-
-      curl -fsSL https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp -o /var/data/yt-dlp &&
-      chmod +x /var/data/yt-dlp &&
-      echo "yt-dlp ready: $(/var/data/yt-dlp --version)" &&
-      pnpm start
+    startCommand: pnpm start
     disk:
       name: bot-data
       mountPath: /var/data
@@ -22,8 +18,6 @@ services:
         value: /var/data/configs.json
       - key: STATE_PATH
         value: /var/data/state.json
-      - key: YTDLP_PATH
-        value: /var/data/yt-dlp
       - key: DAILY_RESET_UTC_OFFSET_MINUTES
         value: 420
       - key: COMMAND_COOLDOWN_MS

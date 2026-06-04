@@ -19,37 +19,11 @@
 //   2. Set env var YTDLP_PATH if yt-dlp is not on PATH (optional)
 //   3. Optionally set YTDLP_COOKIES_FILE=/path/to/cookies.txt for auth
 
-import { spawn, spawnSync } from 'child_process';
-import { Readable } from 'stream';
+import { spawn } from 'child_process';
 import playdl from 'play-dl';
+import { resolveYtdlp } from './ytdlp.js';
 
-// ── yt-dlp binary resolution ─────────────────────────────────────────────────
-
-let _ytdlpBin = null;
-function getYtdlpBin() {
-  if (_ytdlpBin) return _ytdlpBin;
-  const candidates = [
-    process.env.YTDLP_PATH,
-    'yt-dlp',
-    '/usr/local/bin/yt-dlp',
-    '/usr/bin/yt-dlp',
-  ].filter(Boolean);
-
-  for (const bin of candidates) {
-    try {
-      const r = spawnSync(bin, ['--version'], { timeout: 5000 });
-      if (r.status === 0) {
-        _ytdlpBin = bin;
-        console.log(`[music] yt-dlp found: ${bin} (${r.stdout.toString().trim()})`);
-        return _ytdlpBin;
-      }
-    } catch { /* try next */ }
-  }
-  throw new Error(
-    'yt-dlp không tìm thấy. Cài bằng: pip install -U yt-dlp\n' +
-    'Hoặc đặt YTDLP_PATH=/đường/dẫn/yt-dlp trong env.'
-  );
-}
+function getYtdlpBin() { return resolveYtdlp(); }
 
 // ── ffmpeg-static setup ───────────────────────────────────────────────────────
 
