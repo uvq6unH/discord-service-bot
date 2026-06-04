@@ -1,17 +1,20 @@
 /**
  * express-session store backed by Upstash Redis REST API.
- * No extra npm packages — uses the UpstashClient already in the project.
+ * Must extend EventEmitter — express-session calls store.on('disconnect') etc.
  */
+
+import { EventEmitter } from 'node:events';
 
 const SESSION_PREFIX = 'sess:';
 const DEFAULT_TTL    = 7 * 24 * 60 * 60; // 7 days in seconds
 
-export class UpstashSessionStore {
+export class UpstashSessionStore extends EventEmitter {
   /**
    * @param {import('./upstash.js').UpstashClient} client
    * @param {{ ttl?: number }} [opts]
    */
   constructor(client, opts = {}) {
+    super();
     this.client = client;
     this.ttl    = opts.ttl ?? DEFAULT_TTL;
   }
@@ -44,7 +47,7 @@ export class UpstashSessionStore {
       .catch(cb);
   }
 
-  /** express-session: refresh TTL */
+  /** express-session: refresh TTL without resaving full data */
   touch(sid, session, cb) {
     const ttl = this._getTTL(session);
     this.client.expire(this._key(sid), ttl)
