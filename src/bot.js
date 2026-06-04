@@ -95,6 +95,7 @@ setInterval(() => {
 }, 5 * 60 * 1000).unref();
 import { handleComponentInteraction } from './bot/interactions.js';
 import { handleMusicCommand } from './bot/commands/handlers/music.js';
+import { initMusicPlayer } from './bot/music/resolver.js';
 
 const commandCooldowns = new CommandCooldowns();
 
@@ -119,6 +120,11 @@ export function createBot(configStore, stateStore) {
       // 1. Wait for stores to finish loading from disk before doing anything
       await configStore.ready;
       await stateStore.ready;
+
+      // 1b. Init discord-player (must run after client is ready)
+      await initMusicPlayer(readyClient).catch(err =>
+        console.error('[bot] Failed to init music player:', err.message)
+      );
 
       // 2. Purge stale game sessions and refund bets
       await stateStore.purgeStaleGameSessions().catch((err) =>
@@ -148,7 +154,7 @@ export function createBot(configStore, stateStore) {
           try {
             const config = await configStore.getGuildConfig(guildId);
             if (!config.enabled || !config.remindersEnabled || !config.reminders?.length) continue;
-            
+
             let modified = false;
             const nextReminders = [];
             for (const reminder of config.reminders) {

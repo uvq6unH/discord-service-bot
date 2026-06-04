@@ -1,90 +1,49 @@
-// ── Music Command Handler ─────────────────────────────────────────────────────
-// Called from bot.js when a message matches the music prefix.
+// ── Music Command Handler (discord-player backend) ────────────────────────────
 // Handles: play/p, skip/s, stop, pause, resume/r, queue/q, np, loop, volume/vol
 
-import {
-  joinVoiceChannel,
-  createAudioPlayer,
-  createAudioResource,
-  AudioPlayerStatus,
-  VoiceConnectionStatus,
-  entersState,
-  StreamType,
-  NoSubscriberBehavior
-} from '@discordjs/voice';
 import { EmbedBuilder } from 'discord.js';
-import { getQueue, deleteQueue } from '../../music/queue.js';
-import { resolveTrack, createAudioStream } from '../../music/resolver.js';
+import { QueryType, useQueue } from 'discord-player';
+import { getMusicPlayer, buildSearchQuery, fmt } from '../../music/resolver.js';
 
-// ── Helpers ──────────────────────────────────────────────────────────────────
+// ── Helpers ───────────────────────────────────────────────────────────────────
 
-function sourceLabel(source) {
-  return { youtube: '▶️ YouTube', spotify: '💚 Spotify', soundcloud: '🔶 SoundCloud', direct: '🔗 Direct' }[source] ?? source;
+function sourceLabel(extractor) {
+  if (!extractor) return '🎵';
+  const id = extractor.toLowerCase();
+  if (id.includes('soundcloud')) return '🔶 SoundCloud';
+  if (id.includes('youtube')) return '▶️ YouTube';
+  if (id.includes('spotify')) return '💚 Spotify';
+  if (id.includes('vimeo')) return '🎬 Vimeo';
+  return '🔗 Direct';
 }
 
-function nowPlayingEmbed(track) {
+function trackEmbed(track, title, color) {
   const embed = new EmbedBuilder()
-    .setColor(0x5865F2)
-    .setTitle('🎵 Now Playing')
+    .setColor(color)
+    .setTitle(title)
     .setDescription(`**[${track.title}](${track.url})**`)
     .addFields(
-      { name: 'Duration', value: track.durationFmt, inline: true },
-      { name: 'Source', value: sourceLabel(track.source), inline: true },
-      { name: 'Requested by', value: `<@${track.requestedBy}>`, inline: true }
+      { name: 'Duration', value: track.duration || '?:??', inline: true },
+      { name: 'Source', value: sourceLabel(track.extractor), inline: true },
+      { name: 'Requested by', value: `<@${track.requestedBy ?? track.requestedBy}>`, inline: true }
     );
   if (track.thumbnail) embed.setThumbnail(track.thumbnail);
   return embed;
 }
 
-// ── Core playback ─────────────────────────────────────────────────────────────
-
-async function playNext(guildId, textChannel) {
-  const q = getQueue(guildId);
-  const track = q.advance();
-
-  if (!track) {
-    // Queue exhausted — leave channel
-    q.player?.stop(true);
-    try { q.connection?.destroy(); } catch { /* ignored */ }
-    deleteQueue(guildId);
-    textChannel?.send('👋 Hết hàng nhạc, bot rời Voice Channel.').catch(() => null);
-    return;
-  }
-
-  q.current = track;
-
-  try {
-    const streamInfo = await createAudioStream(track);
-
-    const inputType = streamInfo.type === 'opus' ? StreamType.Opus : StreamType.Arbitrary;
-    const resource = createAudioResource(streamInfo.stream, { inputType, inlineVolume: true });
-    resource.volume?.setVolume(q.volume);
-
-    q.player.play(resource);
-
-    textChannel?.send({ embeds: [nowPlayingEmbed(track)] }).catch(() => null);
-  } catch (err) {
-    console.error('[music] Stream error:', err.message);
-    textChannel?.send(`⚠️ Không phát được **${track.title}**: ${err.message}. Chuyển bài tiếp...`).catch(() => null);
-    setTimeout(() => playNext(guildId, textChannel), 1500);
-  }
-}
-
 // ── Main export ───────────────────────────────────────────────────────────────
 
-/**
- * @param {{ message: import('discord.js').Message, subcommand: string, args: string, config: object }} opts
- */
 export async function handleMusicCommand({ message, subcommand, args, config }) {
   const guildId = message.guild.id;
   const musicPrefix = config.musicPrefix || 'hb';
+  const player = getMusicPlayer();
 
   // ── play / p ──────────────────────────────────────────────────────────────
   if (subcommand === 'play' || subcommand === 'p') {
     const input = args.trim();
     if (!input) {
       return message.reply(
-        `❌ Thiếu link hoặc tên bài nhạc.\n📌 Ví dụ: \`${musicPrefix} play https://youtu.be/...\` hoặc \`${musicPrefix} play tên bài hát\``
+        `❌ Thiếu link hoặc tên bài nhạc.\n📌 Ví dụ: \`${musicPrefix} play tên bài\` hoặc \`${musicPrefix} play https://soundcloud.com/...\``
       );
     }
 
@@ -98,174 +57,154 @@ export async function handleMusicCommand({ message, subcommand, args, config }) 
 
     const loadingMsg = await message.reply('🔍 Đang tìm kiếm bài nhạc...').catch(() => null);
 
-    let track;
     try {
-      track = await resolveTrack(input);
-      track.requestedBy = message.author.id;
-    } catch (err) {
-      return loadingMsg
-        ? loadingMsg.edit(`❌ Không tìm thấy: ${err.message}`)
-        : message.reply(`❌ Không tìm thấy: ${err.message}`);
-    }
+      const { query, source } = await buildSearchQuery(input);
 
-    const q = getQueue(guildId);
-    q.enqueue(track);
+      const { track } = await player.play(voiceChannel, query, {
+        nodeOptions: {
+          metadata: { textChannel: message.channel },
+          volume: 80,
+          leaveOnEmpty: true,
+          leaveOnEmptyCooldown: 5000,
+          leaveOnEnd: true,
+          leaveOnEndCooldown: 10000,
+          selfDeaf: true,
+        },
+        requestedBy: message.author,
+        // Prefer SoundCloud for plain searches to avoid YouTube bot-detection
+        searchEngine: (source === 'youtube' || source === 'soundcloud' || source === 'direct')
+          ? QueryType.AUTO
+          : QueryType.SOUNDCLOUD_SEARCH,
+      });
 
-    // If already playing, just add to queue
-    if (q.player && q.player.state.status !== AudioPlayerStatus.Idle) {
+      const queue = useQueue(guildId);
+      const isFirst = !queue || queue.size <= 1;
+
       const embed = new EmbedBuilder()
-        .setColor(0x57F287)
-        .setTitle('✅ Đã thêm vào hàng nhạc')
+        .setColor(isFirst ? 0x5865F2 : 0x57F287)
+        .setTitle(isFirst ? '🎵 Now Playing' : '✅ Đã thêm vào hàng nhạc')
         .setDescription(`**[${track.title}](${track.url})**`)
         .addFields(
-          { name: 'Duration', value: track.durationFmt, inline: true },
-          { name: 'Source', value: sourceLabel(track.source), inline: true },
-          { name: 'Vị trí', value: `#${q.tracks.length}`, inline: true }
+          { name: 'Duration', value: track.duration || '?:??', inline: true },
+          { name: 'Source', value: sourceLabel(track.extractor), inline: true },
+          { name: 'Requested by', value: `<@${message.author.id}>`, inline: true }
         );
       if (track.thumbnail) embed.setThumbnail(track.thumbnail);
+
       return loadingMsg
         ? loadingMsg.edit({ content: '', embeds: [embed] })
         : message.reply({ embeds: [embed] });
-    }
 
-    // First track — join voice and start playing
-    await loadingMsg?.delete().catch(() => null);
-
-    try {
-      const connection = joinVoiceChannel({
-        channelId: voiceChannel.id,
-        guildId,
-        adapterCreator: message.guild.voiceAdapterCreator
-      });
-
-      const player = createAudioPlayer({
-        behaviors: { noSubscriber: NoSubscriberBehavior.Pause }
-      });
-
-      q.connection = connection;
-      q.player = player;
-      q.textChannel = message.channel;
-
-      connection.subscribe(player);
-
-      // Auto-advance on track end
-      player.on(AudioPlayerStatus.Idle, () => {
-        if (q.loop && q.current) q.tracks.unshift({ ...q.current });
-        playNext(guildId, q.textChannel);
-      });
-
-      player.on('error', (err) => {
-        console.error('[music] AudioPlayer error:', err.message);
-        q.textChannel?.send(`⚠️ Lỗi phát nhạc: ${err.message}. Đang chuyển bài...`).catch(() => null);
-        setTimeout(() => playNext(guildId, q.textChannel), 1500);
-      });
-
-      // Handle unexpected disconnects gracefully
-      connection.on(VoiceConnectionStatus.Disconnected, async () => {
-        try {
-          await Promise.race([
-            entersState(connection, VoiceConnectionStatus.Signalling, 5_000),
-            entersState(connection, VoiceConnectionStatus.Connecting, 5_000)
-          ]);
-          // Successfully reconnected
-        } catch {
-          connection.destroy();
-          deleteQueue(guildId);
-        }
-      });
-
-      await playNext(guildId, message.channel);
     } catch (err) {
-      console.error('[music] Join error:', err);
-      return message.reply(`❌ Không thể kết nối Voice Channel: ${err.message}`);
+      console.error('[music] play error:', err.message);
+      const errMsg = err.message?.includes('Sign in') || err.message?.includes('bot')
+        ? '❌ YouTube đang chặn bot. Hãy thử link **SoundCloud** hoặc tìm bằng tên bài.'
+        : `❌ Không tìm thấy: ${err.message}`;
+      return loadingMsg
+        ? loadingMsg.edit(errMsg)
+        : message.reply(errMsg);
     }
-    return;
   }
 
-  // ── All other commands require an active queue ────────────────────────────
-  const q = getQueue(guildId);
-  const active = q.player && q.connection;
+  // ── Helper: get active queue ──────────────────────────────────────────────
+  const queue = useQueue(guildId);
 
   // ── skip / s ──────────────────────────────────────────────────────────────
   if (subcommand === 'skip' || subcommand === 's') {
-    if (!active || !q.current) return message.reply('❌ Không có bài nhạc nào đang phát!');
-    q.player.stop();
+    if (!queue?.isPlaying()) return message.reply('❌ Không có bài nhạc nào đang phát!');
+    queue.node.skip();
     return message.reply('⏭️ Đã bỏ qua bài hiện tại.');
   }
 
   // ── stop ──────────────────────────────────────────────────────────────────
   if (subcommand === 'stop') {
-    if (!active) return message.reply('❌ Bot đang không phát nhạc!');
-    q.loop = false;
-    q.clear();
-    q.player.stop(true);
-    try { q.connection.destroy(); } catch { /* ignored */ }
-    deleteQueue(guildId);
+    if (!queue) return message.reply('❌ Bot đang không phát nhạc!');
+    queue.delete();
     return message.reply('⏹️ Đã dừng phát nhạc và rời Voice Channel.');
   }
 
   // ── pause ─────────────────────────────────────────────────────────────────
   if (subcommand === 'pause') {
-    if (!active) return message.reply('❌ Không có bài nhạc nào đang phát!');
-    if (q.player.state.status === AudioPlayerStatus.Paused) return message.reply('⏸️ Đã tạm dừng rồi.');
-    q.player.pause();
+    if (!queue?.isPlaying()) return message.reply('❌ Không có bài nhạc nào đang phát!');
+    if (queue.node.isPaused()) return message.reply('⏸️ Đã tạm dừng rồi.');
+    queue.node.pause();
     return message.reply('⏸️ Đã tạm dừng.');
   }
 
   // ── resume / r ────────────────────────────────────────────────────────────
   if (subcommand === 'resume' || subcommand === 'r') {
-    if (!active) return message.reply('❌ Không có hàng nhạc nào!');
-    if (q.player.state.status !== AudioPlayerStatus.Paused) return message.reply('▶️ Đang phát rồi!');
-    q.player.unpause();
+    if (!queue) return message.reply('❌ Không có hàng nhạc nào!');
+    if (!queue.node.isPaused()) return message.reply('▶️ Đang phát rồi!');
+    queue.node.resume();
     return message.reply('▶️ Đã tiếp tục phát.');
   }
 
   // ── loop / l ──────────────────────────────────────────────────────────────
   if (subcommand === 'loop' || subcommand === 'l') {
-    q.loop = !q.loop;
-    return message.reply(`🔁 Loop: **${q.loop ? 'BẬT' : 'TẮT'}**`);
+    if (!queue) return message.reply('❌ Không có hàng nhạc nào!');
+    const { QueueRepeatMode } = await import('discord-player');
+    const current = queue.repeatMode;
+    const next = current === QueueRepeatMode.OFF
+      ? QueueRepeatMode.TRACK
+      : QueueRepeatMode.OFF;
+    queue.setRepeatMode(next);
+    return message.reply(`🔁 Loop: **${next === QueueRepeatMode.TRACK ? 'BẬT' : 'TẮT'}**`);
   }
 
   // ── queue / q ─────────────────────────────────────────────────────────────
   if (subcommand === 'queue' || subcommand === 'q') {
-    if (!q.current && q.tracks.length === 0) return message.reply('📭 Hàng nhạc trống!');
+    if (!queue?.currentTrack && !queue?.tracks.size) {
+      return message.reply('📭 Hàng nhạc trống!');
+    }
 
     const lines = [];
-    if (q.current) {
-      lines.push(`▶️ **Đang phát:** [${q.current.title}](${q.current.url}) \`${q.current.durationFmt}\` — <@${q.current.requestedBy}>`);
+    if (queue.currentTrack) {
+      const t = queue.currentTrack;
+      lines.push(`▶️ **Đang phát:** [${t.title}](${t.url}) \`${t.duration}\` — <@${t.requestedBy?.id ?? '?'}>`);
     }
-    if (q.tracks.length > 0) {
+    const upcoming = queue.tracks.toArray();
+    if (upcoming.length) {
       lines.push('');
       lines.push('**Hàng chờ:**');
-      q.tracks.slice(0, 10).forEach((t, i) => {
-        lines.push(`\`${i + 1}.\` [${t.title}](${t.url}) \`${t.durationFmt}\` — <@${t.requestedBy}>`);
+      upcoming.slice(0, 10).forEach((t, i) => {
+        lines.push(`\`${i + 1}.\` [${t.title}](${t.url}) \`${t.duration}\` — <@${t.requestedBy?.id ?? '?'}>`);
       });
-      if (q.tracks.length > 10) lines.push(`*... và **${q.tracks.length - 10}** bài nữa*`);
+      if (upcoming.length > 10) lines.push(`*... và **${upcoming.length - 10}** bài nữa*`);
     }
 
     const embed = new EmbedBuilder()
       .setColor(0x5865F2)
       .setTitle('🎶 Hàng nhạc')
       .setDescription(lines.join('\n') || '*(trống)*')
-      .setFooter({ text: `${q.size} bài tổng cộng${q.loop ? ' • 🔁 Loop BẬT' : ''}` });
+      .setFooter({ text: `${queue.size} bài tổng cộng` });
 
     return message.reply({ embeds: [embed] });
   }
 
   // ── np / nowplaying ───────────────────────────────────────────────────────
   if (subcommand === 'np' || subcommand === 'nowplaying') {
-    if (!q.current) return message.reply('❌ Không có bài nhạc nào đang phát!');
-    return message.reply({ embeds: [nowPlayingEmbed(q.current)] });
+    if (!queue?.currentTrack) return message.reply('❌ Không có bài nhạc nào đang phát!');
+    const t = queue.currentTrack;
+    const bar = queue.node.createProgressBar();
+    const embed = new EmbedBuilder()
+      .setColor(0x5865F2)
+      .setTitle('🎵 Now Playing')
+      .setDescription(`**[${t.title}](${t.url})**\n${bar}`)
+      .addFields(
+        { name: 'Duration', value: t.duration || '?:??', inline: true },
+        { name: 'Source', value: sourceLabel(t.extractor), inline: true },
+        { name: 'Requested by', value: `<@${t.requestedBy?.id ?? '?'}>`, inline: true }
+      );
+    if (t.thumbnail) embed.setThumbnail(t.thumbnail);
+    return message.reply({ embeds: [embed] });
   }
 
   // ── volume / vol ──────────────────────────────────────────────────────────
   if (subcommand === 'volume' || subcommand === 'vol') {
-    const vol = parseFloat(args);
+    const vol = parseInt(args, 10);
     if (isNaN(vol) || vol < 0 || vol > 200) return message.reply('❌ Volume phải từ **0–200**');
-    q.volume = vol / 100;
-    // Apply immediately to the currently playing resource if available
-    const resource = q.player?.state?.resource;
-    if (resource?.volume) resource.volume.setVolume(q.volume);
+    if (!queue) return message.reply('❌ Không có hàng nhạc nào!');
+    queue.node.setVolume(vol);
     return message.reply(`🔊 Volume: **${vol}%**`);
   }
 
@@ -274,14 +213,18 @@ export async function handleMusicCommand({ message, subcommand, args, config }) 
   const embed = new EmbedBuilder()
     .setColor(0x5865F2)
     .setTitle('🎵 Music Commands')
-    .setDescription(`**Music prefix:** \`${p}\`\n\nHỗ trợ: YouTube, Spotify, SoundCloud, URL trực tiếp`)
+    .setDescription(
+      `**Music prefix:** \`${p}\`\n\n` +
+      `Hỗ trợ: SoundCloud, Spotify (tìm qua SC), YouTube, URL trực tiếp\n` +
+      `💡 Nếu YouTube bị chặn, thử link **SoundCloud** hoặc tìm bằng tên bài.`
+    )
     .addFields(
-      { name: `\`${p} play <link hoặc tên>\``, value: 'Phát nhạc — YT / Spotify / SC / URL' },
+      { name: `\`${p} play <link hoặc tên>\``, value: 'Phát nhạc — SC / Spotify / YT / URL' },
       { name: `\`${p} skip\` / \`${p} s\``, value: 'Bỏ qua bài hiện tại' },
       { name: `\`${p} stop\``, value: 'Dừng phát và rời Voice Channel' },
       { name: `\`${p} pause\` / \`${p} resume\``, value: 'Tạm dừng / tiếp tục phát' },
       { name: `\`${p} queue\` / \`${p} q\``, value: 'Xem danh sách hàng nhạc' },
-      { name: `\`${p} np\``, value: 'Xem bài đang phát (Now Playing)' },
+      { name: `\`${p} np\``, value: 'Xem bài đang phát (+ progress bar)' },
       { name: `\`${p} loop\``, value: 'Bật/tắt lặp lại bài hiện tại' },
       { name: `\`${p} volume <0–200>\``, value: 'Điều chỉnh âm lượng (mặc định 80%)' }
     );
