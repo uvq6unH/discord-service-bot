@@ -3,7 +3,7 @@ services:
     name: discord-service-bot
     runtime: node
     plan: free
-    buildCommand: corepack enable && pnpm install --frozen-lockfile
+    buildCommand: corepack enable && pnpm install --no-frozen-lockfile
     startCommand: pnpm start
     disk:
       name: bot-data

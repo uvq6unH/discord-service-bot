@@ -328,7 +328,10 @@ export class ConfigStore {
       autoReplies: normalizeAutoReplies(stored.autoReplies ?? defaultConfig.autoReplies),
       reminders: normalizeReminders(stored.reminders ?? defaultConfig.reminders),
       riotApiKey: '',
-      tftApiKey: ''
+      tftApiKey: '',
+      // musicEnabled defaulted false in older versions — force true unless admin
+      // explicitly disabled it after the feature was properly introduced.
+      musicEnabled: stored.musicEnabled ?? true,
     };
     return this._applyRuntimeSecrets(guildId, base);
   }
