@@ -80,9 +80,8 @@ export function createAuthRouter(botClient) {
 
   // GET /auth/login
   router.get('/auth/login', (req, res) => {
-    const state = crypto.randomBytes(32).toString('base64url');
-    req.session.oauthState = state;
-    req.session.returnTo = safeReturnTo(req.query.returnTo);
+    const returnTo = safeReturnTo(req.query.returnTo);
+    const state    = crypto.randomBytes(32).toString('base64url');
 
     const params = new URLSearchParams({
       client_id: clientId,
@@ -92,15 +91,27 @@ export function createAuthRouter(botClient) {
       state,
       prompt: 'none',
     });
-    // Must save session to Redis BEFORE redirecting to Discord — otherwise the
-    // oauthState written above may not be persisted by the time /auth/callback
-    // reads it back, causing a state-mismatch 400.
-    req.session.save((err) => {
+
+    // Regenerate session on each login attempt to:
+    //   1. Prevent session fixation attacks
+    //   2. Ensure a fresh session ID so concurrent logins (different users,
+    //      different browsers) never share oauthState
+    // Then save to Redis BEFORE redirecting to Discord so /auth/callback
+    // can read back oauthState reliably.
+    req.session.regenerate((err) => {
       if (err) {
-        console.error('[auth] session save error on login:', err);
+        console.error('[auth] session regenerate error:', err);
         return res.status(500).send('Login failed. Please try again.');
       }
-      res.redirect(`https://discord.com/oauth2/authorize?${params}`);
+      req.session.oauthState = state;
+      req.session.returnTo   = returnTo;
+      req.session.save((saveErr) => {
+        if (saveErr) {
+          console.error('[auth] session save error on login:', saveErr);
+          return res.status(500).send('Login failed. Please try again.');
+        }
+        res.redirect(`https://discord.com/oauth2/authorize?${params}`);
+      });
     });
   });
 
@@ -161,20 +172,30 @@ export function createAuthRouter(botClient) {
       const user = await userRes.json();
       if (!userRes.ok) throw new Error('Failed to fetch user info');
 
-      req.session.user = {
+      const newUser = {
         id: user.id,
         username: user.username,
         avatar: user.avatar,
         accessToken: tokens.access_token,
       };
-
-      console.log('[auth] session set for', user.username, '| session keys:', Object.keys(req.session));
-      console.log('[auth] response headers will set cookie:', !res.headersSent);
-
       const returnTo = safeReturnTo(req.session.returnTo);
-      req.session.returnTo = null;
-      res.redirect(returnTo);
-      console.log('[auth] redirected to', returnTo, '| headers sent:', res.headersSent);
+
+      // Regenerate session ID after successful auth to prevent session fixation.
+      req.session.regenerate((err) => {
+        if (err) {
+          console.error('[auth] session regenerate error after login:', err);
+          return res.status(500).send('Login failed. Please try again.');
+        }
+        req.session.user = newUser;
+        req.session.save((saveErr) => {
+          if (saveErr) {
+            console.error('[auth] session save error after login:', saveErr);
+            return res.status(500).send('Login failed. Please try again.');
+          }
+          console.log('[auth] session set for', newUser.username, '| session keys:', Object.keys(req.session));
+          res.redirect(returnTo);
+        });
+      });
     } catch (err) {
       console.error('[auth] callback error:', err.message);
       res.status(500).send('Login failed. Please try again later.');
