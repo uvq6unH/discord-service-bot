@@ -1,4 +1,9 @@
 import 'dotenv/config';
+
+// ── libsodium must be ready before @discordjs/voice encrypts audio packets ───
+// Without this, voice sends empty/corrupted packets → playerStart then instant finish
+import sodium from 'libsodium-wrappers';
+await sodium.ready;
 import { ConfigStore } from './configStore.js';
 import { StateStore } from './stateStore.js';
 import { createBot } from './bot.js';
