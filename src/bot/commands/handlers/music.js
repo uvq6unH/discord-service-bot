@@ -83,11 +83,14 @@ export async function handleMusicCommand({ message, subcommand, args, config }) 
       let usedFallback = false;
 
       try {
-        ({ track } = await player.play(voiceChannel, query, {
+        console.log('[music] play attempt 1 | query:', query, '| engine:', initialEngine);
+        const result = await player.play(voiceChannel, query, {
           nodeOptions: NODE_OPTIONS(message.channel),
           requestedBy: message.author,
           searchEngine: initialEngine,
-        }));
+        });
+        track = result.track;
+        console.log('[music] play attempt 1 OK | track:', track?.title, '| extractor:', track?.extractor?.identifier ?? track?.extractor);
       } catch (firstErr) {
         // ── YouTube bị chặn → fallback SoundCloud ──────────────────────────
         // QUAN TRỌNG: discord-player có thể đã join voice và tạo queue trước
@@ -113,11 +116,14 @@ export async function handleMusicCommand({ message, subcommand, args, config }) 
           if (loadingMsg) {
             await loadingMsg.edit(`🔍 YouTube bị chặn — đang tìm **"${fallbackTitle}"** trên SoundCloud...`).catch(() => null);
           }
-          ({ track } = await player.play(voiceChannel, fallbackTitle, {
+          console.log('[music] play attempt 2 (SC fallback) | query:', fallbackTitle);
+          const result2 = await player.play(voiceChannel, fallbackTitle, {
             nodeOptions: NODE_OPTIONS(message.channel),
             requestedBy: message.author,
             searchEngine: QueryType.SOUNDCLOUD_SEARCH,
-          }));
+          });
+          track = result2.track;
+          console.log('[music] play attempt 2 OK | track:', track?.title, '| extractor:', track?.extractor?.identifier ?? track?.extractor);
           usedFallback = true;
         } else {
           throw firstErr;

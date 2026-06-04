@@ -58,14 +58,40 @@ export async function initMusicPlayer(client) {
   await _player.extractors.loadMulti(DefaultExtractors);
 
   _player.events.on('playerError', (queue, error) => {
-    console.error('[discord-player] playerError:', error.message);
+    console.error('[discord-player] playerError:', error?.message, error?.stack);
     queue.metadata?.textChannel
       ?.send(`⚠️ Lỗi phát nhạc: ${error.message}`)
       .catch(() => null);
   });
 
   _player.events.on('error', (queue, error) => {
-    console.error('[discord-player] error:', error.message);
+    console.error('[discord-player] error:', error?.message, error?.stack);
+    queue.metadata?.textChannel
+      ?.send(`⚠️ Stream error: ${error?.message}`)
+      .catch(() => null);
+  });
+
+  _player.events.on('debug', (message) => {
+    console.log('[discord-player:debug]', message);
+  });
+
+  _player.events.on('audioTrackAdd', (queue, track) => {
+    console.log('[discord-player] track added:', track.title, '| extractor:', track.extractor?.identifier ?? track.extractor);
+  });
+
+  _player.events.on('playerStart', (queue, track) => {
+    console.log('[discord-player] playerStart:', track.title);
+    queue.metadata?.textChannel
+      ?.send(`▶️ Bắt đầu phát: **${track.title}**`)
+      .catch(() => null);
+  });
+
+  _player.events.on('emptyChannel', (queue) => {
+    console.log('[discord-player] emptyChannel — leaving');
+  });
+
+  _player.events.on('emptyQueue', (queue) => {
+    console.log('[discord-player] emptyQueue');
   });
 
   console.log('[music] discord-player ready, extractors:',
