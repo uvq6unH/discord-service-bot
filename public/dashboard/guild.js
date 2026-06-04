@@ -1,6 +1,7 @@
 import { setDirty, showMsg } from './utils.js';
 import {
   currentGuildId, setCurrentGuildId, emptyState, configForm, saveBar, accessBanner, accessBannerMsg,
+  inviteBanner, inviteBtn,
   guildNameEl, guildMetaEl, guildIconEl, mobileGuildNameEl, mobileGuildMetaEl,
   serverList, statusDot, statusText
 } from './state.js';
@@ -53,6 +54,20 @@ export async function selectGuild(guild) {
 
   emptyState.style.display = 'none';
   accessBanner.style.display = 'none';
+  inviteBanner.style.display = 'none';
+
+  // Bot chưa có trong server — hiện invite banner thay vì config form
+  if (!guild.botPresent) {
+    configForm.style.display = 'none';
+    saveBar.style.display = 'none';
+    fetch(`/api/invite-url?guildId=${encodeURIComponent(guild.id)}`)
+      .then(r => r.json())
+      .then(({ url }) => { if (inviteBtn && url) inviteBtn.href = url; })
+      .catch(() => {});
+    inviteBanner.style.display = 'flex';
+    return;
+  }
+
   configForm.style.display = 'block';
   saveBar.style.display = 'none';
 
@@ -87,8 +102,8 @@ export async function loadServers() {
 
   for (const g of guilds) {
     const btn = document.createElement('button');
-    btn.className = 'server-btn';
-    btn.title = g.name;
+    btn.className = 'server-btn' + (g.botPresent === false ? ' no-bot' : '');
+    btn.title = g.botPresent === false ? `${g.name} (chưa có bot)` : g.name;
     if (g.icon) {
       const img = document.createElement('img'); img.src = g.icon; img.alt = g.name;
       btn.append(img);

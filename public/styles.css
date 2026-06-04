@@ -166,6 +166,27 @@ body {
   border-color: #fff3;
 }
 
+.server-btn.no-bot {
+  opacity: 0.5;
+  position: relative;
+}
+.server-btn.no-bot::after {
+  content: '+';
+  position: absolute;
+  bottom: -2px;
+  right: -2px;
+  background: var(--accent);
+  color: #fff;
+  font-size: 10px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+}
+
 .server-skeleton {
   width        : 42px;
   height       : 42px;

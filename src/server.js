@@ -109,6 +109,21 @@ app.use(helmet({
   const auth = createAuthRouter(botClient);
   if (auth.attachTo) auth.attachTo(app);
 
+  // GET /api/invite-url?guildId=xxx — trả về link mời bot vào server cụ thể
+  app.get('/api/invite-url', auth.requireAuth, (req, res) => {
+    const clientId = process.env.DISCORD_CLIENT_ID;
+    if (!clientId) return res.status(500).json({ error: 'DISCORD_CLIENT_ID chưa được cấu hình.' });
+    const guildId = String(req.query.guildId ?? '').trim();
+    const params = new URLSearchParams({
+      client_id: clientId,
+      permissions: '8', // Administrator — có thể giới hạn hơn nếu cần
+      integration_type: '0',
+      scope: 'bot applications.commands',
+    });
+    if (guildId) params.set('guild_id', guildId);
+    res.json({ url: `https://discord.com/oauth2/authorize?${params}` });
+  });
+
   app.get('/health', (_req, res) => {
     if (isProduction) {
       res.json({ status: 'ok' });
@@ -183,35 +198,70 @@ app.use(helmet({
 
   app.get('/api/guilds', auth.requireAuth, readRateLimit, async (req, res) => {
     const configuredGuildIds = await configStore.listGuildIds();
-    const userId = req.session?.user?.id;
-    const guildsById = new Map();
     const isDev = Boolean(req.session?.user?.dev);
+    const guildsById = new Map();
 
-    const guildEntries = [...botClient.guilds.cache];
-    const manageableGuilds = await mapWithConcurrency(guildEntries, 5, async ([id, guild]) => {
-      let canManage = isDev;
-      if (!canManage && userId && botClient.user) {
-        const member = await guild.members.fetch(userId).catch(() => null);
-        canManage = member?.permissions?.has('ManageGuild') || member?.permissions?.has('Administrator') || false;
+    // Lấy danh sách guilds user có quyền quản lý từ OAuth (cache trong session)
+    let userGuilds = req.session.userGuildsCache ?? null;
+    if (!userGuilds && !isDev) {
+      const accessToken = req.session.user?.accessToken;
+      if (accessToken) {
+        try {
+          const ctrl = new AbortController();
+          const t = setTimeout(() => ctrl.abort(), 10_000);
+          const oauthRes = await fetch('https://discord.com/api/v10/users/@me/guilds', {
+            headers: { Authorization: `Bearer ${accessToken}` },
+            signal: ctrl.signal,
+          }).finally(() => clearTimeout(t));
+          if (oauthRes.ok) {
+            userGuilds = await oauthRes.json();
+            req.session.userGuildsCache = userGuilds;
+          }
+        } catch { /* fallback to empty */ }
       }
-      return canManage
-        ? { id, name: guild.name, icon: guild.iconURL({ size: 64 }), configured: configuredGuildIds.includes(id) }
-        : null;
-    });
+    }
 
-    for (const guild of manageableGuilds) {
-      if (guild) guildsById.set(guild.id, guild);
+    // Build set của guild IDs user có ManageGuild hoặc Administrator
+    const ADMINISTRATOR = 0x8n;
+    const MANAGE_GUILD   = 0x20n;
+    const manageableIds = new Set(
+      (userGuilds ?? [])
+        .filter(g => {
+          const p = BigInt(g.permissions ?? 0);
+          return (p & ADMINISTRATOR) === ADMINISTRATOR || (p & MANAGE_GUILD) === MANAGE_GUILD;
+        })
+        .map(g => g.id)
+    );
+
+    // Guilds bot đang có mặt
+    for (const [id, guild] of botClient.guilds.cache) {
+      const canManage = isDev || manageableIds.has(id);
+      if (canManage) {
+        guildsById.set(id, { id, name: guild.name, icon: guild.iconURL({ size: 64 }), configured: configuredGuildIds.includes(id), botPresent: true });
+      }
+    }
+
+    // Guilds user có quyền nhưng bot chưa có mặt — hiện để user có thể invite
+    for (const g of (userGuilds ?? [])) {
+      if (guildsById.has(g.id)) continue; // đã có rồi
+      const p = BigInt(g.permissions ?? 0);
+      const canManage = (p & ADMINISTRATOR) === ADMINISTRATOR || (p & MANAGE_GUILD) === MANAGE_GUILD;
+      if (canManage) {
+        guildsById.set(g.id, { id: g.id, name: g.name, icon: g.icon ? `https://cdn.discordapp.com/icons/${g.id}/${g.icon}.png?size=64` : null, configured: false, botPresent: false });
+      }
     }
 
     if (isDev) {
       for (const guildId of configuredGuildIds) {
         if (!guildsById.has(guildId)) {
-          guildsById.set(guildId, { id: guildId, name: `Server ${guildId}`, icon: null, configured: true });
+          guildsById.set(guildId, { id: guildId, name: `Server ${guildId}`, icon: null, configured: true, botPresent: true });
         }
       }
     }
 
     const guilds = [...guildsById.values()].sort((a, b) => {
+      // Ưu tiên: bot có mặt + đã configured > bot có mặt > chưa có bot
+      if (a.botPresent !== b.botPresent) return a.botPresent ? -1 : 1;
       if (a.configured !== b.configured) return a.configured ? -1 : 1;
       return a.name.localeCompare(b.name);
     });

@@ -153,6 +153,7 @@ export function createAuthRouter(botClient) {
         id: user.id,
         username: user.username,
         avatar: user.avatar,
+        accessToken: tokens.access_token,
       };
 
       const returnTo = safeReturnTo(req.session.returnTo);
@@ -195,6 +196,34 @@ export function createAuthRouter(botClient) {
     next();
   }
 
+  // Fetch danh sách guilds của user qua OAuth token, có cache ngắn hạn trong session
+  async function fetchUserGuilds(accessToken) {
+    const ctrl = new AbortController();
+    const t = setTimeout(() => ctrl.abort(), 10_000);
+    try {
+      const res = await fetch(`${DISCORD_API}/users/@me/guilds`, {
+        headers: { Authorization: `Bearer ${accessToken}` },
+        signal: ctrl.signal,
+      });
+      if (!res.ok) return null;
+      return await res.json(); // array of partial guild objects with `permissions` bitmask
+    } catch {
+      return null;
+    } finally {
+      clearTimeout(t);
+    }
+  }
+
+  // Kiểm tra user có permission ManageGuild (0x20) hoặc Administrator (0x8) trong guild không
+  function hasManagePermission(userGuilds, guildId) {
+    const g = userGuilds?.find(g => g.id === guildId);
+    if (!g) return false;
+    const perms = BigInt(g.permissions ?? 0);
+    const ADMINISTRATOR = 0x8n;
+    const MANAGE_GUILD   = 0x20n;
+    return (perms & ADMINISTRATOR) === ADMINISTRATOR || (perms & MANAGE_GUILD) === MANAGE_GUILD;
+  }
+
   async function requireGuildAccess(req, res, next) {
     if (!req.session?.user) {
       return res.status(401).json({ error: 'Unauthorized', loginUrl: '/auth/login' });
@@ -204,17 +233,23 @@ export function createAuthRouter(botClient) {
     if (!guildId) return next();
 
     try {
-      const guild = botClient.guilds.cache.get(guildId);
-      if (!guild) {
-        return res.status(403).json({ error: 'Bot chưa được mời vào server này.' });
+      const accessToken = req.session.user.accessToken;
+      if (!accessToken) {
+        // Session cũ chưa có token — yêu cầu login lại
+        return res.status(401).json({ error: 'Phiên đăng nhập hết hạn, vui lòng đăng nhập lại.', loginUrl: '/auth/login' });
       }
 
-      const member = await guild.members.fetch(req.session.user.id).catch(() => null);
-      if (!member) {
-        return res.status(403).json({ error: 'Bạn không phải thành viên của server này.' });
+      // Dùng cache guilds trong session để tránh gọi API liên tục
+      let userGuilds = req.session.userGuildsCache;
+      if (!userGuilds) {
+        userGuilds = await fetchUserGuilds(accessToken);
+        if (!userGuilds) {
+          return res.status(403).json({ error: 'Không thể xác minh quyền truy cập. Vui lòng đăng nhập lại.', loginUrl: '/auth/login' });
+        }
+        req.session.userGuildsCache = userGuilds;
       }
 
-      if (!member.permissions.has('ManageGuild') && !member.permissions.has('Administrator')) {
+      if (!hasManagePermission(userGuilds, guildId)) {
         return res.status(403).json({ error: 'Bạn cần quyền Quản lý Máy chủ để cấu hình bot.' });
       }
 
