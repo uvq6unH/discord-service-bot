@@ -78,6 +78,22 @@ export function createAuthRouter(botClient) {
 
   const router = Router();
 
+  // In-process guild cache (per user, 5-minute TTL) — avoids storing 50+ guild
+  // objects in the Redis session and logging them on every request.
+  const _guildCache = new Map(); // userId -> { guilds, expiresAt }
+  const GUILD_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+
+  function getCachedGuilds(userId) {
+    const entry = _guildCache.get(userId);
+    if (!entry) return null;
+    if (Date.now() > entry.expiresAt) { _guildCache.delete(userId); return null; }
+    return entry.guilds;
+  }
+
+  function setCachedGuilds(userId, guilds) {
+    _guildCache.set(userId, { guilds, expiresAt: Date.now() + GUILD_CACHE_TTL });
+  }
+
   // GET /auth/login
   router.get('/auth/login', (req, res) => {
     const returnTo = safeReturnTo(req.query.returnTo);
@@ -192,7 +208,7 @@ export function createAuthRouter(botClient) {
             console.error('[auth] session save error after login:', saveErr);
             return res.status(500).send('Login failed. Please try again.');
           }
-          console.log('[auth] session set for', newUser.username, '| session keys:', Object.keys(req.session));
+          console.log('[auth] session set for', newUser.username);
           res.redirect(returnTo);
         });
       });
@@ -211,8 +227,7 @@ export function createAuthRouter(botClient) {
 
   // GET /auth/me
   router.get('/auth/me', (req, res) => {
-    console.log('[auth/me] session:', JSON.stringify(req.session));
-    console.log('[auth/me] cookies:', req.headers.cookie ? 'present' : 'MISSING');
+    console.log('[auth/me] user:', req.session?.user?.username ?? 'none', '| cookies:', req.headers.cookie ? 'present' : 'MISSING');
     if (!req.session?.user) {
       return res.status(401).json({ loggedIn: false });
     }
@@ -281,13 +296,14 @@ export function createAuthRouter(botClient) {
       }
 
       // Dùng cache guilds trong session để tránh gọi API liên tục
-      let userGuilds = req.session.userGuildsCache;
+      const userId = req.session.user.id;
+      let userGuilds = getCachedGuilds(userId);
       if (!userGuilds) {
         userGuilds = await fetchUserGuilds(accessToken);
         if (!userGuilds) {
           return res.status(403).json({ error: 'Không thể xác minh quyền truy cập. Vui lòng đăng nhập lại.', loginUrl: '/auth/login' });
         }
-        req.session.userGuildsCache = userGuilds;
+        setCachedGuilds(userId, userGuilds);
       }
 
       if (!hasManagePermission(userGuilds, guildId)) {

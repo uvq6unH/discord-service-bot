@@ -109,6 +109,19 @@ app.use(helmet({
     redis
   });
 
+  // In-process guild list cache (userId -> {guilds, expiresAt}, 5-min TTL)
+  // Shared between routes in this server instance.
+  const _guildCache = new Map();
+  const GUILD_CACHE_TTL = 5 * 60 * 1000;
+  function getCachedGuilds(userId) {
+    const e = _guildCache.get(userId);
+    if (!e || Date.now() > e.expiresAt) { _guildCache.delete(userId); return null; }
+    return e.guilds;
+  }
+  function setCachedGuilds(userId, guilds) {
+    _guildCache.set(userId, { guilds, expiresAt: Date.now() + GUILD_CACHE_TTL });
+  }
+
   const auth = createAuthRouter(botClient);
   if (auth.attachTo) auth.attachTo(app);
 
@@ -205,7 +218,8 @@ app.use(helmet({
     const guildsById = new Map();
 
     // Lấy danh sách guilds user có quyền quản lý từ OAuth (cache trong session)
-    let userGuilds = req.session.userGuildsCache ?? null;
+    const _uid = req.session.user?.id;
+    let userGuilds = _uid ? getCachedGuilds(_uid) : null;
     if (!userGuilds && !isDev) {
       const accessToken = req.session.user?.accessToken;
       if (accessToken) {
@@ -218,7 +232,7 @@ app.use(helmet({
           }).finally(() => clearTimeout(t));
           if (oauthRes.ok) {
             userGuilds = await oauthRes.json();
-            req.session.userGuildsCache = userGuilds;
+            if (_uid) setCachedGuilds(_uid, userGuilds);
           }
         } catch { /* fallback to empty */ }
       }
