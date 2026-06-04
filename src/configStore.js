@@ -428,7 +428,9 @@ export class ConfigStore {
         mentionReactEnabled: pickBoolean(patch, 'mentionReactEnabled', current),
         mentionReactEmoji: String(patch.mentionReactEmoji ?? current.mentionReactEmoji ?? '👋').trim().slice(0, 32) || '👋',
         remindersEnabled: pickBoolean(patch, 'remindersEnabled', current),
-        reminders: normalizeReminders(patch.reminders ?? current.reminders)
+        reminders: normalizeReminders(patch.reminders ?? current.reminders),
+        musicEnabled: pickBoolean(patch, 'musicEnabled', current),
+        musicPrefix: String(patch.musicPrefix ?? current.musicPrefix ?? 'hb').trim().slice(0, 10) || 'hb'
       };
 
       delete next.guildId;
