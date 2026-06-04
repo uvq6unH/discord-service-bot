@@ -81,7 +81,7 @@ app.use(helmet({
     maxAge: 7 * 24 * 60 * 60 * 1000,
     secure: isProduction,
     httpOnly: true,
-    sameSite: isProduction ? 'strict' : 'lax',
+    sameSite: 'lax', // 'strict' blocks cookie on OAuth redirect (cross-site navigation)
   }));
 
   app.use((req, _res, next) => {
