@@ -92,7 +92,16 @@ export function createAuthRouter(botClient) {
       state,
       prompt: 'none',
     });
-    res.redirect(`https://discord.com/oauth2/authorize?${params}`);
+    // Must save session to Redis BEFORE redirecting to Discord — otherwise the
+    // oauthState written above may not be persisted by the time /auth/callback
+    // reads it back, causing a state-mismatch 400.
+    req.session.save((err) => {
+      if (err) {
+        console.error('[auth] session save error on login:', err);
+        return res.status(500).send('Login failed. Please try again.');
+      }
+      res.redirect(`https://discord.com/oauth2/authorize?${params}`);
+    });
   });
 
   // GET /auth/callback
