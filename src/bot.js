@@ -407,7 +407,7 @@ export function createBot(configStore, stateStore) {
       }
 
       // ── Music prefix ───────────────────────────────────────────────────────
-      if (config.musicEnabled) {
+      if (config.musicEnabled !== false) { // default true nếu chưa có trong config
         const mPrefix = (config.musicPrefix || 'hb').toLowerCase();
         const lc = content.toLowerCase();
         if (lc === mPrefix || lc.startsWith(mPrefix + ' ')) {
