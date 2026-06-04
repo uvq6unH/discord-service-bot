@@ -42,8 +42,10 @@ const NODE_OPTIONS = (textChannel) => ({
   leaveOnEmpty: true,
   leaveOnEmptyCooldown: 5000,
   leaveOnEnd: true,
-  leaveOnEndCooldown: 30000,   // 30s trước khi rời sau khi hết nhạc
+  leaveOnEndCooldown: 30000,
   selfDeaf: true,
+  bufferingTimeout: 10000,    // fail after 10s if stream doesn't start
+  connectionTimeout: 15000,   // fail if voice connection takes >15s
 });
 
 // ── Main export ───────────────────────────────────────────────────────────────

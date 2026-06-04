@@ -68,6 +68,7 @@ export async function initMusicPlayer(client) {
 
   _player = new Player(client, {
     skipFFmpeg: false,
+    connectionTimeout: 15000,  // fail fast instead of hanging forever
   });
 
   // Load all built-in extractors.
@@ -87,10 +88,6 @@ export async function initMusicPlayer(client) {
     queue.metadata?.textChannel
       ?.send(`⚠️ Stream error: ${error?.message}`)
       .catch(() => null);
-  });
-
-  _player.events.on('debug', (message) => {
-    console.log('[discord-player:debug]', message);
   });
 
   _player.events.on('audioTrackAdd', (queue, track) => {
