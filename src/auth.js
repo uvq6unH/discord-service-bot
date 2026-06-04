@@ -159,9 +159,13 @@ export function createAuthRouter(botClient) {
         accessToken: tokens.access_token,
       };
 
+      console.log('[auth] session set for', user.username, '| session keys:', Object.keys(req.session));
+      console.log('[auth] response headers will set cookie:', !res.headersSent);
+
       const returnTo = safeReturnTo(req.session.returnTo);
       req.session.returnTo = null;
       res.redirect(returnTo);
+      console.log('[auth] redirected to', returnTo, '| headers sent:', res.headersSent);
     } catch (err) {
       console.error('[auth] callback error:', err.message);
       res.status(500).send('Login failed. Please try again later.');
@@ -176,6 +180,8 @@ export function createAuthRouter(botClient) {
 
   // GET /auth/me
   router.get('/auth/me', (req, res) => {
+    console.log('[auth/me] session:', JSON.stringify(req.session));
+    console.log('[auth/me] cookies:', req.headers.cookie ? 'present' : 'MISSING');
     if (!req.session?.user) {
       return res.status(401).json({ loggedIn: false });
     }
