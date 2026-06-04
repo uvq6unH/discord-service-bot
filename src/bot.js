@@ -66,11 +66,20 @@ const EMOJI_MAP = {
 
 /**
  * Replaces :emoji_name: tokens in a string with their unicode equivalents.
- * Unknown names are left as-is.
+ * Tries guild custom emojis first, then falls back to EMOJI_MAP.
+ * Unknown names are left as-is (e.g. :lui2: stays if not found).
  */
-function resolveEmojiNames(text) {
+function resolveEmojiNames(text, guild = null) {
   if (!text) return text;
-  return text.replace(/:([a-zA-Z0-9_]+):/g, (match, name) => EMOJI_MAP[name] ?? match);
+  return text.replace(/:([a-zA-Z0-9_]+):/g, (match, name) => {
+    // 1. Try guild custom emoji (case-insensitive)
+    if (guild) {
+      const custom = guild.emojis.cache.find(e => e.name.toLowerCase() === name.toLowerCase());
+      if (custom) return custom.toString(); // renders as <:name:id> or <a:name:id>
+    }
+    // 2. Fallback to static unicode map
+    return EMOJI_MAP[name] ?? match;
+  });
 }
 
 // In-memory XP cooldown cache — prevents redundant Redis reads when levelsEnabled
@@ -154,7 +163,7 @@ export function createBot(configStore, stateStore) {
                       : (reminder.userId ? [reminder.userId] : []);
                     const mentions = ids.map(id => `<@${id}>`).join(' ');
                     const repeatLabel = { hourly: ' 🔁 (mỗi giờ)', daily: ' 🔁 (mỗi ngày)', weekly: ' 🔁 (mỗi tuần)' }[reminder.repeat] ?? '';
-                    const resolvedMessage = resolveEmojiNames(reminder.message);
+                    const resolvedMessage = resolveEmojiNames(reminder.message, guild);
                     await channel.send(`${mentions} ${resolvedMessage}`).catch(() => null);
                   }
                 }
