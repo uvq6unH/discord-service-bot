@@ -86,10 +86,23 @@ app.use(helmet({
     sameSite: 'lax',
   }));
 
+  // Shim regenerate/save for compatibility with middlewares that expect express-session API.
+  // IMPORTANT: must use non-enumerable properties so cookie-session does NOT serialize these
+  // functions into the cookie — serializing functions corrupts the session after the first request.
   app.use((req, _res, next) => {
-    if (req.session && !req.session.regenerate) {
-      req.session.regenerate = (cb) => { cb?.(); };
-      req.session.save = (cb) => { cb?.(); };
+    if (req.session && !Object.prototype.hasOwnProperty.call(req.session, 'regenerate')) {
+      Object.defineProperty(req.session, 'regenerate', {
+        value: (cb) => { cb?.(); },
+        enumerable: false,
+        configurable: true,
+        writable: true,
+      });
+      Object.defineProperty(req.session, 'save', {
+        value: (cb) => { cb?.(); },
+        enumerable: false,
+        configurable: true,
+        writable: true,
+      });
     }
     next();
   });
