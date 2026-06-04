@@ -3,23 +3,66 @@
 // and creates an audio stream for @discordjs/voice.
 //
 // Supported sources:
-//   • YouTube  – direct URL or search query
-//   • Spotify  – track URL (metadata via oEmbed → search on YouTube)
-//   • SoundCloud – direct URL
-//   • Direct URL – any https:// link (audio file, livestream, etc.)
+//   • YouTube  – direct URL or search query  (via yt-dlp)
+//   • Spotify  – track URL (metadata via oEmbed → search on YouTube via yt-dlp)
+//   • SoundCloud – direct URL                (via play-dl, unchanged)
+//   • Direct URL – any https:// link         (via play-dl/fetch, unchanged)
 //
-// ffmpeg-static provides the FFmpeg binary so no system package is needed.
+// WHY yt-dlp FOR YOUTUBE:
+//   YouTube now requires "Sign in to confirm you're not a bot" for unauthenticated
+//   server-side requests. play-dl's YouTube backend is blocked on hosting IPs.
+//   yt-dlp is updated continuously to bypass these restrictions and supports
+//   --cookies-from-browser / cookie files for authenticated extraction.
+//
+// SETUP (one-time, see README section "Music – YouTube Setup"):
+//   1. Install yt-dlp:  pip install -U yt-dlp   (or use prebuilt binary)
+//   2. Set env var YTDLP_PATH if yt-dlp is not on PATH (optional)
+//   3. Optionally set YTDLP_COOKIES_FILE=/path/to/cookies.txt for auth
 
+import { spawn, spawnSync } from 'child_process';
+import { Readable } from 'stream';
 import playdl from 'play-dl';
 
-// Set FFMPEG_PATH from ffmpeg-static as early as possible so prism-media picks it up.
-// This is done lazily to avoid import-time failures if the package isn't installed yet.
+// ── yt-dlp binary resolution ─────────────────────────────────────────────────
+
+let _ytdlpBin = null;
+function getYtdlpBin() {
+  if (_ytdlpBin) return _ytdlpBin;
+  const candidates = [
+    process.env.YTDLP_PATH,
+    'yt-dlp',
+    '/usr/local/bin/yt-dlp',
+    '/usr/bin/yt-dlp',
+  ].filter(Boolean);
+
+  for (const bin of candidates) {
+    try {
+      const r = spawnSync(bin, ['--version'], { timeout: 5000 });
+      if (r.status === 0) {
+        _ytdlpBin = bin;
+        console.log(`[music] yt-dlp found: ${bin} (${r.stdout.toString().trim()})`);
+        return _ytdlpBin;
+      }
+    } catch { /* try next */ }
+  }
+  throw new Error(
+    'yt-dlp không tìm thấy. Cài bằng: pip install -U yt-dlp\n' +
+    'Hoặc đặt YTDLP_PATH=/đường/dẫn/yt-dlp trong env.'
+  );
+}
+
+// ── ffmpeg-static setup ───────────────────────────────────────────────────────
+
 let _ffmpegInitialized = false;
+let _ffmpegBin = 'ffmpeg';
 async function ensureFfmpeg() {
   if (_ffmpegInitialized) return;
   try {
     const { default: ffmpegPath } = await import('ffmpeg-static');
-    if (ffmpegPath) process.env.FFMPEG_PATH = ffmpegPath;
+    if (ffmpegPath) {
+      process.env.FFMPEG_PATH = ffmpegPath;
+      _ffmpegBin = ffmpegPath;
+    }
     _ffmpegInitialized = true;
     console.log('[music] ffmpeg-static path:', ffmpegPath);
   } catch {
@@ -28,27 +71,113 @@ async function ensureFfmpeg() {
   }
 }
 
-/**
- * @typedef {Object} Track
- * @property {string} title
- * @property {string} url           - playable URL (always a YouTube/SC/direct link)
- * @property {number} duration      - seconds (0 if unknown)
- * @property {string} durationFmt   - human-readable "m:ss"
- * @property {string|null} thumbnail
- * @property {'youtube'|'spotify'|'soundcloud'|'direct'} source
- * @property {string} requestedBy   - Discord user ID
- */
+// ── yt-dlp helpers ────────────────────────────────────────────────────────────
 
-/** Normalize a YouTube URL — ensures it is always a full https:// URL.
- *  play-dl's video_details.url can occasionally be a relative path or bare video ID. */
-function normalizeYouTubeUrl(url, fallbackInput) {
-  if (!url && fallbackInput) return fallbackInput; // keep original input as last resort
-  if (!url) return null;
-  if (/^https?:\/\//i.test(url)) return url;           // already absolute
-  if (url.startsWith('/')) return `https://www.youtube.com${url}`; // relative path
-  if (/^[A-Za-z0-9_-]{11}$/.test(url.trim())) return `https://www.youtube.com/watch?v=${url.trim()}`; // bare ID
-  return url;
+/** Build common yt-dlp args (cookie file, no playlist, etc.) */
+function ytdlpBaseArgs() {
+  const args = [
+    '--no-playlist',
+    '--no-warnings',
+  ];
+  if (process.env.YTDLP_COOKIES_FILE) {
+    args.push('--cookies', process.env.YTDLP_COOKIES_FILE);
+  }
+  return args;
 }
+
+/**
+ * Run yt-dlp --dump-json to get video metadata.
+ * @param {string} urlOrQuery  Full URL or "ytsearch:query string"
+ * @returns {Promise<object>}  Parsed JSON info dict
+ */
+async function ytdlpInfo(urlOrQuery) {
+  const bin = getYtdlpBin();
+  const args = [
+    ...ytdlpBaseArgs(),
+    '--dump-json',
+    '--skip-download',
+    urlOrQuery,
+  ];
+
+  return new Promise((resolve, reject) => {
+    let stdout = '';
+    let stderr = '';
+    const proc = spawn(bin, args, { timeout: 20000 });
+    proc.stdout.on('data', d => (stdout += d));
+    proc.stderr.on('data', d => (stderr += d));
+    proc.on('close', code => {
+      if (code !== 0) {
+        // Surface the most useful line from stderr
+        const msg = stderr.split('\n').find(l => l.includes('ERROR') || l.includes('Sign in')) ?? stderr.trim();
+        return reject(new Error(msg || `yt-dlp exited ${code}`));
+      }
+      try {
+        // yt-dlp may emit multiple JSON lines (playlist); take the first
+        const firstLine = stdout.trim().split('\n')[0];
+        resolve(JSON.parse(firstLine));
+      } catch {
+        reject(new Error('yt-dlp trả về JSON không hợp lệ'));
+      }
+    });
+    proc.on('error', err => reject(new Error(`Không thể chạy yt-dlp: ${err.message}`)));
+  });
+}
+
+/**
+ * Create a Readable audio stream via yt-dlp piped through ffmpeg.
+ * Returns a Node.js Readable stream (PCM/opus depends on ffmpeg args).
+ * We output Opus in an ogg container so @discordjs/voice can consume it directly.
+ * @param {string} url  YouTube watch URL
+ * @returns {Promise<{ stream: Readable, type: 'opus' | 'arbitrary' }>}
+ */
+async function ytdlpStream(url) {
+  await ensureFfmpeg();
+  const bin = getYtdlpBin();
+
+  // yt-dlp outputs best audio to stdout, ffmpeg re-encodes to opus/ogg for discord
+  const ytArgs = [
+    ...ytdlpBaseArgs(),
+    '-f', 'bestaudio[ext=webm]/bestaudio/best',
+    '-o', '-',   // pipe to stdout
+    '--quiet',
+    url,
+  ];
+
+  const ffArgs = [
+    '-i', 'pipe:0',
+    '-vn',
+    '-acodec', 'libopus',
+    '-f', 'opus',
+    '-ar', '48000',
+    '-ac', '2',
+    'pipe:1',
+  ];
+
+  const ytProc = spawn(bin, ytArgs);
+  const ffProc = spawn(_ffmpegBin, ffArgs, { stdio: ['pipe', 'pipe', 'pipe'] });
+
+  // Pipe yt-dlp stdout → ffmpeg stdin
+  ytProc.stdout.pipe(ffProc.stdin);
+
+  // Forward yt-dlp stderr to console for debugging
+  ytProc.stderr.on('data', d => {
+    const msg = d.toString().trim();
+    if (msg) console.debug('[yt-dlp]', msg);
+  });
+  ffProc.stderr.on('data', d => {
+    const msg = d.toString().trim();
+    if (msg) console.debug('[ffmpeg]', msg);
+  });
+
+  // If yt-dlp dies, kill ffmpeg too
+  ytProc.on('close', code => {
+    if (code !== 0) ffProc.stdin.destroy(new Error(`yt-dlp exited ${code}`));
+  });
+
+  return { stream: ffProc.stdout, type: 'opus' };
+}
+
+// ── General helpers ───────────────────────────────────────────────────────────
 
 /** Detect source type from input string */
 function detectSource(input) {
@@ -76,6 +205,19 @@ async function spotifyTitle(url) {
 }
 
 /**
+ * @typedef {Object} Track
+ * @property {string} title
+ * @property {string} url           - canonical URL
+ * @property {number} duration      - seconds (0 if unknown)
+ * @property {string} durationFmt   - human-readable "m:ss"
+ * @property {string|null} thumbnail
+ * @property {'youtube'|'spotify'|'soundcloud'|'direct'} source
+ * @property {string} requestedBy   - Discord user ID
+ */
+
+// ── resolveTrack ──────────────────────────────────────────────────────────────
+
+/**
  * Resolve a user input string into a Track object.
  * Throws if resolution fails.
  * @param {string} input
@@ -84,51 +226,44 @@ async function spotifyTitle(url) {
 export async function resolveTrack(input) {
   const source = detectSource(input.trim());
 
-  // ── YouTube ──────────────────────────────────────────────────────────────
+  // ── YouTube (direct URL) ──────────────────────────────────────────────────
   if (source === 'youtube') {
-    const info = await playdl.video_info(input);
-    const v = info.video_details;
-    const resolvedUrl = normalizeYouTubeUrl(v.url, input);
-    if (!resolvedUrl) throw new Error('play-dl trả về URL trống cho video này');
+    const info = await ytdlpInfo(input.trim());
     return {
-      title: v.title ?? 'Unknown',
-      url: resolvedUrl,
-      duration: v.durationInSec ?? 0,
-      durationFmt: fmt(v.durationInSec),
-      thumbnail: v.thumbnails?.[0]?.url ?? null,
+      title: info.title ?? 'Unknown',
+      url: info.webpage_url ?? input.trim(),
+      duration: info.duration ?? 0,
+      durationFmt: fmt(info.duration),
+      thumbnail: info.thumbnail ?? null,
       source: 'youtube',
-      requestedBy: ''
+      requestedBy: '',
     };
   }
 
-  // ── Spotify (resolve to YouTube) ─────────────────────────────────────────
+  // ── Spotify (resolve title → search on YouTube via yt-dlp) ───────────────
   if (source === 'spotify') {
     let searchQuery;
     try {
       searchQuery = await spotifyTitle(input);
     } catch {
-      // Fallback: extract path segment as query
       const m = input.match(/track\/([A-Za-z0-9]+)/);
       searchQuery = m ? m[1] : input;
     }
 
-    const results = await playdl.search(searchQuery, { source: { youtube: 'video' }, limit: 1 });
-    if (!results.length) throw new Error('Không tìm thấy bài hát trên YouTube');
-    const v = results[0];
-    const resolvedUrl = normalizeYouTubeUrl(v.url);
-    if (!resolvedUrl) throw new Error(`play-dl trả về URL trống cho "${searchQuery}"`);
+    const info = await ytdlpInfo(`ytsearch1:${searchQuery}`);
     return {
-      title: searchQuery,            // Spotify title is more accurate
-      url: resolvedUrl,
-      duration: v.durationInSec ?? 0,
-      durationFmt: fmt(v.durationInSec),
-      thumbnail: v.thumbnails?.[0]?.url ?? null,
+      title: searchQuery,  // Spotify title is more descriptive
+      url: info.webpage_url,
+      duration: info.duration ?? 0,
+      durationFmt: fmt(info.duration),
+      thumbnail: info.thumbnail ?? null,
       source: 'spotify',
-      requestedBy: ''
+      requestedBy: '',
     };
   }
 
   // ── SoundCloud ───────────────────────────────────────────────────────────
+  // play-dl handles SoundCloud fine (no auth wall), keep as-is
   if (source === 'soundcloud') {
     const sc = await playdl.soundcloud(input);
     const durSec = Math.floor((sc.durationInMs ?? 0) / 1000);
@@ -139,7 +274,7 @@ export async function resolveTrack(input) {
       durationFmt: fmt(durSec),
       thumbnail: sc.thumbnail ?? null,
       source: 'soundcloud',
-      requestedBy: ''
+      requestedBy: '',
     };
   }
 
@@ -153,26 +288,24 @@ export async function resolveTrack(input) {
       durationFmt: 'Live',
       thumbnail: null,
       source: 'direct',
-      requestedBy: ''
+      requestedBy: '',
     };
   }
 
-  // ── Search query (YouTube) ───────────────────────────────────────────────
-  const results = await playdl.search(input, { source: { youtube: 'video' }, limit: 1 });
-  if (!results.length) throw new Error('Không tìm thấy kết quả nào');
-  const v = results[0];
-  const resolvedUrl = normalizeYouTubeUrl(v.url);
-  if (!resolvedUrl) throw new Error(`play-dl trả về URL trống cho "${input}"`);
+  // ── Search query → YouTube via yt-dlp ────────────────────────────────────
+  const info = await ytdlpInfo(`ytsearch1:${input.trim()}`);
   return {
-    title: v.title ?? input,
-    url: resolvedUrl,
-    duration: v.durationInSec ?? 0,
-    durationFmt: fmt(v.durationInSec),
-    thumbnail: v.thumbnails?.[0]?.url ?? null,
+    title: info.title ?? input,
+    url: info.webpage_url,
+    duration: info.duration ?? 0,
+    durationFmt: fmt(info.duration),
+    thumbnail: info.thumbnail ?? null,
     source: 'youtube',
-    requestedBy: ''
+    requestedBy: '',
   };
 }
+
+// ── createAudioStream ─────────────────────────────────────────────────────────
 
 /**
  * Create a streamable audio source for a resolved Track.
@@ -182,20 +315,19 @@ export async function resolveTrack(input) {
 export async function createAudioStream(track) {
   await ensureFfmpeg();
 
-  // Guard: validate URL before passing to play-dl — prevents "Invalid URL" crashes
   if (!track.url || !/^https?:\/\//i.test(track.url)) {
     throw new Error(`URL không hợp lệ: "${track.url ?? '(trống)'}"`);
   }
 
+  // SoundCloud — play-dl still works fine
   if (track.source === 'soundcloud') {
     const sc = await playdl.soundcloud(track.url);
     return await playdl.stream_from_info(sc, { quality: 2 });
   }
 
+  // Direct URL — try play-dl first, fall back to raw fetch
   if (track.source === 'direct') {
-    // Let ffmpeg handle arbitrary audio URLs
     const streamInfo = await playdl.stream(track.url, { quality: 2 }).catch(async () => {
-      // play-dl may refuse non-YT; fall through to raw fetch
       const res = await fetch(track.url);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       return { stream: res.body, type: 'arbitrary' };
@@ -203,8 +335,8 @@ export async function createAudioStream(track) {
     return streamInfo;
   }
 
-  // YouTube (covers both 'youtube' and 'spotify' which resolved to YT URL)
-  return await playdl.stream(track.url, { quality: 2 });
+  // YouTube + Spotify (resolved to YT URL) — use yt-dlp
+  return await ytdlpStream(track.url);
 }
 
 export { fmt };
