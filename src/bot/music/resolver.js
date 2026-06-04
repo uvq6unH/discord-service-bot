@@ -39,6 +39,17 @@ async function ensureFfmpeg() {
  * @property {string} requestedBy   - Discord user ID
  */
 
+/** Normalize a YouTube URL — ensures it is always a full https:// URL.
+ *  play-dl's video_details.url can occasionally be a relative path or bare video ID. */
+function normalizeYouTubeUrl(url, fallbackInput) {
+  if (!url && fallbackInput) return fallbackInput; // keep original input as last resort
+  if (!url) return null;
+  if (/^https?:\/\//i.test(url)) return url;           // already absolute
+  if (url.startsWith('/')) return `https://www.youtube.com${url}`; // relative path
+  if (/^[A-Za-z0-9_-]{11}$/.test(url.trim())) return `https://www.youtube.com/watch?v=${url.trim()}`; // bare ID
+  return url;
+}
+
 /** Detect source type from input string */
 function detectSource(input) {
   if (/youtu\.be|youtube\.com/i.test(input)) return 'youtube';
@@ -77,9 +88,11 @@ export async function resolveTrack(input) {
   if (source === 'youtube') {
     const info = await playdl.video_info(input);
     const v = info.video_details;
+    const resolvedUrl = normalizeYouTubeUrl(v.url, input);
+    if (!resolvedUrl) throw new Error('play-dl trả về URL trống cho video này');
     return {
       title: v.title ?? 'Unknown',
-      url: v.url,
+      url: resolvedUrl,
       duration: v.durationInSec ?? 0,
       durationFmt: fmt(v.durationInSec),
       thumbnail: v.thumbnails?.[0]?.url ?? null,
@@ -102,9 +115,11 @@ export async function resolveTrack(input) {
     const results = await playdl.search(searchQuery, { source: { youtube: 'video' }, limit: 1 });
     if (!results.length) throw new Error('Không tìm thấy bài hát trên YouTube');
     const v = results[0];
+    const resolvedUrl = normalizeYouTubeUrl(v.url);
+    if (!resolvedUrl) throw new Error(`play-dl trả về URL trống cho "${searchQuery}"`);
     return {
       title: searchQuery,            // Spotify title is more accurate
-      url: v.url,
+      url: resolvedUrl,
       duration: v.durationInSec ?? 0,
       durationFmt: fmt(v.durationInSec),
       thumbnail: v.thumbnails?.[0]?.url ?? null,
@@ -146,9 +161,11 @@ export async function resolveTrack(input) {
   const results = await playdl.search(input, { source: { youtube: 'video' }, limit: 1 });
   if (!results.length) throw new Error('Không tìm thấy kết quả nào');
   const v = results[0];
+  const resolvedUrl = normalizeYouTubeUrl(v.url);
+  if (!resolvedUrl) throw new Error(`play-dl trả về URL trống cho "${input}"`);
   return {
     title: v.title ?? input,
-    url: v.url,
+    url: resolvedUrl,
     duration: v.durationInSec ?? 0,
     durationFmt: fmt(v.durationInSec),
     thumbnail: v.thumbnails?.[0]?.url ?? null,
@@ -164,6 +181,11 @@ export async function resolveTrack(input) {
  */
 export async function createAudioStream(track) {
   await ensureFfmpeg();
+
+  // Guard: validate URL before passing to play-dl — prevents "Invalid URL" crashes
+  if (!track.url || !/^https?:\/\//i.test(track.url)) {
+    throw new Error(`URL không hợp lệ: "${track.url ?? '(trống)'}"`);
+  }
 
   if (track.source === 'soundcloud') {
     const sc = await playdl.soundcloud(track.url);
