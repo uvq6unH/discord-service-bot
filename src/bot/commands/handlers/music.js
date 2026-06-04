@@ -44,8 +44,10 @@ const NODE_OPTIONS = (textChannel) => ({
   leaveOnEnd: true,
   leaveOnEndCooldown: 30000,
   selfDeaf: true,
-  bufferingTimeout: 10000,    // fail after 10s if stream doesn't start
-  connectionTimeout: 15000,   // fail if voice connection takes >15s
+  bufferingTimeout: 3000,
+  connectionTimeout: 15000,
+  // disableBiquad: true giúp bỏ qua equalizer filter — giảm tải ffmpeg pipeline
+  disableBiquad: true,
 });
 
 // ── Main export ───────────────────────────────────────────────────────────────

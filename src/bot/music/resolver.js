@@ -68,8 +68,22 @@ export async function initMusicPlayer(client) {
 
   _player = new Player(client, {
     skipFFmpeg: false,
-    connectionTimeout: 15000,  // fail fast instead of hanging forever
+    connectionTimeout: 15000,
   });
+
+  // Verify ffmpeg binary is actually executable on this host
+  try {
+    const { spawnSync } = await import('child_process');
+    const ffmpegBin = process.env.FFMPEG_PATH ?? 'ffmpeg';
+    const probe = spawnSync(ffmpegBin, ['-version'], { timeout: 5000, encoding: 'utf8' });
+    if (probe.status === 0) {
+      console.log('[music] ffmpeg OK:', probe.stdout.split('\n')[0]);
+    } else {
+      console.error('[music] ⚠️ ffmpeg binary not working! stderr:', probe.stderr?.slice(0, 200));
+    }
+  } catch (e) {
+    console.error('[music] ⚠️ ffmpeg probe failed:', e.message);
+  }
 
   // Load all built-in extractors.
   // SoundCloud extractor works without credentials.
@@ -106,7 +120,12 @@ export async function initMusicPlayer(client) {
   });
 
   _player.events.on('emptyQueue', (queue) => {
-    console.log('[discord-player] emptyQueue');
+    console.log('[discord-player] emptyQueue | tracks played:', queue.history?.tracks?.size ?? '?');
+  });
+
+  // Log khi stream thực sự bắt đầu đọc data
+  _player.events.on('playerFinish', (queue, track) => {
+    console.log('[discord-player] playerFinish:', track?.title, '| duration:', track?.duration);
   });
 
   console.log('[music] discord-player ready, extractors:',
