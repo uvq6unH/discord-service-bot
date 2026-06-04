@@ -129,7 +129,10 @@ export function createAuthRouter(botClient) {
         throw new Error(`Unexpected response from Discord token endpoint: ${tokenRes.status} ${tokenRes.statusText}`);
       }
       const tokens = await tokenRes.json();
-      if (!tokenRes.ok) throw new Error(tokens.error_description ?? 'Token exchange failed');
+      if (!tokenRes.ok) {
+        console.error('[auth] token exchange failed:', JSON.stringify(tokens));
+        throw new Error(tokens.error_description ?? tokens.error ?? 'Token exchange failed');
+      }
 
       const userController = new AbortController();
       const userTimeout = setTimeout(() => userController.abort(), 10_000);
