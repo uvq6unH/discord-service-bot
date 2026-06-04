@@ -23,6 +23,24 @@ import { createRequire } from 'module';
 //   2. ffmpeg-static bundled binary  ← installed as a dep
 //   3. system ffmpeg on PATH (Render doesn't have this on free tier)
 
+// ── Opus / audio encoder check ───────────────────────────────────────────────
+// Log which encoder is available so we can diagnose "joins but no audio" issues.
+// discord-player v7 prefers: mediaplex > @discordjs/opus > opusscript
+{
+  const _req = createRequire(import.meta.url);
+  const encoders = ['mediaplex', '@discordjs/opus', 'opusscript'];
+  let found = false;
+  for (const enc of encoders) {
+    try {
+      _req(enc);
+      console.log('[music] opus encoder available:', enc);
+      found = true;
+      break;
+    } catch { /* not installed */ }
+  }
+  if (!found) console.error('[music] ⚠️ NO OPUS ENCODER FOUND — audio will not work! Install mediaplex.');
+}
+
 if (!process.env.FFMPEG_PATH) {
   try {
     const _require = createRequire(import.meta.url);
