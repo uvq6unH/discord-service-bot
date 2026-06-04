@@ -8,7 +8,7 @@ services:
       curl -fsSL https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp -o /var/data/yt-dlp &&
       chmod +x /var/data/yt-dlp &&
       echo "yt-dlp ready: $(/var/data/yt-dlp --version)" &&
-      YTDLP_PATH=/var/data/yt-dlp pnpm start
+      pnpm start
     disk:
       name: bot-data
       mountPath: /var/data
@@ -22,6 +22,8 @@ services:
         value: /var/data/configs.json
       - key: STATE_PATH
         value: /var/data/state.json
+      - key: YTDLP_PATH
+        value: /var/data/yt-dlp
       - key: DAILY_RESET_UTC_OFFSET_MINUTES
         value: 420
       - key: COMMAND_COOLDOWN_MS
