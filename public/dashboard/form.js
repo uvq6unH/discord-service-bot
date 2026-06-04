@@ -12,10 +12,12 @@ export function addReplyRow(reply = { keyword: '', response: '' }) {
   const row = document.createElement('div');
   row.className = 'reply-item';
   row.innerHTML = `
-    <div><label>Từ khóa</label><input class="reply-keyword" value="${esc(reply.keyword)}" placeholder="xin chào" /></div>
-    <div><label>Phản hồi</label><input class="reply-response" value="${esc(reply.response)}" placeholder="Chào bạn!" /></div>
+    <div><label>Từ khóa</label><input class="reply-keyword" placeholder="xin chào" /></div>
+    <div><label>Phản hồi</label><input class="reply-response" placeholder="Chào bạn!" /></div>
     <button class="btn btn-xs btn-danger remove-reply" type="button" style="align-self:flex-end">Xóa</button>`;
-  row.querySelector('.remove-reply').addEventListener('click', () => { row.remove(); setDirty(); });
+  row.querySelector('.reply-keyword').value = reply.keyword ?? '';
+  row.querySelector('.reply-response').value = reply.response ?? '';
+    row.querySelector('.remove-reply').addEventListener('click', () => { row.remove(); setDirty(); });
   row.addEventListener('input', setDirty);
   autoRepliesEl.append(row);
 }
@@ -46,7 +48,8 @@ export function addSelfRoleRow(role = { label: '', roleId: '' }) {
     select.append(opt);
   }
   const labelWrap = document.createElement('div');
-  labelWrap.innerHTML = `<label>Label nút</label><input class="self-role-label" value="${esc(role.label)}" placeholder="Coder" />`;
+  labelWrap.innerHTML = `<label>Label nút</label><input class="self-role-label" placeholder="Coder" />`;
+  labelWrap.querySelector('.self-role-label').value = role.label ?? '';
   const roleWrap = document.createElement('div');
   roleWrap.innerHTML = '<label>Vai trò</label>';
   roleWrap.append(select);
@@ -308,7 +311,13 @@ export function addReminderRow(reminder = { id: '', userIds: [], channelId: '', 
   const bottomRow = document.createElement('div');
   bottomRow.style.display = 'flex'; bottomRow.style.gap = '1rem';
   const msgWrap = document.createElement('div'); msgWrap.style.flex = '1';
-  msgWrap.innerHTML = `<label>Nội dung nhắc nhở</label><input class="reminder-message" value="${esc(reminder.message)}" placeholder="Nhớ tham gia event nhé!" />`;
+  const msgLabel = document.createElement('label');
+  msgLabel.textContent = 'Nội dung nhắc nhở';
+  const msgInput = document.createElement('input');
+  msgInput.className = 'reminder-message';
+  msgInput.placeholder = 'Nhớ tham gia event nhé!';
+  msgInput.value = reminder.message ?? '';
+  msgWrap.append(msgLabel, msgInput);
 
   const removeBtn = document.createElement('button');
   removeBtn.className = 'btn btn-xs btn-danger'; removeBtn.type = 'button'; removeBtn.textContent = 'Xóa';
