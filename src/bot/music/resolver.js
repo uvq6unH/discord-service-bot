@@ -19,11 +19,37 @@
 //   2. Set env var YTDLP_PATH if yt-dlp is not on PATH (optional)
 //   3. Optionally set YTDLP_COOKIES_FILE=/path/to/cookies.txt for auth
 
-import { spawn } from 'child_process';
+import { spawn, spawnSync } from 'child_process';
+import { Readable } from 'stream';
 import playdl from 'play-dl';
-import { resolveYtdlp } from './ytdlp.js';
 
-function getYtdlpBin() { return resolveYtdlp(); }
+// ── yt-dlp binary resolution ─────────────────────────────────────────────────
+
+let _ytdlpBin = null;
+function getYtdlpBin() {
+  if (_ytdlpBin) return _ytdlpBin;
+  const candidates = [
+    process.env.YTDLP_PATH,
+    'yt-dlp',
+    '/usr/local/bin/yt-dlp',
+    '/usr/bin/yt-dlp',
+  ].filter(Boolean);
+
+  for (const bin of candidates) {
+    try {
+      const r = spawnSync(bin, ['--version'], { timeout: 5000 });
+      if (r.status === 0) {
+        _ytdlpBin = bin;
+        console.log(`[music] yt-dlp found: ${bin} (${r.stdout.toString().trim()})`);
+        return _ytdlpBin;
+      }
+    } catch { /* try next */ }
+  }
+  throw new Error(
+    'yt-dlp không tìm thấy. Cài bằng: pip install -U yt-dlp\n' +
+    'Hoặc đặt YTDLP_PATH=/đường/dẫn/yt-dlp trong env.'
+  );
+}
 
 // ── ffmpeg-static setup ───────────────────────────────────────────────────────
 
@@ -52,6 +78,9 @@ function ytdlpBaseArgs() {
   const args = [
     '--no-playlist',
     '--no-warnings',
+    // iOS player client bypasses YouTube's bot-detection — no cookies needed
+    '--extractor-args', 'youtube:player_client=ios,web',
+    '--user-agent', 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1',
   ];
   if (process.env.YTDLP_COOKIES_FILE) {
     args.push('--cookies', process.env.YTDLP_COOKIES_FILE);
