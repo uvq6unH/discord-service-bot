@@ -8,10 +8,33 @@
 //   3. Direct URL  — any https:// audio link
 //
 // discord-player handles voice connection + queue internally per guild.
-// This file re-exports helpers so music.js can stay mostly unchanged.
 
 import { Player, useMainPlayer, useQueue } from 'discord-player';
 import { DefaultExtractors } from '@discord-player/extractor';
+import { createRequire } from 'module';
+
+// ── FFmpeg bootstrap ──────────────────────────────────────────────────────────
+// discord-player needs ffmpeg to transcode audio. ffmpeg-static bundles a
+// static binary but discord-player won't find it automatically — we must set
+// process.env.FFMPEG_PATH before constructing the Player.
+//
+// Resolution order:
+//   1. FFMPEG_PATH env var (explicit override — set this in Render dashboard)
+//   2. ffmpeg-static bundled binary  ← installed as a dep
+//   3. system ffmpeg on PATH (Render doesn't have this on free tier)
+
+if (!process.env.FFMPEG_PATH) {
+  try {
+    const _require = createRequire(import.meta.url);
+    const ffmpegPath = _require('ffmpeg-static');
+    if (ffmpegPath) {
+      process.env.FFMPEG_PATH = ffmpegPath;
+      console.log('[music] ffmpeg-static registered:', ffmpegPath);
+    }
+  } catch {
+    console.warn('[music] ffmpeg-static not found — relying on system ffmpeg or FFMPEG_PATH env');
+  }
+}
 
 // ── Player singleton ──────────────────────────────────────────────────────────
 
@@ -30,8 +53,8 @@ export async function initMusicPlayer(client) {
   });
 
   // Load all built-in extractors.
-  // SoundCloud extractor is included and works without credentials.
-  // YouTube extractor is included but skipped if bot-detection fires.
+  // SoundCloud extractor works without credentials.
+  // YouTube extractor is included but will be skipped if bot-detection fires.
   await _player.extractors.loadMulti(DefaultExtractors);
 
   _player.events.on('playerError', (queue, error) => {
@@ -102,10 +125,9 @@ export function detectSource(input) {
 // ── buildSearchQuery ──────────────────────────────────────────────────────────
 // Converts any user input into a query string discord-player can search.
 //
-// YouTube URLs: pass direct URL to discord-player (may work on some IPs), but
-//   also pre-fetch the video title via oEmbed so music.js can do a SoundCloud
-//   title-search fallback without an extra HTTP round-trip.
-// Spotify URLs: resolve title via oEmbed → search SoundCloud.
+// YouTube URLs: pass direct URL first; also pre-fetch the video title via oEmbed
+//   so music.js can SoundCloud-fallback without an extra HTTP call if blocked.
+// Spotify URLs: resolve title via oEmbed → SoundCloud search.
 
 export async function buildSearchQuery(input) {
   const source = detectSource(input.trim());

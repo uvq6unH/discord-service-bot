@@ -285,7 +285,7 @@ export const defaultConfig = {
   welcomeChannelId: '',
   welcomeMessage: 'Welcome {user} to {server}.',
   logChannelId: '',
-  musicEnabled: false,
+  musicEnabled: true,
   musicPrefix: 'hb',
   autoReplyEnabled: false,
   mentionReactEnabled: false,
