@@ -1,0 +1,111 @@
+# ── Lavalink v4 Server Configuration ──────────────────────────────────────────
+# Deploy this file alongside the Lavalink.jar on your Java host.
+# Recommended: Railway / Fly.io free tier, or a VPS.
+#
+# Plugins used:
+#   - youtube-source  : replaces the deprecated built-in YouTube extractor
+#   - LavaSrc         : Spotify, Apple Music, Deezer (resolve metadata → YT audio)
+#
+# Download Lavalink.jar:
+#   https://github.com/lavalink-devs/Lavalink/releases
+#
+# Plugin jars are auto-downloaded on first start if pluginRepositories is set.
+
+server:
+  port: 2333
+  address: 0.0.0.0
+
+plugins:
+  # ── youtube-source ─────────────────────────────────────────────────────────
+  # https://github.com/lavalink-devs/youtube-source
+  youtube:
+    enabled: true
+    allowSearch: true
+    allowDirectVideoIds: true
+    allowDirectPlaylistIds: true
+    # Use OAuth to bypass age-gate / bot detection (optional but recommended)
+    # oauth:
+    #   enabled: true
+    #   refreshToken: ""   # paste token from first-run log
+
+  # ── LavaSrc ────────────────────────────────────────────────────────────────
+  # https://github.com/topi314/LavaSrc
+  # Provides: Spotify, Apple Music, Deezer, Yandex Music
+  lavasrc:
+    providers:
+      - "ytsearch:\"%ISRC%\""        # Try YouTube search by ISRC first
+      - "ytsearch:%QUERY%"            # Fallback: YouTube text search
+    sources:
+      spotify:
+        clientId:     ""              # Set via env: SPOTIFY_CLIENT_ID
+        clientSecret: ""              # Set via env: SPOTIFY_CLIENT_SECRET
+        # countryCode: VN
+      applemusic:
+        mediaAPIToken: ""             # Optional; without it only basic metadata
+      deezer:
+        masterDecryptionKey: ""       # Required for Deezer audio
+
+lavalink:
+  plugins:
+    # Auto-download plugins on startup
+    - dependency: "dev.lavalink.youtube:youtube-plugin:1.11.4"
+      repository: "https://maven.lavalink.dev/releases"
+    - dependency: "com.github.topi314.lavasrc:lavasrc-plugin:4.4.1"
+      repository: "https://maven.lavalink.dev/releases"
+
+  server:
+    password: "CHANGE_THIS_PASSWORD"       # Change this! Set LAVALINK_PASSWORD in bot env too.
+    sources:
+      # Built-in extractors — disable YouTube here; use youtube-source plugin instead
+      youtube:     false              # Handled by youtube-source plugin above
+      bandcamp:    true
+      soundcloud:  true
+      twitch:      true
+      vimeo:       true
+      nico:        false
+      http:        true               # Direct URL streams
+      local:       false
+    filters:
+      volume:       true
+      equalizer:    true
+      karaoke:      false
+      timescale:    true
+      tremolo:      false
+      vibrato:      false
+      distortion:   false
+      rotation:     false
+      channelMix:   false
+      lowPass:      false
+    bufferDurationMs: 400
+    frameBufferDurationMs: 5000
+    opusEncodingQuality: 10
+    resamplingQuality: LOW
+    trackStuckThresholdMs: 10000
+    useSeekGhosting: true
+    youtubePlaylistLoadLimit: 6
+    playerUpdateInterval: 5
+    youtubeSearchEnabled: true       # kept for fallback; real work done by plugin
+    soundcloudSearchEnabled: true
+    gc-warnings: true
+
+metrics:
+  prometheus:
+    enabled: false
+
+sentry:
+  dsn: ""
+  environment: ""
+
+logging:
+  file:
+    path: ./logs/
+  level:
+    root: INFO
+    lavalink: INFO
+  request:
+    enabled: false
+    includeClientInfo: true
+    includeHeaders: false
+    includeQueryString: true
+    includePayload: true
+    maxPayloadLength: 10000

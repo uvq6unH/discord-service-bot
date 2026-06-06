@@ -1,0 +1,22 @@
+# ── Fly.io config cho Lavalink server ─────────────────────────────────────────
+# Đổi app = "lavalink-yourname" thành tên app bạn tạo trên Fly.io dashboard
+# primary_region = "sin" → Singapore, gần VN nhất
+
+app = "lavalink-yourname"
+primary_region = "sin"
+
+[build]
+  dockerfile = "Dockerfile"
+
+[http_service]
+  internal_port = 2333
+  force_https = false
+  # QUAN TRỌNG: tắt auto-stop, không để Lavalink ngủ
+  auto_stop_machines = "off"
+  auto_start_machines = true
+  min_machines_running = 1
+
+[[vm]]
+  memory = "512mb"
+  cpu_kind = "shared"
+  cpus = 1

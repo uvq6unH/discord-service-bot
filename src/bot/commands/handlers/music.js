@@ -36,6 +36,11 @@ export async function handleMusicCommand({ message, subcommand, args, config }) 
   const musicPrefix = config.musicPrefix || 'hb';
   const manager     = getLavalinkManager();
 
+  // Lavalink not yet connected — give friendly error instead of crash
+  if (!manager) {
+    return message.reply('⚠️ Hệ thống nhạc chưa sẵn sàng — Lavalink đang kết nối, thử lại sau vài giây.');
+  }
+
   // ── play / p ──────────────────────────────────────────────────────────────
   if (subcommand === 'play' || subcommand === 'p') {
     const input = args.trim();
@@ -47,6 +52,12 @@ export async function handleMusicCommand({ message, subcommand, args, config }) 
 
     const voiceChannel = message.member?.voice?.channel;
     if (!voiceChannel) return message.reply('❌ Bạn cần vào một **Voice Channel** trước!');
+
+    // Check Lavalink node is actually connected
+    const connectedNodes = manager.nodes.filter(n => n.connected);
+    if (!connectedNodes.size) {
+      return message.reply('⚠️ Lavalink server chưa kết nối. Kiểm tra `LAVALINK_HOST` / `LAVALINK_PASSWORD` trong env vars.');
+    }
 
     const botMember = message.guild.members.me;
     if (!voiceChannel.permissionsFor(botMember)?.has(['Connect', 'Speak'])) {

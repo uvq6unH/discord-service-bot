@@ -1,0 +1,22 @@
+name: Deploy Lavalink to Fly.io
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "lavalink/**"   # chỉ chạy khi có thay đổi trong folder lavalink/
+  workflow_dispatch:    # cho phép chạy thủ công từ tab Actions trên GitHub
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: superfly/flyctl-actions/setup-flyctl@master
+
+      - name: Deploy Lavalink
+        run: flyctl deploy --remote-only --config fly.toml
+        working-directory: lavalink
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
