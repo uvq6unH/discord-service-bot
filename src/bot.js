@@ -95,7 +95,7 @@ setInterval(() => {
 }, 5 * 60 * 1000).unref();
 import { handleComponentInteraction } from './bot/interactions.js';
 import { handleMusicCommand } from './bot/commands/handlers/music.js';
-import { initMusicPlayer } from './bot/music/resolver.js';
+import { initLavalink, forwardVoiceEvent } from './bot/music/lavalink.js';
 
 const commandCooldowns = new CommandCooldowns();
 
@@ -121,9 +121,9 @@ export function createBot(configStore, stateStore) {
       await configStore.ready;
       await stateStore.ready;
 
-      // 1b. Init discord-player (must run after client is ready)
-      await initMusicPlayer(readyClient).catch(err =>
-        console.error('[bot] Failed to init music player:', err.message)
+      // 1b. Init Lavalink manager (must run after client is ready)
+      await initLavalink(readyClient).catch(err =>
+        console.error('[bot] Failed to init Lavalink:', err.message)
       );
 
       // 2. Purge stale game sessions and refund bets
@@ -228,6 +228,16 @@ export function createBot(configStore, stateStore) {
 
   client.on(Events.Warn, (info) => {
     console.warn('[bot] Warning:', info);
+  });
+
+  // ── Lavalink: forward raw voice gateway events ─────────────────────────────
+  // Lavalink needs VOICE_STATE_UPDATE and VOICE_SERVER_UPDATE to manage
+  // voice connections. discord.js does not expose these as typed events,
+  // so we listen on the raw packet stream.
+  client.on(Events.Raw, (packet) => {
+    if (packet.t === 'VOICE_STATE_UPDATE' || packet.t === 'VOICE_SERVER_UPDATE') {
+      forwardVoiceEvent(packet, '0');
+    }
   });
   // ────────────────────────────────────────────────────────────────────────────
 

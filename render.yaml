@@ -46,4 +46,12 @@ services:
         sync: false
       - key: KEEPALIVE_CHANNEL_ID
         sync: false
+      - key: LAVALINK_HOST
+        sync: false
+      - key: LAVALINK_PORT
+        value: "2333"
+      - key: LAVALINK_PASSWORD
+        sync: false
+      - key: LAVALINK_SECURE
+        value: "false"
     healthCheckPath: /health

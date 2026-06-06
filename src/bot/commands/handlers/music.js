@@ -1,61 +1,40 @@
-// ── Music Command Handler (discord-player backend) ────────────────────────────
+// ── Music Command Handler (Lavalink v4 backend) ────────────────────────────────
 // Handles: play/p, skip/s, stop, pause, resume/r, queue/q, np, loop, volume/vol
+//
+// Requires lavalink.js to have been initialised (initLavalink called in bot.js).
 
 import { EmbedBuilder } from 'discord.js';
-import { QueryType, useQueue } from 'discord-player';
-import { getMusicPlayer, buildSearchQuery, fmt } from '../../music/resolver.js';
+import {
+  getLavalinkManager,
+  buildLavalinkQuery,
+  sourceLabel,
+  fmt,
+} from '../../music/lavalink.js';
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
+// ── Embed builder ─────────────────────────────────────────────────────────────
 
-function sourceLabel(extractor) {
-  if (!extractor) return '🎵';
-  // discord-player v7 trả extractor là object có .identifier, không phải string
-  const id = (typeof extractor === 'string'
-    ? extractor
-    : extractor?.identifier ?? extractor?.constructor?.name ?? String(extractor)
-  ).toLowerCase();
-  if (id.includes('soundcloud')) return '🔶 SoundCloud';
-  if (id.includes('youtube'))    return '▶️ YouTube';
-  if (id.includes('spotify'))    return '💚 Spotify';
-  if (id.includes('vimeo'))      return '🎬 Vimeo';
-  return '🔗 Direct';
-}
-
-function trackEmbed(track, title, color) {
+function trackEmbed(track, title, color, extra = {}) {
+  const info = track.info;
   const embed = new EmbedBuilder()
     .setColor(color)
     .setTitle(title)
-    .setDescription(`**[${track.title}](${track.url})**`)
+    .setDescription(`**[${info.title}](${info.uri})**`)
     .addFields(
-      { name: 'Duration', value: track.duration || '?:??', inline: true },
-      { name: 'Source', value: sourceLabel(track.extractor), inline: true },
-      { name: 'Requested by', value: `<@${track.requestedBy?.id ?? '?'}>`, inline: true }
+      { name: 'Duration',      value: info.isStream ? '🔴 Live' : fmt(info.length), inline: true },
+      { name: 'Source',        value: sourceLabel(track), inline: true },
+      { name: 'Requested by',  value: `<@${track.requester?.id ?? info.requester ?? '?'}>`, inline: true }
     );
-  if (track.thumbnail) embed.setThumbnail(track.thumbnail);
+  if (info.artworkUrl) embed.setThumbnail(info.artworkUrl);
+  if (extra.footer)    embed.setFooter({ text: extra.footer });
   return embed;
 }
-
-// nodeOptions dùng chung — leaveOnEnd/leaveOnEmpty luôn bật
-const NODE_OPTIONS = (textChannel) => ({
-  metadata: { textChannel },
-  volume: 80,
-  leaveOnEmpty: true,
-  leaveOnEmptyCooldown: 5000,
-  leaveOnEnd: true,
-  leaveOnEndCooldown: 30000,
-  selfDeaf: true,
-  bufferingTimeout: 3000,
-  connectionTimeout: 15000,
-  // disableBiquad: true giúp bỏ qua equalizer filter — giảm tải ffmpeg pipeline
-  disableBiquad: true,
-});
 
 // ── Main export ───────────────────────────────────────────────────────────────
 
 export async function handleMusicCommand({ message, subcommand, args, config }) {
-  const guildId = message.guild.id;
+  const guildId     = message.guild.id;
   const musicPrefix = config.musicPrefix || 'hb';
-  const player = getMusicPlayer();
+  const manager     = getLavalinkManager();
 
   // ── play / p ──────────────────────────────────────────────────────────────
   if (subcommand === 'play' || subcommand === 'p') {
@@ -77,77 +56,90 @@ export async function handleMusicCommand({ message, subcommand, args, config }) 
     const loadingMsg = await message.reply('🔍 Đang tìm kiếm bài nhạc...').catch(() => null);
 
     try {
-      const { query, source, fallbackTitle } = await buildSearchQuery(input);
-
-      // AUTO để discord-player thử từng extractor theo thứ tự đăng ký
-      // play-dl extractor được register sau cùng — là fallback cuối
-      const initialEngine = QueryType.AUTO;
-
-      let track;
-      let usedFallback = false;
-
-      try {
-        console.log('[music] play attempt 1 | query:', query, '| engine:', initialEngine);
-        const result = await player.play(voiceChannel, query, {
-          nodeOptions: NODE_OPTIONS(message.channel),
-          requestedBy: message.author,
-          searchEngine: initialEngine,
+      // Get or create player for this guild
+      let player = manager.getPlayer(guildId);
+      if (!player) {
+        player = await manager.createPlayer({
+          guildId,
+          voiceChannelId: voiceChannel.id,
+          textChannelId:  message.channel.id,
+          selfDeaf:       true,
+          volume:         80,
         });
-        track = result.track;
-        console.log('[music] play attempt 1 OK | track:', track?.title, '| extractor:', track?.extractor?.identifier ?? track?.extractor);
-      } catch (firstErr) {
-        // ── YouTube bị chặn → fallback SoundCloud ──────────────────────────
-        // QUAN TRỌNG: discord-player có thể đã join voice và tạo queue trước
-        // khi throw. Phải destroy queue đó trước khi retry, nếu không queue rỗng
-        // sẽ trigger leaveOnEnd và bot sẽ disconnect ngay sau khi vào lại.
-        const existingQueue = useQueue(guildId);
-        if (existingQueue) {
-          existingQueue.delete();
-          // Chờ một tick để voice connection được giải phóng
-          await new Promise(r => setTimeout(r, 300));
-        }
-
-        const isYtBlock = source === 'youtube' && (
-          firstErr.message?.toLowerCase().includes('no results') ||
-          firstErr.message?.toLowerCase().includes('sign in') ||
-          firstErr.message?.toLowerCase().includes('bot') ||
-          firstErr.message?.toLowerCase().includes('not available') ||
-          firstErr.message?.toLowerCase().includes('unavailable')
-        );
-
-        if (isYtBlock && fallbackTitle) {
-          console.warn(`[music] YouTube blocked → SoundCloud fallback: "${fallbackTitle}"`);
-          if (loadingMsg) {
-            await loadingMsg.edit(`🔍 YouTube bị chặn — đang tìm **"${fallbackTitle}"** trên SoundCloud...`).catch(() => null);
-          }
-          console.log('[music] play attempt 2 (SC fallback) | query:', fallbackTitle);
-          const result2 = await player.play(voiceChannel, fallbackTitle, {
-            nodeOptions: NODE_OPTIONS(message.channel),
-            requestedBy: message.author,
-            searchEngine: QueryType.SOUNDCLOUD_SEARCH,
-          });
-          track = result2.track;
-          console.log('[music] play attempt 2 OK | track:', track?.title, '| extractor:', track?.extractor?.identifier ?? track?.extractor);
-          usedFallback = true;
-        } else {
-          throw firstErr;
-        }
       }
 
-      const queue = useQueue(guildId);
-      const isFirst = !queue || queue.size <= 1;
+      // Store textChannel ref for event callbacks
+      player.set('textChannel', message.channel);
 
-      const embed = new EmbedBuilder()
-        .setColor(isFirst ? 0x5865F2 : 0x57F287)
-        .setTitle(isFirst ? '🎵 Now Playing' : '✅ Đã thêm vào hàng nhạc')
-        .setDescription(`**[${track.title}](${track.url})**`)
-        .addFields(
-          { name: 'Duration', value: track.duration || '?:??', inline: true },
-          { name: 'Source', value: sourceLabel(track.extractor), inline: true },
-          { name: 'Requested by', value: `<@${message.author.id}>`, inline: true }
-        );
-      if (track.thumbnail) embed.setThumbnail(track.thumbnail);
-      if (usedFallback) embed.setFooter({ text: '⚠️ YouTube bị chặn — đã tìm qua SoundCloud' });
+      // Connect if not already connected
+      if (!player.connected) {
+        await player.connect();
+      }
+
+      // Resolve query — URL first, then ytsearch, fallback scsearch
+      const { query, isUrl, searchTerm } = buildLavalinkQuery(input);
+
+      let res = await player.search({ query }, message.author);
+
+      // YouTube search returned no results or is blocked → fallback SoundCloud
+      if (
+        !isUrl &&
+        (res.loadType === 'empty' || res.loadType === 'error' || !res.tracks?.length)
+      ) {
+        console.warn(`[music] ytsearch failed for "${searchTerm}" — trying scsearch`);
+        res = await player.search({ query: `scsearch:${searchTerm}` }, message.author);
+      }
+
+      if (res.loadType === 'error') {
+        throw new Error(res.exception?.message ?? 'Lavalink search error');
+      }
+      if (res.loadType === 'empty' || !res.tracks?.length) {
+        throw new Error('Không tìm thấy bài nhạc nào.');
+      }
+
+      // Add track(s) to queue
+      const wasPlaying = player.playing || player.paused;
+      let addedCount = 0;
+
+      if (res.loadType === 'playlist') {
+        for (const track of res.playlist.tracks) {
+          await player.queue.add(track);
+        }
+        addedCount = res.playlist.tracks.length;
+      } else {
+        await player.queue.add(res.tracks[0]);
+        addedCount = 1;
+      }
+
+      // Start playback if not already running
+      if (!wasPlaying) await player.play();
+
+      const firstTrack = res.loadType === 'playlist'
+        ? res.playlist.tracks[0]
+        : res.tracks[0];
+
+      const isNowPlaying = !wasPlaying;
+      let embedTitle, embedColor;
+
+      if (res.loadType === 'playlist') {
+        embedTitle = `✅ Đã thêm playlist (${addedCount} bài)`;
+        embedColor = 0x57F287;
+      } else {
+        embedTitle = isNowPlaying ? '🎵 Now Playing' : '✅ Đã thêm vào hàng nhạc';
+        embedColor = isNowPlaying ? 0x5865F2 : 0x57F287;
+      }
+
+      const ytFallback = !isUrl &&
+        res.tracks[0]?.info?.sourceName === 'soundcloud' &&
+        query.startsWith('ytsearch:') === false;
+
+      const embed = trackEmbed(firstTrack, embedTitle, embedColor,
+        ytFallback ? { footer: '⚠️ YouTube không có kết quả — đã tìm qua SoundCloud' } : {}
+      );
+
+      if (res.loadType === 'playlist') {
+        embed.addFields({ name: 'Playlist', value: res.playlist.name ?? 'Unknown', inline: false });
+      }
 
       return loadingMsg
         ? loadingMsg.edit({ content: '', embeds: [embed] })
@@ -155,82 +147,77 @@ export async function handleMusicCommand({ message, subcommand, args, config }) 
 
     } catch (err) {
       console.error('[music] play error:', err.message);
-      // Nếu còn queue treo thì dọn luôn
-      useQueue(guildId)?.delete();
-      const isYtBlock = err.message?.toLowerCase().includes('sign in') ||
-                        err.message?.toLowerCase().includes('bot') ||
-                        err.message?.toLowerCase().includes('no results');
-      const errMsg = isYtBlock
-        ? '❌ Không tìm thấy bài nhạc. YouTube đang chặn bot và không có kết quả SoundCloud thay thế.\n💡 Thử: tên bài nhạc, link SoundCloud, hoặc Spotify.'
-        : `❌ Không tìm thấy: ${err.message}`;
+      const errMsg = `❌ ${err.message}`;
       return loadingMsg
         ? loadingMsg.edit(errMsg)
         : message.reply(errMsg);
     }
   }
 
-  // ── Helper: get active queue ──────────────────────────────────────────────
-  const queue = useQueue(guildId);
+  // ── Helper: get active player ─────────────────────────────────────────────
+  const player = manager.getPlayer(guildId);
 
   // ── skip / s ──────────────────────────────────────────────────────────────
   if (subcommand === 'skip' || subcommand === 's') {
-    if (!queue?.isPlaying()) return message.reply('❌ Không có bài nhạc nào đang phát!');
-    queue.node.skip();
+    if (!player?.playing) return message.reply('❌ Không có bài nhạc nào đang phát!');
+    await player.skip();
     return message.reply('⏭️ Đã bỏ qua bài hiện tại.');
   }
 
   // ── stop ──────────────────────────────────────────────────────────────────
   if (subcommand === 'stop') {
-    if (!queue) return message.reply('❌ Bot đang không phát nhạc!');
-    queue.delete();
+    if (!player) return message.reply('❌ Bot đang không phát nhạc!');
+    await player.destroy();
     return message.reply('⏹️ Đã dừng phát nhạc và rời Voice Channel.');
   }
 
   // ── pause ─────────────────────────────────────────────────────────────────
   if (subcommand === 'pause') {
-    if (!queue?.isPlaying()) return message.reply('❌ Không có bài nhạc nào đang phát!');
-    if (queue.node.isPaused()) return message.reply('⏸️ Đã tạm dừng rồi.');
-    queue.node.pause();
+    if (!player?.playing) return message.reply('❌ Không có bài nhạc nào đang phát!');
+    if (player.paused)    return message.reply('⏸️ Đã tạm dừng rồi.');
+    await player.pause(true);
     return message.reply('⏸️ Đã tạm dừng.');
   }
 
   // ── resume / r ────────────────────────────────────────────────────────────
   if (subcommand === 'resume' || subcommand === 'r') {
-    if (!queue) return message.reply('❌ Không có hàng nhạc nào!');
-    if (!queue.node.isPaused()) return message.reply('▶️ Đang phát rồi!');
-    queue.node.resume();
+    if (!player)          return message.reply('❌ Không có hàng nhạc nào!');
+    if (!player.paused)   return message.reply('▶️ Đang phát rồi!');
+    await player.pause(false);
     return message.reply('▶️ Đã tiếp tục phát.');
   }
 
   // ── loop / l ──────────────────────────────────────────────────────────────
   if (subcommand === 'loop' || subcommand === 'l') {
-    if (!queue) return message.reply('❌ Không có hàng nhạc nào!');
-    const { QueueRepeatMode } = await import('discord-player');
-    const current = queue.repeatMode;
-    const next = current === QueueRepeatMode.OFF
-      ? QueueRepeatMode.TRACK
-      : QueueRepeatMode.OFF;
-    queue.setRepeatMode(next);
-    return message.reply(`🔁 Loop: **${next === QueueRepeatMode.TRACK ? 'BẬT' : 'TẮT'}**`);
+    if (!player) return message.reply('❌ Không có hàng nhạc nào!');
+    // Cycle: off → track → queue → off
+    const modes = ['off', 'track', 'queue'];
+    const current = player.repeatMode ?? 'off';
+    const next = modes[(modes.indexOf(current) + 1) % modes.length];
+    await player.setRepeatMode(next);
+    const label = { off: '❌ TẮT', track: '🔂 Lặp bài', queue: '🔁 Lặp hàng' }[next];
+    return message.reply(`Loop: **${label}**`);
   }
 
   // ── queue / q ─────────────────────────────────────────────────────────────
   if (subcommand === 'queue' || subcommand === 'q') {
-    if (!queue?.currentTrack && !queue?.tracks.size) {
+    const current  = player?.queue?.current;
+    const upcoming = player?.queue?.tracks ?? [];
+
+    if (!current && !upcoming.length) {
       return message.reply('📭 Hàng nhạc trống!');
     }
 
     const lines = [];
-    if (queue.currentTrack) {
-      const t = queue.currentTrack;
-      lines.push(`▶️ **Đang phát:** [${t.title}](${t.url}) \`${t.duration}\` — <@${t.requestedBy?.id ?? '?'}>`);
+    if (current) {
+      const i = current.info;
+      lines.push(`▶️ **Đang phát:** [${i.title}](${i.uri}) \`${fmt(i.length)}\` — <@${current.requester?.id ?? '?'}>`);
     }
-    const upcoming = queue.tracks.toArray();
     if (upcoming.length) {
       lines.push('');
       lines.push('**Hàng chờ:**');
-      upcoming.slice(0, 10).forEach((t, i) => {
-        lines.push(`\`${i + 1}.\` [${t.title}](${t.url}) \`${t.duration}\` — <@${t.requestedBy?.id ?? '?'}>`);
+      upcoming.slice(0, 10).forEach((t, idx) => {
+        lines.push(`\`${idx + 1}.\` [${t.info.title}](${t.info.uri}) \`${fmt(t.info.length)}\` — <@${t.requester?.id ?? '?'}>`);
       });
       if (upcoming.length > 10) lines.push(`*... và **${upcoming.length - 10}** bài nữa*`);
     }
@@ -239,26 +226,35 @@ export async function handleMusicCommand({ message, subcommand, args, config }) 
       .setColor(0x5865F2)
       .setTitle('🎶 Hàng nhạc')
       .setDescription(lines.join('\n') || '*(trống)*')
-      .setFooter({ text: `${queue.size} bài tổng cộng` });
+      .setFooter({ text: `${(upcoming.length + (current ? 1 : 0))} bài tổng cộng` });
 
     return message.reply({ embeds: [embed] });
   }
 
   // ── np / nowplaying ───────────────────────────────────────────────────────
   if (subcommand === 'np' || subcommand === 'nowplaying') {
-    if (!queue?.currentTrack) return message.reply('❌ Không có bài nhạc nào đang phát!');
-    const t = queue.currentTrack;
-    const bar = queue.node.createProgressBar();
+    const current = player?.queue?.current;
+    if (!current) return message.reply('❌ Không có bài nhạc nào đang phát!');
+
+    const info     = current.info;
+    const pos      = player.position ?? 0;
+    const len      = info.length ?? 0;
+    const barLen   = 20;
+    const filled   = len > 0 ? Math.round((pos / len) * barLen) : 0;
+    const bar      = '█'.repeat(filled) + '░'.repeat(barLen - filled);
+    const progress = `\`${fmt(pos)} ${bar} ${fmt(len)}\``;
+
     const embed = new EmbedBuilder()
       .setColor(0x5865F2)
       .setTitle('🎵 Now Playing')
-      .setDescription(`**[${t.title}](${t.url})**\n${bar}`)
+      .setDescription(`**[${info.title}](${info.uri})**\n${progress}`)
       .addFields(
-        { name: 'Duration', value: t.duration || '?:??', inline: true },
-        { name: 'Source', value: sourceLabel(t.extractor), inline: true },
-        { name: 'Requested by', value: `<@${t.requestedBy?.id ?? '?'}>`, inline: true }
+        { name: 'Duration',     value: info.isStream ? '🔴 Live' : fmt(info.length), inline: true },
+        { name: 'Source',       value: sourceLabel(current), inline: true },
+        { name: 'Requested by', value: `<@${current.requester?.id ?? '?'}>`, inline: true }
       );
-    if (t.thumbnail) embed.setThumbnail(t.thumbnail);
+    if (info.artworkUrl) embed.setThumbnail(info.artworkUrl);
+
     return message.reply({ embeds: [embed] });
   }
 
@@ -266,8 +262,8 @@ export async function handleMusicCommand({ message, subcommand, args, config }) 
   if (subcommand === 'volume' || subcommand === 'vol') {
     const vol = parseInt(args, 10);
     if (isNaN(vol) || vol < 0 || vol > 200) return message.reply('❌ Volume phải từ **0–200**');
-    if (!queue) return message.reply('❌ Không có hàng nhạc nào!');
-    queue.node.setVolume(vol);
+    if (!player) return message.reply('❌ Không có hàng nhạc nào!');
+    await player.setVolume(vol);
     return message.reply(`🔊 Volume: **${vol}%**`);
   }
 
@@ -278,18 +274,18 @@ export async function handleMusicCommand({ message, subcommand, args, config }) 
     .setTitle('🎵 Music Commands')
     .setDescription(
       `**Music prefix:** \`${p}\`\n\n` +
-      `Hỗ trợ: SoundCloud, Spotify (tìm qua SC), YouTube, URL trực tiếp\n` +
-      `💡 Nếu YouTube bị chặn, thử link **SoundCloud** hoặc tìm bằng tên bài.`
+      `Hỗ trợ: YouTube, SoundCloud, Spotify\\*, Apple Music\\*, URL trực tiếp\n` +
+      `\\* *Lấy metadata Spotify/Apple → phát audio YouTube*`
     )
     .addFields(
-      { name: `\`${p} play <link hoặc tên>\``, value: 'Phát nhạc — SC / Spotify / YT / URL' },
-      { name: `\`${p} skip\` / \`${p} s\``, value: 'Bỏ qua bài hiện tại' },
-      { name: `\`${p} stop\``, value: 'Dừng phát và rời Voice Channel' },
+      { name: `\`${p} play <link hoặc tên>\``, value: 'Phát nhạc — YT / SC / Spotify / URL' },
+      { name: `\`${p} skip\` / \`${p} s\``,    value: 'Bỏ qua bài hiện tại' },
+      { name: `\`${p} stop\``,                  value: 'Dừng phát và rời Voice Channel' },
       { name: `\`${p} pause\` / \`${p} resume\``, value: 'Tạm dừng / tiếp tục phát' },
-      { name: `\`${p} queue\` / \`${p} q\``, value: 'Xem danh sách hàng nhạc' },
-      { name: `\`${p} np\``, value: 'Xem bài đang phát (+ progress bar)' },
-      { name: `\`${p} loop\``, value: 'Bật/tắt lặp lại bài hiện tại' },
-      { name: `\`${p} volume <0–200>\``, value: 'Điều chỉnh âm lượng (mặc định 80%)' }
+      { name: `\`${p} queue\` / \`${p} q\``,   value: 'Xem danh sách hàng nhạc' },
+      { name: `\`${p} np\``,                    value: 'Xem bài đang phát (+ progress bar)' },
+      { name: `\`${p} loop\``,                  value: 'Cycle: TẮT → Lặp bài → Lặp hàng' },
+      { name: `\`${p} volume <0–200>\``,        value: 'Điều chỉnh âm lượng (mặc định 80%)' }
     );
 
   return message.reply({ embeds: [embed] });

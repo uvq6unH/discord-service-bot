@@ -68,7 +68,7 @@ flowchart TB
 | `bot/games.js` | Economy games, session state, blackjack/poker button handlers |
 | `bot/slash.js` | Slash command registration definitions |
 | `bot/help.js` | Help menu embed + group metadata |
-| `bot/responses.js` | Template variable substitution for custom commands |
+| `bot/music/lavalink.js` | Lavalink v4 manager init, voice event forwarding, query builder |
 | `configDefaults.js` | Default guild schema, command type registry |
 | `configStore.js` | Per-guild config JSON, normalization, **secrets in RAM only** |
 | `stateStore.js` | Warnings, XP, economy, tickets, game sessions, LoL/TFT links |
@@ -107,3 +107,20 @@ flowchart TB
 
 - `render.yaml`: `NODE_ENV=production`, disk at `/var/data`, health `GET /health`.
 - Required: OAuth, `SESSION_SECRET`, Upstash, `DISCORD_TOKEN`.
+- Music: requires a Lavalink v4 server. Set `LAVALINK_HOST`, `LAVALINK_PASSWORD`.
+  - Self-host Lavalink on Railway/Fly.io free tier (Java 17+).
+  - Or use a public Lavalink node for testing (see [lavalink.darrennathanael.com](https://lavalink.darrennathanael.com/NoSSL/lavalink-without-ssl/)).
+  - `application.yml` in project root is the Lavalink server config template.
+
+## Audio pipeline
+
+```
+User message  →  bot.js prefix handler  →  music.js handleMusicCommand
+                                                  ↓
+                                         lavalink.js (lavalink-client)
+                                                  ↓  REST + WebSocket
+                                         Lavalink Server (Java)
+                                                  ↓  youtube-source plugin
+                                         YouTube / SoundCloud / Spotify*
+                                         (* Spotify = metadata → YT audio via LavaSrc)
+```

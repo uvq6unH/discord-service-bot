@@ -4,3 +4,17 @@ data/configs.json
 data/state.json
 logs/*.log
 *.log
+
+# Lavalink server logs
+logs/
+
+# Build / recovery scripts artefacts — not needed in production
+scripts/window-raw.txt
+scripts/head-bot.js
+scripts/head-bot-utf8.js
+scripts/transcript-runBuiltInCommand.js
+scripts/transcript-runBuiltInCommand2.js
+scripts/*.txt
+
+# Backup files
+*.bak
