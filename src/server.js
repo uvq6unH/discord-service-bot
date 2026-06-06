@@ -65,14 +65,14 @@ export function createServer({ configStore, stateStore, botClient, redis = null 
   app.use(helmet({
     contentSecurityPolicy: {
       directives: {
-        defaultSrc:  ["'self'"],
-        scriptSrc:   ["'self'"],
-        styleSrc:    ["'self'", 'https://cdn.jsdelivr.net', 'https://fonts.googleapis.com'],
-        fontSrc:     ["'self'", 'https://fonts.gstatic.com', 'https://cdn.jsdelivr.net'],
-        imgSrc:      ["'self'", 'https://cdn.discordapp.com', 'data:'],
-        connectSrc:  ["'self'"],
-        frameSrc:    ["'none'"],
-        objectSrc:   ["'none'"],
+        defaultSrc: ["'self'"],
+        scriptSrc: ["'self'"],
+        styleSrc: ["'self'", 'https://cdn.jsdelivr.net', 'https://fonts.googleapis.com'],
+        fontSrc: ["'self'", 'https://fonts.gstatic.com', 'https://cdn.jsdelivr.net'],
+        imgSrc: ["'self'", 'https://cdn.discordapp.com', 'data:'],
+        connectSrc: ["'self'"],
+        frameSrc: ["'none'"],
+        objectSrc: ["'none'"],
       },
     },
   }));
@@ -121,6 +121,19 @@ export function createServer({ configStore, stateStore, botClient, redis = null 
   }
   function setCachedGuilds(userId, guilds) {
     _guildCache.set(userId, { guilds, expiresAt: Date.now() + GUILD_CACHE_TTL });
+  }
+
+  // In-process guild-data cache (guildId -> {data, expiresAt}, 2-min TTL)
+  // Avoids repeated guild.members.fetch() calls to Discord API for the same guild.
+  const _guildDataCache = new Map();
+  const GUILD_DATA_CACHE_TTL = 2 * 60 * 1000;
+  function getCachedGuildData(guildId) {
+    const e = _guildDataCache.get(guildId);
+    if (!e || Date.now() > e.expiresAt) { _guildDataCache.delete(guildId); return null; }
+    return e.data;
+  }
+  function setCachedGuildData(guildId, data) {
+    _guildDataCache.set(guildId, { data, expiresAt: Date.now() + GUILD_DATA_CACHE_TTL });
   }
 
   const auth = createAuthRouter(botClient);
@@ -241,7 +254,7 @@ export function createServer({ configStore, stateStore, botClient, redis = null 
 
     // Build set của guild IDs user có ManageGuild hoặc Administrator
     const ADMINISTRATOR = 0x8n;
-    const MANAGE_GUILD   = 0x20n;
+    const MANAGE_GUILD = 0x20n;
     const manageableIds = new Set(
       (userGuilds ?? [])
         .filter(g => {
@@ -290,6 +303,11 @@ export function createServer({ configStore, stateStore, botClient, redis = null 
   app.get('/api/guild-data', auth.requireAuth, readRateLimit, requireGuildId, auth.requireGuildAccess, async (req, res) => {
     const guild = botClient.guilds.cache.get(req.guildId);
     if (!guild) { res.status(404).json({ error: 'Guild not found' }); return; }
+
+    // Serve from cache to avoid repeated guild.members.fetch() Discord API calls
+    const cached = getCachedGuildData(req.guildId);
+    if (cached) { res.json(cached); return; }
+
     try {
       const channels = guild.channels.cache.map((c) => ({ id: c.id, name: c.name, type: c.type }));
       const roles = guild.roles.cache
@@ -300,7 +318,7 @@ export function createServer({ configStore, stateStore, botClient, redis = null 
           color: r.color ? `#${r.color.toString(16).padStart(6, '0')}` : null,
         }))
         .sort((a, b) => b.rawPosition - a.rawPosition);
-      
+
       // Fetch members with timeout — fall back to cache if Discord API is slow or unavailable
       let membersFetched;
       try {
@@ -322,7 +340,9 @@ export function createServer({ configStore, stateStore, botClient, redis = null 
         joinedAt: m.joinedAt ? m.joinedAt.toISOString() : null
       })).sort((a, b) => a.displayName.localeCompare(b.displayName));
 
-      res.json({ channels, roles, members });
+      const data = { channels, roles, members };
+      setCachedGuildData(req.guildId, data);
+      res.json(data);
     } catch (error) {
       res.status(500).json({ error: error.message });
     }

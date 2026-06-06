@@ -164,7 +164,47 @@ function riotGet(path, platform, apiKey) {
   return httpGet(url, { 'X-Riot-Token': apiKey });
 }
 
-// ── Data Dragon helpers ───────────────────────────────────────────────────────
+// ── Global Riot API rate limit bucket ────────────────────────────────────────
+// Free dev keys: 20 req/s, 100 req/2min. This bucket enforces a conservative
+// 18 req/s ceiling across all concurrent Riot API calls to avoid 429s when
+// multiple guild members trigger commands simultaneously.
+
+const _riotBucket = {
+  tokens: 18,
+  lastRefill: Date.now(),
+  refillRate: 18,         // tokens per second
+  maxTokens: 18,
+  queue: [],
+
+  async acquire() {
+    return new Promise((resolve) => {
+      this.queue.push(resolve);
+      this._drain();
+    });
+  },
+
+  _drain() {
+    const now = Date.now();
+    const elapsed = (now - this.lastRefill) / 1000;
+    this.tokens = Math.min(this.maxTokens, this.tokens + elapsed * this.refillRate);
+    this.lastRefill = now;
+
+    while (this.queue.length > 0 && this.tokens >= 1) {
+      this.tokens -= 1;
+      this.queue.shift()();
+    }
+
+    if (this.queue.length > 0) {
+      const waitMs = Math.ceil((1 - this.tokens) / this.refillRate * 1000);
+      setTimeout(() => this._drain(), waitMs);
+    }
+  }
+};
+
+async function riotGetThrottled(path, platform, apiKey) {
+  await _riotBucket.acquire();
+  return riotGetThrottled(path, platform, apiKey);
+}
 
 export async function getLatestPatch() {
   const cacheKey = 'ddragon:versions';
@@ -355,7 +395,7 @@ export async function getAccountByRiotId(gameName, tagLine, region, apiKey) {
   const cacheKey = `account:${routing}:${gameName}:${tagLine}`;
   let data = cache.get(cacheKey);
   if (!data) {
-    data = await riotGet(
+    data = await riotGetThrottled(
       `/riot/account/v1/accounts/by-riot-id/${encodeURIComponent(gameName)}/${encodeURIComponent(tagLine)}`,
       routing, apiKey
     );
@@ -368,7 +408,7 @@ export async function getSummonerByPuuid(puuid, region, apiKey) {
   const cacheKey = `summoner:${region}:${puuid}`;
   let data = cache.get(cacheKey);
   if (!data) {
-    data = await riotGet(`/lol/summoner/v4/summoners/by-puuid/${puuid}`, region, apiKey);
+    data = await riotGetThrottled(`/lol/summoner/v4/summoners/by-puuid/${puuid}`, region, apiKey);
     cache.set(cacheKey, data, TTL.profile);
   }
   return data;
@@ -379,7 +419,7 @@ export async function getRankedInfo(puuid, region, apiKey) {
   let data = cache.get(cacheKey);
   if (!data) {
     // Use puuid-based endpoint (by-summoner/{summonerId} is deprecated as of 2024)
-    data = await riotGet(`/lol/league/v4/entries/by-puuid/${puuid}`, region, apiKey);
+    data = await riotGetThrottled(`/lol/league/v4/entries/by-puuid/${puuid}`, region, apiKey);
     cache.set(cacheKey, data, TTL.profile);
   }
   return data;
@@ -391,7 +431,7 @@ export async function getMatchHistory(puuid, region, apiKey, count = 10, queueId
   const cacheKey = `matches:${routing}:${puuid}:${count}:${queueId ?? 'all'}`;
   let data = cache.get(cacheKey);
   if (!data) {
-    data = await riotGet(
+    data = await riotGetThrottled(
       `/lol/match/v5/matches/by-puuid/${puuid}/ids?start=0&count=${count}${queueParam}`,
       routing, apiKey
     );
@@ -405,7 +445,7 @@ export async function getMatchDetail(matchId, region, apiKey) {
   const cacheKey = `match:${matchId}`;
   let data = cache.get(cacheKey);
   if (!data) {
-    data = await riotGet(`/lol/match/v5/matches/${matchId}`, routing, apiKey);
+    data = await riotGetThrottled(`/lol/match/v5/matches/${matchId}`, routing, apiKey);
     cache.set(cacheKey, data, TTL.match);
   }
   return data;
@@ -415,7 +455,7 @@ export async function getTopMastery(puuid, region, apiKey, count = 5) {
   const cacheKey = `mastery:${region}:${puuid}:${count}`;
   let data = cache.get(cacheKey);
   if (!data) {
-    data = await riotGet(
+    data = await riotGetThrottled(
       `/lol/champion-mastery/v4/champion-masteries/by-puuid/${puuid}/top?count=${count}`,
       region, apiKey
     );

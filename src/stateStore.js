@@ -379,6 +379,14 @@ export class StateStore {
     return this._warningsMutex(lockKey, fn);
   }
 
+  async _withTicketLock(guildId, fn) {
+    const lockKey = `lock:ticket:${guildId}`;
+    if (this._useRedis) {
+      return withRedisLock(this._redis, lockKey, 15, fn);
+    }
+    return this._ticketMutex(guildId, fn);
+  }
+
   async addWarning(guildId, userId, moderatorId, reason) {
     return this._withWarningsLock(guildId, userId, async () => {
       const guild = await this.getGuild(guildId);
@@ -442,7 +450,7 @@ export class StateStore {
   // ── Tickets ────────────────────────────────────────────────────────────────
 
   async nextTicketNumber(guildId) {
-    return this._ticketMutex(`${guildId}`, async () => {
+    return this._withTicketLock(guildId, async () => {
       const guild = await this.getGuild(guildId);
       guild.tickets.nextNumber ??= 1;
       const number = guild.tickets.nextNumber;
