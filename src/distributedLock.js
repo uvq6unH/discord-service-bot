@@ -25,6 +25,6 @@ export async function withRedisLock(redis, lockKey, ttlSec, fn, { waitMs = 5000,
     return await fn();
   } finally {
     const luaScript = `if redis.call("get",KEYS[1])==ARGV[1] then return redis.call("del",KEYS[1]) else return 0 end`;
-    await redis._request(['EVAL', luaScript, 1, lockKey, token]).catch(() => null);
+    await redis.eval(luaScript, 1, lockKey, token).catch(() => null);
   }
 }

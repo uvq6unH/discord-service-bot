@@ -172,7 +172,7 @@ export function createBot(configStore, stateStore) {
                     const mentions = ids.map(id => `<@${id}>`).join(' ');
                     const repeatLabel = { hourly: ' 🔁 (mỗi giờ)', daily: ' 🔁 (mỗi ngày)', weekly: ' 🔁 (mỗi tuần)' }[reminder.repeat] ?? '';
                     const resolvedMessage = resolveEmojiNames(reminder.message, guild);
-                    await channel.send(`${mentions} ${resolvedMessage}`).catch(() => null);
+                    await channel.send(`${mentions} ${resolvedMessage}${repeatLabel}`).catch(() => null);
                   }
                 }
                 // ── Reschedule if repeat is set ──

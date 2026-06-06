@@ -1,6 +1,0 @@
-  if (command.type === 'clearwarns') {
-      if (!permissions?.has(PermissionFlagsBits.ManageMessages)) {
-        return reply(isInteraction ? { content: 'You need Manage Messages permission.', ephemeral: true } : 'You need Manage Messages permission.');
-      }
-
-  if (command.type === 'kick') {

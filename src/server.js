@@ -61,25 +61,26 @@ export function createServer({ configStore, stateStore, botClient, redis = null 
 
   app.set('trust proxy', 1);
 
-  // Content-Security-Policy
-  // Allowlist:
-  //   style-src  : self + jsdelivr (Tabler icons) + Google Fonts CSS
-  //   font-src   : self + gstatic (Google Fonts files) + jsdelivr
-  //   img-src    : self + Discord CDN (avatars) + data URIs
-  //   connect-src: self only (all fetch() goes to our API; jsdelivr .map blocked in prod is fine)
-  //   script-src : self (ES modules)
-  //   frame-src  : none
-
-
-// Apply security headers
-app.use(helmet({
-  contentSecurityPolicy: false, // CSP already set manually
-}));
+  // Apply security headers with proper Content-Security-Policy
+  app.use(helmet({
+    contentSecurityPolicy: {
+      directives: {
+        defaultSrc:  ["'self'"],
+        scriptSrc:   ["'self'"],
+        styleSrc:    ["'self'", 'https://cdn.jsdelivr.net', 'https://fonts.googleapis.com'],
+        fontSrc:     ["'self'", 'https://fonts.gstatic.com', 'https://cdn.jsdelivr.net'],
+        imgSrc:      ["'self'", 'https://cdn.discordapp.com', 'data:'],
+        connectSrc:  ["'self'"],
+        frameSrc:    ["'none'"],
+        objectSrc:   ["'none'"],
+      },
+    },
+  }));
 
   // Session: server-side store in Upstash Redis (when available) so the session
   // data is never serialised into the cookie. Falls back to in-memory MemoryStore
-  // for local dev (no Redis configured). Render terminates TLS at the proxy layer
-  // so cookie.secure is set to false here; the proxy enforces HTTPS externally.
+  // for local dev (no Redis configured). In production, trust proxy = 1 ensures
+  // that cookie.secure works correctly behind Render's TLS-terminating proxy.
   const sessionStore = redis ? new UpstashSessionStore(redis) : undefined;
   app.use(expressSession({
     name: 'dsession',
@@ -89,7 +90,7 @@ app.use(helmet({
     store: sessionStore,
     cookie: {
       maxAge: 7 * 24 * 60 * 60 * 1000,
-      secure: false,
+      secure: isProduction,
       httpOnly: true,
       sameSite: 'lax',
     },

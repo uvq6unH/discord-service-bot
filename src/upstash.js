@@ -125,6 +125,10 @@ export class UpstashClient {
   sadd(key, ...members) {
     return this._request(['SADD', key, ...members]);
   }
+
+  eval(script, numKeys, ...keysAndArgs) {
+    return this._request(['EVAL', script, numKeys, ...keysAndArgs]);
+  }
 }
 
 export function createUpstashFromEnv(env = process.env) {
