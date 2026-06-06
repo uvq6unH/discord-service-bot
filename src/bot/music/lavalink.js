@@ -131,14 +131,12 @@ export async function initLavalink(client) {
     console.log(`[lavalink] playerDestroy | guild ${player.guildId}`);
   });
 
-  // ── Catch-all for any unhandled internal emitter errors ────────────────────
-  // LavalinkManager extends EventEmitter; if any event has no listener and
-  // emits an 'error', Node.js crashes. This prevents that.
+  // ── manager-level error catch ─────────────────────────────────────────────
   _manager.on('error', (err) => {
-    console.error('[lavalink] Unhandled manager error (caught):', err?.message ?? err);
+    console.error('[lavalink] manager error (caught):', err?.message ?? err);
   });
 
-  // ── Init manager — catch connection error so bot doesn't crash ─────────────
+  // ── Init manager ───────────────────────────────────────────────────────────
   try {
     await _manager.init({
       id:       client.user.id,
@@ -146,9 +144,21 @@ export async function initLavalink(client) {
     });
     console.log('[lavalink] Manager initialised. Connecting to node…');
   } catch (err) {
-    // Connection failure at startup — manager will keep retrying in background
     console.error('[lavalink] Initial node connection failed (will retry):', err?.message ?? err);
   }
+
+  // ── Patch NodeManager emitter — nguồn gốc crash ERR_UNHANDLED_ERROR ────────
+  // lavalink-client v2 emit 'error' lên nodeManager (EventEmitter nội bộ).
+  // Nếu nodeManager không có listener 'error', Node.js throw và kill process.
+  // Phải patch SAU khi _manager.init() vì nodeManager chỉ tồn tại sau đó.
+  try {
+    const nm = _manager.nodeManager;
+    if (nm && typeof nm.on === 'function' && nm.listenerCount('error') === 0) {
+      nm.on('error', (err) => {
+        console.error('[lavalink] nodeManager error (caught):', err?.message ?? err);
+      });
+    }
+  } catch (_) {}
 
   return _manager;
 }
