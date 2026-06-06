@@ -54,9 +54,11 @@ export async function handleMusicCommand({ message, subcommand, args, config }) 
     if (!voiceChannel) return message.reply('❌ Bạn cần vào một **Voice Channel** trước!');
 
     // Check Lavalink node is actually connected
-    const connectedNodes = manager.nodes.filter(n => n.connected);
-    if (!connectedNodes.size) {
-      return message.reply('⚠️ Lavalink server chưa kết nối. Kiểm tra `LAVALINK_HOST` / `LAVALINK_PASSWORD` trong env vars.');
+    // manager.nodes là MiniMap (extends Map) — dùng .values() thay .filter()
+    const allNodes = [...(manager.nodeManager?.nodes?.values() ?? [])];
+    const hasConnected = allNodes.some(n => n.connected);
+    if (!hasConnected) {
+      return message.reply('⚠️ Lavalink server chưa kết nối. Đang thử lại tự động — vui lòng thử lại sau 10 giây.');
     }
 
     const botMember = message.guild.members.me;

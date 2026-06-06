@@ -155,6 +155,8 @@ export async function initLavalink(client) {
     const nm = _manager.nodeManager;
     if (nm && typeof nm.on === 'function' && nm.listenerCount('error') === 0) {
       nm.on('error', (err) => {
+        // lavalink-client đôi khi emit AsyncFunction object thay vì Error — bỏ qua
+        if (typeof err === 'function') return;
         console.error('[lavalink] nodeManager error (caught):', err?.message ?? err);
       });
     }
