@@ -495,32 +495,34 @@ export function createBot(configStore, stateStore) {
     }
   });
 
-  // ── Self-ping keepalive ──────────────────────────────────────────────────
-  // Render free tier spin down sau 15 phút không có HTTP traffic.
-  // Tự gọi /health mỗi 14 phút để giữ process sống — không cần gửi message Discord.
-  (function startKeepalive() {
-    const INTERVAL_MS = 5 * 60 * 1000;
-    const RETRY_DELAY_MS = 10_000;
-    const MAX_RETRIES = 3;
-    const port = process.env.PORT ?? 10000;
+  return client;\n}
 
-    async function ping(attempt = 1) {
-      try {
-        const res = await fetch(`http://localhost:${port}/health`);
-        console.log(`[keepalive] /health → ${res.status}, uptime ${Math.floor(process.uptime())}s`);
-        if (!res.ok && attempt < MAX_RETRIES) {
-          setTimeout(() => ping(attempt + 1), RETRY_DELAY_MS);
-        }
-      } catch (err) {
-        console.warn(`[keepalive] attempt ${attempt} failed: ${err.message}`);
-        if (attempt < MAX_RETRIES) {
-          setTimeout(() => ping(attempt + 1), RETRY_DELAY_MS);
-        }
+// ── Self-ping keepalive (export riêng) ────────────────────────────────────────
+// Render free tier spin down sau 15 phút không có HTTP traffic.
+// Gọi startKeepalive() từ entry point SAU KHI HTTP server đã listen.
+// index.js (monolith) gọi nó. index.bot.js KHÔNG gọi vì không có HTTP server.
+export function startKeepalive(port = process.env.PORT ?? 10000) {
+  const INTERVAL_MS  = 5 * 60 * 1000;
+  const RETRY_DELAY_MS = 10_000;
+  const MAX_RETRIES  = 3;
+
+  async function ping(attempt = 1) {
+    try {
+      const res = await fetch(`http://localhost:${port}/health`);
+      console.log(`[keepalive] /health → ${res.status}, uptime ${Math.floor(process.uptime())}s`);
+      if (!res.ok && attempt < MAX_RETRIES) {
+        setTimeout(() => ping(attempt + 1), RETRY_DELAY_MS);
+      }
+    } catch (err) {
+      console.warn(`[keepalive] attempt ${attempt} failed: ${err.message}`);
+      if (attempt < MAX_RETRIES) {
+        setTimeout(() => ping(attempt + 1), RETRY_DELAY_MS);
       }
     }
+  }
 
-    setInterval(() => ping(), INTERVAL_MS).unref();
-  })();
-
-  return client;
+  const handle = setInterval(() => ping(), INTERVAL_MS);
+  handle.unref();
+  console.log(`[keepalive] Started — pinging /health every ${INTERVAL_MS / 60000} min on port ${port}`);
+  return handle;
 }

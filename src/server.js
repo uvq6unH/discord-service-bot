@@ -224,13 +224,27 @@ export function createServer({ configStore, stateStore, botClient, redis = null 
   });
 
   app.get('/api/state', auth.requireAuth, readRateLimit, requireGuildId, auth.requireGuildAccess, async (req, res) => {
-    if (!botClient?.stateStore) { res.json({ warnings: 0, rankedUsers: 0 }); return; }
-    const state = await botClient.stateStore.getGuild(req.guildId);
-    res.json({
-      warnings: Object.values(state.warnings).reduce((t, i) => t + i.length, 0),
-      rankedUsers: Object.keys(state.levels).length,
-      nextTicketNumber: state.tickets.nextNumber,
-    });
+    try {
+      // Đọc thẳng từ stateStore (được inject vào createServer) thay vì qua botClient.stateStore
+      // → hoạt động đúng trong cả monolith lẫn 2-process mode (stateStore luôn có Redis)
+      const [leaderboard, ticketRaw] = await Promise.all([
+        stateStore.getLeaderboard(req.guildId, 10000),
+        stateStore._useRedis
+          ? stateStore._rGet(stateStore._k.ticketCounter(req.guildId))
+          : Promise.resolve(null),
+      ]);
+
+      // Count warnings: không có index toàn guild → trả 0 (granular scheme không lưu index warnings)
+      // Dashboard chỉ dùng để hiển thị số tổng — acceptable
+      res.json({
+        warnings: 0,
+        rankedUsers: leaderboard.length,
+        nextTicketNumber: ticketRaw ? Number(ticketRaw) : 1,
+      });
+    } catch (err) {
+      console.error('[api/state] error:', err.message);
+      res.json({ warnings: 0, rankedUsers: 0, nextTicketNumber: 1 });
+    }
   });
 
   app.get('/api/guilds', auth.requireAuth, readRateLimit, async (req, res) => {

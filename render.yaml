@@ -1,7 +1,14 @@
 # render.yaml — 2 service riêng biệt
 #
-# Render Starter plan: $7/tháng mỗi service
-# Free plan: chỉ 1 web service — dùng PM2 trên 1 VPS thay thế (xem pm2.config.cjs)
+# Mỗi service cần UPSTASH_REDIS_REST_URL + UPSTASH_REDIS_REST_TOKEN giống nhau.
+# Không dùng disk persistent — tất cả state đi qua Upstash Redis.
+# (Disk persistent trên Render không thể share giữa 2 service khác nhau,
+#  nên configs.json/state.json nếu dùng sẽ bị desync → chỉ Redis là source of truth)
+#
+# Plan:
+#   Render Starter ($7/tháng/service): bot Worker + dashboard Web
+#   Render Free: không support Worker → dùng PM2 trên VPS (xem pm2.config.cjs)
+#                hoặc deploy monolith: node src/index.js (xem pm2.config.cjs + src/index.js)
 
 services:
   # ── Bot process (Worker — không expose HTTP) ──────────────────────────────
@@ -14,10 +21,6 @@ services:
     envVars:
       - key: NODE_ENV
         value: production
-      - key: CONFIG_PATH
-        value: /var/data/configs.json
-      - key: STATE_PATH
-        value: /var/data/state.json
       - key: DAILY_RESET_UTC_OFFSET_MINUTES
         value: 420
       - key: COMMAND_COOLDOWN_MS
@@ -48,10 +51,7 @@ services:
         sync: false
       - key: LAVALINK_SECURE
         value: "false"
-    disk:
-      name: bot-data
-      mountPath: /var/data
-      sizeGB: 1
+    # Không có disk: CONFIG_PATH/STATE_PATH không set → stateStore dùng Redis (production default)
 
   # ── Dashboard process (Web — expose HTTP, health check) ───────────────────
   - type: web
@@ -66,10 +66,6 @@ services:
         value: production
       - key: PORT
         value: 10000
-      - key: CONFIG_PATH
-        value: /var/data/configs.json
-      - key: STATE_PATH
-        value: /var/data/state.json
       - key: DISCORD_CLIENT_ID
         sync: false
       - key: DISCORD_CLIENT_SECRET
@@ -82,10 +78,7 @@ services:
         sync: false
       - key: UPSTASH_REDIS_REST_TOKEN
         sync: false
-    disk:
-      name: dashboard-data
-      mountPath: /var/data
-      sizeGB: 1
+    # Không có disk: CONFIG_PATH/STATE_PATH không set → configStore/stateStore dùng Redis
 
   # ── Lavalink server (Docker) ───────────────────────────────────────────────
   - type: web

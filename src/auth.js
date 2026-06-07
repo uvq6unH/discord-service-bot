@@ -307,7 +307,7 @@ export function createAuthRouter(botClient) {
           // user is owner of the guild via the bot's own guild cache. This covers
           // the common case where the bot owner accesses their own server.
           console.warn('[auth] fetchUserGuilds failed — falling back to bot guild cache for', userId);
-          const botGuild = botClient.guilds.cache.get(guildId);
+          const botGuild = botClient?.guilds?.cache?.get(guildId);
           if (botGuild) {
             try {
               const member = await botGuild.members.fetch(userId).catch(() => null);
@@ -324,7 +324,7 @@ export function createAuthRouter(botClient) {
       if (!hasManagePermission(userGuilds, guildId)) {
         // Secondary fallback: if Discord OAuth list doesn't include the guild (e.g. cache stale),
         // check via bot directly before hard-rejecting.
-        const botGuild = botClient.guilds.cache.get(guildId);
+        const botGuild = botClient?.guilds?.cache?.get(guildId);
         if (botGuild) {
           try {
             const member = await botGuild.members.fetch(userId).catch(() => null);

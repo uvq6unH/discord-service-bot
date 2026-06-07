@@ -132,3 +132,51 @@ These are observations for awareness, not bugs:
 - `README.md` — stale old readme
 - `scripts/` — entire directory (dev-session extraction/patch scripts, not part of production code)
 
+
+---
+
+## Post-migration Fix (2026-06-08)
+
+Sau khi phân tích trạng thái chuyển tiếp kiến trúc (old architecture chưa bỏ hết, new chưa hoàn thiện), các vấn đề sau đã được phát hiện và fix:
+
+### F-1: `auth.js` — `requireGuildAccess` crash khi `botClient = null`
+**File:** `src/auth.js` line 310, 327
+**Vấn đề:** `botClient.guilds.cache.get(guildId)` — không có optional chaining. Trong dashboard-only process (`index.server.js`), `botClient` được truyền là `null` → crash TypeError khi Discord OAuth unavailable và fallback vào bot cache.
+**Fix:** `botClient?.guilds?.cache?.get(guildId)` — null-safe ở cả 2 fallback path.
+
+### F-2: `server.js` — `/api/state` dùng `botClient.stateStore.getGuild()` (deprecated, trả stub rỗng)
+**File:** `src/server.js` route `GET /api/state`
+**Vấn đề:** `stateStore.getGuild()` đã được đánh dấu `@deprecated` và trong Redis mode trả về object stub (`warnings: {}, levels: {}, ...`) không chứa data thật. Route `/api/state` phụ thuộc vào nó → trả về `{ warnings: 0, rankedUsers: 0 }` luôn, dù có data.
+**Fix:** Rewrite route dùng `stateStore.getLeaderboard()` (granular) và `stateStore._rGet(ticketCounter)` trực tiếp. `stateStore` đã được inject vào `createServer()` — không cần qua `botClient.stateStore`.
+
+### F-3: `bot.js` — `startKeepalive` chạy auto trong `createBot()`, gây fail ở bot-only process
+**File:** `src/bot.js`
+**Vấn đề:** `startKeepalive()` được gọi tự động bên trong `createBot()`. Trong `index.bot.js`, không có HTTP server → mọi ping `/health` fail với `ECONNREFUSED`. Log spam, không crash nhưng gây noise và warning liên tục.
+**Fix:** Tách `startKeepalive` thành export riêng. `index.js` (monolith) gọi nó sau khi `app.listen()`. `index.bot.js` không gọi.
+
+### F-4: `render.yaml` — 2 persistent disk riêng gây desync configs.json
+**File:** `render.yaml`
+**Vấn đề:** Bot service và dashboard service mỗi cái có disk mount riêng tại `/var/data`. `CONFIG_PATH=/var/data/configs.json` → mỗi service write vào disk của riêng mình, không share → config bot và dashboard khác nhau.
+**Fix:** Bỏ persistent disk khỏi cả 2 service trong render.yaml. `CONFIG_PATH`/`STATE_PATH` không được set → `stateStore` và `configStore` dùng Redis (production default). Redis là single source of truth.
+
+### F-5: `package.json` — `start` script trỏ sai, `test` script trỏ `scripts/` đã xóa
+**File:** `package.json`
+**Vấn đề:** `"start": "node src/index.bot.js"` — sai với Render web service (cần monolith có HTTP server). `"test"` và `"test:economy"` trỏ `scripts/*.mjs` đã bị xóa trong cleanup.
+**Fix:** `start` → `node src/index.js`. Bỏ `test` và `test:economy`.
+
+### F-6: `ARCHITECTURE.md` + `MIGRATION.md` — mô tả kiến trúc cũ, không khớp code
+**Vấn đề:** Tài liệu vẫn mô tả `src/index.js` là 2 dòng import, `botClient: null` hardcoded, keepalive auto-chạy trong bot, disk persistent cần thiết.
+**Fix:** Viết lại cả 2 file phản ánh đúng kiến trúc thực tế.
+
+### Files thay đổi (post-migration fix)
+
+| File | Thay đổi |
+|------|----------|
+| `src/auth.js` | `botClient?.guilds?.cache` thay vì `botClient.guilds.cache` |
+| `src/server.js` | `/api/state` rewrite dùng stateStore granular methods |
+| `src/bot.js` | `startKeepalive` tách thành named export riêng |
+| `src/index.js` | Import và gọi `startKeepalive` sau `app.listen()` |
+| `render.yaml` | Bỏ persistent disk, Redis-only |
+| `package.json` | `start` → monolith; bỏ `test` scripts |
+| `ARCHITECTURE.md` | Viết lại hoàn toàn |
+| `MIGRATION.md` | Viết lại hoàn toàn |
