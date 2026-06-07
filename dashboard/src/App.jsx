@@ -21,7 +21,7 @@ function DashboardLayout() {
 
   useEffect(() => {
     if (!user) return;
-    api.guilds()
+    api.guilds().then(r => Array.isArray(r) ? r : (r.guilds ?? []))
       .then(setGuilds)
       .catch(console.error)
       .finally(() => setGuildsLoading(false));
