@@ -495,16 +495,17 @@ export function createBot(configStore, stateStore) {
     }
   });
 
-  return client;\n}
+  return client;
+}
 
 // ── Self-ping keepalive (export riêng) ────────────────────────────────────────
 // Render free tier spin down sau 15 phút không có HTTP traffic.
 // Gọi startKeepalive() từ entry point SAU KHI HTTP server đã listen.
 // index.js (monolith) gọi nó. index.bot.js KHÔNG gọi vì không có HTTP server.
 export function startKeepalive(port = process.env.PORT ?? 10000) {
-  const INTERVAL_MS  = 5 * 60 * 1000;
+  const INTERVAL_MS = 5 * 60 * 1000;
   const RETRY_DELAY_MS = 10_000;
-  const MAX_RETRIES  = 3;
+  const MAX_RETRIES = 3;
 
   async function ping(attempt = 1) {
     try {
