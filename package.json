@@ -22,7 +22,7 @@
     "dev:server": "node --watch src/index.server.js",
     "prod:bot": "pm2 start pm2.config.cjs --only discord-bot",
     "prod:server": "pm2 start pm2.config.cjs --only discord-dashboard",
-    "build:ui": "cd dashboard && pnpm install --no-frozen-lockfile && pnpm build",
+    "build:ui": "cd dashboard && NODE_ENV=development pnpm install --no-frozen-lockfile && pnpm build",
     "build": "pnpm build:ui",
     "dev:ui": "cd dashboard && pnpm dev"
   },

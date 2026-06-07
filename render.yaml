@@ -86,3 +86,15 @@ services:
       name: dashboard-data
       mountPath: /var/data
       sizeGB: 1
+
+  # ── Lavalink server (Docker) ───────────────────────────────────────────────
+  - type: web
+    name: lavalink
+    runtime: docker
+    plan: free
+    dockerfilePath: ./lavalink/Dockerfile
+    dockerContext: ./lavalink
+    healthCheckPath: /version
+    envVars:
+      - key: LAVALINK_PASSWORD
+        sync: false

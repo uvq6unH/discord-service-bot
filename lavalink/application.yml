@@ -54,7 +54,7 @@ lavalink:
       repository: "https://maven.lavalink.dev/releases"
 
   server:
-    password: "CHANGE_THIS_PASSWORD"       # Change this! Set LAVALINK_PASSWORD in bot env too.
+    password: ${LAVALINK_PASSWORD:youshallnotpass}
     sources:
       # Built-in extractors — disable YouTube here; use youtube-source plugin instead
       youtube:     false              # Handled by youtube-source plugin above
