@@ -17,6 +17,7 @@ export default function LolPage() {
       <div className="cards-grid">
         <SectionCard title="Riot API" icon="ti-key">
           <form autoComplete="off" onSubmit={e => e.preventDefault()}>
+          <input type="text" name="username" autoComplete="username" style={{display:'none'}} readOnly />
           <div className="form-group">
             <label className="form-label">Riot API Key</label>
             <input

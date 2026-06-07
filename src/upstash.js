@@ -129,6 +129,14 @@ export class UpstashClient {
   eval(script, numKeys, ...keysAndArgs) {
     return this._request(['EVAL', script, numKeys, ...keysAndArgs]);
   }
+
+  lpop(key) {
+    return this._request(['LPOP', key]);
+  }
+
+  rpush(key, ...values) {
+    return this._request(['RPUSH', key, ...values]);
+  }
 }
 
 export function createUpstashFromEnv(env = process.env) {
