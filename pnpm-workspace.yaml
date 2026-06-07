@@ -1,3 +1,10 @@
 packages:
   - '.'
   - 'dashboard'
+
+# pnpm 9+: build scripts phải được khai báo tường minh ở đây
+# (không còn đọc từ package.json["pnpm"] nữa)
+onlyBuiltDependencies:
+  - esbuild           # Vite build (dashboard)
+  - libsodium-wrappers # Discord.js voice encryption
+  - '@discordjs/opus'  # Audio codec
