@@ -24,13 +24,13 @@ let _manager = null;
 
 function buildNodeConfig() {
   return {
-    host:          process.env.LAVALINK_HOST     ?? 'localhost',
-    port:          Number(process.env.LAVALINK_PORT ?? 2333),
+    host: process.env.LAVALINK_HOST ?? 'localhost',
+    port: Number(process.env.LAVALINK_PORT ?? 2333),
     authorization: process.env.LAVALINK_PASSWORD ?? 'youshallnotpass',
-    secure:        process.env.LAVALINK_SECURE === 'true',
-    id:            'main',
-    retryAmount:   20,      // keep retrying indefinitely while bot is alive
-    retryDelay:    10_000,  // 10 s between retries
+    secure: process.env.LAVALINK_SECURE === 'true',
+    id: 'main',
+    retryAmount: 20,      // keep retrying indefinitely while bot is alive
+    retryDelay: 10_000,  // 10 s between retries
   };
 }
 
@@ -55,17 +55,17 @@ export async function initLavalink(client) {
     },
 
     client: {
-      id:       client.user?.id,
+      id: client.user?.id,
       username: client.user?.username ?? 'Bot',
     },
 
     playerOptions: {
-      leaveOnEnd:           true,
-      leaveOnEndCooldown:   90_000,  // 90 s — time to queue next track
-      leaveOnEmpty:         true,
+      leaveOnEnd: true,
+      leaveOnEndCooldown: 90_000,  // 90 s — time to queue next track
+      leaveOnEmpty: true,
       leaveOnEmptyCooldown: 20_000,  // 20 s — survive brief disconnects
-      selfDeaf:             true,
-      defaultVolume:        80,
+      selfDeaf: true,
+      defaultVolume: 80,
     },
   });
 
@@ -139,7 +139,7 @@ export async function initLavalink(client) {
   // ── Init manager ───────────────────────────────────────────────────────────
   try {
     await _manager.init({
-      id:       client.user.id,
+      id: client.user.id,
       username: client.user.username,
     });
     console.log('[lavalink] Manager initialised. Connecting to node…');
@@ -155,12 +155,12 @@ export async function initLavalink(client) {
     const nm = _manager.nodeManager;
     if (nm && typeof nm.on === 'function' && nm.listenerCount('error') === 0) {
       nm.on('error', (err) => {
-        // lavalink-client đôi khi emit AsyncFunction object thay vì Error — bỏ qua
-        if (typeof err === 'function') return;
+        // lavalink-client v2 đôi khi emit object có .message là AsyncFunction khi reconnect — bỏ qua
+        if (err == null || typeof err === 'function' || typeof err?.message === 'function') return;
         console.error('[lavalink] nodeManager error (caught):', err?.message ?? err);
       });
     }
-  } catch (_) {}
+  } catch (_) { }
 
   return _manager;
 }
@@ -203,12 +203,12 @@ export function buildLavalinkQuery(input) {
 
 export function sourceLabel(track) {
   const src = track?.info?.sourceName ?? '';
-  if (src === 'youtube')    return '▶️ YouTube';
+  if (src === 'youtube') return '▶️ YouTube';
   if (src === 'soundcloud') return '🔶 SoundCloud';
-  if (src === 'spotify')    return '💚 Spotify';
+  if (src === 'spotify') return '💚 Spotify';
   if (src === 'applemusic') return '🍎 Apple Music';
-  if (src === 'deezer')     return '🎵 Deezer';
-  if (src === 'http')       return '🔗 Direct';
+  if (src === 'deezer') return '🎵 Deezer';
+  if (src === 'http') return '🔗 Direct';
   return '🎵';
 }
 
