@@ -62,7 +62,7 @@ const configStore = new ConfigStore(configPath);
 const stateStore  = new StateStore(statePath, { redis });
 
 // ── Discord bot ───────────────────────────────────────────────────────────────
-const botClient = createBot(configStore, stateStore);
+const botClient = createBot(configStore, stateStore, redis);
 
 // ── Express server (nhận botClient thật, không phải null) ─────────────────────
 const app = createServer({

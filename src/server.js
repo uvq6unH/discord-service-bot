@@ -214,13 +214,21 @@ export function createServer({ configStore, stateStore, botClient, redis = null 
   });
 
   app.post('/api/slash-sync', auth.requireAuth, writeRateLimit, requireGuildId, auth.requireGuildAccess, async (req, res) => {
-    if (!botClient) {
-      res.status(503).json({ error: 'Bot process is not running in this instance. Slash sync is handled by the bot service.' });
-      return;
+    // Phase 2: If botClient is present (monolith), sync directly for instant feedback.
+    // If not (split mode), push to Redis queue — bot worker picks it up within 5 seconds.
+    if (botClient) {
+      const config = await configStore.getGuildConfig(req.guildId);
+      const slashSync = await botClient.syncGuildCommands(req.guildId, config)
+        .catch((e) => ({ synced: false, reason: e.message }));
+      return res.json(slashSync);
     }
-    const config = await configStore.getGuildConfig(req.guildId);
-    const slashSync = await botClient.syncGuildCommands(req.guildId, config);
-    res.json(slashSync);
+
+    if (!redis) {
+      return res.status(503).json({ error: 'Bot not available and no Redis queue configured.' });
+    }
+
+    await redis.rpush('slash_sync_queue', JSON.stringify({ guildId: req.guildId, requestedAt: new Date().toISOString() }));
+    res.json({ queued: true, message: 'Slash sync queued. Bot will process within 5 seconds.' });
   });
 
   app.get('/api/state', auth.requireAuth, readRateLimit, requireGuildId, auth.requireGuildAccess, async (req, res) => {
@@ -322,9 +330,38 @@ export function createServer({ configStore, stateStore, botClient, redis = null 
   });
 
   app.get('/api/members', auth.requireAuth, readRateLimit, requireGuildId, auth.requireGuildAccess, async (req, res) => {
+    const page = Math.max(1, parseInt(req.query.page) || 1);
+    const search = (req.query.search ?? '').toLowerCase().trim();
+    const PAGE_SIZE = 20;
+
+    // Phase 1: Try Redis guild_cache (works in split mode)
+    if (redis) {
+      try {
+        const raw = await redis.get(`guild_cache:${req.guildId}`);
+        if (raw) {
+          const data = typeof raw === 'string' ? JSON.parse(raw) : raw;
+          let members = data.members ?? [];
+          if (search) {
+            members = members.filter(m =>
+              m.username.toLowerCase().includes(search) ||
+              m.displayName.toLowerCase().includes(search)
+            );
+          }
+          members.sort((a, b) => (a.joinedAt ?? '').localeCompare(b.joinedAt ?? ''));
+          const total = members.length;
+          return res.json({ total, page, members: members.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE), source: 'redis_cache' });
+        }
+      } catch (err) {
+        console.warn('[members] Redis cache read failed:', err.message);
+      }
+    }
+
+    // Fallback: direct botClient (monolith mode or cache miss)
     if (!botClient) {
-      res.status(503).json({ error: 'Bot not available' });
-      return;
+      return res.status(503).json({
+        error: 'Guild cache not available. Bot may be offline or guild not yet cached.',
+        hint: 'The bot writes guild_cache to Redis on startup. Wait a few seconds and retry.',
+      });
     }
     const guild = botClient.guilds.cache.get(req.guildId);
     if (!guild) {
@@ -334,10 +371,6 @@ export function createServer({ configStore, stateStore, botClient, redis = null 
     try {
       await guild.members.fetch();
     } catch (_) { }
-
-    const page = Math.max(1, parseInt(req.query.page) || 1);
-    const search = (req.query.search ?? '').toLowerCase().trim();
-    const PAGE_SIZE = 20;
 
     let members = [...guild.members.cache.values()];
     if (search) {
@@ -368,14 +401,29 @@ export function createServer({ configStore, stateStore, botClient, redis = null 
   });
 
   app.get('/api/guild-data', auth.requireAuth, readRateLimit, requireGuildId, auth.requireGuildAccess, async (req, res) => {
+    // Phase 1: Try Redis guild_cache first (works in both monolith and split mode)
+    if (redis) {
+      try {
+        const raw = await redis.get(\`guild_cache:\${req.guildId}\`);
+        if (raw) {
+          const data = typeof raw === 'string' ? JSON.parse(raw) : raw;
+          return res.json({ ...data, source: 'redis_cache' });
+        }
+      } catch (err) {
+        console.warn('[guild-data] Redis cache read failed:', err.message);
+      }
+    }
+
+    // Fallback: direct botClient access (monolith mode or cache miss)
     if (!botClient) {
-      res.status(503).json({ error: 'Bot process not available — channels/roles unavailable in dashboard-only mode.' });
-      return;
+      return res.status(503).json({
+        error: 'Guild cache not available. Bot may be offline or guild not yet cached.',
+        hint: 'The bot writes guild_cache to Redis on startup. Wait a few seconds and retry.',
+      });
     }
     const guild = botClient.guilds.cache.get(req.guildId);
     if (!guild) { res.status(404).json({ error: 'Guild not found' }); return; }
 
-    // Serve from cache to avoid repeated guild.members.fetch() Discord API calls
     const cached = getCachedGuildData(req.guildId);
     if (cached) { res.json(cached); return; }
 

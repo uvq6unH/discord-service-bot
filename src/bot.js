@@ -99,7 +99,57 @@ import { initLavalink, forwardVoiceEvent } from './bot/music/lavalink.js';
 
 const commandCooldowns = new CommandCooldowns();
 
-export function createBot(configStore, stateStore) {
+// ── Guild Cache helpers ────────────────────────────────────────────────────────
+// Writes a snapshot of guild metadata (channels, roles, members) to Redis so
+// the dashboard process can read it without needing a live botClient reference.
+// Key: guild_cache:{guildId}  TTL: 15 minutes
+const GUILD_CACHE_KEY = (id) => `guild_cache:${id}`;
+const GUILD_CACHE_TTL_S = 900; // 15 min
+const GUILD_CACHE_REFRESH_MS = 10 * 60 * 1000; // refresh every 10 min
+
+async function writeGuildCache(guild, redis) {
+  if (!redis) return;
+  try {
+    const channels = guild.channels.cache.map((c) => ({ id: c.id, name: c.name, type: c.type }));
+    const roles = guild.roles.cache
+      .map((r) => ({ id: r.id, name: r.name, rawPosition: r.rawPosition, color: r.color ? `#${r.color.toString(16).padStart(6, '0')}` : null }))
+      .sort((a, b) => b.rawPosition - a.rawPosition);
+
+    // Fetch members — tolerate failures (fallback to cache)
+    let membersFetched;
+    try {
+      const fetchPromise = guild.members.fetch();
+      const timeout = new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), 8000));
+      membersFetched = await Promise.race([fetchPromise, timeout]);
+    } catch {
+      membersFetched = guild.members.cache;
+    }
+    const members = [...membersFetched.values()].map((m) => ({
+      id: m.user.id,
+      username: m.user.username,
+      displayName: m.displayName,
+      avatar: m.user.avatar,
+      joinedAt: m.joinedAt ? m.joinedAt.toISOString() : null,
+      roles: [...m.roles.cache.values()].filter((r) => r.id !== guild.id).map((r) => ({ id: r.id, name: r.name, color: r.color })),
+    })).sort((a, b) => a.displayName.localeCompare(b.displayName));
+
+    const payload = JSON.stringify({
+      name: guild.name,
+      iconURL: guild.iconURL({ size: 64 }) ?? null,
+      channels,
+      roles,
+      members,
+      memberCount: guild.memberCount,
+      updatedAt: new Date().toISOString(),
+    });
+    await redis.set(GUILD_CACHE_KEY(guild.id), payload, 'EX', GUILD_CACHE_TTL_S);
+    console.log(`[guild-cache] ✅ Wrote cache for ${guild.name} (${guild.id}) — ${members.length} members`);
+  } catch (err) {
+    console.error(`[guild-cache] ❌ Failed to write cache for ${guild.id}:`, err.message);
+  }
+}
+
+export function createBot(configStore, stateStore, redis = null) {
   const client = new Client({
     intents: [
       GatewayIntentBits.Guilds,
@@ -146,7 +196,22 @@ export function createBot(configStore, stateStore) {
         }
       }
       console.log(`[bot] Command sync complete: ${synced}/${guilds.length} guilds OK`);
-      // 4. Start reminder worker
+
+      // 5. Write guild cache to Redis for all guilds (dashboard reads from here in split mode)
+      if (redis) {
+        console.log(`[guild-cache] Writing initial cache for ${guilds.length} guild(s)...`);
+        for (const guild of guilds) {
+          await writeGuildCache(guild, redis);
+        }
+        // Refresh cache every 10 minutes
+        setInterval(async () => {
+          const activeGuilds = [...readyClient.guilds.cache.values()];
+          for (const guild of activeGuilds) {
+            await writeGuildCache(guild, redis);
+          }
+        }, GUILD_CACHE_REFRESH_MS).unref();
+      }
+
       setInterval(async () => {
         const now = new Date();
         const guildIds = await configStore.listGuildIds();
@@ -264,6 +329,40 @@ export function createBot(configStore, stateStore) {
     await guild.commands.set(validCommands);
     return { synced: true, count: validCommands.length };
   };
+
+  // ── Guild cache: refresh on join / update ──────────────────────────────────
+  client.on(Events.GuildCreate, async (guild) => {
+    console.log(`[bot] Joined guild: ${guild.name} (${guild.id})`);
+    if (redis) await writeGuildCache(guild, redis);
+  });
+
+  client.on(Events.GuildUpdate, async (_oldGuild, newGuild) => {
+    if (redis) await writeGuildCache(newGuild, redis);
+  });
+
+  // ── Slash sync queue worker ────────────────────────────────────────────────
+  // Dashboard pushes jobs to Redis list `slash_sync_queue` when botClient is null.
+  // Bot polls here every 5 seconds and processes them.
+  if (redis) {
+    const SLASH_SYNC_QUEUE = 'slash_sync_queue';
+    setInterval(async () => {
+      try {
+        const raw = await redis.lpop(SLASH_SYNC_QUEUE);
+        if (!raw) return;
+        let job;
+        try { job = typeof raw === 'string' ? JSON.parse(raw) : raw; } catch { return; }
+        const { guildId } = job;
+        if (!guildId) return;
+        const config = await configStore.getGuildConfig(guildId).catch(() => null);
+        if (!config) return;
+        const result = await client.syncGuildCommands(guildId, config).catch((e) => ({ synced: false, reason: e.message }));
+        console.log(`[slash-queue] Synced ${guildId}:`, result);
+      } catch (err) {
+        console.error('[slash-queue] Worker error:', err.message);
+      }
+    }, 5000).unref();
+    console.log('[slash-queue] Worker started — polling every 5s');
+  }
 
   client.on(Events.GuildMemberAdd, async (member) => {
     const config = await configStore.getGuildConfig(member.guild.id);

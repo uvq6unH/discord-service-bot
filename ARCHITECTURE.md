@@ -1,39 +1,40 @@
-# Discord Service Bot — Architecture Document
+# Discord Service Bot — Architecture
 
-> **Runtime:** Node.js ESM · **Deploy:** Render.com (Starter) hoặc PM2 trên VPS
-> **Backend:** ~85 files · **Frontend:** React + Vite (dashboard/)
+> **Runtime:** Node.js ESM  
+> **Deploy:** Render.com or PM2 on VPS  
+> **Stack:** Discord.js · Express · Upstash Redis · React + Vite (dashboard)
 
 ---
 
-## Mục lục
+## Table of Contents
 
-1. [Tổng quan hệ thống](#1-tổng-quan-hệ-thống)
-2. [Sơ đồ kiến trúc](#2-sơ-đồ-kiến-trúc)
-3. [Process Architecture](#3-process-architecture)
+1. [System Overview](#1-system-overview)
+2. [Architecture Diagram](#2-architecture-diagram)
+3. [Deploy Modes](#3-deploy-modes)
 4. [Boot Flow](#4-boot-flow)
 5. [Backend — src/](#5-backend--src)
 6. [Frontend — dashboard/](#6-frontend--dashboard)
 7. [Redis Key Scheme](#7-redis-key-scheme)
 8. [Deployment](#8-deployment)
-9. [Data Flow theo tính năng](#9-data-flow-theo-tính-năng)
+9. [Feature Data Flows](#9-feature-data-flows)
 10. [Dependency Map](#10-dependency-map)
 
 ---
 
-## 1. Tổng quan hệ thống
+## 1. System Overview
 
-Bot Discord đa chức năng với **2 chế độ deploy**:
+Multi-feature Discord bot with two deploy modes:
 
-**Chế độ A — Monolith (1 process, Render Free / VPS đơn giản):**
+**Mode A — Monolith (1 process):**
 ```
-src/index.js → bot + dashboard trong cùng 1 process
+src/index.js → bot + dashboard in the same process
 ```
 
-**Chế độ B — 2 process (Render Starter / PM2 trên VPS):**
+**Mode B — Split (2 processes):**
 ```
 src/index.bot.js    → Discord client process
 src/index.server.js → Express dashboard process
-Giao tiếp: Upstash Redis (shared state, config, sessions)
+Communication: Upstash Redis (shared state, config, sessions)
 ```
 
 ```
@@ -49,81 +50,82 @@ Giao tiếp: Upstash Redis (shared state, config, sessions)
 └──────────────────────┘                             └─────────────────────────┘
 ```
 
-**Nguyên tắc thiết kế:**
-- **Redis-first persistence:** Tất cả state lưu Upstash Redis. File JSON chỉ là fallback cho local dev.
-- **Granular Redis keys:** Mỗi subsystem dùng key riêng (`guild:{id}:economy:{userId}`) — tránh contention khi concurrent write.
-- **Distributed locking:** `withRedisLock()` (Redis) hoặc `asyncMutex` (single-process). An toàn để scale ngang.
-- **Per-guild isolation:** Config và state đều key theo `guildId`.
-- **botClient optional:** `server.js` nhận `botClient` (có thể `null`). Các route cần bot trả 503 gracefully thay vì crash.
+**Design principles:**
+- **Redis-first persistence:** All state lives in Upstash Redis. JSON files are local-dev fallback only.
+- **Granular Redis keys:** Each subsystem uses its own key (`guild:{id}:economy:{userId}`) — avoids contention on concurrent writes.
+- **Distributed locking:** `withRedisLock()` (Redis) or `asyncMutex` (single-process). Safe to scale horizontally.
+- **Per-guild isolation:** Config and state are all keyed by `guildId`.
+- **`botClient` optional:** `server.js` accepts `botClient` (can be `null`). Routes requiring the bot return 503 gracefully instead of crashing.
 
 ---
 
-## 2. Sơ đồ kiến trúc
+## 2. Architecture Diagram
 
 ```
 Discord API ◄──────────────────────────────────► Lavalink Server
-     │ WebSocket (Gateway)        REST/WS         (Java, âm nhạc)
+     │ WebSocket (Gateway)        REST/WS         (Java, audio)
      │ REST (API calls)
      ▼
 ┌─────────────────────────────────────────────────────────────────────┐
-│ src/index.js  ← MONOLITH ENTRY (Chế độ A)                          │
+│ src/index.js  ← MONOLITH ENTRY (Mode A)                            │
 │  • validateEnvironment()          (bot + server vars)               │
 │  • createUpstashFromEnv()  → redis                                  │
 │  • new ConfigStore() + new StateStore()   ← shared singletons       │
-│  • createBot(configStore, stateStore)     ← botClient thật          │
-│  • createServer({ botClient, ... })       ← dashboard thấy bot      │
+│  • createBot(configStore, stateStore)     ← real botClient          │
+│  • createServer({ botClient, ... })       ← dashboard sees bot      │
 │  • loginWithRetry() → app.listen() → startKeepalive()              │
 └─────────────────────────────────────────────────────────────────────┘
 
 ┌─────────────────────────────────────────────────────────────────────┐
-│ src/index.bot.js  ← BOT ENTRY (Chế độ B)                           │
+│ src/index.bot.js  ← BOT ENTRY (Mode B)                             │
 │  • validateBotEnvironment()                                         │
 │  • createUpstashFromEnv() → sharedRedis                             │
 │  • new ConfigStore() + new StateStore()                             │
 │  • createBot(configStore, stateStore)                               │
-│  • loginWithRetry() — không mở HTTP server, không keepalive         │
+│  • loginWithRetry() — no HTTP server, no keepalive                  │
 └─────────────────────────────────────────────────────────────────────┘
 
 ┌─────────────────────────────────────────────────────────────────────┐
-│ src/index.server.js  ← DASHBOARD ENTRY (Chế độ B)                  │
+│ src/index.server.js  ← DASHBOARD ENTRY (Mode B)                    │
 │  • validateServerEnvironment()                                      │
-│  • createUpstashFromEnv() → sharedRedis  (cùng instance Redis)     │
+│  • createUpstashFromEnv() → sharedRedis  (same Redis instance)     │
 │  • new ConfigStore() + new StateStore()                             │
 │  • createServer({ botClient: null, ... })                           │
-│    → /api/guild-data, /api/members, /api/slash-sync trả 503         │
-│    → /api/config, /api/guilds, /api/state hoạt động bình thường    │
+│    → /api/guild-data, /api/members, /api/slash-sync return 503      │
+│    → /api/config, /api/guilds, /api/state work normally             │
 │  • app.listen(PORT)                                                 │
 └─────────────────────────────────────────────────────────────────────┘
 ```
 
 ---
 
-## 3. Process Architecture
+## 3. Deploy Modes
 
-### Tại sao có 2 chế độ?
+### Why two modes?
 
-| Vấn đề | Chế độ A (Monolith) | Chế độ B (2-process) |
-|--------|---------------------|----------------------|
-| Render Free plan | ✅ 1 web service | ❌ Worker không hỗ trợ |
-| Memory leak music → crash dashboard | ❌ Cùng process | ✅ Isolated |
-| Restart bot mà không ngắt users | ❌ | ✅ |
-| Đơn giản để deploy | ✅ | Phức tạp hơn |
-| Dashboard thấy bot guild cache | ✅ Trực tiếp | ❌ 503 cho guild-data/members |
+| Concern | Mode A (Monolith) | Mode B (2-process) |
+|---------|-------------------|--------------------|
+| Render Free plan | ✅ 1 web service | ❌ Worker not supported |
+| Music memory leak crashes dashboard | ❌ Same process | ✅ Isolated |
+| Restart bot without dropping users | ❌ | ✅ |
+| Deployment simplicity | ✅ | More complex |
+| Dashboard sees bot guild cache | ✅ Direct | ❌ 503 for guild-data/members |
 
-### Giới hạn của Chế độ B (2-process)
+### Mode B limitations (botClient = null in dashboard process)
 
-Khi `botClient: null` trong dashboard process:
-- `GET /api/guild-data` → **503** (channels/roles cần Discord cache)
-- `GET /api/members` → **503** (cần bot cache)
-- `POST /api/slash-sync` → **503** (cần bot connection)
-- `GET /api/guilds` → hoạt động (dùng OAuth)
-- `GET /api/config` → hoạt động (dùng Redis)
-- `PUT /api/config` → hoạt động (lưu Redis, slash-sync skipped)
-- `GET /api/state` → hoạt động (dùng stateStore trực tiếp qua Redis)
+| Route | Mode B |
+|-------|--------|
+| `GET /api/guild-data` | **503** — requires Discord cache |
+| `GET /api/members` | **503** — requires bot cache |
+| `POST /api/slash-sync` | **503** — requires bot connection |
+| `GET /api/guilds` | ✅ (OAuth) |
+| `GET /api/config` | ✅ (Redis) |
+| `PUT /api/config` | ✅ (Redis, slash-sync skipped) |
+| `GET /api/state` | ✅ (stateStore directly via Redis) |
 
-### Giao tiếp giữa 2 process (Chế độ B)
+### Inter-process communication (Mode B)
 
-Không có IPC trực tiếp. Tất cả qua Redis:
+No direct IPC. Everything flows through Redis:
 ```
 Bot writes → Redis ← Dashboard reads
              (ConfigStore, StateStore, SessionStore)
@@ -141,17 +143,17 @@ Bot writes → Redis ← Dashboard reads
 3. createUpstashFromEnv()    → redis
 4. new ConfigStore()         → guild configs
 5. new StateStore()          → ready (Redis mode)
-6. createBot(...)            → Discord Client (chưa login)
-7. createServer({ botClient, ... })   → Express app (chưa listen)
+6. createBot(...)            → Discord Client (not yet logged in)
+7. createServer({ botClient, ... })   → Express app (not yet listening)
 8. loginWithRetry()          → client.login(token)
-   └─ 10 lần, backoff 5s→30s, chỉ retry transient errors
+   └─ 10 attempts, backoff 5s→30s, retry transient errors only
 9. app.listen(PORT)          → HTTP server open
-10. startKeepalive(port)     → ping /health mỗi 5 phút
+10. startKeepalive(port)     → ping /health every 5 minutes
 
-Sau ClientReady:
+After ClientReady:
   ├─ initLavalink()
   ├─ purgeStaleGameSessions()
-  ├─ syncGuildCommands() mỗi guild
+  ├─ syncGuildCommands() per guild
   └─ setInterval(reminderWorker, 60s)
 ```
 
@@ -163,7 +165,7 @@ Sau ClientReady:
 3. createUpstashFromEnv() + ConfigStore + StateStore
 4. createBot()
 5. loginWithRetry()
-   ↳ Không có HTTP server, không keepalive
+   ↳ No HTTP server, no keepalive
 ```
 
 ### Dashboard process (`src/index.server.js`)
@@ -181,7 +183,7 @@ Sau ClientReady:
 
 ### 5.1 Entry Points
 
-| File | Dùng cho | HTTP? | Keepalive? |
+| File | Used for | HTTP? | Keepalive? |
 |------|----------|-------|------------|
 | `src/index.js` | Monolith (1 process) | ✅ | ✅ |
 | `src/index.bot.js` | Bot-only (2-process) | ❌ | ❌ |
@@ -189,11 +191,11 @@ Sau ClientReady:
 
 #### `src/env.js` — Environment Validator
 
-| Export | Dùng bởi | Validate |
-|--------|----------|----------|
+| Export | Used by | Validates |
+|--------|---------|-----------|
 | `validateBotEnvironment()` | `index.bot.js` | `DISCORD_TOKEN`, Redis (prod) |
 | `validateServerEnvironment()` | `index.server.js` | OAuth vars, `SESSION_SECRET` ≥32 chars, Redis (prod) |
-| `validateEnvironment()` | `index.js` (monolith) | Cả 2 bộ trên |
+| `validateEnvironment()` | `index.js` (monolith) | Both sets above |
 
 ---
 
@@ -203,9 +205,9 @@ Sau ClientReady:
 
 `createServer({ configStore, stateStore, botClient, redis })`:
 
-- `botClient` có thể là `null` (dashboard-only mode) hoặc Discord Client thật (monolith)
-- **Tất cả route đọc state** dùng `stateStore` được inject — không qua `botClient.stateStore`
-- Route cần bot cache: guard `if (!botClient)` → trả 503
+- `botClient` can be `null` (dashboard-only mode) or a real Discord Client (monolith)
+- All state-reading routes use the injected `stateStore` — not `botClient.stateStore`
+- Routes requiring bot cache: guarded with `if (!botClient)` → returns 503
 
 **Middleware stack:**
 ```
@@ -213,70 +215,70 @@ helmet (CSP + security headers)
   ↓ expressSession (cookie "dsession", store: Upstash Redis)
   ↓ express.json (limit: 128kb)
   ↓ Rate limiters (read: 60/min, write: 20/min)
-  ↓ CSRF validation (POST/PUT phải có X-CSRF-Token)
+  ↓ CSRF validation (POST/PUT require X-CSRF-Token header)
   ↓ auth.requireAuth / requireGuildAccess (per route)
 ```
 
 **Route summary:**
 
-| Method | Path | Cần bot? |
-|--------|------|----------|
-| GET | /health | ❌ |
-| GET | /auth/login, /callback, /logout, /me | ❌ |
-| GET | /api/csrf-token | ❌ |
-| GET | /api/status | ❌ (trả `botReady: false` nếu null) |
-| GET | /api/guilds | ❌ (OAuth) |
-| GET | /api/config | ❌ |
-| PUT | /api/config | ❌ (slash-sync skipped nếu null) |
-| POST | /api/slash-sync | ✅ → 503 |
-| GET | /api/state | ❌ (stateStore trực tiếp) |
-| GET | /api/guild-data | ✅ → 503 |
-| GET | /api/members | ✅ → 503 |
-| GET | /api/invite-url | ❌ |
-| GET | /api/keepalive-status | ❌ |
+| Method | Path | Requires bot? |
+|--------|------|---------------|
+| GET | `/health` | ❌ |
+| GET | `/auth/login`, `/callback`, `/logout`, `/me` | ❌ |
+| GET | `/api/csrf-token` | ❌ |
+| GET | `/api/status` | ❌ (returns `botReady: false` if null) |
+| GET | `/api/guilds` | ❌ (OAuth) |
+| GET | `/api/config` | ❌ |
+| PUT | `/api/config` | ❌ (slash-sync skipped if null) |
+| POST | `/api/slash-sync` | ✅ → 503 |
+| GET | `/api/state` | ❌ (stateStore directly) |
+| GET | `/api/guild-data` | ✅ → 503 |
+| GET | `/api/members` | ✅ → 503 |
+| GET | `/api/invite-url` | ❌ |
+| GET | `/api/keepalive-status` | ❌ |
 
 ---
 
 #### `src/auth.js` — Discord OAuth2
 
-`requireGuildAccess` dùng `botClient?.guilds?.cache` (optional chaining) — an toàn khi `botClient = null`.
+`requireGuildAccess` uses `botClient?.guilds?.cache` (optional chaining) — safe when `botClient = null`.
 
-Fallback permission check: nếu Discord OAuth unavailable → thử bot guild cache (nếu có) → 403.
+Fallback permission check: if Discord OAuth unavailable → try bot guild cache (if present) → 403.
 
 ---
 
 #### `src/bot.js` — Discord Client Factory + keepalive
 
 - `createBot(configStore, stateStore)` → Discord Client
-- `startKeepalive(port)` → **export riêng**, chỉ được gọi từ `index.js` sau khi HTTP server đã listen
+- `startKeepalive(port)` → **separate export**, only called from `index.js` after the HTTP server is listening
 
 ---
 
-### 5.3 Data Layer — quan trọng
+### 5.3 Data Layer
 
 #### `src/stateStore.js` — Runtime State (granular Redis keys)
 
-`stateStore` được inject vào cả `createBot` và `createServer`. Trong 2-process mode, dashboard dùng `stateStore` trực tiếp (Redis) — không cần bot process.
+`stateStore` is injected into both `createBot` and `createServer`. In 2-process mode, the dashboard uses `stateStore` directly over Redis — no bot process required.
 
-**`/api/state` đọc từ:**
-- `stateStore.getLeaderboard()` → ranked users count
+**`/api/state` reads from:**
+- `stateStore.getLeaderboard()` → ranked user count
 - `stateStore._rGet(ticketCounter)` → next ticket number
-- warnings: không có guild-level index trong granular scheme → trả 0 (acceptable)
 
 #### `src/configStore.js` — Guild Config (Redis)
 
-Tất cả config lưu Redis. File JSON (`CONFIG_PATH`) chỉ là fallback khi dev local (không set Redis env).
-`riotApiKey` / `tftApiKey` không bao giờ persist vào Redis — in-memory only.
+All config is stored in Redis. The JSON file (`CONFIG_PATH`) is a fallback for local dev only (when Redis env vars are not set).
+
+`riotApiKey` / `tftApiKey` are never persisted to Redis — in-memory only.
 
 ---
 
 ## 6. Frontend — dashboard/
 
-React SPA (Vite) → build → `public-react/` → Express serve.
+React SPA (Vite) → build → `public-react/` → served by Express.
 
 ```
 dashboard/src/
-  api.js           ← apiFetch + CSRF auto-attach + 401 redirect
+  api.js           ← apiFetch + auto CSRF attachment + 401 redirect
   contexts/
     AuthContext     ← useAuth() — /auth/me
     GuildContext    ← useGuild() — config, guildData, save
@@ -288,7 +290,7 @@ dashboard/src/
     Login, Overview, Members, Commands, Economy, Moderation, Lol
 ```
 
-`api.saveConfig` → `PUT /api/config` (method đúng, khớp với `app.put` trong server.js)
+`api.saveConfig` → `PUT /api/config` (matches `app.put` in server.js)
 
 ### Dev workflow
 
@@ -297,7 +299,7 @@ dashboard/src/
 node src/index.server.js   # :10001
 
 # Terminal 2: Vite dev server
-pnpm dev:ui                # :5173 (proxy /api → :10001)
+pnpm dev:ui                # :5173 (proxies /api → :10001)
 ```
 
 ---
@@ -354,20 +356,20 @@ config:lock:{guildId}                    → lock token
 
 ## 8. Deployment
 
-### Render.com — Chế độ A (Monolith, Free plan)
+### Render.com — Mode A (Monolith, Free plan)
 
-Dùng 1 **Web** service:
+One **Web** service:
 ```
 Build:  pnpm install --no-frozen-lockfile && pnpm build:ui
 Start:  node src/index.js
 Health: /health
 ```
 
-Env vars cần: tất cả (bot + dashboard + Redis).
+All env vars required (bot + dashboard + Redis).
 
-### Render.com — Chế độ B (2 services, Starter plan)
+### Render.com — Mode B (2 services, Starter plan)
 
-Xem `render.yaml`. Không dùng persistent disk — tất cả state qua Redis.
+See `render.yaml`. No persistent disk — all state flows through Redis.
 
 ```yaml
 services:
@@ -378,11 +380,13 @@ services:
     healthCheckPath: /health
 ```
 
+> **Important:** Do not set `CONFIG_PATH` or `STATE_PATH` on Render. Both services must share the same Upstash Redis instance as the single source of truth.
+
 ### PM2 (VPS)
 
 ```bash
-pm2 start pm2.config.cjs        # 2 process riêng
-# hoặc
+pm2 start pm2.config.cjs        # 2 separate processes
+# or
 node src/index.js               # monolith
 ```
 
@@ -406,7 +410,7 @@ node src/index.js               # monolith
 
 ---
 
-## 9. Data Flow theo tính năng
+## 9. Feature Data Flows
 
 ### Economy Transaction
 
@@ -427,14 +431,14 @@ User clicks "Hit":
     → deleteGameSession() → DEL guild:{id}:game:blackjack:{msgId}
 ```
 
-### Config Save từ Dashboard
+### Config Save from Dashboard
 
 ```
-Admin → thay đổi prefix → click "Lưu"
+Admin changes prefix → clicks Save
   → GuildContext.saveConfig()
   → api.saveConfig(guildId, config)           (PUT /api/config)
   → configStore.updateGuildConfig()           → SET config:guild:{guildId}
-  → botClient?.syncGuildCommands()            (skipped nếu null → 2-process mode)
+  → botClient?.syncGuildCommands()            (skipped if null — Mode B)
   → res.json({ ...config, slashSync })
 ```
 
@@ -456,7 +460,7 @@ src/index.bot.js
   ├── src/upstash.js
   ├── src/configStore.js
   ├── src/stateStore.js
-  └── src/bot.js                (createBot — startKeepalive không gọi)
+  └── src/bot.js                (createBot only — startKeepalive not called)
 
 src/index.server.js
   ├── src/env.js                (validateServerEnvironment)
@@ -482,7 +486,3 @@ src/bot.js
   ├── src/bot/music/lavalink.js
   └── src/bot/slash.js
 ```
-
----
-
-*Cập nhật: refactor hoàn thiện — monolith entry thực sự, keepalive tách khỏi createBot, botClient null-safe, stateStore inject đúng chỗ, Redis-only cho production.*
