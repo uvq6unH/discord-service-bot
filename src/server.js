@@ -404,7 +404,7 @@ export function createServer({ configStore, stateStore, botClient, redis = null 
     // Phase 1: Try Redis guild_cache first (works in both monolith and split mode)
     if (redis) {
       try {
-        const raw = await redis.get(\`guild_cache:\${req.guildId}\`);
+        const raw = await redis.get(`guild_cache:${req.guildId}`);
         if (raw) {
           const data = typeof raw === 'string' ? JSON.parse(raw) : raw;
           return res.json({ ...data, source: 'redis_cache' });
