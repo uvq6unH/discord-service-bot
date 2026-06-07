@@ -307,6 +307,52 @@ export function createServer({ configStore, stateStore, botClient, redis = null 
     res.json({ guilds });
   });
 
+  app.get('/api/members', auth.requireAuth, readRateLimit, requireGuildId, auth.requireGuildAccess, async (req, res) => {
+    if (!botClient) {
+      res.status(503).json({ error: 'Bot not available' });
+      return;
+    }
+    const guild = botClient.guilds.cache.get(req.guildId);
+    if (!guild) {
+      res.status(404).json({ error: 'Guild not found' });
+      return;
+    }
+    try {
+      await guild.members.fetch();
+    } catch (_) {}
+
+    const page   = Math.max(1, parseInt(req.query.page) || 1);
+    const search = (req.query.search ?? '').toLowerCase().trim();
+    const PAGE_SIZE = 20;
+
+    let members = [...guild.members.cache.values()];
+    if (search) {
+      members = members.filter(m =>
+        m.user.username.toLowerCase().includes(search) ||
+        (m.nickname ?? '').toLowerCase().includes(search)
+      );
+    }
+    members.sort((a, b) => (a.joinedTimestamp ?? 0) - (b.joinedTimestamp ?? 0));
+
+    const total = members.length;
+    const slice = members.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+
+    res.json({
+      total,
+      page,
+      members: slice.map(m => ({
+        id:          m.user.id,
+        username:    m.user.username,
+        displayName: m.displayName,
+        avatar:      m.user.avatar,
+        joinedAt:    m.joinedAt,
+        roles:       [...m.roles.cache.values()]
+          .filter(r => r.id !== guild.id)
+          .map(r => ({ id: r.id, name: r.name, color: r.color })),
+      })),
+    });
+  });
+
   app.get('/api/guild-data', auth.requireAuth, readRateLimit, requireGuildId, auth.requireGuildAccess, async (req, res) => {
     if (!botClient) {
       res.status(503).json({ error: 'Bot process not available — channels/roles unavailable in dashboard-only mode.' });
