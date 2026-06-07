@@ -1,18 +1,15 @@
 # render.yaml — 2 service riêng biệt
 #
-# ⚠️  Render free plan chỉ cho phép 1 web service.
-#     Để chạy 2 process, nâng lên Starter ($7/tháng) hoặc dùng PM2 trên 1 VM.
-#     Xem pm2.config.cjs để chạy cả 2 trên 1 host với PM2.
-#
-# Nếu vẫn muốn monolith 1 process: dùng src/index.js (unchanged).
+# Render Starter plan: $7/tháng mỗi service
+# Free plan: chỉ 1 web service — dùng PM2 trên 1 VPS thay thế (xem pm2.config.cjs)
 
 services:
-  # ── Bot service ─────────────────────────────────────────────────────────────
-  - type: worker          # worker = không expose HTTP, không cần health check
+  # ── Bot process (Worker — không expose HTTP) ──────────────────────────────
+  - type: worker
     name: discord-bot
     runtime: node
     plan: starter
-    buildCommand: corepack enable && pnpm install --no-frozen-lockfile
+    buildCommand: pnpm install --no-frozen-lockfile
     startCommand: node src/index.bot.js
     envVars:
       - key: NODE_ENV
@@ -56,12 +53,12 @@ services:
       mountPath: /var/data
       sizeGB: 1
 
-  # ── Dashboard service ────────────────────────────────────────────────────────
-  - type: web             # web = expose HTTP, có health check
+  # ── Dashboard process (Web — expose HTTP, health check) ───────────────────
+  - type: web
     name: discord-dashboard
     runtime: node
     plan: starter
-    buildCommand: corepack enable && pnpm install --no-frozen-lockfile && pnpm build:ui
+    buildCommand: pnpm install --no-frozen-lockfile && pnpm build:ui
     startCommand: node src/index.server.js
     healthCheckPath: /health
     envVars:

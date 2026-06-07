@@ -5,15 +5,15 @@
   "type": "module",
   "packageManager": "pnpm@11.1.3",
   "scripts": {
-    "start": "node src/index.js",
-    "dev": "node --watch src/index.js",
+    "start": "node src/index.bot.js",
+    "dev": "node --watch src/index.bot.js",
     "prod": "pm2 start pm2.config.cjs",
-    "prod:stop": "pm2 stop discord-service-bot",
-    "prod:restart": "pm2 restart discord-service-bot",
-    "prod:logs": "pm2 logs discord-service-bot",
+    "prod:stop": "pm2 stop all",
+    "prod:restart": "pm2 restart all",
+    "prod:logs": "pm2 logs",
     "prod:status": "pm2 status",
     "keep-alive": "bash keep-alive.sh",
-    "check": "node --check src/index.js && node --check src/env.js && node --check src/cooldowns.js && node --check src/bot.js && node --check src/bot/constants.js && node --check src/bot/logging.js && node --check src/bot/embeds.js && node --check src/bot/commands.js && node --check src/bot/commands/index.js && node --check src/bot/commands/runtime.js && node --check src/bot/commands/handlers/help.js && node --check src/bot/commands/handlers/general.js && node --check src/bot/commands/handlers/moderation.js && node --check src/bot/commands/handlers/levels.js && node --check src/bot/commands/handlers/economy.js && node --check src/bot/commands/handlers/panels.js && node --check src/bot/commands/handlers/riot.js && node --check src/bot/interactions.js && node --check src/bot/help.js && node --check src/bot/games.js && node --check src/bot/slash.js && node --check src/bot/responses.js && node --check src/server.js && node --check src/configDefaults.js && node --check src/configStore.js && node --check src/stateStore.js && node --check src/auth.js && node --check src/lolApi.js && node --check src/lolCommands.js && node --check src/tftApi.js && node --check src/tftCommands.js && node --check src/upstash.js && node --check src/safeJson.js && node --check src/csrf.js && node --check src/rateLimit.js && node --check src/commandAccess.js && node --check src/asyncMutex.js && node --check src/distributedLock.js && node --check src/configPatch.js && node --check src/riot/helpers.js",
+    "check": "node --check src/env.js && node --check src/cooldowns.js && node --check src/bot.js && node --check src/bot/constants.js && node --check src/bot/logging.js && node --check src/bot/embeds.js && node --check src/bot/commands.js && node --check src/bot/commands/index.js && node --check src/bot/commands/runtime.js && node --check src/bot/commands/handlers/help.js && node --check src/bot/commands/handlers/general.js && node --check src/bot/commands/handlers/moderation.js && node --check src/bot/commands/handlers/levels.js && node --check src/bot/commands/handlers/economy.js && node --check src/bot/commands/handlers/panels.js && node --check src/bot/commands/handlers/riot.js && node --check src/bot/interactions.js && node --check src/bot/help.js && node --check src/bot/games.js && node --check src/bot/slash.js && node --check src/bot/responses.js && node --check src/server.js && node --check src/configDefaults.js && node --check src/configStore.js && node --check src/stateStore.js && node --check src/auth.js && node --check src/lolApi.js && node --check src/lolCommands.js && node --check src/tftApi.js && node --check src/tftCommands.js && node --check src/upstash.js && node --check src/safeJson.js && node --check src/csrf.js && node --check src/rateLimit.js && node --check src/commandAccess.js && node --check src/asyncMutex.js && node --check src/distributedLock.js && node --check src/configPatch.js && node --check src/riot/helpers.js",
     "test": "node scripts/test-economy-lock.mjs && node scripts/test-command-access.mjs && node scripts/test-safe-json.mjs && node scripts/test-config-patch.mjs",
     "test:economy": "node scripts/test-economy-lock.mjs",
     "start:bot": "node src/index.bot.js",
@@ -35,5 +35,12 @@
     "libsodium-wrappers": "^0.8.4",
     "@discordjs/voice": "^0.19.0",
     "lavalink-client": "^2.4.0"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "libsodium-wrappers",
+      "esbuild",
+      "@discordjs/opus"
+    ]
   }
 }
