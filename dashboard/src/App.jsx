@@ -43,7 +43,7 @@ function DashboardLayout() {
         {!selectedGuild ? (
           <EmptyState />
         ) : !selectedGuild.botPresent ? (
-          <InviteBanner inviteUrl={inviteUrl || `https://discord.com/oauth2/authorize?permissions=8&scope=bot%20applications.commands&guild_id=${selectedGuild.id}`} />
+          <InviteBanner inviteUrl={`https://discord.com/oauth2/authorize?permissions=8&scope=bot%20applications.commands&guild_id=${selectedGuild.id}`} />
         ) : (
           <>
             <PluginNav guildId={selectedGuild.id} />
