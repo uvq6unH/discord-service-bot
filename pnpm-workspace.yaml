@@ -1,5 +1,3 @@
-allowBuilds:
-  ffmpeg-static: true
-  esbuild: true
-  opusscript: true
-  libsodium-wrappers: true
+packages:
+  - '.'
+  - 'dashboard'

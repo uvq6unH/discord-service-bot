@@ -221,7 +221,7 @@ export function createAuthRouter(botClient) {
   // GET /auth/logout
   router.get('/auth/logout', (req, res) => {
     req.session.destroy(() => {
-      res.redirect('/login.html');
+      res.redirect('/login');
     });
   });
 

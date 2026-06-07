@@ -8,7 +8,10 @@ import { fileURLToPath } from 'node:url';
 import { createAuthRouter } from './auth.js';
 import { createCsrfProtection } from './csrf.js';
 const snowflakePattern = /^\d{17,20}$/;
-const publicDir = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'public');
+// React build output (pnpm build:ui → public-react/)
+// Build trước khi deploy: pnpm build:ui
+import { existsSync } from 'node:fs';
+const publicDir = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'public-react');
 
 function sanitizeConfigForClient(config) {
   const { riotApiKey, tftApiKey, ...safeConfig } = config;
@@ -159,22 +162,22 @@ export function createServer({ configStore, stateStore, botClient, redis = null 
       res.json({ status: 'ok' });
       return;
     }
-    res.json({ status: 'ok', uptime: process.uptime(), bot: Boolean(botClient.user) });
+    res.json({ status: 'ok', uptime: process.uptime(), bot: Boolean(botClient?.user) });
   });
 
-  app.get('/login.html', (_req, res) => {
-    res.sendFile(path.join(publicDir, 'login.html'));
-  });
-
-  app.get('/', auth.requirePage, (_req, res) => {
-    res.sendFile(path.join(publicDir, 'index.html'));
-  });
-
-  app.get('/index.html', auth.requirePage, (_req, res) => {
-    res.sendFile(path.join(publicDir, 'index.html'));
-  });
-
+  // React build — serve static assets (JS, CSS, icons)
   app.use(express.static(publicDir, { index: false }));
+
+  // SPA catch-all: React Router xử lý /login, /overview, /members, …
+  // Tất cả routes không phải /api hoặc /auth đều trả về index.html
+  app.get(/^\/(?!api|auth|health).*$/, (_req, res) => {
+    const indexFile = path.join(publicDir, 'index.html');
+    if (existsSync(indexFile)) {
+      res.sendFile(indexFile);
+    } else {
+      res.status(503).send('Dashboard chưa được build. Chạy: pnpm build:ui');
+    }
+  });
 
   app.use('/api', csrf.validate);
 
@@ -183,9 +186,9 @@ export function createServer({ configStore, stateStore, botClient, redis = null 
   app.get('/api/status', auth.requireAuth, readRateLimit, async (_req, res) => {
     const guildIds = await configStore.listGuildIds();
     res.json({
-      botReady: Boolean(botClient.user),
-      botUser: botClient.user?.tag ?? null,
-      guildCount: botClient.guilds.cache.size,
+      botReady: Boolean(botClient?.user),
+      botUser: botClient?.user?.tag ?? null,
+      guildCount: botClient?.guilds?.cache?.size ?? 0,
       configuredGuilds: guildIds.length,
     });
   });
@@ -204,20 +207,24 @@ export function createServer({ configStore, stateStore, botClient, redis = null 
     }
 
     const config = await configStore.updateGuildConfig(req.guildId, req.body);
-    const slashSync = botClient.user
+    const slashSync = botClient?.user
       ? await botClient.syncGuildCommands(req.guildId, config).catch((e) => ({ synced: false, reason: e.message }))
-      : { synced: false, reason: 'bot_not_ready' };
+      : { synced: false, reason: 'bot_not_in_process' };
     res.json({ ...sanitizeConfigForClient(config), slashSync });
   });
 
   app.post('/api/slash-sync', auth.requireAuth, writeRateLimit, requireGuildId, auth.requireGuildAccess, async (req, res) => {
+    if (!botClient) {
+      res.status(503).json({ error: 'Bot process is not running in this instance. Slash sync is handled by the bot service.' });
+      return;
+    }
     const config = await configStore.getGuildConfig(req.guildId);
     const slashSync = await botClient.syncGuildCommands(req.guildId, config);
     res.json(slashSync);
   });
 
   app.get('/api/state', auth.requireAuth, readRateLimit, requireGuildId, auth.requireGuildAccess, async (req, res) => {
-    if (!botClient.stateStore) { res.json({ warnings: 0, rankedUsers: 0 }); return; }
+    if (!botClient?.stateStore) { res.json({ warnings: 0, rankedUsers: 0 }); return; }
     const state = await botClient.stateStore.getGuild(req.guildId);
     res.json({
       warnings: Object.values(state.warnings).reduce((t, i) => t + i.length, 0),
@@ -266,7 +273,7 @@ export function createServer({ configStore, stateStore, botClient, redis = null 
     );
 
     // Guilds bot đang có mặt
-    for (const [id, guild] of botClient.guilds.cache) {
+    for (const [id, guild] of (botClient?.guilds?.cache ?? new Map())) {
       const canManage = isDev || manageableIds.has(id);
       if (canManage) {
         guildsById.set(id, { id, name: guild.name, icon: guild.iconURL({ size: 64 }), configured: configuredGuildIds.includes(id), botPresent: true });
@@ -301,6 +308,10 @@ export function createServer({ configStore, stateStore, botClient, redis = null 
   });
 
   app.get('/api/guild-data', auth.requireAuth, readRateLimit, requireGuildId, auth.requireGuildAccess, async (req, res) => {
+    if (!botClient) {
+      res.status(503).json({ error: 'Bot process not available — channels/roles unavailable in dashboard-only mode.' });
+      return;
+    }
     const guild = botClient.guilds.cache.get(req.guildId);
     if (!guild) { res.status(404).json({ error: 'Guild not found' }); return; }
 
@@ -351,13 +362,12 @@ export function createServer({ configStore, stateStore, botClient, redis = null 
   app.get('/api/keepalive-status', auth.requireAuth, (_req, res) => {
     const channelId = process.env.KEEPALIVE_CHANNEL_ID ?? null;
     let channelName = null;
-    if (channelId) {
+    if (channelId && botClient) {
       const ch = botClient.channels.cache.get(channelId);
       channelName = ch ? `#${ch.name}` : `ID: ${channelId}`;
     }
     res.json({
       enabled: Boolean(channelId),
-      // channelId intentionally omitted — internal Discord snowflake not needed by client
       channelName,
       intervalMinutes: 14,
     });

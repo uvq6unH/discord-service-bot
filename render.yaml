@@ -1,19 +1,22 @@
+# render.yaml — 2 service riêng biệt
+#
+# ⚠️  Render free plan chỉ cho phép 1 web service.
+#     Để chạy 2 process, nâng lên Starter ($7/tháng) hoặc dùng PM2 trên 1 VM.
+#     Xem pm2.config.cjs để chạy cả 2 trên 1 host với PM2.
+#
+# Nếu vẫn muốn monolith 1 process: dùng src/index.js (unchanged).
+
 services:
-  - type: web
-    name: discord-service-bot
+  # ── Bot service ─────────────────────────────────────────────────────────────
+  - type: worker          # worker = không expose HTTP, không cần health check
+    name: discord-bot
     runtime: node
-    plan: free
+    plan: starter
     buildCommand: corepack enable && pnpm install --no-frozen-lockfile
-    startCommand: pnpm start
-    disk:
-      name: bot-data
-      mountPath: /var/data
-      sizeGB: 1
+    startCommand: node src/index.bot.js
     envVars:
       - key: NODE_ENV
         value: production
-      - key: PORT
-        value: 10000
       - key: CONFIG_PATH
         value: /var/data/configs.json
       - key: STATE_PATH
@@ -29,12 +32,6 @@ services:
       - key: DISCORD_TOKEN
         sync: false
       - key: DISCORD_CLIENT_ID
-        sync: false
-      - key: DISCORD_CLIENT_SECRET
-        sync: false
-      - key: DISCORD_REDIRECT_URI
-        sync: false
-      - key: SESSION_SECRET
         sync: false
       - key: RIOT_API_KEY
         sync: false
@@ -54,4 +51,41 @@ services:
         sync: false
       - key: LAVALINK_SECURE
         value: "false"
+    disk:
+      name: bot-data
+      mountPath: /var/data
+      sizeGB: 1
+
+  # ── Dashboard service ────────────────────────────────────────────────────────
+  - type: web             # web = expose HTTP, có health check
+    name: discord-dashboard
+    runtime: node
+    plan: starter
+    buildCommand: corepack enable && pnpm install --no-frozen-lockfile && pnpm build:ui
+    startCommand: node src/index.server.js
     healthCheckPath: /health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 10000
+      - key: CONFIG_PATH
+        value: /var/data/configs.json
+      - key: STATE_PATH
+        value: /var/data/state.json
+      - key: DISCORD_CLIENT_ID
+        sync: false
+      - key: DISCORD_CLIENT_SECRET
+        sync: false
+      - key: DISCORD_REDIRECT_URI
+        sync: false
+      - key: SESSION_SECRET
+        sync: false
+      - key: UPSTASH_REDIS_REST_URL
+        sync: false
+      - key: UPSTASH_REDIS_REST_TOKEN
+        sync: false
+    disk:
+      name: dashboard-data
+      mountPath: /var/data
+      sizeGB: 1

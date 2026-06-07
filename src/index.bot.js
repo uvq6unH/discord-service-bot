@@ -1,0 +1,98 @@
+/**
+ * index.bot.js — Bot process entry point
+ *
+ * Chạy RIÊNG BIỆT với dashboard (index.server.js).
+ * Không khởi động Express. Giao tiếp với Dashboard qua Redis pub/sub.
+ *
+ * Start:  node src/index.bot.js
+ * PM2:    xem pm2.config.cjs (app "discord-bot")
+ */
+
+import 'dotenv/config';
+
+// libsodium phải ready trước khi @discordjs/voice mã hoá audio
+import sodium from 'libsodium-wrappers';
+await sodium.ready;
+
+import { ConfigStore }        from './configStore.js';
+import { StateStore }         from './stateStore.js';
+import { createBot }          from './bot.js';
+import { validateBotEnvironment } from './env.js';
+import { createUpstashFromEnv }   from './upstash.js';
+
+// ── Validate ─────────────────────────────────────────────────────────────────
+try {
+  validateBotEnvironment();
+} catch (error) {
+  console.error(error.message);
+  console.error('Copy .env.example to .env, hoặc set biến môi trường trên host.');
+  process.exit(1);
+}
+
+// ── Global error guards ───────────────────────────────────────────────────────
+process.on('unhandledRejection', (reason) => {
+  console.error('[bot:unhandledRejection]', reason);
+});
+
+process.on('uncaughtException', (error) => {
+  console.error('[bot:uncaughtException]', error);
+  setTimeout(() => process.exit(1), 500);
+});
+
+// ── Graceful shutdown ─────────────────────────────────────────────────────────
+let isShuttingDown = false;
+
+async function shutdown(signal) {
+  if (isShuttingDown) return;
+  isShuttingDown = true;
+  console.log(`[bot:shutdown] ${signal} received, shutting down…`);
+  try {
+    botClient?.destroy();
+    console.log('[bot:shutdown] Discord client destroyed.');
+  } catch (err) {
+    console.error('[bot:shutdown] Error during destroy:', err);
+  }
+  process.exit(0);
+}
+
+process.on('SIGINT',  () => shutdown('SIGINT'));
+process.on('SIGTERM', () => shutdown('SIGTERM'));
+
+// ── Boot ──────────────────────────────────────────────────────────────────────
+const configPath  = process.env.CONFIG_PATH ?? './data/configs.json';
+const statePath   = process.env.STATE_PATH  ?? './data/state.json';
+const token       = process.env.DISCORD_TOKEN;
+
+const sharedRedis = createUpstashFromEnv();
+const configStore = new ConfigStore(configPath);
+const stateStore  = new StateStore(statePath, { redis: sharedRedis });
+const botClient   = createBot(configStore, stateStore);
+
+// Login với retry exponential backoff
+async function loginWithRetry(maxRetries = 10, baseDelay = 5000) {
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      await botClient.login(token);
+      console.log('[bot] Logged in to Discord.');
+      return;
+    } catch (err) {
+      const isTransient =
+        err.code === 'ECONNRESET' ||
+        err.code === 'ETIMEDOUT'  ||
+        err.code === 'ENOTFOUND'  ||
+        String(err.message).includes('connect') ||
+        String(err.message).includes('network');
+
+      if (!isTransient || attempt === maxRetries) {
+        console.error(`[bot:login] Fatal on attempt ${attempt}:`, err.message);
+        process.exit(1);
+      }
+
+      const delay = Math.min(baseDelay * Math.pow(2, attempt - 1), 30_000);
+      console.warn(`[bot:login] Attempt ${attempt} failed (${err.message}). Retry in ${delay / 1000}s…`);
+      await new Promise((r) => setTimeout(r, delay));
+    }
+  }
+}
+
+await loginWithRetry();

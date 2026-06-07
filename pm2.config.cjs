@@ -1,41 +1,82 @@
-// PM2 ecosystem config
-// Run:  pm2 start pm2.config.cjs
-// Stop: pm2 stop discord-service-bot
-// Logs: pm2 logs discord-service-bot
-// Save across reboots: pm2 save && pm2 startup
+/**
+ * pm2.config.cjs
+ *
+ * 2 process riêng biệt:
+ *   discord-bot       — Discord client (index.bot.js)
+ *   discord-dashboard — Express dashboard (index.server.js)
+ *
+ * Lợi ích:
+ *   - Memory leak trong music/games KHÔNG crash dashboard
+ *   - Restart bot mà không ngắt người dùng đang dùng web
+ *   - Có thể scale dashboard độc lập nếu cần
+ *
+ * Run:
+ *   pm2 start pm2.config.cjs          # khởi động cả 2
+ *   pm2 restart discord-bot           # restart bot riêng
+ *   pm2 restart discord-dashboard     # restart dashboard riêng
+ *   pm2 logs discord-bot              # xem log bot
+ */
 
 module.exports = {
   apps: [
+    // ── Bot process ────────────────────────────────────────────────────────
     {
-      name: 'discord-service-bot',
-      script: './src/index.js',
+      name: 'discord-bot',
+      script: './src/index.bot.js',
 
-      // Restart behaviour
-      autorestart: true,         // restart on crash
-      max_restarts: 20,          // after 20 back-to-back crashes, give up
-      min_uptime: '10s',         // must stay up ≥10s to count as "stable"
-      restart_delay: 3000,       // wait 3s between restarts
-      exp_backoff_restart_delay: 100, // exponential backoff up to restart_delay
+      autorestart: true,
+      max_restarts: 20,
+      min_uptime: '10s',
+      restart_delay: 3000,
+      exp_backoff_restart_delay: 100,
 
-      // Resource limits
-      max_memory_restart: '400M', // restart if RAM > 400MB (tune to your server)
+      // Bot nặng hơn vì có voice/music (Lavalink client, audio buffers)
+      max_memory_restart: '350M',
 
-      // Logging
-      out_file: './logs/out.log',
-      error_file: './logs/err.log',
-      merge_logs: true,
+      out_file:      './logs/bot-out.log',
+      error_file:    './logs/bot-err.log',
+      merge_logs:    true,
       log_date_format: 'YYYY-MM-DD HH:mm:ss Z',
-      log_type: 'json',
+      log_type:      'json',
 
-      // Environment
+      kill_timeout:    5000,
+      listen_timeout: 10000,
+      shutdown_with_message: true,
+
       env: {
         NODE_ENV: 'production',
+        // BOT_PORT không cần thiết — bot không mở HTTP server
       },
+    },
 
-      // Graceful shutdown
-      kill_timeout: 5000,          // wait 5s for SIGTERM before SIGKILL
-      listen_timeout: 10000,       // wait 10s for app to signal ready
-      shutdown_with_message: true, // send 'shutdown' message before SIGINT
+    // ── Dashboard process ──────────────────────────────────────────────────
+    {
+      name: 'discord-dashboard',
+      script: './src/index.server.js',
+
+      autorestart: true,
+      max_restarts: 20,
+      min_uptime: '10s',
+      restart_delay: 3000,
+      exp_backoff_restart_delay: 100,
+
+      // Dashboard nhẹ hơn (chỉ Express + session)
+      max_memory_restart: '150M',
+
+      out_file:      './logs/dashboard-out.log',
+      error_file:    './logs/dashboard-err.log',
+      merge_logs:    true,
+      log_date_format: 'YYYY-MM-DD HH:mm:ss Z',
+      log_type:      'json',
+
+      kill_timeout:  3000,
+      listen_timeout: 8000,
+      shutdown_with_message: true,
+
+      env: {
+        NODE_ENV: 'production',
+        DASHBOARD_PORT: 10001,
+      },
     },
   ],
 };

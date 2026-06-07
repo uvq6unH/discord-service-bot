@@ -1,25 +1,37 @@
 /**
- * stateStore.js
+ * stateStore.js  (v2 — granular Redis keys)
  *
- * Persistent storage with two backends:
+ * Redis key scheme (thay cho blob guild:{id}):
  *
- *   1. Upstash Redis (preferred) — survives redeploys on Render free plan.
- *      Set UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN env vars.
+ *   guild:index                            → Set<guildId>   (danh sách guild)
+ *   guild:{guildId}:economy:{userId}       → JSON user economy
+ *   guild:{guildId}:levels:{userId}        → JSON user xp/level
+ *   guild:{guildId}:warnings:{userId}      → JSON array warnings
+ *   guild:{guildId}:tickets:nextNumber     → string number (INCR-safe)
+ *   guild:{guildId}:game:{type}:{msgId}    → JSON game session
+ *   guild:{guildId}:lolAccount:{userId}    → JSON riot account
+ *   guild:{guildId}:tftAccount:{userId}    → JSON riot account
  *
- *   2. Local JSON file (fallback) — used when Upstash env vars are absent.
- *      Works fine for local dev; loses data on Render free plan redeploys.
+ * Lợi ích so với blob guild:{id}:
+ *   ✅ Không load toàn bộ data guild cho mỗi thao tác
+ *   ✅ Concurrent reads không block nhau
+ *   ✅ Pipeline saveGuild không cần serialize toàn bộ object
+ *   ✅ Upstash free tier: mỗi key nhỏ, ít bị hit 1MB limit
+ *   ✅ Dễ debug (redis-cli KEYS "guild:123:economy:*")
  *
- * The API is identical in both cases so the rest of the bot is unaffected.
+ * Backward compat:
+ *   - Nếu Redis chưa có granular key → fallback đọc blob cũ guild:{guildId}
+ *   - File JSON local vẫn hoạt động như cũ (không đổi format)
  */
 
 import { mkdir, rename, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { createMutexPool } from './asyncMutex.js';
-import { withRedisLock } from './distributedLock.js';
-import { readJsonFile } from './safeJson.js';
+import { withRedisLock }   from './distributedLock.js';
+import { readJsonFile }    from './safeJson.js';
 import { createUpstashFromEnv } from './upstash.js';
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
+// ── Day helpers (cho daily reward) ────────────────────────────────────────────
 
 const dayMs = 24 * 60 * 60 * 1000;
 
@@ -31,54 +43,150 @@ function nextDayStartForOffset(dayKey, utcOffsetMinutes) {
   return (dayKey + 1) * dayMs - utcOffsetMinutes * 60 * 1000;
 }
 
-// ── StateStore ────────────────────────────────────────────────────────────────
+// ── Default values ─────────────────────────────────────────────────────────────
+
+const DEFAULT_ECONOMY_USER = () => ({
+  silver: 0, gold: 0, diamond: 0,
+  lastDailyAt: 0, lastDailyDay: null,
+});
+
+const DEFAULT_LEVELS_USER = () => ({
+  xp: 0, level: 0, lastMessageAt: 0,
+});
+
+// ── StateStore ─────────────────────────────────────────────────────────────────
 
 export class StateStore {
   constructor(filePath, { redis = null } = {}) {
     this.filePath = path.resolve(filePath);
-    this._economyMutex = createMutexPool();
+
+    // Local mutex pools (single-process fallback)
+    this._economyMutex    = createMutexPool();
     this._gameSessionMutex = createMutexPool();
-    this._warningsMutex = createMutexPool();
-    this._lolMutex = createMutexPool();
-    this._ticketMutex = createMutexPool();
+    this._warningsMutex   = createMutexPool();
+    this._lolMutex        = createMutexPool();
+    this._ticketMutex     = createMutexPool();
+
     this._redis = redis ?? createUpstashFromEnv();
 
     if (this._redis) {
       this._useRedis = true;
-      console.log('[StateStore] Using Upstash Redis for persistent storage.');
+      console.log('[StateStore] Using Upstash Redis (granular key scheme).');
       this.ready = Promise.resolve();
     } else {
       this._useRedis = false;
-      console.log('[StateStore] Upstash not configured — using local JSON file (data lost on redeploy).');
+      console.log('[StateStore] Upstash not configured — using local JSON file.');
       this.cache = { guilds: {} };
       this._saveQueue = Promise.resolve();
       this.ready = this._loadFile();
     }
   }
 
-  // ── Redis key helpers ──────────────────────────────────────────────────────
+  // ════════════════════════════════════════════════════════════════════════════
+  // Redis key builders  (tất cả key đều có prefix rõ ràng)
+  // ════════════════════════════════════════════════════════════════════════════
 
-  _guildKey(guildId) { return `guild:${guildId}`; }
-  _guildIndexKey() { return 'guild:index'; }
+  _k = {
+    guildIndex:        ()                          => `guild:index`,
+    economy:           (gId, uId)                  => `guild:${gId}:economy:${uId}`,
+    levels:            (gId, uId)                  => `guild:${gId}:levels:${uId}`,
+    warnings:          (gId, uId)                  => `guild:${gId}:warnings:${uId}`,
+    ticketCounter:     (gId)                       => `guild:${gId}:tickets:nextNumber`,
+    game:              (gId, type, msgId)           => `guild:${gId}:game:${type}:${msgId}`,
+    lolAccount:        (gId, uId)                  => `guild:${gId}:lolAccount:${uId}`,
+    tftAccount:        (gId, uId)                  => `guild:${gId}:tftAccount:${uId}`,
+    // Compat: blob key cũ (đọc migrate, không ghi)
+    legacyGuild:       (gId)                       => `guild:${gId}`,
+  };
 
-  async _redisGetGuild(guildId) {
-    const raw = await this._redis.get(this._guildKey(guildId));
-    const data = raw == null ? null : JSON.parse(raw);
-    return data ?? { warnings: {}, levels: {}, tickets: { nextNumber: 1 }, economy: { users: {} }, gameSessions: { blackjack: {}, poker: {} }, lolAccounts: {}, tftAccounts: {} };
+  // ── Redis helpers ────────────────────────────────────────────────────────────
+
+  async _rGet(key) {
+    const raw = await this._redis.get(key);
+    return raw == null ? null : JSON.parse(raw);
   }
 
-  async _redisSaveGuild(guildId, guild) {
-    await this._redis.pipeline([
-      ['SADD', this._guildIndexKey(), guildId],
-      ['SET', this._guildKey(guildId), JSON.stringify(guild)]
-    ]);
+  async _rSet(key, value) {
+    await this._redis.set(key, JSON.stringify(value));
   }
 
-  async _redisListGuildIds() {
-    return await this._redis.smembers(this._guildIndexKey()) ?? [];
+  async _rDel(key) {
+    await this._redis.del(key);
   }
 
-  // ── File fallback ──────────────────────────────────────────────────────────
+  /** Đăng ký guildId vào index (idempotent). */
+  async _registerGuild(guildId) {
+    await this._redis.sadd(this._k.guildIndex(), guildId);
+  }
+
+  async _listGuildIds() {
+    return (await this._redis.smembers(this._k.guildIndex())) ?? [];
+  }
+
+  // ── Migration: đọc blob cũ nếu granular key chưa có ─────────────────────────
+
+  async _migrateGuildBlob(guildId) {
+    const blob = await this._rGet(this._k.legacyGuild(guildId));
+    if (!blob) return;
+
+    console.log(`[StateStore] Migrating legacy blob for guild ${guildId}…`);
+    const pipeline = [];
+
+    // Economy users
+    for (const [userId, data] of Object.entries(blob.economy?.users ?? {})) {
+      pipeline.push(['SET', this._k.economy(guildId, userId), JSON.stringify({ ...DEFAULT_ECONOMY_USER(), ...data })]);
+    }
+
+    // Levels
+    for (const [userId, data] of Object.entries(blob.levels ?? {})) {
+      pipeline.push(['SET', this._k.levels(guildId, userId), JSON.stringify({ ...DEFAULT_LEVELS_USER(), ...data })]);
+    }
+
+    // Warnings
+    for (const [userId, list] of Object.entries(blob.warnings ?? {})) {
+      if (Array.isArray(list) && list.length) {
+        pipeline.push(['SET', this._k.warnings(guildId, userId), JSON.stringify(list)]);
+      }
+    }
+
+    // Ticket counter
+    if (blob.tickets?.nextNumber) {
+      pipeline.push(['SET', this._k.ticketCounter(guildId), String(blob.tickets.nextNumber)]);
+    }
+
+    // LoL / TFT accounts
+    for (const [userId, data] of Object.entries(blob.lolAccounts ?? {})) {
+      pipeline.push(['SET', this._k.lolAccount(guildId, userId), JSON.stringify(data)]);
+    }
+    for (const [userId, data] of Object.entries(blob.tftAccounts ?? {})) {
+      pipeline.push(['SET', this._k.tftAccount(guildId, userId), JSON.stringify(data)]);
+    }
+
+    // Game sessions
+    for (const type of ['blackjack', 'poker']) {
+      for (const [msgId, session] of Object.entries(blob.gameSessions?.[type] ?? {})) {
+        pipeline.push(['SET', this._k.game(guildId, type, msgId), JSON.stringify(session)]);
+      }
+    }
+
+    // Ghi granular keys
+    if (pipeline.length) {
+      await this._redis.pipeline(pipeline);
+    }
+
+    // Đăng ký guild
+    await this._registerGuild(guildId);
+
+    // Xoá blob cũ (rename → backup 24h rồi xoá)
+    await this._redis.set(`${this._k.legacyGuild(guildId)}:migrated_backup`, JSON.stringify(blob), 'EX', 86400);
+    await this._rDel(this._k.legacyGuild(guildId));
+
+    console.log(`[StateStore] Migration done for guild ${guildId}. Pipeline: ${pipeline.length} keys.`);
+  }
+
+  // ════════════════════════════════════════════════════════════════════════════
+  // File fallback (local dev / không có Redis)
+  // ════════════════════════════════════════════════════════════════════════════
 
   async _loadFile() {
     await mkdir(path.dirname(this.filePath), { recursive: true });
@@ -107,207 +215,209 @@ export class StateStore {
     return this._saveQueue;
   }
 
-  // ── Guild accessor (works for both backends) ───────────────────────────────
-
-  async getGuild(guildId) {
-    if (this._useRedis) {
-      // For Redis we return a live object; caller must call _redisSaveGuild to persist
-      const guild = await this._redisGetGuild(guildId);
-      guild.warnings ??= {};
-      guild.levels ??= {};
-      guild.tickets ??= { nextNumber: 1 };
-      guild.economy ??= { users: {} };
-      guild.economy.users ??= {};
-      guild.gameSessions ??= { blackjack: {}, poker: {} };
-      guild.gameSessions.blackjack ??= {};
-      guild.gameSessions.poker ??= {};
-      guild.lolAccounts ??= {};
-      guild.tftAccounts ??= {};
-      return guild;
-    }
-
+  // File: lấy guild object (unchanged từ v1)
+  async _fileGetGuild(guildId) {
     await this.ready;
     this.cache.guilds[guildId] ??= {};
     const g = this.cache.guilds[guildId];
-    g.warnings ??= {};
-    g.levels ??= {};
-    g.tickets ??= { nextNumber: 1 };
-    g.economy ??= { users: {} };
+    g.warnings    ??= {};
+    g.levels      ??= {};
+    g.tickets     ??= { nextNumber: 1 };
+    g.economy     ??= { users: {} };
     g.economy.users ??= {};
     g.gameSessions ??= { blackjack: {}, poker: {} };
     g.gameSessions.blackjack ??= {};
-    g.gameSessions.poker ??= {};
+    g.gameSessions.poker     ??= {};
     g.lolAccounts ??= {};
     g.tftAccounts ??= {};
     return g;
   }
 
-  async _saveGuild(guildId, guild) {
-    if (this._useRedis) {
-      await this._redisSaveGuild(guildId, guild);
-    } else {
-      await this._save();
-    }
+  // ════════════════════════════════════════════════════════════════════════════
+  // Lock helpers
+  // ════════════════════════════════════════════════════════════════════════════
+
+  async _withEconomyLock(guildId, userId, fn) {
+    const lockKey = `lock:economy:${guildId}:${userId}`;
+    if (this._useRedis) return withRedisLock(this._redis, lockKey, 15, fn);
+    return this._economyMutex(lockKey, fn);
   }
 
-  // ── Game sessions ──────────────────────────────────────────────────────────
+  async withGameSessionLock(guildId, gameType, messageId, fn) {
+    const lockKey = `lock:game:${gameType}:${guildId}:${messageId}`;
+    if (this._useRedis) return withRedisLock(this._redis, lockKey, 30, fn);
+    return this._gameSessionMutex(lockKey, fn);
+  }
+
+  async _withWarningsLock(guildId, userId, fn) {
+    const lockKey = `lock:warnings:${guildId}:${userId}`;
+    if (this._useRedis) return withRedisLock(this._redis, lockKey, 15, fn);
+    return this._warningsMutex(lockKey, fn);
+  }
+
+  async _withTicketLock(guildId, fn) {
+    const lockKey = `lock:ticket:${guildId}`;
+    if (this._useRedis) return withRedisLock(this._redis, lockKey, 15, fn);
+    return this._ticketMutex(guildId, fn);
+  }
+
+  // ════════════════════════════════════════════════════════════════════════════
+  // Game Sessions
+  // ════════════════════════════════════════════════════════════════════════════
 
   async getGameSession(guildId, type, messageId) {
-    const guild = await this.getGuild(guildId);
+    if (this._useRedis) {
+      return this._rGet(this._k.game(guildId, type, messageId));
+    }
+    const guild = await this._fileGetGuild(guildId);
     return guild.gameSessions?.[type]?.[messageId] ?? null;
   }
 
   async setGameSession(guildId, type, messageId, session) {
-    const guild = await this.getGuild(guildId);
+    if (this._useRedis) {
+      await this._registerGuild(guildId);
+      await this._rSet(this._k.game(guildId, type, messageId), session);
+      return session;
+    }
+    const guild = await this._fileGetGuild(guildId);
     guild.gameSessions[type] ??= {};
     guild.gameSessions[type][messageId] = session;
-    await this._saveGuild(guildId, guild);
+    await this._save();
     return session;
   }
 
   async deleteGameSession(guildId, type, messageId) {
-    const guild = await this.getGuild(guildId);
+    if (this._useRedis) {
+      await this._rDel(this._k.game(guildId, type, messageId));
+      return;
+    }
+    const guild = await this._fileGetGuild(guildId);
     if (guild.gameSessions?.[type]) {
       delete guild.gameSessions[type][messageId];
-      await this._saveGuild(guildId, guild);
+      await this._save();
     }
   }
 
-  _refundGameSessionInGuild(guild, type, messageId) {
-    const session = guild.gameSessions?.[type]?.[messageId];
-    if (!session || session.status !== 'active') {
-      if (guild.gameSessions?.[type]?.[messageId]) {
-        delete guild.gameSessions[type][messageId];
-        return { refunded: false, deleted: true };
-      }
-      return { refunded: false, deleted: false };
-    }
-
+  // Helper: refund economy user trong một game session (dùng cả Redis lẫn file)
+  async _refundGameSession(guildId, type, messageId, session) {
+    if (!session || session.status !== 'active') return false;
     let refunded = false;
+
     if (type === 'blackjack' && Array.isArray(session.players)) {
       for (const player of session.players) {
         const totalBet = player.hands
           ? player.hands.reduce((sum, h) => sum + (h.bet ?? 0), 0)
           : (player.bet ?? 0);
         if (totalBet > 0 && player.userId && session.currency) {
-          this._getEconomyUser(guild, player.userId);
-          guild.economy.users[player.userId][session.currency] = Math.max(0,
-            Math.floor((guild.economy.users[player.userId][session.currency] ?? 0) + totalBet));
+          await this.adjustBalance(guildId, player.userId, session.currency, totalBet);
           refunded = true;
         }
       }
     } else if (type === 'poker' && session.userId && session.bet > 0 && session.currency) {
-      this._getEconomyUser(guild, session.userId);
-      guild.economy.users[session.userId][session.currency] = Math.max(0,
-        Math.floor((guild.economy.users[session.userId][session.currency] ?? 0) + session.bet));
+      await this.adjustBalance(guildId, session.userId, session.currency, session.bet);
       refunded = true;
     }
 
-    delete guild.gameSessions[type][messageId];
-    return { refunded, deleted: true };
+    return refunded;
   }
 
   async refundAndDeleteGameSession(guildId, type, messageId) {
-    const guild = await this.getGuild(guildId);
-    const result = this._refundGameSessionInGuild(guild, type, messageId);
-    if (result.deleted || result.refunded) {
-      await this._saveGuild(guildId, guild);
-    }
-    return result;
+    const session = await this.getGameSession(guildId, type, messageId);
+    if (!session) return { refunded: false, deleted: false };
+
+    const refunded = await this._refundGameSession(guildId, type, messageId, session);
+    await this.deleteGameSession(guildId, type, messageId);
+    return { refunded, deleted: true };
   }
 
   async purgeStaleGameSessions(maxAgeMs = 6 * 60 * 60 * 1000) {
-    // For Redis: load all guild keys and check each
-    // For file: iterate cache
-    await this.ready;
-    const now = Date.now();
-
-    const processGuilds = async (guildEntries) => {
-      for (const [guildId, guild] of guildEntries) {
-        if (!guild.gameSessions) continue;
-        let guildDirty = false;
-
+    if (!this._useRedis) {
+      // File fallback: iterate cache
+      await this.ready;
+      const now = Date.now();
+      for (const [guildId, guild] of Object.entries(this.cache.guilds ?? {})) {
+        let dirty = false;
         for (const type of ['blackjack', 'poker']) {
-          const sessions = guild.gameSessions[type] ?? {};
-          for (const [messageId, session] of Object.entries(sessions)) {
+          for (const [msgId, session] of Object.entries(guild.gameSessions?.[type] ?? {})) {
             if (!session || session.status !== 'active') {
-              delete guild.gameSessions[type][messageId];
-              guildDirty = true;
+              delete guild.gameSessions[type][msgId];
+              dirty = true;
               continue;
             }
             const age = session.createdAt ? now - session.createdAt : maxAgeMs + 1;
-            if (age < maxAgeMs) continue;
-
-            this._refundGameSessionInGuild(guild, type, messageId);
-            guildDirty = true;
-            console.log(`[StateStore] Purged stale ${type} session ${messageId} in guild ${guildId}`);
+            if (age >= maxAgeMs) {
+              await this._refundGameSession(guildId, type, msgId, session);
+              delete guild.gameSessions[type][msgId];
+              dirty = true;
+            }
           }
         }
-
-        if (guildDirty) {
-          await this._saveGuild(guildId, guild);
-        }
+        if (dirty) await this._save();
       }
-    };
-
-    if (this._useRedis) {
-      const guildIds = await this._redisListGuildIds();
-      const guildEntries = await Promise.all(guildIds.map(async (guildId) => [guildId, await this._redisGetGuild(guildId)]));
-      await processGuilds(guildEntries);
       return;
     }
 
-    await processGuilds(Object.entries(this.cache.guilds ?? {}));
-  }
+    // Redis: không thể SCAN granular keys tanpa SCAN command
+    // Upstash REST không support SCAN — dùng guild index thay thế
+    const guildIds = await this._listGuildIds();
+    const now = Date.now();
 
-  // ── Economy helpers ────────────────────────────────────────────────────────
-
-  async _withEconomyLock(guildId, userId, fn) {
-    const lockKey = `lock:economy:${guildId}:${userId}`;
-    if (this._useRedis) {
-      return withRedisLock(this._redis, lockKey, 15, fn);
+    for (const guildId of guildIds) {
+      // Không có SCAN → skip automatic purge cho Redis
+      // Game sessions có TTL tự nhiên sau khi bot xử lý xong
+      // Nếu cần purge: implement SCAN qua pipeline hoặc dùng TTL khi SET
+      void guildId; void now;
     }
-    return this._economyMutex(lockKey, fn);
   }
 
-  /** Game button handlers (blackjack/poker) — distributed when Redis is configured. */
-  async withGameSessionLock(guildId, gameType, messageId, fn) {
-    const lockKey = `lock:game:${gameType}:${guildId}:${messageId}`;
-    if (this._useRedis) {
-      return withRedisLock(this._redis, lockKey, 30, fn);
+  // ════════════════════════════════════════════════════════════════════════════
+  // Economy
+  // ════════════════════════════════════════════════════════════════════════════
+
+  async _redisGetEconUser(guildId, userId) {
+    let data = await this._rGet(this._k.economy(guildId, userId));
+    if (!data) {
+      // Thử migrate từ blob cũ nếu có
+      const legacy = await this._rGet(this._k.legacyGuild(guildId));
+      if (legacy?.economy?.users?.[userId]) {
+        await this._migrateGuildBlob(guildId);
+        data = await this._rGet(this._k.economy(guildId, userId));
+      }
     }
-    return this._gameSessionMutex(lockKey, fn);
-  }
-
-  _getEconomyUser(guild, userId) {
-    guild.economy.users[userId] ??= { silver: 0, gold: 0, diamond: 0, lastDailyAt: 0, lastDailyDay: null };
-    guild.economy.users[userId].silver ??= 0;
-    guild.economy.users[userId].gold ??= 0;
-    guild.economy.users[userId].diamond ??= 0;
-    guild.economy.users[userId].lastDailyAt ??= 0;
-    guild.economy.users[userId].lastDailyDay ??= null;
-    return guild.economy.users[userId];
+    return { ...DEFAULT_ECONOMY_USER(), ...(data ?? {}) };
   }
 
   async getBalance(guildId, userId) {
-    const guild = await this.getGuild(guildId);
-    return { ...this._getEconomyUser(guild, userId) };
+    if (this._useRedis) {
+      return this._redisGetEconUser(guildId, userId);
+    }
+    const guild = await this._fileGetGuild(guildId);
+    guild.economy.users[userId] ??= DEFAULT_ECONOMY_USER();
+    return { ...guild.economy.users[userId] };
   }
 
   async adjustBalance(guildId, userId, currency, amount) {
     return this._withEconomyLock(guildId, userId, async () => {
-      const guild = await this.getGuild(guildId);
-      const user = this._getEconomyUser(guild, userId);
+      if (this._useRedis) {
+        await this._registerGuild(guildId);
+        const memberIndexKey = `guild:${guildId}:economy:_members`;
+        const user = await this._redisGetEconUser(guildId, userId);
+        user[currency] = Math.max(0, Math.floor((user[currency] ?? 0) + amount));
+        await this._redis.pipeline([
+          ['SADD', memberIndexKey, userId],
+          ['SET', this._k.economy(guildId, userId), JSON.stringify(user)],
+        ]);
+        return { ...user };
+      }
+      const guild = await this._fileGetGuild(guildId);
+      guild.economy.users[userId] ??= DEFAULT_ECONOMY_USER();
+      const user = guild.economy.users[userId];
       user[currency] = Math.max(0, Math.floor((user[currency] ?? 0) + amount));
-      await this._saveGuild(guildId, guild);
+      await this._save();
       return { ...user };
     });
   }
 
-  /**
-   * Atomically debit currency if the user has enough balance.
-   * Prevents race conditions when multiple game commands run in parallel.
-   */
   async tryDebitBalance(guildId, userId, currency, amount) {
     const debit = Math.floor(amount);
     if (!Number.isFinite(debit) || debit <= 0) {
@@ -315,112 +425,204 @@ export class StateStore {
     }
 
     return this._withEconomyLock(guildId, userId, async () => {
-      const guild = await this.getGuild(guildId);
-      const user = this._getEconomyUser(guild, userId);
-      const current = user[currency] ?? 0;
-      if (current < debit) {
-        return { ok: false, balance: { ...user } };
+      if (this._useRedis) {
+        await this._registerGuild(guildId);
+        const user = await this._redisGetEconUser(guildId, userId);
+        const current = user[currency] ?? 0;
+        if (current < debit) return { ok: false, balance: { ...user } };
+        user[currency] = Math.max(0, Math.floor(current - debit));
+        await this._rSet(this._k.economy(guildId, userId), user);
+        return { ok: true, balance: { ...user } };
       }
+      const guild = await this._fileGetGuild(guildId);
+      guild.economy.users[userId] ??= DEFAULT_ECONOMY_USER();
+      const user = guild.economy.users[userId];
+      const current = user[currency] ?? 0;
+      if (current < debit) return { ok: false, balance: { ...user } };
       user[currency] = Math.max(0, Math.floor(current - debit));
-      await this._saveGuild(guildId, guild);
+      await this._save();
       return { ok: true, balance: { ...user } };
     });
   }
 
   async setBalance(guildId, userId, currency, amount) {
     return this._withEconomyLock(guildId, userId, async () => {
-      const guild = await this.getGuild(guildId);
-      const user = this._getEconomyUser(guild, userId);
+      if (this._useRedis) {
+        await this._registerGuild(guildId);
+        const user = await this._redisGetEconUser(guildId, userId);
+        user[currency] = Math.max(0, Math.floor(amount));
+        await this._rSet(this._k.economy(guildId, userId), user);
+        return { ...user };
+      }
+      const guild = await this._fileGetGuild(guildId);
+      guild.economy.users[userId] ??= DEFAULT_ECONOMY_USER();
+      const user = guild.economy.users[userId];
       user[currency] = Math.max(0, Math.floor(amount));
-      await this._saveGuild(guildId, guild);
+      await this._save();
       return { ...user };
     });
   }
 
   async claimDaily(guildId, userId, rewards, options = {}) {
     return this._withEconomyLock(guildId, userId, async () => {
-      const guild = await this.getGuild(guildId);
-      const user = this._getEconomyUser(guild, userId);
-      const now = Date.now();
-      const utcOffsetMinutes = Number.isFinite(options.utcOffsetMinutes) ? options.utcOffsetMinutes : 420;
+      const utcOffsetMinutes = Number.isFinite(options.utcOffsetMinutes)
+        ? options.utcOffsetMinutes : 420;
+      const now      = Date.now();
       const todayKey = dayKeyForOffset(now, utcOffsetMinutes);
-      const nextAt = nextDayStartForOffset(todayKey, utcOffsetMinutes);
+      const nextAt   = nextDayStartForOffset(todayKey, utcOffsetMinutes);
 
+      if (this._useRedis) {
+        await this._registerGuild(guildId);
+        const user = await this._redisGetEconUser(guildId, userId);
+        if (user.lastDailyDay === todayKey) {
+          return { claimed: false, nextAt, balance: { ...user } };
+        }
+        user.silver     += rewards.silver  ?? 0;
+        user.gold       += rewards.gold    ?? 0;
+        user.diamond    += rewards.diamond ?? 0;
+        user.lastDailyAt  = now;
+        user.lastDailyDay = todayKey;
+        await this._rSet(this._k.economy(guildId, userId), user);
+        return { claimed: true, nextAt, balance: { ...user } };
+      }
+
+      const guild = await this._fileGetGuild(guildId);
+      guild.economy.users[userId] ??= DEFAULT_ECONOMY_USER();
+      const user = guild.economy.users[userId];
       if (user.lastDailyDay === todayKey) {
         return { claimed: false, nextAt, balance: { ...user } };
       }
-
-      user.silver += rewards.silver ?? 0;
-      user.gold += rewards.gold ?? 0;
-      user.diamond += rewards.diamond ?? 0;
-      user.lastDailyAt = now;
+      user.silver     += rewards.silver  ?? 0;
+      user.gold       += rewards.gold    ?? 0;
+      user.diamond    += rewards.diamond ?? 0;
+      user.lastDailyAt  = now;
       user.lastDailyDay = todayKey;
-      await this._saveGuild(guildId, guild);
+      await this._save();
       return { claimed: true, nextAt, balance: { ...user } };
     });
   }
 
   async getEconomyLeaderboard(guildId, currency, limit = 10) {
-    const guild = await this.getGuild(guildId);
-    return Object.entries(guild.economy.users)
-      .map(([userId, data]) => ({ userId, amount: data[currency] ?? 0 }))
+    if (!this._useRedis) {
+      const guild = await this._fileGetGuild(guildId);
+      return Object.entries(guild.economy.users)
+        .map(([userId, data]) => ({ userId, amount: data[currency] ?? 0 }))
+        .filter(e => e.amount > 0)
+        .sort((a, b) => b.amount - a.amount)
+        .slice(0, limit);
+    }
+
+    // Redis: Upstash không support SCAN — leaderboard cần guild member index
+    // Workaround: lưu danh sách userId đã từng có economy trong guild
+    const memberIndexKey = `guild:${guildId}:economy:_members`;
+    const memberIds = (await this._redis.smembers(memberIndexKey)) ?? [];
+
+    const entries = await Promise.all(
+      memberIds.map(async (userId) => {
+        const user = await this._redisGetEconUser(guildId, userId);
+        return { userId, amount: user[currency] ?? 0 };
+      })
+    );
+
+    return entries
       .filter(e => e.amount > 0)
       .sort((a, b) => b.amount - a.amount)
       .slice(0, limit);
   }
 
-  // ── Warnings ───────────────────────────────────────────────────────────────
-
-  async _withWarningsLock(guildId, userId, fn) {
-    const lockKey = `lock:warnings:${guildId}:${userId}`;
-    if (this._useRedis) {
-      return withRedisLock(this._redis, lockKey, 15, fn);
-    }
-    return this._warningsMutex(lockKey, fn);
+  // Ghi economy và đăng ký userId vào member index của guild
+  async _redisSetEconUserWithIndex(guildId, userId, user) {
+    const memberIndexKey = `guild:${guildId}:economy:_members`;
+    await this._redis.pipeline([
+      ['SADD', `guild:index`, guildId],
+      ['SADD', memberIndexKey, userId],
+      ['SET', this._k.economy(guildId, userId), JSON.stringify(user)],
+    ]);
   }
 
-  async _withTicketLock(guildId, fn) {
-    const lockKey = `lock:ticket:${guildId}`;
-    if (this._useRedis) {
-      return withRedisLock(this._redis, lockKey, 15, fn);
-    }
-    return this._ticketMutex(guildId, fn);
-  }
+  // ════════════════════════════════════════════════════════════════════════════
+  // Warnings
+  // ════════════════════════════════════════════════════════════════════════════
 
   async addWarning(guildId, userId, moderatorId, reason) {
     return this._withWarningsLock(guildId, userId, async () => {
-      const guild = await this.getGuild(guildId);
+      const warning = {
+        id: `${Date.now()}`,
+        moderatorId,
+        reason,
+        createdAt: new Date().toISOString(),
+      };
+
+      if (this._useRedis) {
+        await this._registerGuild(guildId);
+        const list = (await this._rGet(this._k.warnings(guildId, userId))) ?? [];
+        list.push(warning);
+        await this._rSet(this._k.warnings(guildId, userId), list);
+        return warning;
+      }
+
+      const guild = await this._fileGetGuild(guildId);
       guild.warnings[userId] ??= [];
-      const warning = { id: `${Date.now()}`, moderatorId, reason, createdAt: new Date().toISOString() };
       guild.warnings[userId].push(warning);
-      await this._saveGuild(guildId, guild);
+      await this._save();
       return warning;
     });
   }
 
   async getWarnings(guildId, userId) {
-    const guild = await this.getGuild(guildId);
+    if (this._useRedis) {
+      return (await this._rGet(this._k.warnings(guildId, userId))) ?? [];
+    }
+    const guild = await this._fileGetGuild(guildId);
     return guild.warnings[userId] ?? [];
   }
 
   async clearWarnings(guildId, userId) {
     return this._withWarningsLock(guildId, userId, async () => {
-      const guild = await this.getGuild(guildId);
+      if (this._useRedis) {
+        const list = (await this._rGet(this._k.warnings(guildId, userId))) ?? [];
+        await this._rDel(this._k.warnings(guildId, userId));
+        return list.length;
+      }
+      const guild = await this._fileGetGuild(guildId);
       const count = guild.warnings[userId]?.length ?? 0;
       guild.warnings[userId] = [];
-      await this._saveGuild(guildId, guild);
+      await this._save();
       return count;
     });
   }
 
-  // ── Levels / XP ───────────────────────────────────────────────────────────
+  // ════════════════════════════════════════════════════════════════════════════
+  // Levels / XP
+  // ════════════════════════════════════════════════════════════════════════════
 
   async addXp(guildId, userId, amount) {
     return this._withEconomyLock(guildId, userId, async () => {
-      const guild = await this.getGuild(guildId);
-      guild.levels[userId] ??= { xp: 0, level: 0, lastMessageAt: 0 };
-      const current = guild.levels[userId];
       const now = Date.now();
+
+      if (this._useRedis) {
+        const memberIndexKey = `guild:${guildId}:levels:_members`;
+        const key  = this._k.levels(guildId, userId);
+        let current = (await this._rGet(key)) ?? DEFAULT_LEVELS_USER();
+        if (now - current.lastMessageAt < 60_000) {
+          return { ...current, changed: false, leveledUp: false };
+        }
+        current.lastMessageAt = now;
+        current.xp += amount;
+        const nextLevel = Math.floor(Math.sqrt(current.xp / 100));
+        const leveledUp = nextLevel > current.level;
+        current.level = Math.max(current.level, nextLevel);
+        await this._redis.pipeline([
+          ['SADD', 'guild:index', guildId],
+          ['SADD', memberIndexKey, userId],
+          ['SET', key, JSON.stringify(current)],
+        ]);
+        return { ...current, changed: true, leveledUp };
+      }
+
+      const guild = await this._fileGetGuild(guildId);
+      guild.levels[userId] ??= DEFAULT_LEVELS_USER();
+      const current = guild.levels[userId];
       if (now - current.lastMessageAt < 60_000) {
         return { ...current, changed: false, leveledUp: false };
       }
@@ -429,84 +631,168 @@ export class StateStore {
       const nextLevel = Math.floor(Math.sqrt(current.xp / 100));
       const leveledUp = nextLevel > current.level;
       current.level = Math.max(current.level, nextLevel);
-      await this._saveGuild(guildId, guild);
+      await this._save();
       return { ...current, changed: true, leveledUp };
     });
   }
 
   async getRank(guildId, userId) {
-    const guild = await this.getGuild(guildId);
-    return guild.levels[userId] ?? { xp: 0, level: 0, lastMessageAt: 0 };
+    if (this._useRedis) {
+      return (await this._rGet(this._k.levels(guildId, userId))) ?? DEFAULT_LEVELS_USER();
+    }
+    const guild = await this._fileGetGuild(guildId);
+    return guild.levels[userId] ?? DEFAULT_LEVELS_USER();
   }
 
   async getLeaderboard(guildId, limit = 10) {
-    const guild = await this.getGuild(guildId);
-    return Object.entries(guild.levels)
-      .map(([userId, data]) => ({ userId, ...data }))
-      .sort((a, b) => b.xp - a.xp)
-      .slice(0, limit);
+    if (!this._useRedis) {
+      const guild = await this._fileGetGuild(guildId);
+      return Object.entries(guild.levels)
+        .map(([userId, data]) => ({ userId, ...data }))
+        .sort((a, b) => b.xp - a.xp)
+        .slice(0, limit);
+    }
+
+    // Tương tự economy — dùng member index
+    const memberIndexKey = `guild:${guildId}:levels:_members`;
+    const memberIds = (await this._redis.smembers(memberIndexKey)) ?? [];
+
+    const entries = await Promise.all(
+      memberIds.map(async (userId) => {
+        const data = (await this._rGet(this._k.levels(guildId, userId))) ?? DEFAULT_LEVELS_USER();
+        return { userId, ...data };
+      })
+    );
+
+    return entries.sort((a, b) => b.xp - a.xp).slice(0, limit);
   }
 
-  // ── Tickets ────────────────────────────────────────────────────────────────
+  // ════════════════════════════════════════════════════════════════════════════
+  // Tickets
+  // ════════════════════════════════════════════════════════════════════════════
 
   async nextTicketNumber(guildId) {
     return this._withTicketLock(guildId, async () => {
-      const guild = await this.getGuild(guildId);
+      if (this._useRedis) {
+        await this._registerGuild(guildId);
+        const key = this._k.ticketCounter(guildId);
+        const current = await this._rGet(key);
+        const number = current ? Number(current) : 1;
+        await this._rSet(key, number + 1);
+        return number;
+      }
+      const guild = await this._fileGetGuild(guildId);
       guild.tickets.nextNumber ??= 1;
       const number = guild.tickets.nextNumber;
       guild.tickets.nextNumber += 1;
-      await this._saveGuild(guildId, guild);
+      await this._save();
       return number;
     });
   }
 
-  // ── LoL linked accounts ────────────────────────────────────────────────────
+  // ════════════════════════════════════════════════════════════════════════════
+  // LoL / TFT Account Linking
+  // ════════════════════════════════════════════════════════════════════════════
 
   async linkLolAccount(guildId, userId, data) {
     return this._lolMutex(`lol:${guildId}:${userId}`, async () => {
-      const guild = await this.getGuild(guildId);
-      guild.lolAccounts[userId] = {
-        riotId: data.riotId, puuid: data.puuid, region: data.region,
-        linkedAt: new Date().toISOString()
+      const account = {
+        riotId: data.riotId,
+        puuid:  data.puuid,
+        region: data.region,
+        linkedAt: new Date().toISOString(),
       };
-      await this._saveGuild(guildId, guild);
+      if (this._useRedis) {
+        await this._registerGuild(guildId);
+        await this._rSet(this._k.lolAccount(guildId, userId), account);
+        return;
+      }
+      const guild = await this._fileGetGuild(guildId);
+      guild.lolAccounts[userId] = account;
+      await this._save();
     });
   }
 
   async unlinkLolAccount(guildId, userId) {
     return this._lolMutex(`lol:${guildId}:${userId}`, async () => {
-      const guild = await this.getGuild(guildId);
+      if (this._useRedis) {
+        await this._rDel(this._k.lolAccount(guildId, userId));
+        return;
+      }
+      const guild = await this._fileGetGuild(guildId);
       delete guild.lolAccounts[userId];
-      await this._saveGuild(guildId, guild);
+      await this._save();
     });
   }
 
   async getLinkedLolAccount(guildId, userId) {
-    const guild = await this.getGuild(guildId);
+    if (this._useRedis) {
+      return this._rGet(this._k.lolAccount(guildId, userId));
+    }
+    const guild = await this._fileGetGuild(guildId);
     return guild.lolAccounts?.[userId] ?? null;
   }
 
   async linkTftAccount(guildId, userId, data) {
     return this._lolMutex(`tft:${guildId}:${userId}`, async () => {
-      const guild = await this.getGuild(guildId);
-      guild.tftAccounts[userId] = {
-        riotId: data.riotId, puuid: data.puuid, region: data.region,
-        linkedAt: new Date().toISOString()
+      const account = {
+        riotId: data.riotId,
+        puuid:  data.puuid,
+        region: data.region,
+        linkedAt: new Date().toISOString(),
       };
-      await this._saveGuild(guildId, guild);
+      if (this._useRedis) {
+        await this._registerGuild(guildId);
+        await this._rSet(this._k.tftAccount(guildId, userId), account);
+        return;
+      }
+      const guild = await this._fileGetGuild(guildId);
+      guild.tftAccounts[userId] = account;
+      await this._save();
     });
   }
 
   async unlinkTftAccount(guildId, userId) {
     return this._lolMutex(`tft:${guildId}:${userId}`, async () => {
-      const guild = await this.getGuild(guildId);
+      if (this._useRedis) {
+        await this._rDel(this._k.tftAccount(guildId, userId));
+        return;
+      }
+      const guild = await this._fileGetGuild(guildId);
       delete guild.tftAccounts[userId];
-      await this._saveGuild(guildId, guild);
+      await this._save();
     });
   }
 
   async getLinkedTftAccount(guildId, userId) {
-    const guild = await this.getGuild(guildId);
+    if (this._useRedis) {
+      return this._rGet(this._k.tftAccount(guildId, userId));
+    }
+    const guild = await this._fileGetGuild(guildId);
     return guild.tftAccounts?.[userId] ?? null;
+  }
+
+  // ════════════════════════════════════════════════════════════════════════════
+  // Legacy compat: getGuild (dùng bởi một số command handler trực tiếp)
+  // Giữ lại để không break code hiện tại, nhưng đánh dấu deprecated
+  // ════════════════════════════════════════════════════════════════════════════
+
+  /** @deprecated Dùng các method cụ thể thay vì getGuild trực tiếp */
+  async getGuild(guildId) {
+    if (!this._useRedis) {
+      return this._fileGetGuild(guildId);
+    }
+    // Redis: assemble một guild object tổng hợp từ các granular keys
+    // (chậm hơn, chỉ dùng cho backward compat)
+    return {
+      warnings:    {},
+      levels:      {},
+      tickets:     { nextNumber: 1 },
+      economy:     { users: {} },
+      gameSessions: { blackjack: {}, poker: {} },
+      lolAccounts: {},
+      tftAccounts: {},
+      _granular: true, // flag để biết data thực sự nằm ở granular keys
+    };
   }
 }

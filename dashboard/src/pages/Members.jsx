@@ -1,0 +1,123 @@
+import React, { useEffect, useState, useCallback } from 'react';
+import { useGuild } from '../contexts/GuildContext.jsx';
+import { Spinner } from '../components/ui.jsx';
+import { api } from '../api.js';
+
+function MemberRow({ member }) {
+  return (
+    <div className="member-row">
+      <img
+        className="member-avatar"
+        src={member.avatar
+          ? `https://cdn.discordapp.com/avatars/${member.id}/${member.avatar}.png?size=32`
+          : `https://cdn.discordapp.com/embed/avatars/${Number(member.id) % 5}.png`
+        }
+        alt=""
+      />
+      <div className="member-info">
+        <span className="member-name">{member.displayName ?? member.username}</span>
+        <span className="member-tag">{member.username}</span>
+      </div>
+      <div className="member-roles">
+        {(member.roles ?? []).slice(0, 3).map(r => (
+          <span key={r.id} className="role-pill" style={{ borderColor: r.color ? `#${r.color.toString(16).padStart(6,'0')}` : undefined }}>
+            {r.name}
+          </span>
+        ))}
+      </div>
+      <div className="member-joined">
+        {member.joinedAt ? new Date(member.joinedAt).toLocaleDateString('vi-VN') : '—'}
+      </div>
+    </div>
+  );
+}
+
+export default function MembersPage() {
+  const { selectedGuild } = useGuild();
+  const [members, setMembers]   = useState([]);
+  const [total, setTotal]       = useState(0);
+  const [page, setPage]         = useState(1);
+  const [search, setSearch]     = useState('');
+  const [loading, setLoading]   = useState(false);
+  const [error, setError]       = useState(null);
+
+  const load = useCallback(async (p = 1, q = '') => {
+    if (!selectedGuild) return;
+    setLoading(true);
+    setError(null);
+    try {
+      const data = await api.members(selectedGuild.id, p, q);
+      setMembers(data.members ?? []);
+      setTotal(data.total ?? 0);
+      setPage(p);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  }, [selectedGuild]);
+
+  useEffect(() => { load(1, ''); }, [load]);
+
+  const handleSearch = (e) => {
+    setSearch(e.target.value);
+    load(1, e.target.value);
+  };
+
+  const pageCount = Math.ceil(total / 20);
+
+  return (
+    <div className="page">
+      <h1 className="page-title">Thành viên</h1>
+      <p className="page-subtitle">{total} thành viên</p>
+
+      <div className="members-toolbar">
+        <div className="search-box">
+          <i className="ti ti-search" />
+          <input
+            className="form-input"
+            placeholder="Tìm thành viên…"
+            value={search}
+            onChange={handleSearch}
+          />
+        </div>
+      </div>
+
+      {error && <div className="error-banner">{error}</div>}
+
+      {loading
+        ? <div className="page-loading"><Spinner /></div>
+        : (
+          <div className="member-list">
+            <div className="member-list-header">
+              <span>Thành viên</span>
+              <span>Roles</span>
+              <span>Ngày tham gia</span>
+            </div>
+            {members.map(m => <MemberRow key={m.id} member={m} />)}
+          </div>
+        )
+      }
+
+      {pageCount > 1 && (
+        <div className="pagination">
+          <button
+            className="btn btn-secondary"
+            disabled={page <= 1}
+            onClick={() => load(page - 1, search)}
+          >
+            ← Trước
+          </button>
+          <span className="pagination-info">{page} / {pageCount}</span>
+          <button
+            className="btn btn-secondary"
+            disabled={page >= pageCount}
+            onClick={() => load(page + 1, search)}
+          >
+            Tiếp →
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
