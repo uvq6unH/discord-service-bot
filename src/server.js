@@ -319,9 +319,9 @@ export function createServer({ configStore, stateStore, botClient, redis = null 
     }
     try {
       await guild.members.fetch();
-    } catch (_) {}
+    } catch (_) { }
 
-    const page   = Math.max(1, parseInt(req.query.page) || 1);
+    const page = Math.max(1, parseInt(req.query.page) || 1);
     const search = (req.query.search ?? '').toLowerCase().trim();
     const PAGE_SIZE = 20;
 
@@ -341,12 +341,12 @@ export function createServer({ configStore, stateStore, botClient, redis = null 
       total,
       page,
       members: slice.map(m => ({
-        id:          m.user.id,
-        username:    m.user.username,
+        id: m.user.id,
+        username: m.user.username,
         displayName: m.displayName,
-        avatar:      m.user.avatar,
-        joinedAt:    m.joinedAt,
-        roles:       [...m.roles.cache.values()]
+        avatar: m.user.avatar,
+        joinedAt: m.joinedAt,
+        roles: [...m.roles.cache.values()]
           .filter(r => r.id !== guild.id)
           .map(r => ({ id: r.id, name: r.name, color: r.color })),
       })),

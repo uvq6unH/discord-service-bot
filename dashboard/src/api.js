@@ -84,7 +84,7 @@ export const api = {
 
   /** Lưu config */
   saveConfig: (guildId, config) =>
-    apiFetch('/api/config', { method: 'POST', body: { guildId, ...config } }).then(r => r.json()),
+    apiFetch(`/api/config?guildId=${encodeURIComponent(guildId)}`, { method: 'PUT', body: config }).then(r => r.json()),
 
   /** Lấy channels + roles của guild (cho dropdown) */
   guildData: (guildId) =>
