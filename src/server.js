@@ -73,7 +73,7 @@ export function createServer({ configStore, stateStore, botClient, redis = null 
         styleSrc: ["'self'", 'https://cdn.jsdelivr.net', 'https://fonts.googleapis.com'],
         fontSrc: ["'self'", 'https://fonts.gstatic.com', 'https://cdn.jsdelivr.net'],
         imgSrc: ["'self'", 'https://cdn.discordapp.com', 'data:'],
-        connectSrc: ["'self'"],
+        connectSrc: ["'self'", 'https://cdn.jsdelivr.net'],
         frameSrc: ["'none'"],
         objectSrc: ["'none'"],
       },

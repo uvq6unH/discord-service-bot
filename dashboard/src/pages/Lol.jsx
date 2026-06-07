@@ -16,6 +16,7 @@ export default function LolPage() {
 
       <div className="cards-grid">
         <SectionCard title="Riot API" icon="ti-key">
+          <form autoComplete="off" onSubmit={e => e.preventDefault()}>
           <div className="form-group">
             <label className="form-label">Riot API Key</label>
             <input
@@ -24,6 +25,7 @@ export default function LolPage() {
               value={config.riotApiKey ?? ''}
               onChange={e => updateConfig({ riotApiKey: e.target.value })}
               placeholder={config.riotApiKeyConfigured ? '••••••••••• (đã cấu hình)' : 'RGAPI-…'}
+              autoComplete="new-password"
             />
             <span className="form-hint">
               Lấy tại <a href="https://developer.riotgames.com" target="_blank" rel="noreferrer">developer.riotgames.com</a>
@@ -37,8 +39,10 @@ export default function LolPage() {
               value={config.tftApiKey ?? ''}
               onChange={e => updateConfig({ tftApiKey: e.target.value })}
               placeholder={config.tftApiKeyConfigured ? '••••••••••• (đã cấu hình)' : 'RGAPI-…'}
+              autoComplete="new-password"
             />
           </div>
+          </form>
         </SectionCard>
 
         <SectionCard title="Lệnh LoL" icon="ti-sword">
