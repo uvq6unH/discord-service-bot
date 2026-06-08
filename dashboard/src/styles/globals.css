@@ -97,6 +97,7 @@ a:hover { text-decoration: underline; }
 .main-area {
   display: flex;
   flex: 1;
+  min-width: 0;
   overflow: hidden;
   background: var(--surface-0);
 }
@@ -382,14 +383,15 @@ a:hover { text-decoration: underline; }
 /* ── Content area ────────────────────────────────────────────────────────── */
 .content {
   flex: 1;
+  min-width: 0;
   overflow-y: auto;
-  padding: var(--s8) var(--s8);
+  overflow-x: hidden;
+  padding: var(--s8);
   scrollbar-width: thin;
   scrollbar-color: var(--surface-3) transparent;
-  max-width: calc(var(--content-max) + var(--s8) * 2);
 }
 
-.page { display: flex; flex-direction: column; gap: var(--s6); }
+.page { display: flex; flex-direction: column; gap: var(--s6); width: 100%; }
 
 .page-header { display: flex; flex-direction: column; gap: var(--s1); }
 
@@ -415,8 +417,9 @@ a:hover { text-decoration: underline; }
 /* ── Cards grid ──────────────────────────────────────────────────────────── */
 .cards-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(380px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
   gap: var(--s4);
+  width: 100%;
 }
 
 /* ── Section card ────────────────────────────────────────────────────────── */
@@ -870,7 +873,7 @@ textarea.form-input {
 .pagination-info { font-size: 12px; color: var(--text-3); font-family: var(--font-mono); }
 
 /* ── Commands ────────────────────────────────────────────────────────────── */
-.commands-layout { display: flex; gap: var(--s4); align-items: flex-start; }
+.commands-layout { display: flex; gap: var(--s4); align-items: flex-start; width: 100%; }
 
 .group-tabs {
   display: flex;
@@ -902,7 +905,7 @@ textarea.form-input {
 .group-tab:hover { background: var(--surface-2); color: var(--text-1); }
 .group-tab--active { background: var(--accent-dim); color: var(--accent); font-weight: 500; }
 
-.commands-content { flex: 1; display: flex; flex-direction: column; gap: var(--s3); }
+.commands-content { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: var(--s3); }
 
 .commands-search {
   display: flex;
