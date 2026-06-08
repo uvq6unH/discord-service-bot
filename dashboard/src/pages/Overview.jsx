@@ -1,16 +1,114 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import { useGuild } from '../contexts/GuildContext.jsx';
 import { Spinner, Toggle, SectionCard, ChannelSelect } from '../components/ui.jsx';
 
+// ── Reminder editor ─────────────────────────────────────────────────────────
+function ReminderEditor({ reminders, onChange, channels }) {
+  const textChannels = channels.filter(c => c.type === 0 || c.type === 5);
+
+  const add = () => onChange([
+    ...reminders,
+    {
+      id: `rem_${Date.now()}`,
+      userIds: [],
+      channelId: '',
+      message: '',
+      time: new Date(Date.now() + 3600_000).toISOString().slice(0, 16),
+      repeat: 'none',
+    },
+  ]);
+
+  const remove = (id) => onChange(reminders.filter(r => r.id !== id));
+  const update = (id, patch) => onChange(reminders.map(r => r.id === id ? { ...r, ...patch } : r));
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--s3)' }}>
+      {reminders.length === 0 && (
+        <p style={{ color: 'var(--text-3)', fontSize: 13 }}>Chưa có reminder nào.</p>
+      )}
+      {reminders.map((r) => (
+        <div key={r.id} style={{
+          background: 'var(--surface-2)', border: '1px solid var(--border)',
+          borderRadius: 'var(--r3)', padding: 'var(--s3)',
+          display: 'flex', flexDirection: 'column', gap: 'var(--s2)',
+        }}>
+          <div style={{ display: 'flex', gap: 'var(--s2)', alignItems: 'flex-start' }}>
+            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 'var(--s2)' }}>
+              <div className="form-group" style={{ margin: 0 }}>
+                <label className="form-label">Nội dung</label>
+                <input
+                  className="form-input"
+                  placeholder="Nội dung reminder…"
+                  value={r.message}
+                  onChange={e => update(r.id, { message: e.target.value })}
+                />
+              </div>
+              <div style={{ display: 'flex', gap: 'var(--s2)' }}>
+                <div className="form-group" style={{ margin: 0, flex: 1 }}>
+                  <label className="form-label">Thời gian</label>
+                  <input
+                    type="datetime-local"
+                    className="form-input"
+                    value={r.time ? r.time.slice(0, 16) : ''}
+                    onChange={e => update(r.id, { time: new Date(e.target.value).toISOString() })}
+                  />
+                </div>
+                <div className="form-group" style={{ margin: 0, flex: 1 }}>
+                  <label className="form-label">Lặp lại</label>
+                  <select
+                    className="form-select"
+                    value={r.repeat ?? 'none'}
+                    onChange={e => update(r.id, { repeat: e.target.value })}
+                  >
+                    <option value="none">Một lần</option>
+                    <option value="hourly">Mỗi giờ</option>
+                    <option value="daily">Mỗi ngày</option>
+                    <option value="weekly">Mỗi tuần</option>
+                  </select>
+                </div>
+              </div>
+              <ChannelSelect
+                label="Kênh gửi"
+                value={r.channelId}
+                onChange={v => update(r.id, { channelId: v })}
+                channels={textChannels}
+              />
+              <div className="form-group" style={{ margin: 0 }}>
+                <label className="form-label">Mention user IDs (cách nhau bằng dấu phẩy)</label>
+                <input
+                  className="form-input"
+                  placeholder="123456789, 987654321"
+                  value={(r.userIds ?? []).join(', ')}
+                  onChange={e => update(r.id, {
+                    userIds: e.target.value.split(',').map(s => s.trim()).filter(Boolean),
+                  })}
+                />
+              </div>
+            </div>
+            <button
+              className="btn btn-xs btn-danger"
+              style={{ marginTop: 20 }}
+              onClick={() => remove(r.id)}
+            >×</button>
+          </div>
+        </div>
+      ))}
+      <button className="btn btn-secondary btn-sm" style={{ alignSelf: 'flex-start' }} onClick={add}>
+        + Thêm reminder
+      </button>
+    </div>
+  );
+}
+
+// ── Main page ───────────────────────────────────────────────────────────────
 export default function OverviewPage() {
   const { config, guildData, configLoading, updateConfig, selectedGuild } = useGuild();
 
-  if (configLoading || !config) {
-    return <div className="page-loading"><Spinner /></div>;
-  }
+  if (configLoading || !config) return <div className="page-loading"><Spinner /></div>;
 
   const ch = guildData?.channels ?? [];
   const textChannels = ch.filter(c => c.type === 0 || c.type === 5);
+  const voiceChannels = ch.filter(c => c.type === 2);
   const cacheAge = guildData?.cacheAgeMs;
   const stale = guildData?.stale;
   const cacheLabel = cacheAge != null
@@ -32,7 +130,8 @@ export default function OverviewPage() {
       </p>
 
       <div className="cards-grid">
-        {/* Tổng quan */}
+
+        {/* ── Cài đặt chung ── */}
         <SectionCard title="Cài đặt chung" icon="ti-settings">
           <Toggle
             label="Bật bot"
@@ -59,7 +158,7 @@ export default function OverviewPage() {
           />
         </SectionCard>
 
-        {/* Welcome */}
+        {/* ── Welcome ── */}
         <SectionCard
           title="Chào mừng thành viên"
           icon="ti-door-enter"
@@ -81,10 +180,11 @@ export default function OverviewPage() {
               onChange={e => updateConfig({ welcomeMessage: e.target.value })}
               placeholder="Chào {user} đến với {server}!"
             />
+            <span className="form-hint">Template: <code>{'{user}'}</code> <code>{'{server}'}</code></span>
           </div>
         </SectionCard>
 
-        {/* Thông báo */}
+        {/* ── Thông báo ── */}
         <SectionCard
           title="Thông báo"
           icon="ti-speakerphone"
@@ -108,7 +208,7 @@ export default function OverviewPage() {
           </div>
         </SectionCard>
 
-        {/* Music */}
+        {/* ── Music ── */}
         <SectionCard
           title="Music"
           icon="ti-music"
@@ -119,16 +219,30 @@ export default function OverviewPage() {
             <label className="form-label">Music prefix</label>
             <input
               className="form-input form-input--sm"
-              value={config.musicPrefix ?? '!'}
+              value={config.musicPrefix ?? 'hb'}
               onChange={e => updateConfig({ musicPrefix: e.target.value })}
-              maxLength={5}
-              style={{ width: 80 }}
+              maxLength={10}
+              style={{ width: 100 }}
             />
+            <span className="form-hint">Ví dụ: <code>hb play tên bài</code></span>
           </div>
-          <p className="form-hint">
-            Bot dùng Lavalink — không xử lý audio trực tiếp, CPU thấp.
-          </p>
+          <p className="form-hint">Bot dùng Lavalink — không xử lý audio trực tiếp, CPU thấp.</p>
         </SectionCard>
+
+        {/* ── Reminders ── */}
+        <SectionCard
+          title="Reminders"
+          icon="ti-bell"
+          enabled={config.remindersEnabled}
+          onToggle={v => updateConfig({ remindersEnabled: v })}
+        >
+          <ReminderEditor
+            reminders={config.reminders ?? []}
+            onChange={v => updateConfig({ reminders: v })}
+            channels={ch}
+          />
+        </SectionCard>
+
       </div>
     </div>
   );

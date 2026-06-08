@@ -1,7 +1,59 @@
 import React from 'react';
 import { useGuild } from '../contexts/GuildContext.jsx';
-import { Spinner, SectionCard, TextInput, Toggle } from '../components/ui.jsx';
+import { Spinner, SectionCard } from '../components/ui.jsx';
 
+// ── API key row với status badge ─────────────────────────────────────────────
+function ApiKeyInput({ label, valueKey, configuredKey, config, updateConfig, placeholder }) {
+  const isConfigured = config[configuredKey];
+  const currentVal   = config[valueKey] ?? '';
+
+  return (
+    <div className="form-group">
+      <label className="form-label" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+        {label}
+        {isConfigured && !currentVal && (
+          <span style={{
+            fontSize: 11, padding: '1px 7px', borderRadius: 99, fontWeight: 600,
+            background: 'rgba(34,197,94,.15)', color: 'var(--green)',
+            border: '1px solid rgba(34,197,94,.3)',
+          }}>✓ Đã cấu hình</span>
+        )}
+        {!isConfigured && !currentVal && (
+          <span style={{
+            fontSize: 11, padding: '1px 7px', borderRadius: 99, fontWeight: 600,
+            background: 'var(--red-dim)', color: 'var(--red)',
+            border: '1px solid rgba(239,68,68,.25)',
+          }}>Chưa cài</span>
+        )}
+      </label>
+      <input
+        type="password"
+        className="form-input"
+        value={currentVal}
+        onChange={e => updateConfig({ [valueKey]: e.target.value })}
+        placeholder={isConfigured && !currentVal ? '••••••••••• (để trống = giữ nguyên)' : placeholder}
+        autoComplete="new-password"
+      />
+    </div>
+  );
+}
+
+// ── Command reference card ───────────────────────────────────────────────────
+function CmdRef({ cmds }) {
+  return (
+    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--s1)' }}>
+      {cmds.map(c => (
+        <code key={c} style={{
+          background: 'var(--surface-3)', border: '1px solid var(--border)',
+          borderRadius: 'var(--r2)', padding: '2px 8px', fontSize: 12,
+          color: 'var(--accent)',
+        }}>/{c}</code>
+      ))}
+    </div>
+  );
+}
+
+// ── Main page ─────────────────────────────────────────────────────────────────
 export default function LolPage() {
   const { config, configLoading, updateConfig } = useGuild();
 
@@ -11,58 +63,113 @@ export default function LolPage() {
     <div className="page">
       <h1 className="page-title">LoL & TFT</h1>
       <p className="page-subtitle">
-        Tích hợp Riot API — hỗ trợ TTL cache, token bucket, account linking.
+        Tích hợp Riot API — hỗ trợ TTL cache, token bucket, account linking qua Discord ID.
       </p>
 
       <div className="cards-grid">
-        <SectionCard title="Riot API" icon="ti-key">
+
+        {/* ── API Keys ── */}
+        <SectionCard title="Riot API Keys" icon="ti-key">
           <form autoComplete="off" onSubmit={e => e.preventDefault()}>
-          <input type="text" name="username" autoComplete="username" style={{display:'none'}} readOnly />
-          <div className="form-group">
-            <label className="form-label">Riot API Key</label>
-            <input
-              type="password"
-              className="form-input"
-              value={config.riotApiKey ?? ''}
-              onChange={e => updateConfig({ riotApiKey: e.target.value })}
-              placeholder={config.riotApiKeyConfigured ? '••••••••••• (đã cấu hình)' : 'RGAPI-…'}
-              autoComplete="new-password"
+            {/* Hidden username trick để tắt browser autofill */}
+            <input type="text" name="username" autoComplete="username" style={{ display: 'none' }} readOnly />
+            <ApiKeyInput
+              label="Riot API Key (LoL)"
+              valueKey="riotApiKey"
+              configuredKey="riotApiKeyConfigured"
+              config={config}
+              updateConfig={updateConfig}
+              placeholder="RGAPI-xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
             />
-            <span className="form-hint">
-              Lấy tại <a href="https://developer.riotgames.com" target="_blank" rel="noreferrer">developer.riotgames.com</a>
-            </span>
-          </div>
-          <div className="form-group">
-            <label className="form-label">TFT API Key</label>
-            <input
-              type="password"
-              className="form-input"
-              value={config.tftApiKey ?? ''}
-              onChange={e => updateConfig({ tftApiKey: e.target.value })}
-              placeholder={config.tftApiKeyConfigured ? '••••••••••• (đã cấu hình)' : 'RGAPI-…'}
-              autoComplete="new-password"
+            <ApiKeyInput
+              label="TFT API Key"
+              valueKey="tftApiKey"
+              configuredKey="tftApiKeyConfigured"
+              config={config}
+              updateConfig={updateConfig}
+              placeholder="RGAPI-xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
             />
-          </div>
           </form>
+          <p className="form-hint">
+            Lấy tại{' '}
+            <a href="https://developer.riotgames.com" target="_blank" rel="noreferrer">
+              developer.riotgames.com
+            </a>.{' '}
+            Key <strong>Development</strong> bị rate limit thấp — Production key cần approval của Riot.
+          </p>
+          <p className="form-hint" style={{ marginTop: 4 }}>
+            Key được giữ trong memory server, không lưu vào Redis. Restart server = cần nhập lại trừ khi
+            set biến môi trường <code>RIOT_API_KEY</code> / <code>TFT_API_KEY</code>.
+          </p>
         </SectionCard>
 
-        <SectionCard title="Lệnh LoL" icon="ti-sword">
-          <p className="form-hint">
-            Bao gồm: <code>/lsd</code> <code>/lolprofile</code> <code>/lolmatch</code>{' '}
-            <code>/lolchamp</code> <code>/lolitem</code> <code>/lolrunes</code>{' '}
-            <code>/lolpatch</code> <code>/lollink</code> <code>/lolunlink</code>
-          </p>
-          <p className="form-hint">
-            Cooldown mặc định 15 giây giữa các lệnh Riot để tránh rate limit 429.
+        {/* ── LoL commands ── */}
+        <SectionCard title="Lệnh League of Legends" icon="ti-sword">
+          <CmdRef cmds={['lsd', 'lol', 'lolmatch', 'lolchamp', 'lolitem', 'lolrunes', 'lolpatch', 'lollink', 'lolunlink']} />
+          <div style={{ marginTop: 'var(--s3)', display: 'flex', flexDirection: 'column', gap: 'var(--s1)' }}>
+            {[
+              ['/lsd',      'Lịch sử 5 trận LoL gần nhất'],
+              ['/lol',      'Hồ sơ người chơi (rank, mastery)'],
+              ['/lolmatch', 'Chi tiết một trận đấu cụ thể'],
+              ['/lolchamp', 'Thông tin tướng'],
+              ['/lolitem',  'Thông tin trang bị'],
+              ['/lolrunes', 'Bảng ngọc gợi ý'],
+              ['/lolpatch', 'Phiên bản LoL mới nhất'],
+              ['/lollink',  'Liên kết tài khoản Riot với Discord'],
+              ['/lolunlink','Bỏ liên kết'],
+            ].map(([cmd, desc]) => (
+              <div key={cmd} style={{ display: 'flex', gap: 'var(--s3)', alignItems: 'baseline' }}>
+                <code style={{ minWidth: 100, color: 'var(--accent)', fontSize: 12 }}>{cmd}</code>
+                <span style={{ color: 'var(--text-2)', fontSize: 13 }}>{desc}</span>
+              </div>
+            ))}
+          </div>
+          <p className="form-hint" style={{ marginTop: 'var(--s3)' }}>
+            Cooldown 15s giữa các lệnh Riot để tránh rate limit 429.
           </p>
         </SectionCard>
 
-        <SectionCard title="Lệnh TFT" icon="ti-chess-knight">
-          <p className="form-hint">
-            Bao gồm: <code>/tftlsd</code> <code>/tftprofile</code> <code>/tftmatch</code>{' '}
-            <code>/tftlink</code> <code>/tftunlink</code>
-          </p>
+        {/* ── TFT commands ── */}
+        <SectionCard title="Lệnh Teamfight Tactics" icon="ti-chess-knight">
+          <CmdRef cmds={['tftlsd', 'tft', 'tftmatch', 'tftlink', 'tftunlink']} />
+          <div style={{ marginTop: 'var(--s3)', display: 'flex', flexDirection: 'column', gap: 'var(--s1)' }}>
+            {[
+              ['/tftlsd',   'Lịch sử 5 trận TFT (hạng, bài, con, đồ, augment)'],
+              ['/tft',      'Hồ sơ TFT (rank, avg placement, trait stats)'],
+              ['/tftmatch', 'Chi tiết trận TFT (bài, con, đồ đầy đủ)'],
+              ['/tftlink',  'Liên kết tài khoản TFT với Discord'],
+              ['/tftunlink','Bỏ liên kết TFT'],
+            ].map(([cmd, desc]) => (
+              <div key={cmd} style={{ display: 'flex', gap: 'var(--s3)', alignItems: 'baseline' }}>
+                <code style={{ minWidth: 100, color: 'var(--accent)', fontSize: 12 }}>{cmd}</code>
+                <span style={{ color: 'var(--text-2)', fontSize: 13 }}>{desc}</span>
+              </div>
+            ))}
+          </div>
         </SectionCard>
+
+        {/* ── Rate limit info ── */}
+        <SectionCard title="Rate limits & Cache" icon="ti-database">
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--s2)' }}>
+            {[
+              ['Development key',   '20 req/s, 100 req/2min'],
+              ['Cache TTL',         '60 giây cho profile/rank'],
+              ['Match cache TTL',   '300 giây'],
+              ['Cooldown per user', '15 giây giữa các lệnh'],
+              ['Token bucket',      'Queue tự động nếu sắp vượt limit'],
+            ].map(([k, v]) => (
+              <div key={k} style={{
+                display: 'flex', justifyContent: 'space-between',
+                padding: '6px 0', borderBottom: '1px solid var(--border)',
+                fontSize: 13,
+              }}>
+                <span style={{ color: 'var(--text-2)' }}>{k}</span>
+                <code style={{ color: 'var(--text-1)', fontSize: 12 }}>{v}</code>
+              </div>
+            ))}
+          </div>
+        </SectionCard>
+
       </div>
     </div>
   );

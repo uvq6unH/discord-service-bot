@@ -1076,3 +1076,37 @@ textarea.form-input {
   .content { padding: var(--s4); }
   .save-bar { left: var(--s4); right: var(--s4); transform: none; min-width: 0; }
 }
+
+/* ── Misc patches ────────────────────────────────────────────────────────── */
+/* code tags used inline — reset browser defaults */
+code {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  background: var(--surface-3);
+  border: 1px solid var(--border);
+  border-radius: var(--r1);
+  padding: 1px 5px;
+  color: var(--accent);
+}
+
+/* command-name as <code> should not have extra box */
+.command-name {
+  background: transparent;
+  border: none;
+  padding: 0;
+  width: 160px;
+  flex-shrink: 0;
+}
+
+/* group-tab badge counter */
+.group-tab { align-items: center; }
+
+/* form-select consistent height */
+.form-select {
+  min-height: 36px;
+}
+
+/* datetime-local input color fix */
+input[type="datetime-local"] {
+  color-scheme: dark;
+}
