@@ -100,12 +100,19 @@ import { initLavalink, forwardVoiceEvent } from './bot/music/lavalink.js';
 const commandCooldowns = new CommandCooldowns();
 
 // ── Guild Cache helpers ────────────────────────────────────────────────────────
-// Writes a snapshot of guild metadata (channels, roles, members) to Redis so
-// the dashboard process can read it without needing a live botClient reference.
-// Key: guild_cache:{guildId}  TTL: 15 minutes
+// Two separate Redis keys to avoid Upstash 1MB REST request limit on large guilds:
+//
+//   guild_cache:{guildId}         → meta  (name, iconURL, channels[], roles[], memberCount)
+//   guild_cache:{guildId}:members → members[] only
+//
+// /api/guild-data reads only the meta key  (~5–20 KB regardless of guild size)
+// /api/members    reads only the members key (~200 bytes × N members)
+//
+// TTL: 15 min on both. Bot refreshes every 10 min + on GuildCreate/GuildUpdate.
 const GUILD_CACHE_KEY = (id) => `guild_cache:${id}`;
-const GUILD_CACHE_TTL_S = 900; // 15 min
-const GUILD_CACHE_REFRESH_MS = 10 * 60 * 1000; // refresh every 10 min
+const GUILD_CACHE_MEMBERS_KEY = (id) => `guild_cache:${id}:members`;
+const GUILD_CACHE_TTL_S = 900;              // 15 min
+const GUILD_CACHE_REFRESH_MS = 10 * 60 * 1000;  // refresh every 10 min
 
 async function writeGuildCache(guild, redis) {
   if (!redis) return;
@@ -115,6 +122,18 @@ async function writeGuildCache(guild, redis) {
       .map((r) => ({ id: r.id, name: r.name, rawPosition: r.rawPosition, color: r.color ? `#${r.color.toString(16).padStart(6, '0')}` : null }))
       .sort((a, b) => b.rawPosition - a.rawPosition);
 
+    // ── Key 1: meta (small, always fast — used by /api/guild-data) ────────────
+    const metaPayload = JSON.stringify({
+      name: guild.name,
+      iconURL: guild.iconURL({ size: 64 }) ?? null,
+      channels,
+      roles,
+      memberCount: guild.memberCount,
+      updatedAt: new Date().toISOString(),
+    });
+    await redis.set(GUILD_CACHE_KEY(guild.id), metaPayload, 'EX', GUILD_CACHE_TTL_S);
+
+    // ── Key 2: members (scales with guild size — used only by /api/members) ───
     // Fetch members — tolerate failures (fallback to cache)
     let membersFetched;
     try {
@@ -133,17 +152,10 @@ async function writeGuildCache(guild, redis) {
       roles: [...m.roles.cache.values()].filter((r) => r.id !== guild.id).map((r) => ({ id: r.id, name: r.name, color: r.color })),
     })).sort((a, b) => a.displayName.localeCompare(b.displayName));
 
-    const payload = JSON.stringify({
-      name: guild.name,
-      iconURL: guild.iconURL({ size: 64 }) ?? null,
-      channels,
-      roles,
-      members,
-      memberCount: guild.memberCount,
-      updatedAt: new Date().toISOString(),
-    });
-    await redis.set(GUILD_CACHE_KEY(guild.id), payload, 'EX', GUILD_CACHE_TTL_S);
-    console.log(`[guild-cache] ✅ Wrote cache for ${guild.name} (${guild.id}) — ${members.length} members`);
+    const membersPayload = JSON.stringify(members);
+    await redis.set(GUILD_CACHE_MEMBERS_KEY(guild.id), membersPayload, 'EX', GUILD_CACHE_TTL_S);
+
+    console.log(`[guild-cache] ✅ ${guild.name} (${guild.id}) — meta ${Math.round(Buffer.byteLength(metaPayload) / 1024)}KB, members ${members.length} (${Math.round(Buffer.byteLength(membersPayload) / 1024)}KB)`);
   } catch (err) {
     console.error(`[guild-cache] ❌ Failed to write cache for ${guild.id}:`, err.message);
   }

@@ -334,13 +334,12 @@ export function createServer({ configStore, stateStore, botClient, redis = null 
     const search = (req.query.search ?? '').toLowerCase().trim();
     const PAGE_SIZE = 20;
 
-    // Phase 1: Try Redis guild_cache (works in split mode)
+    // Phase 1: Try Redis guild_cache:{id}:members (dedicated key — meta key no longer contains members[])
     if (redis) {
       try {
-        const raw = await redis.get(`guild_cache:${req.guildId}`);
+        const raw = await redis.get(`guild_cache:${req.guildId}:members`);
         if (raw) {
-          const data = typeof raw === 'string' ? JSON.parse(raw) : raw;
-          let members = data.members ?? [];
+          let members = typeof raw === 'string' ? JSON.parse(raw) : raw;
           if (search) {
             members = members.filter(m =>
               m.username.toLowerCase().includes(search) ||

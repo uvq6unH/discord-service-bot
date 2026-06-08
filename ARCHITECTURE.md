@@ -55,7 +55,7 @@ Communication: Upstash Redis (shared state, config, sessions)
 - **Granular Redis keys:** Each subsystem uses its own key (`guild:{id}:economy:{userId}`) — avoids contention on concurrent writes.
 - **Distributed locking:** `withRedisLock()` (Redis) or `asyncMutex` (single-process). Safe to scale horizontally.
 - **Per-guild isolation:** Config and state are all keyed by `guildId`.
-- **`botClient` optional:** `server.js` accepts `botClient` (can be `null`). Routes requiring the bot return 503 gracefully instead of crashing.
+- **`botClient` optional:** `server.js` accepts `botClient` (can be `null`). Guild data routes use Redis `guild_cache` as primary source; 503 only when cache is cold AND no botClient. `/api/slash-sync` queues to Redis instead of returning 503.
 
 ---
 
@@ -91,7 +91,8 @@ Discord API ◄─────────────────────�
 │  • createUpstashFromEnv() → sharedRedis  (same Redis instance)     │
 │  • new ConfigStore() + new StateStore()                             │
 │  • createServer({ botClient: null, ... })                           │
-│    → /api/guild-data, /api/members, /api/slash-sync return 503      │
+│    → /api/guild-data, /api/members read guild_cache from Redis  │
+│    → /api/slash-sync pushes to slash_sync_queue (no 503)        │
 │    → /api/config, /api/guilds, /api/state work normally             │
 │  • app.listen(PORT)                                                 │
 └─────────────────────────────────────────────────────────────────────┘
@@ -109,18 +110,20 @@ Discord API ◄─────────────────────�
 | Music memory leak crashes dashboard | ❌ Same process | ✅ Isolated |
 | Restart bot without dropping users | ❌ | ✅ |
 | Deployment simplicity | ✅ | More complex |
-| Dashboard sees bot guild cache | ✅ Direct | ❌ 503 for guild-data/members |
+| Dashboard sees bot guild cache | ✅ Direct | ✅ Via Redis guild_cache (Phase 1) |
 
 ### Mode B limitations (botClient = null in dashboard process)
 
+> Phase 1 + Phase 2 (PLAN.md) are complete — the three previously-broken routes now work via Redis.
+
 | Route | Mode B |
 |-------|--------|
-| `GET /api/guild-data` | **503** — requires Discord cache |
-| `GET /api/members` | **503** — requires bot cache |
-| `POST /api/slash-sync` | **503** — requires bot connection |
+| `GET /api/guild-data` | ✅ reads `guild_cache:{guildId}` from Redis; **503** only on cache miss |
+| `GET /api/members` | ✅ reads `guild_cache:{guildId}` from Redis; **503** only on cache miss |
+| `POST /api/slash-sync` | ✅ pushes job to `slash_sync_queue` Redis list; bot picks up within 5 s |
 | `GET /api/guilds` | ✅ (OAuth) |
 | `GET /api/config` | ✅ (Redis) |
-| `PUT /api/config` | ✅ (Redis, slash-sync skipped) |
+| `PUT /api/config` | ✅ (Redis, slash-sync skipped if botClient null) |
 | `GET /api/state` | ✅ (stateStore directly via Redis) |
 
 ### Inter-process communication (Mode B)
@@ -230,10 +233,10 @@ helmet (CSP + security headers)
 | GET | `/api/guilds` | ❌ (OAuth) |
 | GET | `/api/config` | ❌ |
 | PUT | `/api/config` | ❌ (slash-sync skipped if null) |
-| POST | `/api/slash-sync` | ✅ → 503 |
+| POST | `/api/slash-sync` | ⚡ Redis queue fallback (no 503 in split mode) |
 | GET | `/api/state` | ❌ (stateStore directly) |
-| GET | `/api/guild-data` | ✅ → 503 |
-| GET | `/api/members` | ✅ → 503 |
+| GET | `/api/guild-data` | ⚡ Redis `guild_cache` fallback; 503 only on cache miss |
+| GET | `/api/members` | ⚡ Redis `guild_cache` fallback; 503 only on cache miss |
 | GET | `/api/invite-url` | ❌ |
 | GET | `/api/keepalive-status` | ❌ |
 
@@ -249,7 +252,11 @@ Fallback permission check: if Discord OAuth unavailable → try bot guild cache 
 
 #### `src/bot.js` — Discord Client Factory + keepalive
 
-- `createBot(configStore, stateStore)` → Discord Client
+- `createBot(configStore, stateStore, redis?)` → Discord Client
+  - `redis` param is optional — when present, enables guild cache writing and slash sync queue worker
+  - On `ClientReady`: writes `guild_cache:{guildId}` (meta) + `guild_cache:{guildId}:members` for all guilds, sets 10-min refresh interval
+  - On `GuildCreate` / `GuildUpdate`: immediately refreshes both keys
+  - Slash sync queue: polls `slash_sync_queue` every 5 s via `setInterval` (only when `redis` present)
 - `startKeepalive(port)` → **separate export**, only called from `index.js` after the HTTP server is listening
 
 ---
@@ -310,6 +317,20 @@ pnpm dev:ui                # :5173 (proxies /api → :10001)
 # Config
 config:_index                            → JSON string[]
 config:guild:{guildId}                   → JSON config object
+
+# Guild cache (bot writes, dashboard reads — Split mode Phase 1)
+guild_cache:{guildId}                    → JSON { name, iconURL, channels[], roles[], memberCount, updatedAt }
+                                           Small (~5–20 KB). TTL: 900 s (15 min).
+                                           Read by /api/guild-data (channels + roles for dashboard dropdowns).
+guild_cache:{guildId}:members            → JSON members[] — separate key to avoid Upstash 1MB limit
+                                           Scales with guild size (~200 B × member count).
+                                           Read only by /api/members. TTL: 900 s (15 min).
+                                           Bot refreshes both keys every 10 min on setInterval,
+                                           and immediately on GuildCreate / GuildUpdate events.
+
+# Slash sync queue (dashboard writes, bot polls — Split mode Phase 2)
+slash_sync_queue                         → Redis list of JSON { guildId, requestedAt }
+                                           Bot polls via lpop every 5 s.
 
 # Economy
 guild:{guildId}:economy:{userId}         → JSON { silver, gold, diamond, lastDailyAt, lastDailyDay }
@@ -457,10 +478,10 @@ src/index.js  (monolith)
 
 src/index.bot.js
   ├── src/env.js                (validateBotEnvironment)
-  ├── src/upstash.js
+  ├── src/upstash.js            → sharedRedis (passed to createBot for guild_cache + slash_sync_queue)
   ├── src/configStore.js
   ├── src/stateStore.js
-  └── src/bot.js                (createBot only — startKeepalive not called)
+  └── src/bot.js                (createBot(configStore, stateStore, sharedRedis) — startKeepalive not called)
 
 src/index.server.js
   ├── src/env.js                (validateServerEnvironment)
