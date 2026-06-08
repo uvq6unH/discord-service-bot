@@ -359,11 +359,43 @@ export function createServer({ configStore, stateStore, botClient, redis = null 
         .map(g => g.id)
     );
 
-    // Guilds bot đang có mặt
-    for (const [id, guild] of (botClient?.guilds?.cache ?? new Map())) {
+    // Guilds bot đang có mặt — lấy từ botClient cache (monolith) hoặc Redis guild_cache (split mode)
+    const botGuildIds = new Set();
+    if (botClient?.guilds?.cache?.size) {
+      for (const id of botClient.guilds.cache.keys()) botGuildIds.add(id);
+    } else if (redis) {
+      // Split mode: bot đã write guild_cache:{id} khi khởi động
+      try {
+        const keys = await redis.keys('guild_cache:*');
+        for (const key of (keys ?? [])) {
+          // Chỉ lấy key dạng guild_cache:{id} (không phải guild_cache:{id}:members)
+          const parts = key.split(':');
+          if (parts.length === 2) botGuildIds.add(parts[1]);
+        }
+      } catch { /* fallback: botGuildIds rỗng */ }
+    }
+
+    for (const id of botGuildIds) {
       const canManage = isDev || manageableIds.has(id);
-      if (canManage) {
-        guildsById.set(id, { id, name: guild.name, icon: guild.iconURL({ size: 64 }), configured: configuredGuildIds.includes(id), botPresent: true });
+      if (!canManage) continue;
+      // Lấy meta từ botClient cache (monolith) hoặc Redis (split mode)
+      const botGuild = botClient?.guilds?.cache?.get(id);
+      if (botGuild) {
+        guildsById.set(id, { id, name: botGuild.name, icon: botGuild.iconURL({ size: 64 }), configured: configuredGuildIds.includes(id), botPresent: true });
+      } else if (redis) {
+        try {
+          const raw = await redis.get(`guild_cache:${id}`);
+          const meta = raw ? (typeof raw === 'string' ? JSON.parse(raw) : raw) : null;
+          guildsById.set(id, {
+            id,
+            name: meta?.name ?? `Server ${id}`,
+            icon: meta?.iconURL ?? null,
+            configured: configuredGuildIds.includes(id),
+            botPresent: true,
+          });
+        } catch {
+          guildsById.set(id, { id, name: `Server ${id}`, icon: null, configured: configuredGuildIds.includes(id), botPresent: true });
+        }
       }
     }
 

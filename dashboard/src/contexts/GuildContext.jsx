@@ -17,8 +17,6 @@ export function GuildProvider({ children }) {
     setDirty(false);
     setSaveStatus('idle');
 
-    if (!guild.botPresent) return;
-
     setConfigLoading(true);
     try {
       const [cfg, data] = await Promise.all([

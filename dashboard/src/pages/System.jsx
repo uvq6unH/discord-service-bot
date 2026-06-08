@@ -111,6 +111,7 @@ export default function SystemPage() {
               <KV label="Uptime"        value={fmtUptime(bot?.uptimeS)} />
               <KV label="Guilds"        value={bot?.guilds ?? status?.guildCount ?? '—'} />
               <KV label="Heartbeat"     value={fmtAge(bot?.lastSeenMs)} />
+              {bot?.commit && <KV label="Commit" value={bot.commit} />}
             </div>
 
             {/* Dashboard */}
@@ -128,6 +129,7 @@ export default function SystemPage() {
                 </span>
               </div>
               <KV label="Uptime" value={fmtUptime(dash?.uptimeS)} />
+              {dash?.commit && <KV label="Commit" value={dash.commit} />}
             </div>
           </div>
         </SectionCard>

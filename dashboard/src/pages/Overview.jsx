@@ -9,17 +9,27 @@ export default function OverviewPage() {
     return <div className="page-loading"><Spinner /></div>;
   }
 
-  if (!selectedGuild?.botPresent) {
-    return null; // App.jsx handle invite banner
-  }
-
   const ch = guildData?.channels ?? [];
   const textChannels = ch.filter(c => c.type === 0 || c.type === 5);
+  const cacheAge = guildData?.cacheAgeMs;
+  const stale = guildData?.stale;
+  const cacheLabel = cacheAge != null
+    ? stale
+      ? '⚠ Dữ liệu có thể cũ (>15 phút)'
+      : `Cập nhật ${Math.round(cacheAge / 60000)} phút trước`
+    : null;
 
   return (
     <div className="page">
       <h1 className="page-title">Dashboard</h1>
-      <p className="page-subtitle">Cài đặt chung cho {selectedGuild.name}</p>
+      <p className="page-subtitle">
+        Cài đặt chung cho {selectedGuild.name}
+        {cacheLabel && (
+          <span style={{ marginLeft: 10, fontSize: 12, color: stale ? 'var(--color-warning)' : 'var(--color-muted)' }}>
+            · {cacheLabel}
+          </span>
+        )}
+      </p>
 
       <div className="cards-grid">
         {/* Tổng quan */}

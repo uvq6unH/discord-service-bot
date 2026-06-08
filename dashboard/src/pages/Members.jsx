@@ -10,20 +10,13 @@ function MemberRow({ member }) {
         className="member-avatar"
         src={member.avatar
           ? `https://cdn.discordapp.com/avatars/${member.id}/${member.avatar}.png?size=32`
-          : `https://cdn.discordapp.com/embed/avatars/${Number(member.id) % 5}.png`
+          : `https://cdn.discordapp.com/embed/avatars/${Number(BigInt(member.id) % 5n)}.png`
         }
         alt=""
       />
       <div className="member-info">
         <span className="member-name">{member.displayName ?? member.username}</span>
         <span className="member-tag">{member.username}</span>
-      </div>
-      <div className="member-roles">
-        {(member.roles ?? []).slice(0, 3).map(r => (
-          <span key={r.id} className="role-pill" style={{ borderColor: r.color ? `#${r.color.toString(16).padStart(6,'0')}` : undefined }}>
-            {r.name}
-          </span>
-        ))}
       </div>
       <div className="member-joined">
         {member.joinedAt ? new Date(member.joinedAt).toLocaleDateString('vi-VN') : '—'}
@@ -91,7 +84,6 @@ export default function MembersPage() {
           <div className="member-list">
             <div className="member-list-header">
               <span>Thành viên</span>
-              <span>Roles</span>
               <span>Ngày tham gia</span>
             </div>
             {members.map(m => <MemberRow key={m.id} member={m} />)}

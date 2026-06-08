@@ -4,7 +4,7 @@ import { AuthProvider, useAuth } from './contexts/AuthContext.jsx';
 import { GuildProvider, useGuild } from './contexts/GuildContext.jsx';
 import ServerRail from './components/ServerRail.jsx';
 import PluginNav from './components/PluginNav.jsx';
-import { SaveBar, EmptyState, InviteBanner } from './components/ui.jsx';
+import { SaveBar, EmptyState } from './components/ui.jsx';
 import OverviewPage from './pages/Overview.jsx';
 import MembersPage from './pages/Members.jsx';
 import CommandsPage from './pages/Commands.jsx';
@@ -43,8 +43,6 @@ function DashboardLayout() {
       <div className="main-area">
         {!selectedGuild ? (
           <EmptyState />
-        ) : !selectedGuild.botPresent ? (
-          <InviteBanner inviteUrl={`https://discord.com/oauth2/authorize?permissions=8&scope=bot%20applications.commands&guild_id=${selectedGuild.id}`} />
         ) : (
           <>
             <PluginNav guildId={selectedGuild.id} />
