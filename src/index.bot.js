@@ -102,3 +102,30 @@ async function loginWithRetry(maxRetries = 10, baseDelay = 5000) {
 }
 
 await loginWithRetry();
+
+// ── Minimal HTTP server ───────────────────────────────────────────────────────
+// Render Web Service (Free) yêu cầu bind HTTP port, nếu không sẽ restart liên tục.
+// Server này không phục vụ dashboard — chỉ để:
+//   1. Render health check pass (không spin down / restart)
+//   2. Uptime Robot ping giữ bot sống 24/7 miễn phí
+//
+// Endpoint duy nhất: GET /health → {"status":"ok","bot":"tag#0000","uptime":123}
+import http from 'http';
+
+const botPort = Number(process.env.PORT ?? 10000);
+
+http.createServer((req, res) => {
+  if (req.method !== 'GET') {
+    res.writeHead(405).end();
+    return;
+  }
+  res.writeHead(200, { 'Content-Type': 'application/json' });
+  res.end(JSON.stringify({
+    status: 'ok',
+    bot: botClient?.user?.tag ?? null,
+    guilds: botClient?.guilds?.cache?.size ?? 0,
+    uptime: Math.floor(process.uptime()),
+  }));
+}).listen(botPort, () => {
+  console.log(`[bot:health] HTTP health server listening on port ${botPort}`);
+});
