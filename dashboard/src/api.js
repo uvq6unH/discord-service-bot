@@ -82,9 +82,13 @@ export const api = {
   config: (guildId) =>
     apiFetch(`/api/config?guildId=${encodeURIComponent(guildId)}`).then(r => r.json()),
 
-  /** Lưu config */
-  saveConfig: (guildId, config) =>
-    apiFetch(`/api/config?guildId=${encodeURIComponent(guildId)}`, { method: 'PUT', body: config }).then(r => r.json()),
+  /** Lưu config — trả về { config, slashSync } */
+  saveConfig: async (guildId, config) => {
+    const res = await apiFetch(`/api/config?guildId=${encodeURIComponent(guildId)}`, { method: 'PUT', body: config });
+    const data = await res.json();
+    // Server trả về { config, slashSync } — trả nguyên để GuildContext dùng
+    return data.config ?? data; // backward compat nếu chưa deploy server mới
+  },
 
   /** Lấy channels + roles của guild (cho dropdown) */
   guildData: (guildId) =>

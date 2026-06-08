@@ -18,6 +18,7 @@ export function GuildProvider({ children }) {
 
     setSelectedGuild(guild);
     setConfig(null);
+    setGuildData({ channels: [], roles: [] });
     setDirty(false);
     setSaveStatus('idle');
 
@@ -46,7 +47,20 @@ export function GuildProvider({ children }) {
     if (!selectedGuild || !config) return;
     setSaveStatus('saving');
     try {
-      await api.saveConfig(selectedGuild.id, config);
+      // Strip server-computed / read-only fields before sending — they are not
+      // valid patch keys and can corrupt stored config (e.g. riotApiKeyConfigured
+      // is a boolean status flag, not the actual secret string the server expects).
+      const {
+        guildId: _gid,
+        riotApiKeyConfigured: _rac,
+        tftApiKeyConfigured: _tac,
+        slashSync: _ss,
+        ...patch
+      } = config;
+      const saved = await api.saveConfig(selectedGuild.id, patch);
+      // Refresh local config with the server-normalized version so stale values
+      // (e.g. trimmed prefix, sorted commands) are reflected immediately.
+      setConfig(saved);
       setDirty(false);
       setSaveStatus('saved');
       setTimeout(() => setSaveStatus('idle'), 2000);

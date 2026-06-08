@@ -316,7 +316,7 @@ export function createBot(configStore, stateStore, redis = null) {
   // so we listen on the raw packet stream.
   client.on(Events.Raw, (packet) => {
     if (packet.t === 'VOICE_STATE_UPDATE' || packet.t === 'VOICE_SERVER_UPDATE') {
-      forwardVoiceEvent(packet, '0');
+      forwardVoiceEvent(packet, 0);
     }
   });
   // ────────────────────────────────────────────────────────────────────────────
@@ -616,8 +616,8 @@ export function createBot(configStore, stateStore, redis = null) {
           });
           return;
         }
-
-        return;
+        // Unknown prefix command — do NOT return here.
+        // Fall through so XP tracking and autoReply still run for this message.
       }
 
       if (config.levelsEnabled) {

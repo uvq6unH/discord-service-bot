@@ -275,7 +275,7 @@ export function createServer({ configStore, stateStore, botClient, redis = null 
       slashSync = { synced: false, reason: 'bot_not_available' };
     }
 
-    res.json({ ...sanitizeConfigForClient(config), slashSync });
+    res.json({ config: sanitizeConfigForClient(config), slashSync });
   });
 
   app.post('/api/slash-sync', auth.requireAuth, writeRateLimit, requireGuildId, auth.requireGuildAccess, async (req, res) => {

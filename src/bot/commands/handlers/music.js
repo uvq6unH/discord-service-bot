@@ -115,12 +115,14 @@ export async function handleMusicCommand({ message, subcommand, args, config }) 
       let addedCount = 0;
 
       if (res.loadType === 'playlist') {
-        for (const track of res.playlist.tracks) {
-          await player.queue.add(track);
+        // lavalink-client v2: all tracks (including playlist) are on res.tracks
+        const playlistTracks = res.tracks ?? res.playlist?.tracks ?? [];
+        for (const track of playlistTracks) {
+          player.queue.add(track);
         }
-        addedCount = res.playlist.tracks.length;
+        addedCount = playlistTracks.length;
       } else {
-        await player.queue.add(res.tracks[0]);
+        player.queue.add(res.tracks[0]);
         addedCount = 1;
       }
 
@@ -128,7 +130,7 @@ export async function handleMusicCommand({ message, subcommand, args, config }) 
       if (!wasPlaying) await player.play();
 
       const firstTrack = res.loadType === 'playlist'
-        ? res.playlist.tracks[0]
+        ? (res.tracks ?? res.playlist?.tracks ?? [])[0]
         : res.tracks[0];
 
       const isNowPlaying = !wasPlaying;
@@ -151,7 +153,7 @@ export async function handleMusicCommand({ message, subcommand, args, config }) 
       );
 
       if (res.loadType === 'playlist') {
-        embed.addFields({ name: 'Playlist', value: res.playlist.name ?? 'Unknown', inline: false });
+        embed.addFields({ name: 'Playlist', value: res.playlist?.name ?? res.playlistInfo?.name ?? 'Unknown', inline: false });
       }
 
       return loadingMsg
