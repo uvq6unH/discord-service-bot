@@ -4,28 +4,17 @@ import { api } from '../api.js';
 const GuildContext = createContext(null);
 
 export function GuildProvider({ children }) {
-  const [selectedGuild, setSelectedGuild] = useState(null); // guild object từ /api/guilds
-  const [config, setConfig]               = useState(null); // config từ /api/config
+  const [selectedGuild, setSelectedGuild] = useState(null);
+  const [config, setConfig]               = useState(null);
   const [guildData, setGuildData]         = useState({ channels: [], roles: [] });
   const [configLoading, setConfigLoading] = useState(false);
   const [dirty, setDirty]                 = useState(false);
-  const [saveStatus, setSaveStatus]       = useState('idle'); // 'idle' | 'saving' | 'saved' | 'error'
+  const [saveStatus, setSaveStatus]       = useState('idle');
 
   const selectGuild = useCallback(async (guild) => {
-    // Nếu bot chưa trong server → redirect sang invite URL, không mở dashboard
-    if (!guild.botPresent) {
-      try {
-        const { url } = await api.inviteUrl(guild.id);
-        window.open(url, '_blank', 'noopener,noreferrer');
-      } catch {
-        // Fallback: build invite URL thủ công
-        const clientId = window.__BOT_CLIENT_ID__ ?? '';
-        const perms = '8'; // Administrator
-        const inviteUrl = `https://discord.com/oauth2/authorize?client_id=${clientId}&scope=bot%20applications.commands&permissions=${perms}&guild_id=${guild.id}`;
-        window.open(inviteUrl, '_blank', 'noopener,noreferrer');
-      }
-      return; // Không set selectedGuild, không load config
-    }
+    // Chỉ load dashboard cho server bot đang có mặt
+    // Server không có bot sẽ được xử lý bởi ServerRail (show invite modal)
+    if (!guild.botPresent) return;
 
     setSelectedGuild(guild);
     setConfig(null);
