@@ -146,6 +146,26 @@ a:hover { text-decoration: underline; }
   border: 2px solid var(--color-surface);
 }
 
+
+.guild-btn--invite .guild-icon,
+.guild-btn--invite .guild-icon--text { opacity: 0.55; }
+.guild-btn--invite:hover .guild-icon,
+.guild-btn--invite:hover .guild-icon--text { opacity: 0.85; }
+
+.guild-badge--invite {
+  background: var(--color-accent);
+  font-size: 9px;
+}
+.guild-badge--invite .ti { font-size: 9px; }
+
+.rail-section-divider {
+  width: 32px;
+  height: 1px;
+  background: var(--color-border);
+  margin: 4px auto;
+  border-radius: 1px;
+}
+
 .server-skeleton {
   width: 44px; height: 44px;
   border-radius: var(--radius-md);

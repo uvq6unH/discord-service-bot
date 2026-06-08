@@ -12,6 +12,21 @@ export function GuildProvider({ children }) {
   const [saveStatus, setSaveStatus]       = useState('idle'); // 'idle' | 'saving' | 'saved' | 'error'
 
   const selectGuild = useCallback(async (guild) => {
+    // Nếu bot chưa trong server → redirect sang invite URL, không mở dashboard
+    if (!guild.botPresent) {
+      try {
+        const { url } = await api.inviteUrl(guild.id);
+        window.open(url, '_blank', 'noopener,noreferrer');
+      } catch {
+        // Fallback: build invite URL thủ công
+        const clientId = window.__BOT_CLIENT_ID__ ?? '';
+        const perms = '8'; // Administrator
+        const inviteUrl = `https://discord.com/oauth2/authorize?client_id=${clientId}&scope=bot%20applications.commands&permissions=${perms}&guild_id=${guild.id}`;
+        window.open(inviteUrl, '_blank', 'noopener,noreferrer');
+      }
+      return; // Không set selectedGuild, không load config
+    }
+
     setSelectedGuild(guild);
     setConfig(null);
     setDirty(false);
