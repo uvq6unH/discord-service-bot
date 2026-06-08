@@ -66,7 +66,7 @@ const token       = process.env.DISCORD_TOKEN;
 const sharedRedis = createUpstashFromEnv();
 const configStore = new ConfigStore(configPath);
 const stateStore  = new StateStore(statePath, { redis: sharedRedis });
-const botClient   = createBot(configStore, stateStore, sharedRedis);
+const botClient   = createBot(configStore, stateStore, redis);
 
 // Login với retry exponential backoff
 async function loginWithRetry(maxRetries = 10, baseDelay = 5000) {
