@@ -375,10 +375,21 @@ export function createServer({ configStore, stateStore, botClient, redis = null 
       } catch { /* fallback: botGuildIds rỗng */ }
     }
 
+    // Fallback: guild đã có config = bot đã từng vào và setup → coi là botPresent
+    // Điều này tránh false-negative khi Redis TTL expire hoặc bot đang khởi động
+    for (const guildId of configuredGuildIds) {
+      botGuildIds.add(guildId);
+    }
+
     for (const id of botGuildIds) {
       const canManage = isDev || manageableIds.has(id);
       if (!canManage) continue;
-      // Lấy meta từ botClient cache (monolith) hoặc Redis (split mode)
+      // Lấy meta từ botClient cache (monolith) > Redis (split mode) > OAuth userGuilds (fallback)
+      const oauthMeta = (userGuilds ?? []).find(g => g.id === id);
+      const oauthIcon = oauthMeta?.icon
+        ? `https://cdn.discordapp.com/icons/${id}/${oauthMeta.icon}.png?size=64`
+        : null;
+
       const botGuild = botClient?.guilds?.cache?.get(id);
       if (botGuild) {
         guildsById.set(id, { id, name: botGuild.name, icon: botGuild.iconURL({ size: 64 }), configured: configuredGuildIds.includes(id), botPresent: true });
@@ -388,14 +399,29 @@ export function createServer({ configStore, stateStore, botClient, redis = null 
           const meta = raw ? (typeof raw === 'string' ? JSON.parse(raw) : raw) : null;
           guildsById.set(id, {
             id,
-            name: meta?.name ?? `Server ${id}`,
-            icon: meta?.iconURL ?? null,
+            name: meta?.name ?? oauthMeta?.name ?? `Server ${id}`,
+            icon: meta?.iconURL ?? oauthIcon,
             configured: configuredGuildIds.includes(id),
             botPresent: true,
           });
         } catch {
-          guildsById.set(id, { id, name: `Server ${id}`, icon: null, configured: configuredGuildIds.includes(id), botPresent: true });
+          guildsById.set(id, {
+            id,
+            name: oauthMeta?.name ?? `Server ${id}`,
+            icon: oauthIcon,
+            configured: configuredGuildIds.includes(id),
+            botPresent: true,
+          });
         }
+      } else {
+        // Không có Redis — lấy meta từ OAuth
+        guildsById.set(id, {
+          id,
+          name: oauthMeta?.name ?? `Server ${id}`,
+          icon: oauthIcon,
+          configured: configuredGuildIds.includes(id),
+          botPresent: true,
+        });
       }
     }
 
