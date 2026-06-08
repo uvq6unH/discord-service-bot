@@ -154,6 +154,7 @@ async function writeGuildCache(guild, redis) {
 
     const membersPayload = JSON.stringify(members);
     await redis.set(GUILD_CACHE_MEMBERS_KEY(guild.id), membersPayload, 'EX', GUILD_CACHE_TTL_S);
+    redis.incr('stats:guild_cache_refresh').catch(() => null);
 
     console.log(`[guild-cache] ✅ ${guild.name} (${guild.id}) — meta ${Math.round(Buffer.byteLength(metaPayload) / 1024)}KB, members ${members.length} (${Math.round(Buffer.byteLength(membersPayload) / 1024)}KB)`);
   } catch (err) {
@@ -296,11 +297,13 @@ export function createBot(configStore, stateStore, redis = null) {
 
   client.on(Events.ShardError, (error, shardId) => {
     console.error(`[bot] Shard ${shardId} error:`, error.message);
+    if (redis) redis.incr('stats:discord_errors').catch(() => null);
     // Do NOT re-throw — discord.js handles its own reconnect logic.
   });
 
   client.on(Events.Error, (error) => {
     console.error('[bot] Client error:', error.message);
+    if (redis) redis.incr('stats:discord_errors').catch(() => null);
   });
 
   client.on(Events.Warn, (info) => {
@@ -368,12 +371,32 @@ export function createBot(configStore, stateStore, redis = null) {
         const config = await configStore.getGuildConfig(guildId).catch(() => null);
         if (!config) return;
         const result = await client.syncGuildCommands(guildId, config).catch((e) => ({ synced: false, reason: e.message }));
+        if (result.synced !== false) redis.incr('stats:slash_sync_processed').catch(() => null);
         console.log(`[slash-queue] Synced ${guildId}:`, result);
       } catch (err) {
         console.error('[slash-queue] Worker error:', err.message);
       }
     }, 5000).unref();
     console.log('[slash-queue] Worker started — polling every 5s');
+  }
+
+  // ── Bot heartbeat ──────────────────────────────────────────────────────────
+  // Writes heartbeat:bot to Redis every 30 s so the dashboard can show
+  // real bot online/offline status and cache freshness even in split mode.
+  if (redis) {
+    const writeHeartbeat = async () => {
+      try {
+        await redis.set('heartbeat:bot', JSON.stringify({
+          ts: new Date().toISOString(),
+          uptimeS: Math.floor(process.uptime()),
+          guilds: client.guilds.cache.size,
+          ready: Boolean(client.user),
+        }), 'EX', 90); // expires after 90 s — dashboard shows "offline" if missing
+      } catch { /* non-fatal */ }
+    };
+    writeHeartbeat();
+    setInterval(writeHeartbeat, 30_000).unref();
+    console.log('[heartbeat] Bot heartbeat started — writing every 30s');
   }
 
   client.on(Events.GuildMemberAdd, async (member) => {

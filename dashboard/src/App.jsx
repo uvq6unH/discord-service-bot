@@ -10,7 +10,8 @@ import MembersPage from './pages/Members.jsx';
 import CommandsPage from './pages/Commands.jsx';
 import EconomyPage from './pages/Economy.jsx';
 import ModerationPage from './pages/Moderation.jsx';
-import LolPage from './pages/Lol.jsx';
+import LolPage    from './pages/Lol.jsx';
+import SystemPage from './pages/System.jsx';
 import { api } from './api.js';
 
 function DashboardLayout() {
@@ -56,6 +57,7 @@ function DashboardLayout() {
                 <Route path="/economy"     element={<EconomyPage />} />
                 <Route path="/moderation"  element={<ModerationPage />} />
                 <Route path="/lol"         element={<LolPage />} />
+                <Route path="/system"      element={<SystemPage />} />
                 <Route path="*"            element={<Navigate to="/overview" replace />} />
               </Routes>
             </main>

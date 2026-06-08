@@ -9,6 +9,7 @@ const NAV_ITEMS = [
   { to: '/economy',    icon: 'ti-coin',              label: 'Tiền ảo' },
   { to: '/moderation', icon: 'ti-shield-check',      label: 'Kiểm duyệt' },
   { to: '/lol',        icon: 'ti-sword',             label: 'LoL & TFT' },
+  { to: '/system',     icon: 'ti-activity',          label: 'Hệ thống' },
 ];
 
 export default function PluginNav() {

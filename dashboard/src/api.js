@@ -100,4 +100,7 @@ export const api = {
 
   /** Health check */
   health: () => apiFetch('/health', {}, { allowNotOk: true }).then(r => r.json()),
+
+  /** Bot/system status — heartbeats + stats counters */
+  status: () => apiFetch('/api/status').then(r => r.json()),
 };

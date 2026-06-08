@@ -229,7 +229,7 @@ helmet (CSP + security headers)
 | GET | `/health` | ❌ |
 | GET | `/auth/login`, `/callback`, `/logout`, `/me` | ❌ |
 | GET | `/api/csrf-token` | ❌ |
-| GET | `/api/status` | ❌ (returns `botReady: false` if null) |
+| GET | `/api/status` | ❌ (returns heartbeats + stats counters from Redis) |
 | GET | `/api/guilds` | ❌ (OAuth) |
 | GET | `/api/config` | ❌ |
 | PUT | `/api/config` | ❌ (slash-sync skipped if null) |
@@ -331,6 +331,11 @@ guild_cache:{guildId}:members            → JSON members[] — separate key to 
 # Slash sync queue (dashboard writes, bot polls — Split mode Phase 2)
 slash_sync_queue                         → Redis list of JSON { guildId, requestedAt }
                                            Bot polls via lpop every 5 s.
+
+# Observability counters (bot increments, /api/status reads — Phase 3.3)
+stats:slash_sync_processed               → integer — total slash sync jobs completed by bot worker
+stats:guild_cache_refresh                → integer — total successful guild cache writes
+stats:discord_errors                     → integer — total ShardError + Error events
 
 # Economy
 guild:{guildId}:economy:{userId}         → JSON { silver, gold, diamond, lastDailyAt, lastDailyDay }

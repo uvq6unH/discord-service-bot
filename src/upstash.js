@@ -137,6 +137,10 @@ export class UpstashClient {
   rpush(key, ...values) {
     return this._request(['RPUSH', key, ...values]);
   }
+
+  llen(key) {
+    return this._request(['LLEN', key]);
+  }
 }
 
 export function createUpstashFromEnv(env = process.env) {

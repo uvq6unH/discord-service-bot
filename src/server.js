@@ -185,11 +185,58 @@ export function createServer({ configStore, stateStore, botClient, redis = null 
 
   app.get('/api/status', auth.requireAuth, readRateLimit, async (_req, res) => {
     const guildIds = await configStore.listGuildIds();
+
+    // Read heartbeats + stats counters from Redis.
+    // All reads are parallel and non-fatal.
+    let botHeartbeat = null;
+    let dashboardHeartbeat = null;
+    let stats = null;
+    if (redis) {
+      try {
+        const [rawBot, rawDash, slashSynced, cacheRefresh, discordErrors, queueLen] = await Promise.all([
+          redis.get('heartbeat:bot').catch(() => null),
+          redis.get('heartbeat:dashboard').catch(() => null),
+          redis.get('stats:slash_sync_processed').catch(() => null),
+          redis.get('stats:guild_cache_refresh').catch(() => null),
+          redis.get('stats:discord_errors').catch(() => null),
+          redis.llen('slash_sync_queue').catch(() => null),
+        ]);
+        if (rawBot) botHeartbeat = typeof rawBot === 'string' ? JSON.parse(rawBot) : rawBot;
+        if (rawDash) dashboardHeartbeat = typeof rawDash === 'string' ? JSON.parse(rawDash) : rawDash;
+        stats = {
+          slashSyncProcessed: slashSynced ? parseInt(slashSynced, 10) : 0,
+          guildCacheRefresh: cacheRefresh ? parseInt(cacheRefresh, 10) : 0,
+          discordErrors: discordErrors ? parseInt(discordErrors, 10) : 0,
+          slashQueueLength: queueLen ? parseInt(queueLen, 10) : 0,
+        };
+      } catch { /* non-fatal — return partial status */ }
+    }
+
+    // botOnline: true if botClient is live in this process OR Redis heartbeat is fresh
+    const botOnline = Boolean(botClient?.user) || Boolean(botHeartbeat?.ready);
+    const nowMs = Date.now();
+    const botHeartbeatAgeMs = botHeartbeat?.ts ? nowMs - new Date(botHeartbeat.ts).getTime() : null;
+
     res.json({
-      botReady: Boolean(botClient?.user),
+      // Legacy fields (kept for backwards compat)
+      botReady: botOnline,
       botUser: botClient?.user?.tag ?? null,
-      guildCount: botClient?.guilds?.cache?.size ?? 0,
+      guildCount: botClient?.guilds?.cache?.size ?? botHeartbeat?.guilds ?? 0,
       configuredGuilds: guildIds.length,
+      // Heartbeat fields (meaningful in split mode)
+      bot: botHeartbeat ? {
+        online: botHeartbeat.ready && botHeartbeatAgeMs < 90_000,
+        uptimeS: botHeartbeat.uptimeS,
+        guilds: botHeartbeat.guilds,
+        lastSeenMs: botHeartbeatAgeMs,
+        ts: botHeartbeat.ts,
+      } : null,
+      dashboard: dashboardHeartbeat ? {
+        uptimeS: dashboardHeartbeat.uptimeS,
+        ts: dashboardHeartbeat.ts,
+      } : null,
+      // Observability counters (Phase 3.3)
+      stats,
     });
   });
 
@@ -487,6 +534,23 @@ export function createServer({ configStore, stateStore, botClient, redis = null 
       res.status(500).json({ error: 'Internal server error' });
     }
   });
+
+  // ── Dashboard heartbeat ────────────────────────────────────────────────────
+  // Writes heartbeat:dashboard to Redis every 30 s.
+  // Allows the bot (or any consumer) to know the dashboard is alive.
+  if (redis) {
+    const writeDashboardHeartbeat = async () => {
+      try {
+        await redis.set('heartbeat:dashboard', JSON.stringify({
+          ts: new Date().toISOString(),
+          uptimeS: Math.floor(process.uptime()),
+        }), 'EX', 90);
+      } catch { /* non-fatal */ }
+    };
+    writeDashboardHeartbeat();
+    setInterval(writeDashboardHeartbeat, 30_000).unref();
+    console.log('[heartbeat] Dashboard heartbeat started — writing every 30s');
+  }
 
   return app;
 }
