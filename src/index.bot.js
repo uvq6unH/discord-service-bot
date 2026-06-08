@@ -1,10 +1,16 @@
 /**
- * index.bot.js — Bot process entry point
+ * index.bot.js — Bot process entry point (Render Worker / PM2)
  *
- * Chạy RIÊNG BIỆT với dashboard (index.server.js).
- * Không khởi động Express. Giao tiếp với Dashboard qua Redis pub/sub.
+ * KHÔNG mở HTTP server. KHÔNG expose port.
+ * Phải deploy dưới dạng Render Background Worker, không phải Web Service.
+ * Web Service mong đợi HTTP port → sẽ báo unhealthy và restart bot.
  *
- * Start:  node src/index.bot.js
+ * Giao tiếp với dashboard qua Redis:
+ *   Bot writes  → guild_cache, heartbeat:bot, stats:*
+ *   Bot reads   → slash_sync_queue (consumer)
+ *   Bot writes  → config:guild:* (qua configStore)
+ *
+ * Render: type = worker, startCommand = node src/index.bot.js
  * PM2:    xem pm2.config.cjs (app "discord-bot")
  */
 
@@ -14,11 +20,11 @@ import 'dotenv/config';
 import sodium from 'libsodium-wrappers';
 await sodium.ready;
 
-import { ConfigStore }        from './configStore.js';
-import { StateStore }         from './stateStore.js';
-import { createBot }          from './bot.js';
+import { ConfigStore } from './configStore.js';
+import { StateStore } from './stateStore.js';
+import { createBot } from './bot.js';
 import { validateBotEnvironment } from './env.js';
-import { createUpstashFromEnv }   from './upstash.js';
+import { createUpstashFromEnv } from './upstash.js';
 
 // ── Validate ─────────────────────────────────────────────────────────────────
 try {
@@ -55,18 +61,18 @@ async function shutdown(signal) {
   process.exit(0);
 }
 
-process.on('SIGINT',  () => shutdown('SIGINT'));
+process.on('SIGINT', () => shutdown('SIGINT'));
 process.on('SIGTERM', () => shutdown('SIGTERM'));
 
 // ── Boot ──────────────────────────────────────────────────────────────────────
-const configPath  = process.env.CONFIG_PATH ?? './data/configs.json';
-const statePath   = process.env.STATE_PATH  ?? './data/state.json';
-const token       = process.env.DISCORD_TOKEN;
+const configPath = process.env.CONFIG_PATH ?? './data/configs.json';
+const statePath = process.env.STATE_PATH ?? './data/state.json';
+const token = process.env.DISCORD_TOKEN;
 
 const sharedRedis = createUpstashFromEnv();
 const configStore = new ConfigStore(configPath);
-const stateStore  = new StateStore(statePath, { redis: sharedRedis });
-const botClient   = createBot(configStore, stateStore, redis);
+const stateStore = new StateStore(statePath, { redis: sharedRedis });
+const botClient = createBot(configStore, stateStore, sharedRedis);
 
 // Login với retry exponential backoff
 async function loginWithRetry(maxRetries = 10, baseDelay = 5000) {
@@ -78,8 +84,8 @@ async function loginWithRetry(maxRetries = 10, baseDelay = 5000) {
     } catch (err) {
       const isTransient =
         err.code === 'ECONNRESET' ||
-        err.code === 'ETIMEDOUT'  ||
-        err.code === 'ENOTFOUND'  ||
+        err.code === 'ETIMEDOUT' ||
+        err.code === 'ENOTFOUND' ||
         String(err.message).includes('connect') ||
         String(err.message).includes('network');
 

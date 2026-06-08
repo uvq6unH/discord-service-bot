@@ -147,9 +147,9 @@ async function writeGuildCache(guild, redis) {
       id: m.user.id,
       username: m.user.username,
       displayName: m.displayName,
-      avatar: m.user.avatar,
+      avatar: m.user.avatar ?? null,
       joinedAt: m.joinedAt ? m.joinedAt.toISOString() : null,
-      roles: [...m.roles.cache.values()].filter((r) => r.id !== guild.id).map((r) => ({ id: r.id, name: r.name, color: r.color })),
+      // roles của từng member không cache — giảm size, redundant với guild_cache meta
     })).sort((a, b) => a.displayName.localeCompare(b.displayName));
 
     const membersPayload = JSON.stringify(members);
@@ -357,27 +357,46 @@ export function createBot(configStore, stateStore, redis = null) {
 
   // ── Slash sync queue worker ────────────────────────────────────────────────
   // Dashboard pushes jobs to Redis list `slash_sync_queue` when botClient is null.
-  // Bot polls here every 5 seconds and processes them.
+  // Bot polls every 5 s. On Discord API failure, job is re-queued up to 3 times.
   if (redis) {
     const SLASH_SYNC_QUEUE = 'slash_sync_queue';
+    const MAX_RETRIES = 3;
+
     setInterval(async () => {
       try {
         const raw = await redis.lpop(SLASH_SYNC_QUEUE);
         if (!raw) return;
         let job;
         try { job = typeof raw === 'string' ? JSON.parse(raw) : raw; } catch { return; }
-        const { guildId } = job;
+
+        const { guildId, retries = 0, requestedAt } = job;
         if (!guildId) return;
+
         const config = await configStore.getGuildConfig(guildId).catch(() => null);
         if (!config) return;
-        const result = await client.syncGuildCommands(guildId, config).catch((e) => ({ synced: false, reason: e.message }));
-        if (result.synced !== false) redis.incr('stats:slash_sync_processed').catch(() => null);
-        console.log(`[slash-queue] Synced ${guildId}:`, result);
+
+        try {
+          const result = await client.syncGuildCommands(guildId, config);
+          redis.incr('stats:slash_sync_processed').catch(() => null);
+          console.log(`[slash-queue] Synced ${guildId}:`, result);
+        } catch (err) {
+          if (retries < MAX_RETRIES) {
+            // Re-queue with incremented retry count
+            await redis.rpush(SLASH_SYNC_QUEUE, JSON.stringify({
+              guildId, retries: retries + 1, requestedAt,
+              lastError: err.message, retriedAt: new Date().toISOString(),
+            }));
+            console.warn(`[slash-queue] Retry ${retries + 1}/${MAX_RETRIES} queued for ${guildId}: ${err.message}`);
+          } else {
+            console.error(`[slash-queue] Giving up on ${guildId} after ${MAX_RETRIES} retries: ${err.message}`);
+            redis.incr('stats:slash_sync_failed').catch(() => null);
+          }
+        }
       } catch (err) {
         console.error('[slash-queue] Worker error:', err.message);
       }
     }, 5000).unref();
-    console.log('[slash-queue] Worker started — polling every 5s');
+    console.log('[slash-queue] Worker started — polling every 5s, max 3 retries');
   }
 
   // ── Bot heartbeat ──────────────────────────────────────────────────────────
@@ -391,7 +410,9 @@ export function createBot(configStore, stateStore, redis = null) {
           uptimeS: Math.floor(process.uptime()),
           guilds: client.guilds.cache.size,
           ready: Boolean(client.user),
-        }), 'EX', 90); // expires after 90 s — dashboard shows "offline" if missing
+          commit: process.env.RENDER_GIT_COMMIT?.slice(0, 7) ?? process.env.GIT_COMMIT?.slice(0, 7) ?? 'unknown',
+          version: process.env.npm_package_version ?? 'unknown',
+        }), 'EX', 90);
       } catch { /* non-fatal */ }
     };
     writeHeartbeat();

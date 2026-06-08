@@ -113,6 +113,9 @@ export function createServer({ configStore, stateStore, botClient, redis = null 
     redis
   });
 
+  // Redis guild_cache TTL — phải khớp với GUILD_CACHE_TTL_S trong bot.js (900s)
+  const GUILD_CACHE_TTL_S = 900;
+
   // In-process guild list cache (userId -> {guilds, expiresAt}, 5-min TTL)
   // Shared between routes in this server instance.
   const _guildCache = new Map();
@@ -230,10 +233,14 @@ export function createServer({ configStore, stateStore, botClient, redis = null 
         guilds: botHeartbeat.guilds,
         lastSeenMs: botHeartbeatAgeMs,
         ts: botHeartbeat.ts,
+        commit: botHeartbeat.commit ?? null,
+        version: botHeartbeat.version ?? null,
       } : null,
       dashboard: dashboardHeartbeat ? {
         uptimeS: dashboardHeartbeat.uptimeS,
         ts: dashboardHeartbeat.ts,
+        commit: dashboardHeartbeat.commit ?? null,
+        version: dashboardHeartbeat.version ?? null,
       } : null,
       // Observability counters (Phase 3.3)
       stats,
@@ -254,9 +261,20 @@ export function createServer({ configStore, stateStore, botClient, redis = null 
     }
 
     const config = await configStore.updateGuildConfig(req.guildId, req.body);
-    const slashSync = botClient?.user
-      ? await botClient.syncGuildCommands(req.guildId, config).catch((e) => ({ synced: false, reason: e.message }))
-      : { synced: false, reason: 'bot_not_in_process' };
+
+    let slashSync;
+    if (botClient?.user) {
+      // Monolith: sync trực tiếp
+      slashSync = await botClient.syncGuildCommands(req.guildId, config)
+        .catch((e) => ({ synced: false, reason: e.message }));
+    } else if (redis) {
+      // Split mode: đẩy vào queue để bot worker xử lý trong 5s
+      await redis.rpush('slash_sync_queue', JSON.stringify({ guildId: req.guildId, requestedAt: new Date().toISOString() }));
+      slashSync = { synced: false, queued: true, reason: 'bot_not_in_process' };
+    } else {
+      slashSync = { synced: false, reason: 'bot_not_available' };
+    }
+
     res.json({ ...sanitizeConfigForClient(config), slashSync });
   });
 
@@ -395,7 +413,20 @@ export function createServer({ configStore, stateStore, botClient, redis = null 
           }
           members.sort((a, b) => (a.joinedAt ?? '').localeCompare(b.joinedAt ?? ''));
           const total = members.length;
-          return res.json({ total, page, members: members.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE), source: 'redis_cache' });
+          // Lấy updatedAt từ meta key để tính cache age (members key không chứa updatedAt riêng)
+          let cacheAgeMs = null;
+          try {
+            const meta = await redis.get(`guild_cache:${req.guildId}`);
+            const metaData = meta ? (typeof meta === 'string' ? JSON.parse(meta) : meta) : null;
+            if (metaData?.updatedAt) cacheAgeMs = Date.now() - new Date(metaData.updatedAt).getTime();
+          } catch { /* non-fatal */ }
+          return res.json({
+            total, page,
+            members: members.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE),
+            source: 'redis_cache',
+            cacheAgeMs,
+            stale: cacheAgeMs !== null ? cacheAgeMs > GUILD_CACHE_TTL_S * 1000 : false,
+          });
         }
       } catch (err) {
         console.warn('[members] Redis cache read failed:', err.message);
@@ -453,7 +484,13 @@ export function createServer({ configStore, stateStore, botClient, redis = null 
         const raw = await redis.get(`guild_cache:${req.guildId}`);
         if (raw) {
           const data = typeof raw === 'string' ? JSON.parse(raw) : raw;
-          return res.json({ ...data, source: 'redis_cache' });
+          const cacheAgeMs = data.updatedAt ? Date.now() - new Date(data.updatedAt).getTime() : null;
+          return res.json({
+            ...data,
+            source: 'redis_cache',
+            cacheAgeMs,
+            stale: cacheAgeMs !== null ? cacheAgeMs > GUILD_CACHE_TTL_S * 1000 : false,
+          });
         }
       } catch (err) {
         console.warn('[guild-data] Redis cache read failed:', err.message);
@@ -544,6 +581,8 @@ export function createServer({ configStore, stateStore, botClient, redis = null 
         await redis.set('heartbeat:dashboard', JSON.stringify({
           ts: new Date().toISOString(),
           uptimeS: Math.floor(process.uptime()),
+          commit: process.env.RENDER_GIT_COMMIT?.slice(0, 7) ?? process.env.GIT_COMMIT?.slice(0, 7) ?? 'unknown',
+          version: process.env.npm_package_version ?? 'unknown',
         }), 'EX', 90);
       } catch { /* non-fatal */ }
     };
