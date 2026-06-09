@@ -290,9 +290,13 @@ export function createAuthRouter(botClient) {
         headers: { Authorization: `Bearer ${accessToken}` },
         signal: ctrl.signal,
       });
-      if (!res.ok) return null;
-      return await res.json(); // array of partial guild objects with `permissions` bitmask
-    } catch {
+      if (!res.ok) {
+        console.warn(`[auth] fetchUserGuilds → HTTP ${res.status}`);
+        return null;
+      }
+      return await res.json();
+    } catch (err) {
+      console.warn(`[auth] fetchUserGuilds → exception: ${err.message}`);
       return null;
     } finally {
       clearTimeout(t);
