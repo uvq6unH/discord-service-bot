@@ -193,6 +193,8 @@ export function createAuthRouter(botClient) {
         username: user.username,
         avatar: user.avatar,
         accessToken: tokens.access_token,
+        refreshToken: tokens.refresh_token,
+        expiresAt: Date.now() + (tokens.expires_in ?? 604800) * 1000,
       };
       const returnTo = safeReturnTo(req.session.returnTo);
 
@@ -252,6 +254,34 @@ export function createAuthRouter(botClient) {
   }
 
   // Fetch danh sách guilds của user qua OAuth token, có cache ngắn hạn trong session
+  async function refreshAccessToken(req) {
+    const refreshToken = req.session?.user?.refreshToken;
+    if (!refreshToken) return null;
+    try {
+      const res = await fetch(`${DISCORD_API}/oauth2/token`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({
+          client_id: clientId,
+          client_secret: clientSecret,
+          grant_type: 'refresh_token',
+          refresh_token: refreshToken,
+        }),
+      });
+      if (!res.ok) return null;
+      const tokens = await res.json();
+      req.session.user.accessToken  = tokens.access_token;
+      req.session.user.refreshToken = tokens.refresh_token;
+      req.session.user.expiresAt    = Date.now() + (tokens.expires_in ?? 604800) * 1000;
+      await new Promise((resolve) => req.session.save(resolve));
+      console.log('[auth] Access token refreshed for', req.session.user.id);
+      return tokens.access_token;
+    } catch (err) {
+      console.warn('[auth] refreshAccessToken failed:', err.message);
+      return null;
+    }
+  }
+
   async function fetchUserGuilds(accessToken) {
     const ctrl = new AbortController();
     const t = setTimeout(() => ctrl.abort(), 10_000);
@@ -289,9 +319,8 @@ export function createAuthRouter(botClient) {
     if (!guildId) return next();
 
     try {
-      const accessToken = req.session.user.accessToken;
-      if (!accessToken) {
-        // Session cũ chưa có token — yêu cầu login lại
+      if (!req.session.user.accessToken && !req.session.user.refreshToken) {
+        // Session cũ không có token — yêu cầu login lại
         return res.status(401).json({ error: 'Phiên đăng nhập hết hạn, vui lòng đăng nhập lại.', loginUrl: '/auth/login' });
       }
 
@@ -299,6 +328,13 @@ export function createAuthRouter(botClient) {
       const userId = req.session.user.id;
       let userGuilds = getCachedGuilds(userId);
       if (!userGuilds) {
+        // Auto-refresh access token nếu đã expire
+        let accessToken = req.session.user.accessToken;
+        const expiresAt = req.session.user.expiresAt ?? 0;
+        if (Date.now() > expiresAt - 60_000) {
+          const newToken = await refreshAccessToken(req);
+          if (newToken) accessToken = newToken;
+        }
         userGuilds = await fetchUserGuilds(accessToken);
         if (userGuilds) {
           setCachedGuilds(userId, userGuilds);
