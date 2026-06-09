@@ -356,17 +356,29 @@ export function createAuthRouter(botClient, redis = null) {
         if (userGuilds) {
           await setCachedGuilds(userId, userGuilds);
         } else {
-          // Discord API unavailable (rate limit / network) — fallback: check if the
-          // user is owner of the guild via the bot's own guild cache. This covers
-          // the common case where the bot owner accesses their own server.
-          console.warn('[auth] fetchUserGuilds failed — falling back to bot guild cache for', userId);
+          // Discord API unavailable (rate limit / network).
+          // Fallback 1: botClient trực tiếp (monolith mode)
+          console.warn('[auth] fetchUserGuilds failed — falling back to guild cache for', userId);
           const botGuild = botClient?.guilds?.cache?.get(guildId);
           if (botGuild) {
             try {
               const member = await botGuild.members.fetch(userId).catch(() => null);
               if (member && (botGuild.ownerId === userId || member.permissions.has('ManageGuild') || member.permissions.has('Administrator'))) {
-                console.log('[auth] fallback guild access granted for', userId, 'in', guildId);
+                console.log('[auth] botClient fallback granted for', userId, 'in', guildId);
                 return next();
+              }
+            } catch { /* ignore */ }
+          }
+          // Fallback 2: Redis guild_cache (split mode — botClient = null)
+          if (redis) {
+            try {
+              const raw = await redis.get(`guild_cache:${guildId}`);
+              if (raw) {
+                const meta = JSON.parse(raw);
+                if (meta.ownerId === userId) {
+                  console.log('[auth] Redis guild_cache fallback granted (owner) for', userId, 'in', guildId);
+                  return next();
+                }
               }
             } catch { /* ignore */ }
           }

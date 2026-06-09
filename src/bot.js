@@ -129,6 +129,7 @@ async function writeGuildCache(guild, redis) {
       channels,
       roles,
       memberCount: guild.memberCount,
+      ownerId: guild.ownerId,
       updatedAt: new Date().toISOString(),
     });
     await redis.set(GUILD_CACHE_KEY(guild.id), metaPayload, 'EX', GUILD_CACHE_TTL_S);
