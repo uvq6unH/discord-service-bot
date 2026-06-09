@@ -22,7 +22,7 @@ await sodium.ready;
 
 import { ConfigStore } from './configStore.js';
 import { StateStore } from './stateStore.js';
-import { createBot } from './bot.js';
+import { createBot, startKeepalive } from './bot.js';
 import { validateBotEnvironment } from './env.js';
 import { createUpstashFromEnv } from './upstash.js';
 
@@ -128,4 +128,5 @@ http.createServer((req, res) => {
   }));
 }).listen(botPort, () => {
   console.log(`[bot:health] HTTP health server listening on port ${botPort}`);
+  startKeepalive(botPort);
 });

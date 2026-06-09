@@ -16,6 +16,7 @@ import { StateStore }             from './stateStore.js';
 import { createServer }           from './server.js';
 import { validateServerEnvironment } from './env.js';
 import { createUpstashFromEnv }       from './upstash.js';
+import { startKeepalive }             from './bot.js';
 
 // ── Validate ──────────────────────────────────────────────────────────────────
 try {
@@ -61,4 +62,5 @@ const app = createServer({
 
 app.listen(port, () => {
   console.log(`[server] Dashboard running at http://localhost:${port}`);
+  startKeepalive(port);
 });
