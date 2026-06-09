@@ -25,7 +25,7 @@ function safeReturnTo(value) {
   }
 }
 
-export function createAuthRouter(botClient) {
+export function createAuthRouter(botClient, redis = null) {
   const clientId = process.env.DISCORD_CLIENT_ID;
   const clientSecret = process.env.DISCORD_CLIENT_SECRET;
   const redirectUri = process.env.DISCORD_REDIRECT_URI;
@@ -78,20 +78,33 @@ export function createAuthRouter(botClient) {
 
   const router = Router();
 
-  // In-process guild cache (per user, 5-minute TTL) — avoids storing 50+ guild
-  // objects in the Redis session and logging them on every request.
-  const _guildCache = new Map(); // userId -> { guilds, expiresAt }
-  const GUILD_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+  // Guild cache — Redis-backed để survive qua restart, tránh rate limit Discord API.
+  // Fallback về in-memory Map nếu Redis không có (local dev).
+  const GUILD_CACHE_TTL = 5 * 60; // 300 giây (Redis EX)
+  const GUILD_CACHE_TTL_MS = GUILD_CACHE_TTL * 1000;
+  const _guildCacheMem = new Map(); // fallback khi không có Redis
 
-  function getCachedGuilds(userId) {
-    const entry = _guildCache.get(userId);
+  async function getCachedGuilds(userId) {
+    if (redis) {
+      try {
+        const raw = await redis.get(`auth:guild_cache:${userId}`);
+        return raw ? JSON.parse(raw) : null;
+      } catch { return null; }
+    }
+    const entry = _guildCacheMem.get(userId);
     if (!entry) return null;
-    if (Date.now() > entry.expiresAt) { _guildCache.delete(userId); return null; }
+    if (Date.now() > entry.expiresAt) { _guildCacheMem.delete(userId); return null; }
     return entry.guilds;
   }
 
-  function setCachedGuilds(userId, guilds) {
-    _guildCache.set(userId, { guilds, expiresAt: Date.now() + GUILD_CACHE_TTL });
+  async function setCachedGuilds(userId, guilds) {
+    if (redis) {
+      try {
+        await redis.set(`auth:guild_cache:${userId}`, JSON.stringify(guilds), 'EX', GUILD_CACHE_TTL);
+      } catch { /* non-fatal */ }
+      return;
+    }
+    _guildCacheMem.set(userId, { guilds, expiresAt: Date.now() + GUILD_CACHE_TTL_MS });
   }
 
   // GET /auth/login
@@ -330,7 +343,7 @@ export function createAuthRouter(botClient) {
 
       // Dùng cache guilds trong session để tránh gọi API liên tục
       const userId = req.session.user.id;
-      let userGuilds = getCachedGuilds(userId);
+      let userGuilds = await getCachedGuilds(userId);
       if (!userGuilds) {
         // Auto-refresh access token nếu đã expire
         let accessToken = req.session.user.accessToken;
@@ -341,7 +354,7 @@ export function createAuthRouter(botClient) {
         }
         userGuilds = await fetchUserGuilds(accessToken);
         if (userGuilds) {
-          setCachedGuilds(userId, userGuilds);
+          await setCachedGuilds(userId, userGuilds);
         } else {
           // Discord API unavailable (rate limit / network) — fallback: check if the
           // user is owner of the guild via the bot's own guild cache. This covers

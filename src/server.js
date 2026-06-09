@@ -142,7 +142,7 @@ export function createServer({ configStore, stateStore, botClient, redis = null 
     _guildDataCache.set(guildId, { data, expiresAt: Date.now() + GUILD_DATA_CACHE_TTL });
   }
 
-  const auth = createAuthRouter(botClient);
+  const auth = createAuthRouter(botClient, redis);
   if (auth.attachTo) auth.attachTo(app);
 
   // GET /api/invite-url?guildId=xxx — trả về link mời bot vào server cụ thể
