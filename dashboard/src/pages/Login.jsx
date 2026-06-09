@@ -9,7 +9,7 @@ export default function Login() {
         </div>
         <h1>Bot Dashboard</h1>
         <p>Đăng nhập bằng tài khoản Discord để quản lý bot.</p>
-        <a href="/auth/discord" className="btn btn-discord">
+        <a href="/auth/login" className="btn btn-discord">
           <i className="ti ti-brand-discord" />
           Đăng nhập với Discord
         </a>
