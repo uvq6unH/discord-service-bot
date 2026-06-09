@@ -1,20 +1,21 @@
 /**
- * index.bot.js — Bot process entry point (Render Worker / PM2)
+ * index.bot.js — Bot process entry point (Render Web Service / PM2)
  *
- * KHÔNG mở HTTP server. KHÔNG expose port.
- * Phải deploy dưới dạng Render Background Worker, không phải Web Service.
- * Web Service mong đợi HTTP port → sẽ báo unhealthy và restart bot.
+ * Render Free yêu cầu bind HTTP port NGAY LẬP TỨC sau khi process start.
+ * → HTTP server phải listen TRƯỚC khi login Discord.
+ * → Sau khi login xong, /health trả về bot tag + guild count thực.
  *
  * Giao tiếp với dashboard qua Redis:
  *   Bot writes  → guild_cache, heartbeat:bot, stats:*
  *   Bot reads   → slash_sync_queue (consumer)
  *   Bot writes  → config:guild:* (qua configStore)
  *
- * Render: type = worker, startCommand = node src/index.bot.js
+ * Render: type = web, startCommand = node src/index.bot.js
  * PM2:    xem pm2.config.cjs (app "discord-bot")
  */
 
 import 'dotenv/config';
+import http from 'http';
 
 // libsodium phải ready trước khi @discordjs/voice mã hoá audio
 import sodium from 'libsodium-wrappers';
@@ -45,6 +46,17 @@ process.on('uncaughtException', (error) => {
   setTimeout(() => process.exit(1), 500);
 });
 
+// ── Boot singletons ───────────────────────────────────────────────────────────
+const configPath = process.env.CONFIG_PATH ?? './data/configs.json';
+const statePath  = process.env.STATE_PATH  ?? './data/state.json';
+const token      = process.env.DISCORD_TOKEN;
+const botPort    = Number(process.env.PORT ?? 10000);
+
+const sharedRedis = createUpstashFromEnv();
+const configStore = new ConfigStore(configPath);
+const stateStore  = new StateStore(statePath, { redis: sharedRedis });
+const botClient   = createBot(configStore, stateStore, sharedRedis);
+
 // ── Graceful shutdown ─────────────────────────────────────────────────────────
 let isShuttingDown = false;
 
@@ -61,20 +73,33 @@ async function shutdown(signal) {
   process.exit(0);
 }
 
-process.on('SIGINT', () => shutdown('SIGINT'));
+process.on('SIGINT',  () => shutdown('SIGINT'));
 process.on('SIGTERM', () => shutdown('SIGTERM'));
 
-// ── Boot ──────────────────────────────────────────────────────────────────────
-const configPath = process.env.CONFIG_PATH ?? './data/configs.json';
-const statePath = process.env.STATE_PATH ?? './data/state.json';
-const token = process.env.DISCORD_TOKEN;
+// ── HTTP server — bind TRƯỚC khi login để Render detect port ngay ─────────────
+// Render zero-downtime deploy scan port ngay sau process start.
+// Nếu bind sau login (~4-5s) → Render không thấy port → deploy fail → SIGTERM.
+//
+// /health trả về bot status thực sau khi login xong.
+// Trước khi login: bot: null, guilds: 0 — vẫn trả 200 để Render pass health check.
+http.createServer((req, res) => {
+  if (req.method !== 'GET') {
+    res.writeHead(405).end();
+    return;
+  }
+  res.writeHead(200, { 'Content-Type': 'application/json' });
+  res.end(JSON.stringify({
+    status: 'ok',
+    bot:    botClient?.user?.tag   ?? null,
+    guilds: botClient?.guilds?.cache?.size ?? 0,
+    uptime: Math.floor(process.uptime()),
+  }));
+}).listen(botPort, () => {
+  console.log(`[bot:health] HTTP health server listening on port ${botPort}`);
+  startKeepalive(botPort);
+});
 
-const sharedRedis = createUpstashFromEnv();
-const configStore = new ConfigStore(configPath);
-const stateStore = new StateStore(statePath, { redis: sharedRedis });
-const botClient = createBot(configStore, stateStore, sharedRedis);
-
-// Login với retry exponential backoff
+// ── Login Discord — SAU khi HTTP server đã bind ───────────────────────────────
 async function loginWithRetry(maxRetries = 10, baseDelay = 5000) {
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     try {
@@ -83,9 +108,9 @@ async function loginWithRetry(maxRetries = 10, baseDelay = 5000) {
       return;
     } catch (err) {
       const isTransient =
-        err.code === 'ECONNRESET' ||
-        err.code === 'ETIMEDOUT' ||
-        err.code === 'ENOTFOUND' ||
+        err.code === 'ECONNRESET'   ||
+        err.code === 'ETIMEDOUT'    ||
+        err.code === 'ENOTFOUND'    ||
         String(err.message).includes('connect') ||
         String(err.message).includes('network');
 
@@ -102,31 +127,3 @@ async function loginWithRetry(maxRetries = 10, baseDelay = 5000) {
 }
 
 await loginWithRetry();
-
-// ── Minimal HTTP server ───────────────────────────────────────────────────────
-// Render Web Service (Free) yêu cầu bind HTTP port, nếu không sẽ restart liên tục.
-// Server này không phục vụ dashboard — chỉ để:
-//   1. Render health check pass (không spin down / restart)
-//   2. Uptime Robot ping giữ bot sống 24/7 miễn phí
-//
-// Endpoint duy nhất: GET /health → {"status":"ok","bot":"tag#0000","uptime":123}
-import http from 'http';
-
-const botPort = Number(process.env.PORT ?? 10000);
-
-http.createServer((req, res) => {
-  if (req.method !== 'GET') {
-    res.writeHead(405).end();
-    return;
-  }
-  res.writeHead(200, { 'Content-Type': 'application/json' });
-  res.end(JSON.stringify({
-    status: 'ok',
-    bot: botClient?.user?.tag ?? null,
-    guilds: botClient?.guilds?.cache?.size ?? 0,
-    uptime: Math.floor(process.uptime()),
-  }));
-}).listen(botPort, () => {
-  console.log(`[bot:health] HTTP health server listening on port ${botPort}`);
-  startKeepalive(botPort);
-});
