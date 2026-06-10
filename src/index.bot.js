@@ -87,8 +87,10 @@ http.createServer((req, res) => {
     res.writeHead(405).end();
     return;
   }
-  res.writeHead(200, { 'Content-Type': 'application/json' });
-  if (req.method === 'HEAD') { res.end(); return; }
+  if (req.method === 'HEAD') {
+    res.writeHead(200, { 'Content-Type': 'application/json' }).end();
+    return;
+  }
   res.writeHead(200, { 'Content-Type': 'application/json' });
   res.end(JSON.stringify({
     status: 'ok',
