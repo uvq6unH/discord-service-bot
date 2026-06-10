@@ -411,8 +411,11 @@ export function createBot(configStore, stateStore, redis = null) {
           uptimeS: Math.floor(process.uptime()),
           guilds: client.guilds.cache.size,
           ready: Boolean(client.user),
+          tag: client.user?.tag ?? null,
           commit: process.env.RENDER_GIT_COMMIT?.slice(0, 7) ?? process.env.GIT_COMMIT?.slice(0, 7) ?? 'unknown',
           version: process.env.npm_package_version ?? 'unknown',
+          riotApiKeyConfigured: Boolean(process.env.RIOT_API_KEY),
+          tftApiKeyConfigured: Boolean(process.env.TFT_API_KEY),
         }), 'EX', 90);
       } catch { /* non-fatal */ }
     };

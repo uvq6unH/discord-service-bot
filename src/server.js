@@ -223,7 +223,7 @@ export function createServer({ configStore, stateStore, botClient, redis = null 
     res.json({
       // Legacy fields (kept for backwards compat)
       botReady: botOnline,
-      botUser: botClient?.user?.tag ?? null,
+      botUser: botClient?.user?.tag ?? botHeartbeat?.tag ?? null,
       guildCount: botClient?.guilds?.cache?.size ?? botHeartbeat?.guilds ?? 0,
       configuredGuilds: guildIds.length,
       // Heartbeat fields (meaningful in split mode)
@@ -249,7 +249,21 @@ export function createServer({ configStore, stateStore, botClient, redis = null 
 
   app.get('/api/config', auth.requireAuth, readRateLimit, requireGuildId, auth.requireGuildAccess, async (req, res) => {
     const config = await configStore.getGuildConfig(req.guildId);
-    res.json(sanitizeConfigForClient(config));
+    const sanitized = sanitizeConfigForClient(config);
+    // Split mode: riotApiKey có thể từ env var của bot process.
+    // Dashboard process không có env đó → tính sai riotApiKeyConfigured.
+    // Đọc từ bot heartbeat để lấy trạng thái đúng.
+    if (!sanitized.riotApiKeyConfigured && redis) {
+      try {
+        const raw = await redis.get('heartbeat:bot');
+        if (raw) {
+          const hb = JSON.parse(raw);
+          if (hb.riotApiKeyConfigured) sanitized.riotApiKeyConfigured = true;
+          if (hb.tftApiKeyConfigured)  sanitized.tftApiKeyConfigured  = true;
+        }
+      } catch { /* non-fatal */ }
+    }
+    res.json(sanitized);
   });
 
   app.put('/api/config', auth.requireAuth, writeRateLimit, requireGuildId, auth.requireGuildAccess, async (req, res) => {

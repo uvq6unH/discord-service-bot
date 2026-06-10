@@ -98,8 +98,7 @@ export default function LolPage() {
             Key <strong>Development</strong> bị rate limit thấp — Production key cần approval của Riot.
           </p>
           <p className="form-hint" style={{ marginTop: 4 }}>
-            Key được giữ trong memory server, không lưu vào Redis. Restart server = cần nhập lại trừ khi
-            set biến môi trường <code>RIOT_API_KEY</code> / <code>TFT_API_KEY</code>.
+            Key được lưu vào Redis và persist qua restart. Nhập key rồi bấm <strong>Lưu thay đổi</strong> ở cuối trang.
           </p>
         </SectionCard>
 
