@@ -34,7 +34,7 @@ src/index.js → bot + dashboard in the same process
 ```
 src/index.bot.js    → Discord client process
 src/index.server.js → Express dashboard process
-Communication: Upstash Redis (shared state, config, sessions)
+Communication: Upstash Redis (shared state, config, sessions, event queues)
 ```
 
 ```
@@ -42,20 +42,21 @@ Communication: Upstash Redis (shared state, config, sessions)
 │   discord-bot        │ ◄───── shared state ──────► │   discord-dashboard     │
 │   (index.bot.js)     │       configs               │   (index.server.js)     │
 │                      │       sessions              │                         │
-│  • Discord Gateway   │       distributed locks     │  • Express + OAuth2     │
-│  • Slash commands    │                             │  • REST API             │
-│  • Music (Lavalink)  │                             │  • React SPA (Vite)     │
+│  • Discord Gateway   │       event queues          │  • Express + OAuth2     │
+│  • Slash commands    │       heartbeats            │  • REST API             │
+│  • Music (Lavalink)  │       stats counters        │  • React SPA (Vite)     │
 │  • Economy / Games   │                             │  • Guild config UI      │
-│  • Riot API          │                             │                         │
+│  • Riot / TFT API    │                             │                         │
 └──────────────────────┘                             └─────────────────────────┘
 ```
 
 **Design principles:**
-- **Redis-first persistence:** All state lives in Upstash Redis. JSON files are local-dev fallback only.
-- **Granular Redis keys:** Each subsystem uses its own key (`guild:{id}:economy:{userId}`) — avoids contention on concurrent writes.
-- **Distributed locking:** `withRedisLock()` (Redis) or `asyncMutex` (single-process). Safe to scale horizontally.
-- **Per-guild isolation:** Config and state are all keyed by `guildId`.
-- **`botClient` optional:** `server.js` accepts `botClient` (can be `null`). Guild data routes use Redis `guild_cache` as primary source; 503 only when cache is cold AND no botClient. `/api/slash-sync` queues to Redis instead of returning 503.
+
+- **Redis-first persistence:** All persistent state lives in Upstash Redis. Local JSON files (`data/configs.json`, `data/state.json`) are local-dev fallbacks only — never used in production.
+- **Granular Redis keys:** Each subsystem uses its own namespaced key (e.g. `guild:{id}:economy:{userId}`) to avoid contention on concurrent writes.
+- **Distributed locking:** `withRedisLock()` in Redis mode, `asyncMutex` in single-process mode. Safe to scale horizontally.
+- **Per-guild isolation:** All config and runtime state is keyed by `guildId`.
+- **`botClient` optional in dashboard:** `createServer()` accepts `botClient = null`. Guild data routes read from Redis `guild_cache`; the 503 only fires on a cold cache miss with no bot present.
 
 ---
 
@@ -70,9 +71,9 @@ Discord API ◄─────────────────────�
 │ src/index.js  ← MONOLITH ENTRY (Mode A)                            │
 │  • validateEnvironment()          (bot + server vars)               │
 │  • createUpstashFromEnv()  → redis                                  │
-│  • new ConfigStore() + new StateStore()   ← shared singletons       │
-│  • createBot(configStore, stateStore)     ← real botClient          │
-│  • createServer({ botClient, ... })       ← dashboard sees bot      │
+│  • new ConfigStore() + new StateStore()                             │
+│  • createBot(configStore, stateStore, redis)                        │
+│  • createServer({ botClient, configStore, stateStore, redis })      │
 │  • loginWithRetry() → app.listen() → startKeepalive()              │
 └─────────────────────────────────────────────────────────────────────┘
 
@@ -81,19 +82,19 @@ Discord API ◄─────────────────────�
 │  • validateBotEnvironment()                                         │
 │  • createUpstashFromEnv() → sharedRedis                             │
 │  • new ConfigStore() + new StateStore()                             │
-│  • createBot(configStore, stateStore)                               │
-│  • loginWithRetry() — no HTTP server, no keepalive                  │
+│  • createBot(configStore, stateStore, sharedRedis)                  │
+│  • HTTP health server binds BEFORE login (Render port detection)    │
+│  • loginWithRetry()                                                 │
 └─────────────────────────────────────────────────────────────────────┘
 
 ┌─────────────────────────────────────────────────────────────────────┐
 │ src/index.server.js  ← DASHBOARD ENTRY (Mode B)                    │
 │  • validateServerEnvironment()                                      │
-│  • createUpstashFromEnv() → sharedRedis  (same Redis instance)     │
+│  • createUpstashFromEnv() → sharedRedis                             │
 │  • new ConfigStore() + new StateStore()                             │
 │  • createServer({ botClient: null, ... })                           │
-│    → /api/guild-data, /api/members read guild_cache from Redis  │
-│    → /api/slash-sync pushes to slash_sync_queue (no 503)        │
-│    → /api/config, /api/guilds, /api/state work normally             │
+│    → /api/guild-data, /api/members  read guild_cache from Redis     │
+│    → /api/slash-sync               pushes to slash_sync_queue       │
 │  • app.listen(PORT)                                                 │
 └─────────────────────────────────────────────────────────────────────┘
 ```
@@ -104,34 +105,37 @@ Discord API ◄─────────────────────�
 
 ### Why two modes?
 
-| Concern | Mode A (Monolith) | Mode B (2-process) |
-|---------|-------------------|--------------------|
+| Concern | Mode A (Monolith) | Mode B (Split) |
+|---------|-------------------|----------------|
 | Render Free plan | ✅ 1 web service | ❌ Worker not supported |
-| Music memory leak crashes dashboard | ❌ Same process | ✅ Isolated |
-| Restart bot without dropping users | ❌ | ✅ |
+| Music memory leak isolated from dashboard | ❌ Same process | ✅ Separate processes |
+| Restart bot without dropping dashboard | ❌ | ✅ |
 | Deployment simplicity | ✅ | More complex |
-| Dashboard sees bot guild cache | ✅ Direct | ✅ Via Redis guild_cache (Phase 1) |
+| Dashboard sees live guild data | ✅ Direct | ✅ Via Redis guild_cache |
 
-### Mode B limitations (botClient = null in dashboard process)
+### Mode B — botClient = null in dashboard process
 
-> Phase 1 + Phase 2 (PLAN.md) are complete — the three previously-broken routes now work via Redis.
+All three previously-problematic routes are fully resolved via Redis:
 
-| Route | Mode B |
-|-------|--------|
-| `GET /api/guild-data` | ✅ reads `guild_cache:{guildId}` from Redis; **503** only on cache miss |
-| `GET /api/members` | ✅ reads `guild_cache:{guildId}` from Redis; **503** only on cache miss |
+| Route | Mode B behaviour |
+|-------|-----------------|
+| `GET /api/guild-data` | ✅ reads `guild_cache:{guildId}`; **503** only on cold cache miss |
+| `GET /api/members` | ✅ reads `guild_cache:{guildId}:members`; **503** only on cold cache miss |
 | `POST /api/slash-sync` | ✅ pushes job to `slash_sync_queue` Redis list; bot picks up within 5 s |
 | `GET /api/guilds` | ✅ (OAuth) |
-| `GET /api/config` | ✅ (Redis) |
-| `PUT /api/config` | ✅ (Redis, slash-sync skipped if botClient null) |
-| `GET /api/state` | ✅ (stateStore directly via Redis) |
+| `GET /api/config` | ✅ (Redis via ConfigStore) |
+| `PUT /api/config` | ✅ (Redis; slash-sync skipped if botClient null) |
+| `GET /api/state` | ✅ (StateStore directly via Redis) |
+| `GET /api/status` | ✅ (reads heartbeat:bot + heartbeat:dashboard + stats counters) |
 
 ### Inter-process communication (Mode B)
 
 No direct IPC. Everything flows through Redis:
 ```
-Bot writes → Redis ← Dashboard reads
-             (ConfigStore, StateStore, SessionStore)
+Bot writes  → guild_cache, heartbeat:bot, stats:*
+Bot reads   ← slash_sync_queue (polled every 5 s)
+Dashboard writes → slash_sync_queue, config:guild:*
+Dashboard reads  ← guild_cache, heartbeat:*, stats:*, config:*
 ```
 
 ---
@@ -141,43 +145,51 @@ Bot writes → Redis ← Dashboard reads
 ### Monolith (`src/index.js`)
 
 ```
-1. sodium.ready              (voice encryption)
-2. validateEnvironment()     (bot + server env vars)
+1. sodium.ready              (voice encryption pre-requisite)
+2. validateEnvironment()     (bot + server vars)
 3. createUpstashFromEnv()    → redis
-4. new ConfigStore()         → guild configs
-5. new StateStore()          → ready (Redis mode)
+4. new ConfigStore()         → guild configs (Redis-backed)
+5. new StateStore()          → runtime state (Redis-backed)
 6. createBot(...)            → Discord Client (not yet logged in)
-7. createServer({ botClient, ... })   → Express app (not yet listening)
+7. createServer({ botClient, ... }) → Express app (not yet listening)
 8. loginWithRetry()          → client.login(token)
-   └─ 10 attempts, backoff 5s→30s, retry transient errors only
+   └─ up to 10 attempts, exponential backoff 5 s → 30 s, transient errors only
 9. app.listen(PORT)          → HTTP server open
-10. startKeepalive(port)     → ping /health every 5 minutes
+10. startKeepalive(port)     → pings /health every 5 minutes
 
 After ClientReady:
   ├─ initLavalink()
   ├─ purgeStaleGameSessions()
   ├─ syncGuildCommands() per guild
-  └─ setInterval(reminderWorker, 60s)
+  ├─ writeGuildCache() for all guilds → guild_cache:* (Redis)
+  ├─ setInterval(writeGuildCache, 10 min)
+  ├─ setInterval(pollSlashSyncQueue, 5 s)
+  ├─ setInterval(heartbeatWriter, 30 s)  → heartbeat:bot (TTL 90 s)
+  └─ setInterval(reminderWorker, 60 s)
 ```
 
 ### Bot process (`src/index.bot.js`)
 
 ```
 1. sodium.ready
-2. validateBotEnvironment()  (DISCORD_TOKEN + Redis in prod)
+2. validateBotEnvironment()
 3. createUpstashFromEnv() + ConfigStore + StateStore
-4. createBot()
-5. loginWithRetry()
-   ↳ No HTTP server, no keepalive
+4. createBot(configStore, stateStore, sharedRedis)
+5. http.createServer().listen(PORT)    ← binds BEFORE login (Render port detection)
+   └─ /health responds 200 immediately; bot tag populated after login
+6. loginWithRetry()
+   └─ same retry logic as monolith
 ```
+
+> **Why HTTP before login?** Render's zero-downtime deploy scans for an open port immediately after process start. Binding after `client.login()` (~4–5 s) causes Render to miss the port, triggering a SIGTERM.
 
 ### Dashboard process (`src/index.server.js`)
 
 ```
-1. validateServerEnvironment()  (OAuth + SESSION_SECRET)
+1. validateServerEnvironment()   (OAuth vars, SESSION_SECRET ≥ 32 chars, Redis in prod)
 2. createUpstashFromEnv() + ConfigStore + StateStore
 3. createServer({ botClient: null, ... })
-4. app.listen(PORT)   ← default 10000
+4. app.listen(PORT)              ← default 10000
 ```
 
 ---
@@ -186,19 +198,19 @@ After ClientReady:
 
 ### 5.1 Entry Points
 
-| File | Used for | HTTP? | Keepalive? |
-|------|----------|-------|------------|
-| `src/index.js` | Monolith (1 process) | ✅ | ✅ |
-| `src/index.bot.js` | Bot-only (2-process) | ❌ | ❌ |
-| `src/index.server.js` | Dashboard-only (2-process) | ✅ | ❌ |
+| File | Purpose | HTTP | Keepalive |
+|------|---------|------|-----------|
+| `src/index.js` | Monolith (1 process) | ✅ Express | ✅ |
+| `src/index.bot.js` | Bot-only (split mode) | ✅ minimal health server | ✅ |
+| `src/index.server.js` | Dashboard-only (split mode) | ✅ Express | ❌ |
 
 #### `src/env.js` — Environment Validator
 
 | Export | Used by | Validates |
 |--------|---------|-----------|
 | `validateBotEnvironment()` | `index.bot.js` | `DISCORD_TOKEN`, Redis (prod) |
-| `validateServerEnvironment()` | `index.server.js` | OAuth vars, `SESSION_SECRET` ≥32 chars, Redis (prod) |
-| `validateEnvironment()` | `index.js` (monolith) | Both sets above |
+| `validateServerEnvironment()` | `index.server.js` | OAuth vars, `SESSION_SECRET` ≥ 32 chars, Redis (prod) |
+| `validateEnvironment()` | `index.js` | Both sets combined |
 
 ---
 
@@ -206,37 +218,37 @@ After ClientReady:
 
 #### `src/server.js` — Express Application
 
-`createServer({ configStore, stateStore, botClient, redis })`:
+`createServer({ configStore, stateStore, botClient, redis })`
 
-- `botClient` can be `null` (dashboard-only mode) or a real Discord Client (monolith)
-- All state-reading routes use the injected `stateStore` — not `botClient.stateStore`
-- Routes requiring bot cache: guarded with `if (!botClient)` → returns 503
+- `botClient` may be `null` (split-mode dashboard) or a live Discord Client (monolith).
+- State-reading routes use injected `stateStore`, never `botClient.stateStore`.
+- Routes requiring live bot data are guarded by Redis cache fallback first, then 503.
 
-**Middleware stack:**
+**Middleware stack (in order):**
 ```
 helmet (CSP + security headers)
-  ↓ expressSession (cookie "dsession", store: Upstash Redis)
-  ↓ express.json (limit: 128kb)
-  ↓ Rate limiters (read: 60/min, write: 20/min)
+  ↓ expressSession (cookie "dsession" → Upstash Redis store)
+  ↓ express.json (limit: 128 kb)
+  ↓ rate limiters (read: 60/min, write: 20/min, keyed by IP + userId)
   ↓ CSRF validation (POST/PUT require X-CSRF-Token header)
   ↓ auth.requireAuth / requireGuildAccess (per route)
 ```
 
 **Route summary:**
 
-| Method | Path | Requires bot? |
-|--------|------|---------------|
+| Method | Path | Bot required? |
+|--------|------|--------------|
 | GET | `/health` | ❌ |
 | GET | `/auth/login`, `/callback`, `/logout`, `/me` | ❌ |
 | GET | `/api/csrf-token` | ❌ |
-| GET | `/api/status` | ❌ (returns heartbeats + stats counters from Redis) |
+| GET | `/api/status` | ❌ (reads heartbeat + stats counters from Redis) |
 | GET | `/api/guilds` | ❌ (OAuth) |
-| GET | `/api/config` | ❌ |
-| PUT | `/api/config` | ❌ (slash-sync skipped if null) |
-| POST | `/api/slash-sync` | ⚡ Redis queue fallback (no 503 in split mode) |
-| GET | `/api/state` | ❌ (stateStore directly) |
-| GET | `/api/guild-data` | ⚡ Redis `guild_cache` fallback; 503 only on cache miss |
-| GET | `/api/members` | ⚡ Redis `guild_cache` fallback; 503 only on cache miss |
+| GET | `/api/config` | ❌ (ConfigStore / Redis) |
+| PUT | `/api/config` | ❌ (slash-sync skipped if botClient null) |
+| POST | `/api/slash-sync` | ⚡ queued to Redis; instant if botClient present |
+| GET | `/api/state` | ❌ (StateStore / Redis) |
+| GET | `/api/guild-data` | ⚡ Redis `guild_cache` fallback; 503 on cold miss only |
+| GET | `/api/members` | ⚡ Redis `guild_cache:members` fallback; 503 on cold miss only |
 | GET | `/api/invite-url` | ❌ |
 | GET | `/api/keepalive-status` | ❌ |
 
@@ -244,65 +256,178 @@ helmet (CSP + security headers)
 
 #### `src/auth.js` — Discord OAuth2
 
-`requireGuildAccess` uses `botClient?.guilds?.cache` (optional chaining) — safe when `botClient = null`.
-
-Fallback permission check: if Discord OAuth unavailable → try bot guild cache (if present) → 403.
+- `requireGuildAccess` uses optional chaining on `botClient?.guilds?.cache` — null-safe.
+- Permission fallback order: Discord OAuth token → bot guild cache (if present) → 403.
 
 ---
 
-#### `src/bot.js` — Discord Client Factory + keepalive
+#### `src/bot.js` — Discord Client Factory
 
-- `createBot(configStore, stateStore, redis?)` → Discord Client
-  - `redis` param is optional — when present, enables guild cache writing and slash sync queue worker
-  - On `ClientReady`: writes `guild_cache:{guildId}` (meta) + `guild_cache:{guildId}:members` for all guilds, sets 10-min refresh interval
-  - On `GuildCreate` / `GuildUpdate`: immediately refreshes both keys
-  - Slash sync queue: polls `slash_sync_queue` every 5 s via `setInterval` (only when `redis` present)
-- `startKeepalive(port)` → **separate export**, only called from `index.js` after the HTTP server is listening
+`createBot(configStore, stateStore, redis?)`
+
+- `redis` is optional; when present it enables guild cache writes and the slash-sync queue worker.
+- On `ClientReady`: writes `guild_cache:{guildId}` (meta) and `guild_cache:{guildId}:members` for every guild; starts 10-min refresh interval.
+- On `GuildCreate` / `GuildUpdate`: immediately refreshes both keys.
+- Slash sync queue: polls `slash_sync_queue` via `lpop` every 5 s (only when `redis` present).
+- Heartbeat: writes `heartbeat:bot` every 30 s with `{ ts, uptimeS, guilds, ready }`. TTL = 90 s.
+- Stats counters: increments `stats:slash_sync_processed`, `stats:guild_cache_refresh`, `stats:discord_errors` (fire-and-forget, non-fatal).
+
+`startKeepalive(port)` — separate export, called only from `index.js` and `index.bot.js` after HTTP binds.
 
 ---
 
 ### 5.3 Data Layer
 
-#### `src/stateStore.js` — Runtime State (granular Redis keys)
+#### `src/stateStore.js` — Runtime State
 
-`stateStore` is injected into both `createBot` and `createServer`. In 2-process mode, the dashboard uses `stateStore` directly over Redis — no bot process required.
+Granular Redis key-per-entity model. Each subsystem (economy, levels, tickets, games, Riot accounts) has its own key space.
 
-**`/api/state` reads from:**
-- `stateStore.getLeaderboard()` → ranked user count
-- `stateStore._rGet(ticketCounter)` → next ticket number
+In split mode, the dashboard reads from `stateStore` directly over Redis — no bot process needed.
 
-#### `src/configStore.js` — Guild Config (Redis)
+Key operations exposed: `tryDebitBalance`, `adjustBalance`, `getLeaderboard`, `setGameSession`, `withGameSessionLock`, `addWarning`, `getWarnings`.
 
-All config is stored in Redis. The JSON file (`CONFIG_PATH`) is a fallback for local dev only (when Redis env vars are not set).
+#### `src/configStore.js` — Guild Config
 
-`riotApiKey` / `tftApiKey` are never persisted to Redis — in-memory only.
+Redis-backed (`config:guild:{guildId}`). Local JSON file is a local-dev fallback only.
+
+`riotApiKey` and `tftApiKey` are never persisted to Redis — in-memory only, cleared on process restart.
+
+`configPatch.js` exports `pickBoolean` and `pickFlag` helpers to safely merge partial API patches without clobbering existing values.
+
+#### `src/upstash.js` — Redis Client
+
+Minimal hand-rolled Upstash REST client (no SDK dependency). Supports: `get`, `set`, `del`, `incr`, `expire`, `smembers`, `sadd`, `eval`, `lpop`, `rpush`, `llen`, `pipeline`. Each request has a built-in 8 s timeout and up to 2 automatic retries with 200 ms / 400 ms backoff.
+
+#### `src/distributedLock.js` / `src/asyncMutex.js`
+
+`withRedisLock(redis, key, ttlS, fn)` — Redis-based distributed lock using `EVAL` + Lua for atomic acquire/release.
+
+`asyncMutex` — in-process fallback for local dev when Redis is unavailable.
+
+---
+
+### 5.4 Command System
+
+#### `src/bot/commands/index.js` — Command Router
+
+Chains through an ordered list of domain handlers:
+
+```
+handleHelp → handleGeneral → handleModeration → handleLevels
+  → handleEconomy → handlePanels → handleRiot
+```
+
+First handler to return a non-`undefined` value wins. Falls through to the configured `command.response` template.
+
+#### `src/bot/commands/runtime.js` — Command Context
+
+`createCommandContext({ client, config, command, source, args })` normalises slash interactions and legacy prefix messages into a single `ctx` object with `{ guild, channel, user, reply, isInteraction, actorMember, permissions, ... }`.
+
+Permission check (`memberCanUseCommand`) runs before any handler. Auto-defer fires for command types listed in `AUTO_DEFER_COMMAND_TYPES`.
+
+#### Handler files (`src/bot/commands/handlers/`)
+
+| File | Commands handled |
+|------|-----------------|
+| `help.js` | `/help` |
+| `general.js` | `/ping`, `/config`, `/server`, `/user`, `/avatar`, `/say`, `/remindme` |
+| `moderation.js` | `/warn`, `/warnings`, `/clearwarnings`, `/kick`, `/ban`, `/purge`, `/ticket` |
+| `levels.js` | `/level`, `/leaderboard` |
+| `economy.js` | `/balance`, `/daily`, `/transfer`, `/blackjack`, `/coinflip`, `/slots` |
+| `panels.js` | `/panel` |
+| `riot.js` | `/lol-link`, `/lol-profile`, `/lol-match`, `/tft-link`, `/tft-profile` |
+
+---
+
+### 5.5 Riot / League of Legends Integration
+
+#### `src/lolApi.js` — Riot API + Data Dragon Wrapper
+
+Covers: Account-v1, Summoner-v4, League-v4, Match-v5, Champion-Mastery-v4, Data Dragon (champions, items, runes, patch version).
+
+- All Riot API calls go through a throttled queue (20 req/s, 100 req/2 min — free tier).
+- Static DDragon data cached in-memory with 1-hour TTL.
+- Profile and match history responses cached 2 minutes.
+- All endpoints use puuid-based paths (summoner ID endpoints are deprecated as of 2024).
+- Region routing: uses `accountRouting` map for Account-v1 (VN2 → asia), `routing` map for Match-v5 (VN2 → sea).
+
+#### `src/tftApi.js` — TFT API Wrapper
+
+Same structure as `lolApi.js` but for TFT endpoints (TFT-Summoner-v1, TFT-League-v1, TFT-Match-v1, TFT-Champion-Mastery-v1).
+
+#### `src/riot/helpers.js` — Shared Riot Utilities
+
+Format helpers shared by both `lolCommands.js` and `tftCommands.js`.
+
+#### Riot account storage (Redis)
+
+```
+guild:{guildId}:lolAccount:{userId}  → { riotId, puuid, region, linkedAt }
+guild:{guildId}:tftAccount:{userId}  → { riotId, puuid, region, linkedAt }
+```
+
+Accounts are linked per user per guild. The `puuid` (not the deprecated summoner ID) is the persistent identifier.
+
+---
+
+### 5.6 Music
+
+`src/bot/music/lavalink.js` — Lavalink client wrapper. Manages player lifecycle (join, play, skip, stop, queue). Lavalink server runs as a separate Java process (see `lavalink/` directory and `lavalink/fly.toml` for Fly.io deploy).
+
+---
+
+### 5.7 Remaining Utilities
+
+| File | Purpose |
+|------|---------|
+| `src/cooldowns.js` | Per-command cooldown tracking (in-memory Map) |
+| `src/commandAccess.js` | `memberCanUseCommand` — role/channel/permission checks |
+| `src/bot/interactions.js` | Button/select-menu interaction router |
+| `src/bot/games.js` | Blackjack, coinflip, slots game logic |
+| `src/bot/help.js` | Dynamic help text generation |
+| `src/bot/slash.js` | Slash command registration builder |
+| `src/bot/embeds.js` | Shared Discord embed helpers |
+| `src/bot/responses.js` | Template renderer (`{ping}`, `{userId}`, etc.) |
+| `src/bot/logging.js` | `sendLog()` — sends formatted log to guild log channel |
+| `src/bot/constants.js` | `AUTO_DEFER_COMMAND_TYPES` and other constants |
+| `src/safeJson.js` | JSON parse that returns null on error |
+| `src/csrf.js` | CSRF token generation and validation |
+| `src/rateLimit.js` | Express rate limiter middleware |
+| `src/sessionStore.js` | `UpstashSessionStore` for express-session |
 
 ---
 
 ## 6. Frontend — dashboard/
 
-React SPA (Vite) → build → `public-react/` → served by Express.
+React SPA (Vite) → built to `public-react/` → served by Express as static files.
 
 ```
 dashboard/src/
-  api.js           ← apiFetch + auto CSRF attachment + 401 redirect
+  api.js              ← apiFetch wrapper: auto-attaches CSRF token, redirects on 401
   contexts/
-    AuthContext     ← useAuth() — /auth/me
-    GuildContext    ← useGuild() — config, guildData, save
+    AuthContext.jsx   ← useAuth() — wraps /auth/me
+    GuildContext.jsx  ← useGuild() — config, guildData, updateConfig, saveConfig
   components/
-    ServerRail      ← guild icon list (72px sidebar)
-    PluginNav       ← nav sidebar (220px)
-    ui.jsx          ← SaveBar, Toggle, ChannelSelect, RoleSelect, ...
+    ServerRail.jsx    ← 72 px guild icon sidebar
+    PluginNav.jsx     ← 220 px feature nav sidebar
+    ui.jsx            ← SaveBar, Toggle, ChannelSelect, RoleSelect, Spinner, SectionCard
   pages/
-    Login, Overview, Members, Commands, Economy, Moderation, Lol
+    Login.jsx         ← Discord OAuth entry point
+    Overview.jsx      ← Guild summary + welcome config
+    Members.jsx       ← Member list
+    Commands.jsx      ← Custom command editor
+    Economy.jsx       ← Economy settings
+    Moderation.jsx    ← Moderation settings
+    Lol.jsx           ← LoL / TFT API key config + command reference
+    System.jsx        ← Bot/dashboard heartbeat, slash queue length, stats counters
 ```
 
-`api.saveConfig` → `PUT /api/config` (matches `app.put` in server.js)
+`GuildContext.saveConfig()` → `PUT /api/config` → `configStore.updateGuildConfig()` → `SET config:guild:{guildId}` in Redis.
 
 ### Dev workflow
 
 ```bash
-# Terminal 1: Express API
+# Terminal 1: Express API (no bot)
 node src/index.server.js   # :10001
 
 # Terminal 2: Vite dev server
@@ -315,27 +440,27 @@ pnpm dev:ui                # :5173 (proxies /api → :10001)
 
 ```
 # Config
-config:_index                            → JSON string[]
+config:_index                            → JSON string[] (all guild IDs with config)
 config:guild:{guildId}                   → JSON config object
 
-# Guild cache (bot writes, dashboard reads — Split mode Phase 1)
-guild_cache:{guildId}                    → JSON { name, iconURL, channels[], roles[], memberCount, updatedAt }
-                                           Small (~5–20 KB). TTL: 900 s (15 min).
-                                           Read by /api/guild-data (channels + roles for dashboard dropdowns).
-guild_cache:{guildId}:members            → JSON members[] — separate key to avoid Upstash 1MB limit
-                                           Scales with guild size (~200 B × member count).
-                                           Read only by /api/members. TTL: 900 s (15 min).
-                                           Bot refreshes both keys every 10 min on setInterval,
-                                           and immediately on GuildCreate / GuildUpdate events.
+# Guild cache (bot writes → dashboard reads)
+guild_cache:{guildId}                    → JSON { name, iconURL, channels[], roles[], memberCount, ownerId, updatedAt }
+                                           TTL: 900 s (15 min). Used by /api/guild-data.
+guild_cache:{guildId}:members            → JSON members[] (separate key — avoids Upstash 1 MB limit)
+                                           TTL: 900 s (15 min). Used by /api/members.
 
-# Slash sync queue (dashboard writes, bot polls — Split mode Phase 2)
+# Slash sync queue (dashboard writes → bot polls)
 slash_sync_queue                         → Redis list of JSON { guildId, requestedAt }
                                            Bot polls via lpop every 5 s.
 
-# Observability counters (bot increments, /api/status reads — Phase 3.3)
-stats:slash_sync_processed               → integer — total slash sync jobs completed by bot worker
-stats:guild_cache_refresh                → integer — total successful guild cache writes
-stats:discord_errors                     → integer — total ShardError + Error events
+# Heartbeats (TTL 90 s — absence = offline)
+heartbeat:bot                            → JSON { ts, uptimeS, guilds, ready }
+heartbeat:dashboard                      → JSON { ts, uptimeS }
+
+# Stats counters (bot increments, /api/status reads)
+stats:slash_sync_processed               → integer
+stats:guild_cache_refresh                → integer
+stats:discord_errors                     → integer
 
 # Economy
 guild:{guildId}:economy:{userId}         → JSON { silver, gold, diamond, lastDailyAt, lastDailyDay }
@@ -349,12 +474,12 @@ guild:{guildId}:levels:_members          → Set<userId>
 guild:{guildId}:warnings:{userId}        → JSON Warning[]
 
 # Tickets
-guild:{guildId}:tickets:nextNumber       → string number (INCR-safe)
+guild:{guildId}:tickets:nextNumber       → string (INCR-safe counter)
 
 # Games
-guild:{guildId}:game:{type}:{messageId}  → JSON session
+guild:{guildId}:game:{type}:{messageId}  → JSON session (TTL 30 s)
 
-# Riot Accounts
+# Riot accounts
 guild:{guildId}:lolAccount:{userId}      → JSON { riotId, puuid, region, linkedAt }
 guild:{guildId}:tftAccount:{userId}      → JSON { riotId, puuid, region, linkedAt }
 
@@ -362,20 +487,18 @@ guild:{guildId}:tftAccount:{userId}      → JSON { riotId, puuid, region, linke
 guild:index                              → Set<guildId>
 
 # Distributed locks
-lock:economy:{guildId}:{userId}          → token (EX 15s)
-lock:warnings:{guildId}:{userId}         → token (EX 15s)
-lock:ticket:{guildId}                    → token (EX 15s)
-lock:game:{type}:{guildId}:{messageId}   → token (EX 30s)
+lock:economy:{guildId}:{userId}          → token (EX 15 s)
+lock:warnings:{guildId}:{userId}         → token (EX 15 s)
+lock:ticket:{guildId}                    → token (EX 15 s)
+lock:game:{type}:{guildId}:{messageId}   → token (EX 30 s)
+config:lock:{guildId}                    → token
 
 # Sessions
-sess:{sessionId}                         → JSON session data (EX 7d)
+sess:{sessionId}                         → JSON session data (EX 7 d)
 
 # Rate limiting
-rl:read:{ip}:{userId}                    → counter (EX 60s)
-rl:write:{ip}:{userId}                   → counter (EX 60s)
-
-# Config locks
-config:lock:{guildId}                    → lock token
+rl:read:{ip}:{userId}                    → counter (EX 60 s)
+rl:write:{ip}:{userId}                   → counter (EX 60 s)
 ```
 
 ---
@@ -393,27 +516,28 @@ Health: /health
 
 All env vars required (bot + dashboard + Redis).
 
-### Render.com — Mode B (2 services, Starter plan)
+### Render.com — Mode B (Split, Starter plan)
 
 See `render.yaml`. No persistent disk — all state flows through Redis.
 
 ```yaml
 services:
-  - type: worker   # Bot
+  - type: web      # Bot (needs port for Render health check)
     startCommand: node src/index.bot.js
+    healthCheckPath: /health
   - type: web      # Dashboard
     startCommand: node src/index.server.js
     healthCheckPath: /health
 ```
 
-> **Important:** Do not set `CONFIG_PATH` or `STATE_PATH` on Render. Both services must share the same Upstash Redis instance as the single source of truth.
+> **Important:** Do not set `CONFIG_PATH` or `STATE_PATH` on Render. Both services must point to the same Upstash Redis instance as the single source of truth.
 
 ### PM2 (VPS)
 
 ```bash
-pm2 start pm2.config.cjs        # 2 separate processes
+pm2 start pm2.config.cjs   # Starts both bot + dashboard as separate processes
 # or
-node src/index.js               # monolith
+node src/index.js           # Monolith
 ```
 
 ### Environment Variables
@@ -431,41 +555,75 @@ node src/index.js               # monolith
 | `TFT_API_KEY` | ✅ | ✅ | — |
 | `LAVALINK_HOST/PORT/PASSWORD/SECURE` | ✅ | ✅ | — |
 | `KEEPALIVE_CHANNEL_ID` | ✅ | ✅ | — |
-| `PORT` | ✅ | — | ✅ |
+| `PORT` | ✅ | ✅ | ✅ |
 | `NODE_ENV` | ✅ | ✅ | ✅ |
 
 ---
 
 ## 9. Feature Data Flows
 
-### Economy Transaction
+### Economy Transaction (e.g. Blackjack)
 
 ```
-User: "!blackjack 100"
-  → MessageCreate → runBuiltInCommand()
+User: "/blackjack 100"
+  → InteractionCreate → runBuiltInCommand()
     → handleEconomy() → parseBetCommand() → { bet: 100, currency: 'silver' }
     → stateStore.tryDebitBalance(guildId, userId, 'silver', 100)
-      → _withEconomyLock() → withRedisLock()
-      → SET guild:{id}:economy:{userId}
-    → reply(blackjackEmbed + buttons)
-    → setGameSession() → SET guild:{id}:game:blackjack:{msgId}
+      → withRedisLock('lock:economy:{guildId}:{userId}')
+      → SET guild:{guildId}:economy:{userId}
+    → reply(blackjackEmbed + Hit/Stand buttons)
+    → setGameSession() → SET guild:{guildId}:game:blackjack:{msgId} (TTL 30 s)
 
 User clicks "Hit":
-  → InteractionCreate → handleBlackjackButton()
+  → InteractionCreate → handleComponentInteraction()
     → withGameSessionLock() → deal card
-    → on win: adjustBalance(+win) → SET guild:{id}:economy:{userId}
-    → deleteGameSession() → DEL guild:{id}:game:blackjack:{msgId}
+    → on win:  adjustBalance(+winAmount) → SET guild:{guildId}:economy:{userId}
+    → on bust: session ends naturally
+    → deleteGameSession() → DEL guild:{guildId}:game:blackjack:{msgId}
 ```
 
 ### Config Save from Dashboard
 
 ```
-Admin changes prefix → clicks Save
+Admin changes a setting → clicks Save
   → GuildContext.saveConfig()
-  → api.saveConfig(guildId, config)           (PUT /api/config)
-  → configStore.updateGuildConfig()           → SET config:guild:{guildId}
-  → botClient?.syncGuildCommands()            (skipped if null — Mode B)
+  → api.saveConfig(guildId, config)            → PUT /api/config
+  → configStore.updateGuildConfig(guildId, ...) → SET config:guild:{guildId}
+  → botClient?.syncGuildCommands(guildId, ...)  (skipped if botClient = null)
   → res.json({ ...config, slashSync })
+```
+
+### Slash Sync (Split Mode)
+
+```
+Dashboard PUT /api/config (Mode B — botClient = null)
+  → configStore.updateGuildConfig() → Redis
+  → POST /api/slash-sync (or inlined)
+    → redis.rpush('slash_sync_queue', JSON.stringify({ guildId, requestedAt }))
+
+Bot (every 5 s):
+  → redis.lpop('slash_sync_queue')
+  → syncGuildCommands(guildId, config)
+  → redis.incr('stats:slash_sync_processed')
+```
+
+### Guild Data Flow (Split Mode)
+
+```
+Bot (ClientReady / GuildCreate / every 10 min):
+  → guild.channels.cache, guild.roles.cache → meta payload
+  → guild.members.fetch() (8 s timeout → falls back to cache)
+  → redis.set('guild_cache:{guildId}', metaJSON, 'EX', 900)
+  → redis.set('guild_cache:{guildId}:members', membersJSON, 'EX', 900)
+  → redis.incr('stats:guild_cache_refresh')
+
+Dashboard GET /api/guild-data:
+  → redis.get('guild_cache:{guildId}')  → channels + roles for dropdowns
+  → 503 only if null (cache expired + no bot)
+
+Dashboard GET /api/members:
+  → redis.get('guild_cache:{guildId}:members')
+  → 503 only if null
 ```
 
 ---
@@ -483,10 +641,10 @@ src/index.js  (monolith)
 
 src/index.bot.js
   ├── src/env.js                (validateBotEnvironment)
-  ├── src/upstash.js            → sharedRedis (passed to createBot for guild_cache + slash_sync_queue)
+  ├── src/upstash.js
   ├── src/configStore.js
   ├── src/stateStore.js
-  └── src/bot.js                (createBot(configStore, stateStore, sharedRedis) — startKeepalive not called)
+  └── src/bot.js                (createBot + startKeepalive)
 
 src/index.server.js
   ├── src/env.js                (validateServerEnvironment)
@@ -494,7 +652,7 @@ src/index.server.js
   ├── src/configStore.js
   ├── src/stateStore.js
   └── src/server.js
-        ├── src/auth.js         (botClient optional — null-safe)
+        ├── src/auth.js
         ├── src/csrf.js
         ├── src/rateLimit.js
         └── src/sessionStore.js
@@ -502,13 +660,22 @@ src/index.server.js
 src/bot.js
   ├── src/cooldowns.js
   ├── src/commandAccess.js
+  ├── src/bot/slash.js
   ├── src/bot/commands/index.js
   │     ├── src/bot/commands/runtime.js
-  │     └── handlers/ (8 files)
-  │           └── riot.js → lolCommands.js + tftCommands.js
+  │     └── handlers/
+  │           ├── help.js
+  │           ├── general.js
+  │           ├── moderation.js
+  │           ├── levels.js
+  │           ├── economy.js
+  │           ├── panels.js
+  │           └── riot.js
+  │                 ├── src/lolCommands.js → src/lolApi.js
+  │                 └── src/tftCommands.js → src/tftApi.js
+  │                       └── src/riot/helpers.js (shared)
   ├── src/bot/interactions.js
   │     ├── src/bot/games.js
   │     └── src/bot/help.js
-  ├── src/bot/music/lavalink.js
-  └── src/bot/slash.js
+  └── src/bot/music/lavalink.js
 ```

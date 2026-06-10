@@ -1,180 +1,153 @@
-# Discord Bot — Architecture Roadmap
+# Discord Bot — Roadmap
 
-> **Current state:** Split Architecture Phase 1 + 2 complete.  
-> Bot và Dashboard chạy độc lập qua Redis data bus.
+> **Current state:** Phases 1–3 complete. Bot and dashboard run independently via Redis data bus.  
+> Riot/TFT API updated to puuid-based endpoints (League-v4, Match-v5, Mastery-v4).
 
 ---
 
 ## Status legend
+
 - ✅ Done
-- 🔄 In progress
 - ⬜ Not started
 
 ---
 
 ## Phase 1 — Guild Cache Layer ✅
 
-### 1.1 Guild Cache Writer (bot side)
-**File:** `src/bot.js`  
-**Status:** ✅ Done
+Bot writes guild data to Redis so the dashboard can read it without a direct bot connection.
 
-Bot writes guild cache to Redis on:
-- `ClientReady` — initial write for all guilds
-- `GuildCreate` — when bot joins a new guild
-- `GuildUpdate` — when guild name/icon changes
-- `setInterval` — refresh every 10 minutes
+**Bot side (`src/bot.js`):** Writes on `ClientReady`, `GuildCreate`, `GuildUpdate`, and every 10 minutes.
 
-**Redis keys (split to avoid 1MB Upstash limit):**
-- `guild_cache:{guildId}` → meta: `{ name, iconURL, channels[], roles[], memberCount, updatedAt }`
+Two separate Redis keys to avoid Upstash's 1 MB per-request limit:
+- `guild_cache:{guildId}` → meta: `{ name, iconURL, channels[], roles[], memberCount, ownerId, updatedAt }` (≤ 20 KB)
 - `guild_cache:{guildId}:members` → `members[]` only (scales with guild size)
 
-**TTL:** 15 minutes (900 s) on both keys.
+Both keys have a 15-minute TTL. Bot refreshes every 10 minutes.
 
----
-
-### 1.2 Dashboard reads guild_cache (server side)
-**File:** `src/server.js`  
-**Status:** ✅ Done
-
-Routes:
-- `GET /api/guild-data` — reads `guild_cache:{guildId}` (meta key, channels + roles)
-- `GET /api/members` — reads `guild_cache:{guildId}:members` (members key)
-
-Fallback: `503` with hint when both Redis cache AND botClient are unavailable.
+**Dashboard side (`src/server.js`):**
+- `GET /api/guild-data` — reads meta key (channels + roles for config dropdowns)
+- `GET /api/members` — reads members key
+- `503` only when Redis cache is cold **and** `botClient` is null
 
 ---
 
 ## Phase 2 — Slash Sync Queue ✅
 
-### 2.1 Queue writer (dashboard side)
-**File:** `src/server.js` | **Status:** ✅ Done
+Allows the dashboard to trigger slash command re-registration without a live bot connection.
 
-`POST /api/slash-sync`: pushes `{ guildId, requestedAt }` to Redis list `slash_sync_queue`.  
-When `botClient` present (monolith): syncs directly for instant feedback.
+**Dashboard (`src/server.js`):** `POST /api/slash-sync` pushes `{ guildId, requestedAt }` to the `slash_sync_queue` Redis list. When `botClient` is present (monolith mode), it syncs directly instead.
 
-### 2.2 Queue worker (bot side)
-**File:** `src/bot.js` | **Status:** ✅ Done
-
-Bot polls `slash_sync_queue` every 5 s via `setInterval`.  
-On job found: calls `syncGuildCommands(guildId, config)`.
+**Bot (`src/bot.js`):** Polls `slash_sync_queue` every 5 s via `lpop`. On job found: calls `syncGuildCommands(guildId, config)`, increments `stats:slash_sync_processed`.
 
 ---
 
-## Phase 3 — Stability & Observability
+## Phase 3 — Stability & Observability ✅
 
-### 3.1 Split members out of guild_cache
-**Status:** ✅ Done
+### 3.1 Members key split ✅
 
-`guild_cache:{guildId}` no longer contains `members[]`.  
-Members moved to `guild_cache:{guildId}:members` — separate key, separate TTL.  
-Prevents 1MB Upstash REST limit breach on guilds with 5,000+ members.
+`guild_cache:{guildId}` no longer contains `members[]`. Members live in `guild_cache:{guildId}:members` — separate key, separate TTL. Prevents 1 MB Upstash REST limit breach on large guilds.
 
----
+### 3.2 Heartbeat ✅
 
-### 3.2 Heartbeat
-**Status:** ✅ Done  
-**Files:** `src/bot.js`, `src/server.js`
-
-Both services write to Redis every 30 s. TTL = 90 s (missing = offline).
+Both services write to Redis every 30 s. TTL = 90 s — absence means offline.
 
 | Key | Writer | Payload |
 |-----|--------|---------|
-| `heartbeat:bot` | `bot.js` | `{ ts, uptimeS, guilds, ready }` |
-| `heartbeat:dashboard` | `server.js` | `{ ts, uptimeS }` |
+| `heartbeat:bot` | `src/bot.js` | `{ ts, uptimeS, guilds, ready }` |
+| `heartbeat:dashboard` | `src/server.js` | `{ ts, uptimeS }` |
 
-`GET /api/status` reads both keys and returns:
+`GET /api/status` returns:
 ```json
 {
   "botReady": true,
-  "bot": { "online": true, "uptimeS": 3600, "guilds": 5, "lastSeenMs": 8000, "ts": "..." },
-  "dashboard": { "uptimeS": 7200, "ts": "..." }
+  "bot": { "online": true, "uptimeS": 3600, "guilds": 5, "lastSeenMs": 8000 },
+  "dashboard": { "uptimeS": 7200 },
+  "stats": { "slashSyncProcessed": 12, "guildCacheRefresh": 48, "discordErrors": 0, "slashQueueLength": 0 }
 }
 ```
 
----
+### 3.3 Stats counters ✅
 
-### 3.3 Observability / metrics
-**Status:** ✅ Done  
-**Files:** `src/bot.js`, `src/server.js`, `src/upstash.js`, `dashboard/src/pages/System.jsx`
-
-Redis counters incremented by bot (fire-and-forget, non-fatal):
+Bot increments Redis counters (fire-and-forget, non-fatal):
 
 | Key | Incremented on |
 |-----|----------------|
-| `stats:slash_sync_processed` | Bot completes a slash sync job from queue |
-| `stats:guild_cache_refresh` | Bot successfully writes both guild cache keys |
-| `stats:discord_errors` | `ShardError` or `Error` event fires on Discord client |
+| `stats:slash_sync_processed` | Bot completes a slash sync job |
+| `stats:guild_cache_refresh` | Bot writes both guild cache keys successfully |
+| `stats:discord_errors` | `ShardError` or `Error` event on the Discord client |
 
-`GET /api/status` now returns `stats` object + `stats.slashQueueLength` (via `LLEN slash_sync_queue`).
+Dashboard **System** page (`/system`) shows bot/dashboard online status, uptime, heartbeat age, slash queue length (warn > 0, danger > 5), and cumulative stats since last key reset.
 
-Dashboard **Hệ thống** tab (`/system`) shows:
-- Bot / Dashboard online status with uptime and last heartbeat age
-- Slash sync queue length (warn if >0, danger if >5)
-- Cumulative stats counters since last Redis key reset
+### 3.4 Riot API — puuid migration ✅
+
+All Riot/TFT API calls migrated to puuid-based endpoints:
+- `League-v4` now uses `/by-puuid/{puuid}` (summoner ID endpoint deprecated 2024)
+- `Champion-Mastery-v4` now uses `/by-puuid/{puuid}`
+- Stored account records use `{ riotId, puuid, region, linkedAt }` — no summonerId stored
+
+Region routing uses two separate maps: `accountRouting` for Account-v1 (VN2 → asia), `routing` for Match-v5 (VN2 → sea).
 
 ---
 
-## Phase 4 — Event System (future)
+## Phase 4 — Event System ⬜
 
-**Status:** ⬜ Not started  
-**Trigger:** When slash_sync_queue pattern needs to expand to other event types
+**Trigger:** When `slash_sync_queue` pattern needs to expand to other cross-process event types.
 
-Standardise all inter-service communication through a single `event_queue`:
+Standardise all inter-service communication through a single `event_queue` Redis list:
 ```json
 { "type": "sync_commands", "guildId": "..." }
 { "type": "refresh_guild",  "guildId": "..." }
 { "type": "purge_sessions" }
 ```
 
-Dashboard sends events, bot reacts. No direct RPC.
+Bot consumes events and reacts. No direct RPC. Replaces the current dedicated `slash_sync_queue` key.
 
 ---
 
-## Phase 5 — Internal API (future)
+## Phase 5 — Internal Bot API ⬜
 
-**Status:** ⬜ Not started  
-**Trigger:** Guild size exceeds ~50,000 members where Redis cache is no longer practical
+**Trigger:** Guild size exceeds ~50,000 members where Redis cache is no longer practical.
 
 ```
-Dashboard → GET /internal/members → Bot → Discord
-Dashboard → GET /internal/presence → Bot → Discord
+Dashboard → GET /internal/members  → Bot → Discord (live fetch)
+Dashboard → GET /internal/presence → Bot → Discord (live fetch)
 ```
 
-Redis remains for cache. Internal API for realtime/on-demand data.
+Redis remains the primary cache. Internal API handles on-demand realtime data.
 
 ---
 
-## Phase 6 — Replace polling with Redis Streams (future)
+## Phase 6 — Redis Streams ⬜
 
-**Status:** ⬜ Not started  
-**Trigger:** Slash sync queue backlog or multiple bot instances needed
+**Trigger:** Slash sync queue backlog, or multiple bot instances needed.
 
-Current `setInterval(..., 5000)` is fine for current scale.  
-Redis Streams or Pub/Sub when throughput actually warrants it.
+Replace `setInterval` + `lpop` polling (currently 5 s interval) with Redis Streams or Pub/Sub for lower latency and better multi-consumer support.
+
+Current polling is fine at current scale. Revisit when throughput warrants it.
 
 ---
 
-## Phase 7 — Sharding (future)
+## Phase 7 — Sharding ⬜
 
-**Status:** ⬜ Not started  
-**Trigger:** 500–1,000+ guilds
+**Trigger:** 500–1,000+ guilds.
 
-Redis-first architecture is already shard-ready — no shared in-process state.
+Redis-first architecture is already shard-ready — no shared in-process state. Add Discord.js `ShardingManager` and partition guild cache writes by shard.
 
 ---
 
 ## Priority order
 
 ```
-✅ P1  Guild cache split (members key)
-✅ P2  Heartbeat (bot + dashboard)
-✅ P3  Observability / stats counters + System page
-⬜ P4  Event system normalisation
-⬜ P5  Internal API
-⬜ P6  Redis Streams/PubSub
-⬜ P7  Sharding
+✅ P1  Guild cache (meta + members split)
+✅ P2  Slash sync queue
+✅ P3  Heartbeat + observability counters + System page
+✅ P4  Riot API puuid migration (League-v4, Mastery-v4, Match-v5)
+⬜ P5  Event system normalisation
+⬜ P6  Internal bot API
+⬜ P7  Redis Streams / Pub/Sub
+⬜ P8  Sharding
 ```
 
 ---
 
-*Last updated: Phase 1–3.3 complete. Observability layer live — bot/dashboard heartbeat + stats counters + System dashboard page.*
+*Last updated: Phases 1–3 complete + Riot puuid migration. Split architecture stable in production.*

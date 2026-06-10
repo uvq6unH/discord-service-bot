@@ -1,34 +1,36 @@
-# render.yaml — 2 service riêng biệt
+# render.yaml — Canonical deployment config (Split Mode)
 #
-# Mỗi service cần UPSTASH_REDIS_REST_URL + UPSTASH_REDIS_REST_TOKEN giống nhau.
-# Không dùng disk persistent — tất cả state đi qua Upstash Redis.
-# (Disk persistent trên Render không thể share giữa 2 service khác nhau,
-#  nên configs.json/state.json nếu dùng sẽ bị desync → chỉ Redis là source of truth)
+# 3 services:
+#   discord-bot       Web service — Discord client + HTTP health endpoint
+#   discord-dashboard Web service — Express dashboard + React SPA
+#   lavalink          Docker      — Audio server (optional, for music commands)
 #
-# Plan:
-#   Render Starter ($7/tháng/service): bot Worker + dashboard Web
-#   Render Free: không support Worker → dùng PM2 trên VPS (xem pm2.config.cjs)
-#                hoặc deploy monolith: node src/index.js (xem pm2.config.cjs + src/index.js)
+# Cả hai service dùng cùng một Upstash Redis instance.
+# Không dùng disk persistent — mọi state đi qua Redis.
+# Không set CONFIG_PATH hay STATE_PATH — stateStore tự dùng Redis khi NODE_ENV=production.
 
 services:
-  # ── Bot process (Worker — không expose HTTP) ──────────────────────────────
-  - type: worker
+  # ── Bot (Web — binds HTTP port trước khi login, bắt buộc để Render detect) ──
+  - type: web
     name: discord-bot
     runtime: node
     plan: starter
     buildCommand: pnpm install --no-frozen-lockfile
     startCommand: node src/index.bot.js
+    healthCheckPath: /health
     envVars:
       - key: NODE_ENV
         value: production
+      - key: PORT
+        value: "10000"
       - key: DAILY_RESET_UTC_OFFSET_MINUTES
-        value: 420
+        value: "420"
       - key: COMMAND_COOLDOWN_MS
-        value: 3000
+        value: "3000"
       - key: RIOT_COMMAND_COOLDOWN_MS
-        value: 15000
+        value: "15000"
       - key: GAME_COMMAND_COOLDOWN_MS
-        value: 5000
+        value: "5000"
       - key: DISCORD_TOKEN
         sync: false
       - key: DISCORD_CLIENT_ID
@@ -51,9 +53,8 @@ services:
         sync: false
       - key: LAVALINK_SECURE
         value: "false"
-    # Không có disk: CONFIG_PATH/STATE_PATH không set → stateStore dùng Redis (production default)
 
-  # ── Dashboard process (Web — expose HTTP, health check) ───────────────────
+  # ── Dashboard (Web — React SPA + Express API + OAuth2) ────────────────────
   - type: web
     name: discord-dashboard
     runtime: node
@@ -65,7 +66,7 @@ services:
       - key: NODE_ENV
         value: production
       - key: PORT
-        value: 10000
+        value: "10000"
       - key: DISCORD_CLIENT_ID
         sync: false
       - key: DISCORD_CLIENT_SECRET
@@ -78,9 +79,8 @@ services:
         sync: false
       - key: UPSTASH_REDIS_REST_TOKEN
         sync: false
-    # Không có disk: CONFIG_PATH/STATE_PATH không set → configStore/stateStore dùng Redis
 
-  # ── Lavalink server (Docker) ───────────────────────────────────────────────
+  # ── Lavalink (Docker — tùy chọn, cần cho music commands) ─────────────────
   - type: web
     name: lavalink
     runtime: docker
