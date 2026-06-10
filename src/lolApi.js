@@ -203,7 +203,7 @@ const _riotBucket = {
 
 async function riotGetThrottled(path, platform, apiKey) {
   await _riotBucket.acquire();
-  return riotGetThrottled(path, platform, apiKey);
+  return riotGet(path, platform, apiKey);
 }
 
 export async function getLatestPatch() {
