@@ -83,10 +83,12 @@ process.on('SIGTERM', () => shutdown('SIGTERM'));
 // /health trả về bot status thực sau khi login xong.
 // Trước khi login: bot: null, guilds: 0 — vẫn trả 200 để Render pass health check.
 http.createServer((req, res) => {
-  if (req.method !== 'GET') {
+  if (req.method !== 'GET' && req.method !== 'HEAD') {
     res.writeHead(405).end();
     return;
   }
+  res.writeHead(200, { 'Content-Type': 'application/json' });
+  if (req.method === 'HEAD') { res.end(); return; }
   res.writeHead(200, { 'Content-Type': 'application/json' });
   res.end(JSON.stringify({
     status: 'ok',
