@@ -113,6 +113,10 @@ export const api = {
   inviteUrl: (guildId) =>
     apiFetch(`/api/invite-url?guildId=${encodeURIComponent(guildId)}`).then(r => r.json()),
 
+  /** Lấy role của user hiện tại trong một guild cụ thể */
+  myRole: (guildId) =>
+    apiFetch(`/api/my-role?guildId=${encodeURIComponent(guildId)}`).then(r => r.json()),
+
   /** Health check */
   health: () => apiFetch('/health', {}, { allowNotOk: true }).then(r => r.json()),
 

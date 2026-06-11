@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { ShieldCheck, Bot, Ticket, Tag } from 'lucide-react';
 import { useGuild } from '../contexts/GuildContext.jsx';
-import { useAuth } from '../contexts/AuthContext.jsx';
 import { Spinner, Toggle, SectionCard, ChannelSelect, RoleSelect, ThemeToggle, PermissionGuard } from '../components/ui.jsx';
 
 
@@ -101,8 +100,8 @@ function SelfRoleEditor({ roles, allRoles, onChange }) {
 
 // ── Main page ───────────────────────────────────────────────────────────────
 export default function ModerationPage() {
-  const { user } = useAuth();
-  const { config, guildData, configLoading, updateConfig } = useGuild();
+  const { config, guildData, configLoading, updateConfig, userRole } = useGuild();
+  const user = { role: userRole };
 
   if (configLoading || !config) return <div className="page-loading"><Spinner /></div>;
 

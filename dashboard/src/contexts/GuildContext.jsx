@@ -45,6 +45,15 @@ export function GuildProvider({ children }) {
     enabled: !!selectedGuildId,
   });
 
+  // Role của user trong guild này — fetch riêng theo guild, tránh rate limit
+  // khi load danh sách server. Cache 5 phút vì quyền thay đổi rất hiếm.
+  const { data: userRole = null } = useQuery({
+    queryKey: ['my-role', selectedGuildId],
+    queryFn: () => api.myRole(selectedGuildId).then(r => r.role ?? null),
+    enabled: !!selectedGuildId,
+    staleTime: 5 * 60 * 1000,
+  });
+
   const saveMutation = useMutation({
     mutationFn: (patch) => api.saveConfig(selectedGuildId, patch),
     onSuccess: (saved) => {
@@ -89,6 +98,7 @@ export function GuildProvider({ children }) {
       configLoading,
       dirty,
       saveStatus,
+      userRole,
       selectGuild,
       updateConfig,
       saveConfig,
