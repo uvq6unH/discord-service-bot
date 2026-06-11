@@ -89,19 +89,11 @@ async function shutdown(signal) {
 process.on('SIGINT', () => shutdown('SIGINT'));
 process.on('SIGTERM', () => shutdown('SIGTERM'));
 
-// ── Boot: listen first → login in background ─────────────────────────────────
-// HTTP server starts immediately so Render health check (/health) responds
-// with 200 right away, before the Discord bot finishes connecting.
+// ── Boot: login → listen → keepalive ─────────────────────────────────────────
+await loginWithRetry(botClient, token, { logPrefix: 'app' });
+
 httpServer = app.listen(port, () => {
   console.log(`[app] Dashboard running at http://localhost:${port}`);
+  console.log(`[app] Bot: ${botClient.user?.tag}`);
+  startKeepalive(port);
 });
-
-loginWithRetry(botClient, token, { logPrefix: 'app' })
-  .then(() => {
-    console.log(`[app] Bot logged in: ${botClient.user?.tag}`);
-    startKeepalive(port);
-  })
-  .catch((err) => {
-    console.error('[app] Bot login failed:', err.message);
-    // Server stays up — Discord.js will auto-reconnect
-  });
