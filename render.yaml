@@ -59,7 +59,7 @@ services:
     name: discord-dashboard
     runtime: node
     plan: starter
-    buildCommand: NODE_ENV=development pnpm install --no-frozen-lockfile && cd dashboard && NODE_ENV=production pnpm build
+    buildCommand: pnpm install --no-frozen-lockfile --include=dev && cd dashboard && pnpm build
     startCommand: node src/index.server.js
     healthCheckPath: /health
     envVars:
