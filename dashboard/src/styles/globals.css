@@ -463,17 +463,15 @@ a:hover { text-decoration: underline; }
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 30px;
-  height: 30px;
+  width: 32px;
+  height: 32px;
   border-radius: var(--r2);
-  border: 1px solid var(--surface-3);
+  border: 1px solid var(--border);
   background: var(--surface-2);
   color: var(--text-2);
   cursor: pointer;
   transition: background var(--dur), color var(--dur), border-color var(--dur);
-  flex-shrink: 0;
   font-size: 15px;
-  line-height: 1;
 }
 .theme-toggle:hover {
   background: var(--surface-3);
@@ -481,10 +479,3 @@ a:hover { text-decoration: underline; }
   border-color: var(--accent);
 }
 .theme-toggle:active { transform: scale(.93); }
-
-/* ── Content topbar — chứa toggle, nằm trên mọi page ────────────────────── */
-.content-topbar {
-  display: flex;
-  justify-content: flex-end;
-  margin-bottom: var(--s4);
-}

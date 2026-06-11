@@ -1,6 +1,7 @@
 import React from 'react';
 import { NavLink } from 'react-router-dom';
 import { useGuild } from '../contexts/GuildContext.jsx';
+import { ThemeToggle } from './ui.jsx';
 
 const NAV_ITEMS = [
   { to: '/overview',    icon: 'ti-layout-dashboard', label: 'Dashboard' },
@@ -12,7 +13,7 @@ const NAV_ITEMS = [
   { to: '/system',      icon: 'ti-activity',         label: 'Hệ thống' },
 ];
 
-export default function PluginNav() {
+export default function PluginNav({ theme, onThemeToggle }) {
   const { selectedGuild } = useGuild();
   if (!selectedGuild) return null;
 
@@ -62,6 +63,11 @@ export default function PluginNav() {
           <span>{label}</span>
         </NavLink>
       ))}
+
+      {/* Theme toggle — cuối nav, tự đẩy xuống bottom bằng margin-top: auto */}
+      <div style={{ marginTop: 'auto', paddingTop: 'var(--s3)' }}>
+        <ThemeToggle theme={theme} onToggle={onThemeToggle} />
+      </div>
     </nav>
   );
 }
