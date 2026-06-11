@@ -459,28 +459,7 @@ function _startHeartbeat(client, redis) {
 }
 
 // ── Self-ping keepalive ────────────────────────────────────────────────────────
-// Render free tier spin down sau 15 phút không có HTTP traffic.
-// Gọi startKeepalive() từ entry point SAU KHI HTTP server đã listen.
-export function startKeepalive(port = process.env.PORT ?? 10000) {
-  const INTERVAL_MS   = 5 * 60_000;
-  const RETRY_DELAY   = 10_000;
-  const MAX_RETRIES   = 3;
-
-  async function ping(attempt = 1) {
-    try {
-      const res = await fetch(`http://localhost:${port}/health`);
-      console.log(`[keepalive] /health → ${res.status}, uptime ${Math.floor(process.uptime())}s`);
-      if (!res.ok && attempt < MAX_RETRIES) {
-        setTimeout(() => ping(attempt + 1), RETRY_DELAY);
-      }
-    } catch (err) {
-      console.warn(`[keepalive] attempt ${attempt} failed: ${err.message}`);
-      if (attempt < MAX_RETRIES) setTimeout(() => ping(attempt + 1), RETRY_DELAY);
-    }
-  }
-
-  const handle = setInterval(() => ping(), INTERVAL_MS);
-  handle.unref();
-  console.log(`[keepalive] Started — pinging /health every ${INTERVAL_MS / 60_000} min on port ${port}`);
-  return handle;
-}
+// Re-export từ utils/keepalive.js để entry points không cần import 2 nơi.
+// Logic thực sự nằm ở src/utils/keepalive.js — tách khỏi bot.js để
+// index.server.js import mà không kéo theo Discord client dependency graph.
+export { startKeepalive } from './utils/keepalive.js';

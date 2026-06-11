@@ -126,7 +126,7 @@
 
 ---
 
-## ADR-006 — Bot.js middleware pipeline (tách sub-modules)
+## ADR-007 — Bot.js middleware pipeline (tách sub-modules)
 
 **Quyết định:** Tách các concern trong `bot.js` (reminder, XP, automod, mention-react, emoji map) thành các module riêng tại `src/bot/`.
 
@@ -144,11 +144,12 @@
 **Hệ quả:**
 - `bot.js` còn ~220 dòng — chỉ giữ Discord event registration và wiring
 - `reminderWorker.js`, `xpHandler.js`, `autoMod.js` test được mà không cần Discord client mock
-- `emojiMap.js` lazy-loaded — không tốn memory khi không dùng reminder feature
+- `emojiMap.js` tách riêng — không load vào memory khi không dùng reminder feature
+- `loginWithRetry` và `startKeepalive` tách ra `src/utils/` — dùng chung giữa các entry points mà không gây coupling sai (`index.server.js` không còn import `bot.js`)
 
 ---
 
-## ADR-007 — Upstash client dùng `fetch` thay `https.request`
+## ADR-008 — Upstash client dùng `fetch` thay `https.request`
 
 **Quyết định:** Rewrite `UpstashClient._request()` và `pipeline()` dùng `fetch` + `AbortController` thay vì `https.request` thủ công.
 
@@ -163,14 +164,14 @@
 - Custom client đủ nhỏ (~100 dòng) và cover đủ commands cần dùng
 - Không muốn phụ thuộc vào SDK update/breaking change
 
-**Hệg quả:**
+**Hệ quả:**
 - Yêu cầu Node 18+ (đã dùng sẵn)
 - `keys(pattern)`, `ttl(key)`, `srem(key, members)` available → purgeStaleGameSessions() dùng được KEYS
-- Exponential backoff (50 ms → 200 ms → 400 ms) thay vì fixed 200 ms/400 ms
+- Exponential backoff thật sự: `200ms * 2^attempt` (200ms → 400ms → 800ms) thay vì linear (200ms → 400ms)
 
 ---
 
-## ADR-008 — Game sessions TTL trên Redis
+## ADR-009 — Game sessions TTL trên Redis
 
 **Quyết định:** `setGameSession()` thêm `EX 10800` (3 giờ) khi SET vào Redis. `purgeStaleGameSessions()` dùng `KEYS guild:*:game:*:*` để tìm và refund sessions còn tồn tại khi bot khởi động.
 

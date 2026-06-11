@@ -3,6 +3,12 @@
  * reschedule nếu repeat, xoá nếu one-shot.
  *
  * Tách ra khỏi bot.js để ClientReady handler gọn hơn.
+ *
+ * ⚠️  SINGLE-INSTANCE ASSUMPTION:
+ * Worker này không dùng distributed lock. An toàn khi chỉ có 1 bot process
+ * (split mode hiện tại). Nếu sau này horizontal scale bot (multi-shard / multiple
+ * instances), 2 worker sẽ cùng chạy reminderTick → double-fire mỗi reminder.
+ * Giải pháp: wrap `reminderTick` trong `withRedisLock('lock:reminder-worker', ...)`.
  */
 
 import { resolveEmojiNames } from './emojiMap.js';

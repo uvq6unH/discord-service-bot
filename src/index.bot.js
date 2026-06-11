@@ -23,7 +23,9 @@ await sodium.ready;
 
 import { ConfigStore } from './configStore.js';
 import { StateStore } from './stateStore.js';
-import { createBot, startKeepalive } from './bot.js';
+import { createBot } from './bot.js';
+import { startKeepalive } from './utils/keepalive.js';
+import { loginWithRetry } from './utils/loginWithRetry.js';
 import { validateBotEnvironment } from './env.js';
 import { createUpstashFromEnv } from './upstash.js';
 
@@ -104,26 +106,4 @@ http.createServer((req, res) => {
 });
 
 // ── Login Discord — SAU khi HTTP server đã bind ───────────────────────────────
-async function loginWithRetry(maxRetries = 10, baseDelay = 5000) {
-  for (let attempt = 1; attempt <= maxRetries; attempt++) {
-    try {
-      await botClient.login(token);
-      console.log('[bot] Logged in to Discord.');
-      return;
-    } catch (err) {
-      const TRANSIENT_CODES = new Set(['ECONNRESET', 'ETIMEDOUT', 'ENOTFOUND', 'ECONNREFUSED', 'EAI_AGAIN']);
-      const isTransient = TRANSIENT_CODES.has(err.code) || err.status >= 500 || err.status === 429;
-
-      if (!isTransient || attempt === maxRetries) {
-        console.error(`[bot:login] Fatal on attempt ${attempt}:`, err.message);
-        process.exit(1);
-      }
-
-      const delay = Math.min(baseDelay * Math.pow(2, attempt - 1), 30_000);
-      console.warn(`[bot:login] Attempt ${attempt} failed (${err.message}). Retry in ${delay / 1000}s…`);
-      await new Promise((r) => setTimeout(r, delay));
-    }
-  }
-}
-
-await loginWithRetry();
+await loginWithRetry(botClient, token, { logPrefix: 'bot' });

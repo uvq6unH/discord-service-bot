@@ -2,7 +2,7 @@
  * Minimal Upstash Redis REST client (shared by state + rate limiting).
  *
  * Sử dụng fetch thay vì https.request — gọn hơn, timeout qua AbortController.
- * Retry logic: exponential backoff 200 ms → 400 ms (tối đa 2 lần).
+ * Retry logic: exponential backoff 200 ms → 400 ms → 800 ms (tối đa 2 lần).
  */
 
 const REQUEST_TIMEOUT_MS = 8_000;
@@ -38,7 +38,8 @@ export class UpstashClient {
       return data.result;
     } catch (err) {
       if (retries > 0) {
-        const delay = 200 * (MAX_RETRIES - retries + 1);
+        const attempt = MAX_RETRIES - retries; // 0-based: 0, 1, 2…
+        const delay = 200 * Math.pow(2, attempt); // 200ms → 400ms → 800ms
         await sleep(delay);
         return this._request(body, retries - 1);
       }
@@ -70,7 +71,8 @@ export class UpstashClient {
       return data;
     } catch (err) {
       if (retries > 0) {
-        const delay = 200 * (MAX_RETRIES - retries + 1);
+        const attempt = MAX_RETRIES - retries; // 0-based: 0, 1, 2…
+        const delay = 200 * Math.pow(2, attempt); // 200ms → 400ms → 800ms
         await sleep(delay);
         return this.pipeline(commands, retries - 1);
       }

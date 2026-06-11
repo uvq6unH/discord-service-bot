@@ -1,7 +1,12 @@
 /**
- * emojiMap.js — Lazy-loaded emoji name → unicode resolver
+ * emojiMap.js — Emoji name → unicode resolver, tách ra khỏi bot.js
  *
- * Giữ EMOJI_MAP tách ra khỏi bot.js để giảm memory footprint khi load.
+ * Module được tách riêng để giảm coupling trong bot.js và dễ maintain.
+ * Lưu ý: đây là "module-separated", không phải "lazy-loaded" — EMOJI_MAP
+ * vẫn được khởi tạo ngay khi file được import lần đầu. Để lazy thật sự,
+ * cần dùng pattern: let map = null; export function getMap() { map ??= {...}; return map; }
+ * Ở quy mô hiện tại (~120 entries) không cần thiết.
+ *
  * Chỉ import file này khi cần resolveEmojiNames (reminder worker, v.v.)
  */
 

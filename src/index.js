@@ -15,7 +15,9 @@ await sodium.ready;
 
 import { ConfigStore } from './configStore.js';
 import { StateStore } from './stateStore.js';
-import { createBot, startKeepalive } from './bot.js';
+import { createBot } from './bot.js';
+import { startKeepalive } from './utils/keepalive.js';
+import { loginWithRetry } from './utils/loginWithRetry.js';
 import { createServer } from './server.js';
 import { validateEnvironment } from './env.js';
 import { createUpstashFromEnv } from './upstash.js';
@@ -87,33 +89,8 @@ async function shutdown(signal) {
 process.on('SIGINT', () => shutdown('SIGINT'));
 process.on('SIGTERM', () => shutdown('SIGTERM'));
 
-// ── Login với retry ───────────────────────────────────────────────────────────
-async function loginWithRetry(maxRetries = 10, baseDelay = 5000) {
-  for (let attempt = 1; attempt <= maxRetries; attempt++) {
-    try {
-      await botClient.login(token);
-      console.log('[app] Discord bot logged in.');
-      return;
-    } catch (err) {
-      // Phân loại transient dựa trên error code (không phải string match — ít false-positive hơn).
-      // Discord.js ném HTTPError với status code khi token sai — đó là fatal, không retry.
-      const TRANSIENT_CODES = new Set(['ECONNRESET', 'ETIMEDOUT', 'ENOTFOUND', 'ECONNREFUSED', 'EAI_AGAIN']);
-      const isTransient = TRANSIENT_CODES.has(err.code) || err.status >= 500 || err.status === 429;
-
-      if (!isTransient || attempt === maxRetries) {
-        console.error(`[app:login] Fatal on attempt ${attempt}:`, err.message);
-        process.exit(1);
-      }
-
-      const delay = Math.min(baseDelay * Math.pow(2, attempt - 1), 30_000);
-      console.warn(`[app:login] Attempt ${attempt} failed (${err.message}). Retry in ${delay / 1000}s…`);
-      await new Promise((r) => setTimeout(r, delay));
-    }
-  }
-}
-
 // ── Boot: login → listen → keepalive ─────────────────────────────────────────
-await loginWithRetry();
+await loginWithRetry(botClient, token, { logPrefix: 'app' });
 
 httpServer = app.listen(port, () => {
   console.log(`[app] Dashboard running at http://localhost:${port}`);

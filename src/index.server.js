@@ -16,7 +16,9 @@ import { StateStore }             from './stateStore.js';
 import { createServer }           from './server.js';
 import { validateServerEnvironment } from './env.js';
 import { createUpstashFromEnv }       from './upstash.js';
-import { startKeepalive }             from './bot.js';
+// Import từ utils/keepalive.js — KHÔNG import từ bot.js để tránh kéo theo
+// toàn bộ Discord client dependency graph vào dashboard process.
+import { startKeepalive }             from './utils/keepalive.js';
 
 // ── Validate ──────────────────────────────────────────────────────────────────
 try {
