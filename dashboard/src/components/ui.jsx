@@ -214,12 +214,15 @@ export function TextInput({ value, onChange, label, placeholder, type = 'text' }
 // icon prop now accepts a Lucide component (Icon) OR a legacy "ti-xxx" string
 // Pass Icon={SomeIcon} for new usage; icon="ti-xxx" still works via <i> fallback
 
-export function SectionCard({ title, icon, Icon: IconComponent, children, enabled, onToggle }) {
+export function SectionCard({ title, icon, children, enabled, onToggle }) {
   return (
     <div className={`section-card ${enabled === false ? 'section-card--disabled' : ''}`}>
       <div className="section-card__header">
-        {IconComponent && <IconComponent size={16} />}
-        {!IconComponent && icon && <i className={`ti ${icon}`} />}
+        {icon && (
+          typeof icon === 'string'
+            ? <i className={`ti ${icon}`} />
+            : icon
+        )}
         <h3 className="section-card__title">{title}</h3>
         {onToggle != null && (
           <Toggle

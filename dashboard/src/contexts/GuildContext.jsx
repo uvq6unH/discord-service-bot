@@ -6,10 +6,12 @@ import { api } from '../api.js';
 const GuildContext = createContext(null);
 
 export function GuildProvider({ children }) {
-  const [selectedGuildId, setSelectedGuildId] = useState(null);
-  const [selectedGuild, setSelectedGuild]     = useState(null);
-  const [dirty, setDirty]                     = useState(false);
+  // selectedGuild stays local state — it's UI state, not server data
+  const [selectedGuild, setSelectedGuild] = useState(null);
+  const [dirty, setDirty]                 = useState(false);
   const queryClient = useQueryClient();
+
+  const selectedGuildId = selectedGuild?.id ?? null;
 
   const { data: config, isLoading: configLoading } = useQuery({
     queryKey: ['config', selectedGuildId],
@@ -36,12 +38,13 @@ export function GuildProvider({ children }) {
   const selectGuild = useCallback((guild) => {
     if (!guild.botPresent) return;
     setSelectedGuild(guild);
-    setSelectedGuildId(guild.id);
     setDirty(false);
   }, []);
 
   const updateConfig = useCallback((patch) => {
-    queryClient.setQueryData(['config', selectedGuildId], prev => prev ? { ...prev, ...patch } : prev);
+    queryClient.setQueryData(['config', selectedGuildId], prev =>
+      prev ? { ...prev, ...patch } : prev
+    );
     setDirty(true);
   }, [queryClient, selectedGuildId]);
 
@@ -57,10 +60,10 @@ export function GuildProvider({ children }) {
     await saveMutation.mutateAsync(patch);
   }, [selectedGuildId, config, saveMutation]);
 
-  // Legacy saveStatus for SaveBar compatibility
+  // saveStatus for SaveBar compatibility
   const saveStatus = saveMutation.isPending ? 'saving'
     : saveMutation.isSuccess ? 'saved'
-    : saveMutation.isError ? 'error'
+    : saveMutation.isError   ? 'error'
     : 'idle';
 
   return (

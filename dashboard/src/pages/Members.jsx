@@ -1,5 +1,6 @@
 import { Search } from 'lucide-react';
-import React, { useEffect, useState, useCallback, useMemo, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { useGuild } from '../contexts/GuildContext.jsx';
 import { Spinner, ThemeToggle} from '../components/ui.jsx';
 import { useAppTheme } from '../App.jsx';
@@ -39,43 +40,32 @@ function MemberRow({ member }) {
 export default function MembersPage() {
   const { theme, toggleTheme } = useAppTheme();
   const { selectedGuild } = useGuild();
-  const [members, setMembers]   = useState([]);
-  const [total, setTotal]       = useState(0);
-  const [page, setPage]         = useState(1);
-  const [search, setSearch]     = useState('');
-  const [loading, setLoading]   = useState(false);
-  const [error, setError]       = useState(null);
+  const [page, setPage]     = useState(1);
+  const [search, setSearch] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
 
-  const load = useCallback(async (p = 1, q = '') => {
-    if (!selectedGuild) return;
-    setLoading(true);
-    setError(null);
-    try {
-      const data = await api.members(selectedGuild.id, p, q);
-      setMembers(data.members ?? []);
-      setTotal(data.total ?? 0);
-      setPage(p);
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setLoading(false);
-    }
-  }, [selectedGuild]);
-
-  useEffect(() => { load(1, ''); }, [load]);
-
-  // Debounce 300ms — tránh gửi HTTP request cho mỗi keystroke
+  // Debounce 300ms — tránh query mỗi keystroke
   const debounceTimer = useRef(null);
   const handleSearch = (e) => {
     const val = e.target.value;
     setSearch(val);
     clearTimeout(debounceTimer.current);
-    debounceTimer.current = setTimeout(() => load(1, val), 300);
+    debounceTimer.current = setTimeout(() => {
+      setDebouncedSearch(val);
+      setPage(1);
+    }, 300);
   };
-
-  // Cleanup debounce khi unmount
   useEffect(() => () => clearTimeout(debounceTimer.current), []);
 
+  const { data, isLoading: loading, isError, error } = useQuery({
+    queryKey: ['members', selectedGuild?.id, page, debouncedSearch],
+    queryFn: () => api.members(selectedGuild.id, page, debouncedSearch),
+    enabled: !!selectedGuild,
+    placeholderData: (prev) => prev,  // giữ data cũ khi fetch trang mới — tránh flash
+  });
+
+  const members   = data?.members ?? [];
+  const total     = data?.total ?? 0;
   const pageCount = Math.ceil(total / 20);
 
   return (
@@ -118,7 +108,7 @@ export default function MembersPage() {
           <button
             className="btn btn-secondary"
             disabled={page <= 1}
-            onClick={() => load(page - 1, search)}
+            onClick={() => setPage(p => p - 1)}
           >
             ← Trước
           </button>
@@ -126,7 +116,7 @@ export default function MembersPage() {
           <button
             className="btn btn-secondary"
             disabled={page >= pageCount}
-            onClick={() => load(page + 1, search)}
+            onClick={() => setPage(p => p + 1)}
           >
             Tiếp →
           </button>

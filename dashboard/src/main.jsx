@@ -25,12 +25,12 @@ createRoot(document.getElementById('root')).render(
           <Route path="/login" element={<Login />} />
           <Route path="/*"     element={<App />} />
         </Routes>
-        <Toaster
-          theme="dark"
-          position="bottom-right"
-          richColors
-        />
       </BrowserRouter>
+      <Toaster
+        theme="dark"
+        position="bottom-right"
+        richColors
+      />
     </QueryClientProvider>
   </React.StrictMode>
 );
