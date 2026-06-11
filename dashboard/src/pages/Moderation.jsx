@@ -49,7 +49,6 @@ function BadWordsEditor({ words, onChange }) {
         <button className="btn btn-secondary btn-sm" onClick={add}>Thêm</button>
       </div>
     </div>
-    </PermissionGuard>
   );
 }
 
