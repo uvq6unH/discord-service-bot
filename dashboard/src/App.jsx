@@ -4,7 +4,7 @@ import { AuthProvider, useAuth } from './contexts/AuthContext.jsx';
 import { GuildProvider, useGuild } from './contexts/GuildContext.jsx';
 import ServerRail from './components/ServerRail.jsx';
 import PluginNav from './components/PluginNav.jsx';
-import { SaveBar, EmptyState, useTheme } from './components/ui.jsx';
+import { SaveBar, EmptyState, useTheme, ThemeToggle } from './components/ui.jsx';
 import OverviewPage from './pages/Overview.jsx';
 import MembersPage from './pages/Members.jsx';
 import CommandsPage from './pages/Commands.jsx';
@@ -45,8 +45,11 @@ function DashboardLayout({ theme, toggleTheme }) {
           <EmptyState />
         ) : (
           <>
-            <PluginNav guildId={selectedGuild.id} theme={theme} onThemeToggle={toggleTheme} />
+            <PluginNav guildId={selectedGuild.id} />
             <main className="content">
+              <div className="content-topbar">
+                <ThemeToggle theme={theme} onToggle={toggleTheme} />
+              </div>
               <Routes>
                 <Route path="/" element={<Navigate to="/overview" replace />} />
                 <Route path="/overview"    element={<OverviewPage />} />
