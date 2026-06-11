@@ -15,7 +15,7 @@ services:
     name: discord-bot
     runtime: node
     plan: starter
-    buildCommand: pnpm install --no-frozen-lockfile
+    buildCommand: pnpm install --no-frozen-lockfile --include=dev
     startCommand: node src/index.bot.js
     healthCheckPath: /health
     envVars:
@@ -59,7 +59,7 @@ services:
     name: discord-dashboard
     runtime: node
     plan: starter
-    buildCommand: pnpm install --no-frozen-lockfile --include=dev && cd dashboard && pnpm build
+    buildCommand: pnpm install --no-frozen-lockfile --include=dev && pnpm build:ui
     startCommand: node src/index.server.js
     healthCheckPath: /health
     envVars:
