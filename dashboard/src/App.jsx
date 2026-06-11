@@ -45,7 +45,7 @@ function DashboardLayout({ theme, toggleTheme }) {
           <EmptyState />
         ) : (
           <>
-            <PluginNav theme={theme} onThemeToggle={toggleTheme} />
+            <PluginNav guildId={selectedGuild.id} theme={theme} onThemeToggle={toggleTheme} />
             <main className="content">
               <Routes>
                 <Route path="/" element={<Navigate to="/overview" replace />} />
@@ -71,7 +71,6 @@ function DashboardLayout({ theme, toggleTheme }) {
 
 export default function App() {
   const { theme, toggle } = useTheme();
-
   return (
     <AuthProvider>
       <GuildProvider>

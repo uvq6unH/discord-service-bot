@@ -1,7 +1,6 @@
 import React from 'react';
 
 // ── useTheme ──────────────────────────────────────────────────────────────────
-// Hook duy nhất quản lý theme — dùng trong App.jsx, không cần truyền xuống pages
 
 export function useTheme() {
   const [theme, setTheme] = React.useState(() => {
@@ -15,8 +14,7 @@ export function useTheme() {
     try { localStorage.setItem('theme', theme); } catch {}
   }, [theme]);
 
-  const toggle = () => setTheme(t => (t === 'dark' ? 'light' : 'dark'));
-  return { theme, toggle };
+  return { theme, toggle: () => setTheme(t => t === 'dark' ? 'light' : 'dark') };
 }
 
 // ── ThemeToggle ───────────────────────────────────────────────────────────────
@@ -28,7 +26,6 @@ export function ThemeToggle({ theme, onToggle }) {
       className="theme-toggle"
       onClick={onToggle}
       title={isLight ? 'Chuyển sang dark mode' : 'Chuyển sang light mode'}
-      aria-label={isLight ? 'Chuyển sang dark mode' : 'Chuyển sang light mode'}
     >
       <i className={`ti ${isLight ? 'ti-moon' : 'ti-sun'}`} />
     </button>

@@ -64,7 +64,7 @@ export default function PluginNav({ theme, onThemeToggle }) {
         </NavLink>
       ))}
 
-      {/* Theme toggle — cuối nav, tự đẩy xuống bottom bằng margin-top: auto */}
+      {/* Toggle nằm cuối nav — margin-top:auto đẩy xuống bottom */}
       <div style={{ marginTop: 'auto', paddingTop: 'var(--s3)' }}>
         <ThemeToggle theme={theme} onToggle={onThemeToggle} />
       </div>
