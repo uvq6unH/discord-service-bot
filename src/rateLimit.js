@@ -31,12 +31,30 @@ function memoryRateLimit(key, windowMs, max) {
 
 async function redisRateLimit(redis, key, windowMs, max) {
   const windowSec = Math.max(1, Math.ceil(windowMs / 1000));
-  const count = Number(await redis.incr(key));
-  if (count === 1) {
-    await redis.expire(key, windowSec);
-  }
+
+  // Dùng Lua script để INCR + EXPIRE atomic — tránh race condition khi
+  // server crash sau INCR nhưng trước EXPIRE khiến key không bao giờ expire.
+  const count = Number(
+    await redis.eval(
+      `local c = redis.call('INCR', KEYS[1])
+       if c == 1 then redis.call('EXPIRE', KEYS[1], ARGV[1]) end
+       return c`,
+      1,        // numKeys
+      key,      // KEYS[1]
+      String(windowSec) // ARGV[1]
+    )
+  );
+
   if (count > max) {
-    return { allowed: false, retryAfterMs: windowMs };
+    // Trả TTL thực của key để Retry-After chính xác thay vì luôn dùng windowMs cố định.
+    let retryAfterMs = windowMs;
+    try {
+      const ttlSec = Number(await redis.ttl(key));
+      if (ttlSec > 0) retryAfterMs = ttlSec * 1000;
+    } catch {
+      // Fallback về windowMs nếu TTL call fail
+    }
+    return { allowed: false, retryAfterMs };
   }
   return { allowed: true, retryAfterMs: 0 };
 }

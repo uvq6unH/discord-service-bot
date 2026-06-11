@@ -20,7 +20,9 @@ export async function runAutoMod(message, config, client) {
   const content      = message.content.trim();
   const lowerContent = content.toLowerCase();
   const hasBadWord   = config.badWords.some((w) => lowerContent.includes(w.toLowerCase()));
-  const hasBlockedLink = config.antiLinkEnabled && /https?:\/\/|discord\.gg\//i.test(content);
+  // Anti-link: bỏ qua nếu user có ManageMessages (đã check ở trên) hoặc có quyền embed links.
+  // Regex chỉ match URL có domain thực (tránh false-positive với "https://" bare không có domain).
+  const hasBlockedLink = config.antiLinkEnabled && /https?:\/\/\S+\.\S+|discord\.gg\/\S+/i.test(content);
 
   if (!hasBadWord && !hasBlockedLink) return false;
 

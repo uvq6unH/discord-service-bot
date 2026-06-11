@@ -4,7 +4,92 @@ Format: `[vX.Y] — Mô tả ngắn` → chi tiết thay đổi.
 
 ---
 
+## [v1.6.0] — commandCooldowns scope fix + API validation layer
+
+**`src/bot.js`** — fix `commandCooldowns` scope
+- `CommandCooldowns` instance được tạo ở module scope (ngoài factory) → tất cả bot instance trong cùng process share chung cooldown state
+- Chuyển vào bên trong `createBot()` → mỗi instance có tracker riêng, dễ unit test (inject mock, assert state)
+
+**`src/server.js`** — thêm validation layer ở `PUT /api/config`
+- Trước: validation chỉ check array length; type error được configStore handle ngầm (không có error message rõ ràng cho client)
+- Sau: validate type của array fields, string fields, và numeric range (`xpPerMessage 1–100`, `dailyCooldownHours 1–168`) ở API layer — client nhận `400` với message cụ thể thay vì lỗi generic
+- configStore vẫn là source of truth cho sanitization — API layer chỉ fail fast với lỗi rõ ràng
+
+---
+
+## [v1.5.2] — Patch: fix race condition rate limit + anti-link regex + build env
+
+**`src/rateLimit.js`** — fix race condition quan trọng
+- `INCR` + `EXPIRE` tách biệt → thay bằng Lua script atomic: nếu crash giữa 2 lệnh, key không còn sống mãi không có TTL
+- `Retry-After` header giờ dùng TTL thực của key (`redis.ttl()`) thay vì luôn trả `windowMs` cố định
+
+**`src/bot/autoMod.js`** — fix anti-link regex quá broad
+- Regex cũ `/https?:\/\//i` match cả URL không có domain (false-positive)
+- Regex mới `/https?:\/\/\S+\.\S+/i` yêu cầu có domain thực sau protocol
+
+**`package.json`**
+- `build:ui`: đổi `NODE_ENV=development` → `NODE_ENV=production` — Vite giờ tree-shake đúng
+
+---
+
+
+
+**`src/rateLimit.js`** — fix race condition quan trọng
+- `INCR` + `EXPIRE` tách biệt → thay bằng Lua script atomic: nếu crash giữa 2 lệnh, key không còn sống mãi không có TTL
+- `Retry-After` header giờ dùng TTL thực của key (`redis.ttl()`) thay vì luôn trả `windowMs` cố định
+
+**`src/bot/autoMod.js`** — fix anti-link regex quá broad
+- Regex cũ `/https?:\/\//i` match cả URL không có domain (false-positive)
+- Regex mới `/https?:\/\/\S+\.\S+/i` yêu cầu có domain thực sau protocol
+- `discord.gg/` pattern cũng được tighten: phải có path sau slash
+
+**`package.json`**
+- `build:ui`: đổi `NODE_ENV=development` → `NODE_ENV=production` — Vite giờ tree-shake đúng, bundle nhỏ hơn
+
+---
+
+## [v1.5.1] — Patch: fix comment delay sai + CHANGELOG đầy đủ
+
+**`src/upstash.js`**
+- Comment delay sửa thành `// 200ms (attempt=0) → 400ms (attempt=1)` — trước đó ghi sai `800ms` (chỉ đạt được nếu `MAX_RETRIES=3`, thực tế là 2)
+- Header comment cập nhật: `200 ms → 400 ms (tối đa 2 lần, MAX_RETRIES=2)`
+
+**`CHANGELOG.md`**
+- Thêm entry v1.5 đầy đủ
+- Viết lại entry v1.4 với đúng nội dung (bị paste nhầm nội dung v1.3)
+- Xóa block v1.4 duplicate ở cuối file
+
+---
+
 ## [v1.5] — Patch: sửa toàn bộ vấn đề tồn đọng từ v1.4
+
+**`src/utils/loginWithRetry.js`** _(mới)_
+- Extract `loginWithRetry` ra shared utility — xóa bỏ ~20 dòng duplicate giữa `index.js` và `index.bot.js`
+- Signature mới: `loginWithRetry(client, token, { maxRetries, baseDelay, logPrefix })` — `logPrefix` phân biệt log `[app:login]` vs `[bot:login]`
+
+**`src/utils/keepalive.js`** _(mới)_
+- Extract `startKeepalive` ra khỏi `bot.js` — `index.server.js` không còn kéo theo Discord client dependency graph
+
+**`src/index.server.js`**
+- Import `startKeepalive` từ `utils/keepalive.js` thay vì `bot.js` — coupling sai đã được fix
+
+**`src/upstash.js`**
+- Delay đổi thành `200 * 2^attempt` — exponential thật sự thay vì linear
+- Comment header cập nhật
+
+**`src/bot/emojiMap.js`**
+- Sửa comment "Lazy-loaded" → "module-separated" kèm giải thích rõ sự khác biệt và migration path
+
+**`src/bot/reminderWorker.js`**
+- Thêm `⚠️ SINGLE-INSTANCE ASSUMPTION` block — document rõ rủi ro double-fire nếu horizontal scale
+
+**`ADR.md`**
+- Fix đánh số: ADR-006 (pipeline) → ADR-007, shift ADR-007→008, ADR-008→009
+- Sửa typo "Hệg quả" → "Hệ quả"
+
+---
+
+
 
 **`src/utils/loginWithRetry.js`** _(mới)_
 - Extract `loginWithRetry` ra shared utility — xóa bỏ ~20 dòng duplicate giữa `index.js` và `index.bot.js`

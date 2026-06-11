@@ -31,8 +31,6 @@ import { startReminderWorker }                 from './bot/reminderWorker.js';
 import { handleXp }                            from './bot/xpHandler.js';
 import { runAutoMod, runMentionReact }         from './bot/autoMod.js';
 
-const commandCooldowns = new CommandCooldowns();
-
 // ── Guild Cache ───────────────────────────────────────────────────────────────
 // Hai key tách biệt để tránh Upstash 1 MB REST limit trên guild lớn:
 //   guild_cache:{id}         → meta (name, iconURL, channels[], roles[], memberCount)
@@ -105,6 +103,9 @@ async function writeGuildCache(guild, redis) {
 // ── Bot factory ───────────────────────────────────────────────────────────────
 
 export function createBot(configStore, stateStore, redis = null) {
+  // Per-instance cooldown tracker — không phải module-scope singleton.
+  // Đặt trong factory để mỗi bot instance có state riêng (dễ test, đúng với multiple instance).
+  const commandCooldowns = new CommandCooldowns();
   const client = new Client({
     intents: [
       GatewayIntentBits.Guilds,

@@ -13,7 +13,7 @@
     "dev:bot": "node --watch src/index.bot.js",
     "dev:server": "node --watch src/index.server.js",
     "dev:ui": "cd dashboard && pnpm dev",
-    "build:ui": "cd dashboard && NODE_ENV=development pnpm install --no-frozen-lockfile && pnpm build",
+    "build:ui": "cd dashboard && NODE_ENV=production pnpm install --no-frozen-lockfile && pnpm build",
     "build": "pnpm build:ui",
     "prod": "pm2 start pm2.config.cjs",
     "prod:stop": "pm2 stop all",

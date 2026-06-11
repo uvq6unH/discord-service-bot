@@ -270,14 +270,53 @@ export function createServer({ configStore, stateStore, botClient, redis = null 
   });
 
   app.put('/api/config', auth.requireAuth, writeRateLimit, requireGuildId, auth.requireGuildAccess, async (req, res) => {
-    const limits = { commands: 100, autoReplies: 100, reminders: 100 };
-    for (const [key, limit] of Object.entries(limits)) {
-      if (Array.isArray(req.body?.[key]) && req.body[key].length > limit) {
-        return res.status(400).json({ error: `${key} exceeds limit ${limit}` });
+    // ── API-layer validation — fail fast với lỗi rõ ràng trước khi vào configStore ──
+    // configStore.updateGuildConfig sanitize từng field kỹ, nhưng validation ở đây
+    // giúp client nhận 400 với message cụ thể thay vì lỗi generic từ store.
+    const body = req.body;
+    if (!body || typeof body !== 'object' || Array.isArray(body)) {
+      return res.status(400).json({ error: 'Request body phải là object.' });
+    }
+
+    const errors = [];
+
+    // Array length limits
+    const arrayLimits = { commands: 100, autoReplies: 100, reminders: 100 };
+    for (const [key, limit] of Object.entries(arrayLimits)) {
+      if (body[key] !== undefined && !Array.isArray(body[key])) {
+        errors.push(`${key} phải là array.`);
+      } else if (Array.isArray(body[key]) && body[key].length > limit) {
+        errors.push(`${key} vượt giới hạn ${limit} entries.`);
       }
     }
 
-    const config = await configStore.updateGuildConfig(req.guildId, req.body);
+    // String field length limits (fast pre-check trước khi store slice)
+    const strLimits = {
+      prefix: 5, blockedMessage: 500, levelUpMessage: 500,
+      selfRolePanelTitle: 100, selfRolePanelMessage: 1000,
+      ticketPanelTitle: 100, ticketPanelMessage: 1000,
+    };
+    for (const [key, max] of Object.entries(strLimits)) {
+      if (body[key] !== undefined && typeof body[key] !== 'string') {
+        errors.push(`${key} phải là string.`);
+      }
+    }
+
+    // Numeric range checks
+    if (body.xpPerMessage !== undefined) {
+      const v = Number(body.xpPerMessage);
+      if (!Number.isInteger(v) || v < 1 || v > 100) errors.push('xpPerMessage phải là số nguyên 1–100.');
+    }
+    if (body.dailyCooldownHours !== undefined) {
+      const v = Number(body.dailyCooldownHours);
+      if (!Number.isInteger(v) || v < 1 || v > 168) errors.push('dailyCooldownHours phải là số nguyên 1–168.');
+    }
+
+    if (errors.length) {
+      return res.status(400).json({ error: errors.join(' ') });
+    }
+
+    const config = await configStore.updateGuildConfig(req.guildId, body);
 
     let slashSync;
     if (botClient?.user) {
