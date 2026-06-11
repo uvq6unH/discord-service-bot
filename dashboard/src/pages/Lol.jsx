@@ -8,7 +8,6 @@ function ApiKeyInput({ label, valueKey, configuredKey, config, updateConfig, pla
   const isConfigured = config[configuredKey];
   const currentVal   = config[valueKey] ?? '';
 
-  const { theme, toggleTheme } = useAppTheme();
   return (
     <div className="form-group">
       <label className="form-label" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
@@ -57,6 +56,7 @@ function CmdRef({ cmds }) {
 
 // ── Main page ─────────────────────────────────────────────────────────────────
 export default function LolPage() {
+  const { theme, toggleTheme } = useAppTheme();
   const { config, configLoading, updateConfig } = useGuild();
 
   if (configLoading || !config) return <div className="page-loading"><Spinner /></div>;

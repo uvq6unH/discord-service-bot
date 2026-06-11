@@ -5,7 +5,6 @@ import { useAppTheme } from '../App.jsx';
 
 // ── Currency row ─────────────────────────────────────────────────────────────
 function CurrencySection({ name, prefix, config, updateConfig }) {
-  const { theme, toggleTheme } = useAppTheme();
   return (
     <div className="currency-section">
       <div className="form-row">
@@ -88,6 +87,7 @@ const UTC_OFFSETS = [
 
 // ── Main page ─────────────────────────────────────────────────────────────────
 export default function EconomyPage() {
+  const { theme, toggleTheme } = useAppTheme();
   const { config, configLoading, updateConfig } = useGuild();
 
   if (configLoading || !config) return <div className="page-loading"><Spinner /></div>;

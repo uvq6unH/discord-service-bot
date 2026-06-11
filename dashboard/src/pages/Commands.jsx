@@ -86,7 +86,6 @@ function CustomCommandEditor({ commands, onChange }) {
     ));
   };
 
-  const { theme, toggleTheme } = useAppTheme();
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--s3)' }}>
       {customs.length === 0 && (
@@ -168,6 +167,7 @@ function AutoReplyEditor({ replies, onChange }) {
 
 // ── Main page ───────────────────────────────────────────────────────────────
 export default function CommandsPage() {
+  const { theme, toggleTheme } = useAppTheme();
   const { config, configLoading, updateConfig } = useGuild();
   const [search, setSearch] = useState('');
   const [activeGroup, setActiveGroup] = useState('general');

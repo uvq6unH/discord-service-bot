@@ -31,7 +31,6 @@ function ReminderEditor({ reminders, onChange, channels }) {
   const remove = (id) => onChange(reminders.filter(r => r.id !== id));
   const update = (id, patch) => onChange(reminders.map(r => r.id === id ? { ...r, ...patch } : r));
 
-  const { theme, toggleTheme } = useAppTheme();
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--s3)' }}>
       {reminders.length === 0 && (
@@ -113,6 +112,7 @@ function ReminderEditor({ reminders, onChange, channels }) {
 
 // ── Main page ───────────────────────────────────────────────────────────────
 export default function OverviewPage() {
+  const { theme, toggleTheme } = useAppTheme();
   const { config, guildData, configLoading, updateConfig, selectedGuild } = useGuild();
 
   if (configLoading || !config) return <div className="page-loading"><Spinner /></div>;

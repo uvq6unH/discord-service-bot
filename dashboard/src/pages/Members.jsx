@@ -14,7 +14,6 @@ function getDefaultAvatarIndex(id) {
 }
 
 function MemberRow({ member }) {
-  const { theme, toggleTheme } = useAppTheme();
   return (
     <div className="member-row">
       <img
@@ -37,6 +36,7 @@ function MemberRow({ member }) {
 }
 
 export default function MembersPage() {
+  const { theme, toggleTheme } = useAppTheme();
   const { selectedGuild } = useGuild();
   const [members, setMembers]   = useState([]);
   const [total, setTotal]       = useState(0);

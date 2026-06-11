@@ -33,7 +33,6 @@ function StatusDot({ online }) {
 }
 
 function KV({ label, value, highlight }) {
-  const { theme, toggleTheme } = useAppTheme();
   return (
     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center',
       padding: '8px 0', borderBottom: '1px solid var(--border)' }}>
@@ -49,6 +48,7 @@ function KV({ label, value, highlight }) {
 }
 
 export default function SystemPage() {
+  const { theme, toggleTheme } = useAppTheme();
   const [status, setStatus] = useState(null);
   const [loading, setLoading] = useState(true);
   const [lastRefresh, setLastRefresh] = useState(null);

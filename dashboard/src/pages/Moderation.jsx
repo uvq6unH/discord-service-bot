@@ -14,7 +14,6 @@ function BadWordsEditor({ words, onChange }) {
     setInput('');
   };
 
-  const { theme, toggleTheme } = useAppTheme();
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--s2)' }}>
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--s1)' }}>
@@ -100,6 +99,7 @@ function SelfRoleEditor({ roles, allRoles, onChange }) {
 
 // ── Main page ───────────────────────────────────────────────────────────────
 export default function ModerationPage() {
+  const { theme, toggleTheme } = useAppTheme();
   const { config, guildData, configLoading, updateConfig } = useGuild();
 
   if (configLoading || !config) return <div className="page-loading"><Spinner /></div>;
