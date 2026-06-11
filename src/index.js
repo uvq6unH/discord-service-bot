@@ -95,12 +95,10 @@ async function loginWithRetry(maxRetries = 10, baseDelay = 5000) {
       console.log('[app] Discord bot logged in.');
       return;
     } catch (err) {
-      const isTransient =
-        err.code === 'ECONNRESET' ||
-        err.code === 'ETIMEDOUT' ||
-        err.code === 'ENOTFOUND' ||
-        String(err.message).includes('connect') ||
-        String(err.message).includes('network');
+      // Phân loại transient dựa trên error code (không phải string match — ít false-positive hơn).
+      // Discord.js ném HTTPError với status code khi token sai — đó là fatal, không retry.
+      const TRANSIENT_CODES = new Set(['ECONNRESET', 'ETIMEDOUT', 'ENOTFOUND', 'ECONNREFUSED', 'EAI_AGAIN']);
+      const isTransient = TRANSIENT_CODES.has(err.code) || err.status >= 500 || err.status === 429;
 
       if (!isTransient || attempt === maxRetries) {
         console.error(`[app:login] Fatal on attempt ${attempt}:`, err.message);

@@ -266,6 +266,7 @@ helmet (CSP + security headers)
 `createBot(configStore, stateStore, redis?)`
 
 - `redis` is optional; when present it enables guild cache writes and the slash-sync queue worker.
+- Logic tách thành sub-modules: `bot/emojiMap.js`, `bot/reminderWorker.js`, `bot/xpHandler.js`, `bot/autoMod.js`.
 - On `ClientReady`: writes `guild_cache:{guildId}` (meta) and `guild_cache:{guildId}:members` for every guild; starts 10-min refresh interval.
 - On `GuildCreate` / `GuildUpdate`: immediately refreshes both keys.
 - Slash sync queue: polls `slash_sync_queue` via `lpop` every 5 s (only when `redis` present).
@@ -296,11 +297,11 @@ Redis-backed (`config:guild:{guildId}`). Local JSON file is a local-dev fallback
 
 #### `src/upstash.js` — Redis Client
 
-Minimal hand-rolled Upstash REST client (no SDK dependency). Supports: `get`, `set`, `del`, `incr`, `expire`, `smembers`, `sadd`, `eval`, `lpop`, `rpush`, `llen`, `pipeline`. Each request has a built-in 8 s timeout and up to 2 automatic retries with 200 ms / 400 ms backoff.
+Minimal Upstash REST client (no SDK dependency) using `fetch` + `AbortController`. Supports: `get`, `set`, `del`, `incr`, `expire`, `ttl`, `keys`, `smembers`, `sadd`, `srem`, `eval`, `lpop`, `rpush`, `llen`, `pipeline`. Each request has an 8 s timeout and up to 2 automatic retries with exponential backoff (200 ms → 400 ms).
 
 #### `src/distributedLock.js` / `src/asyncMutex.js`
 
-`withRedisLock(redis, key, ttlS, fn)` — Redis-based distributed lock using `EVAL` + Lua for atomic acquire/release.
+`withRedisLock(redis, key, ttlS, fn)` — Redis-based distributed lock using `EVAL` + Lua for atomic acquire/release. Retry uses exponential backoff (50 ms → max 400 ms) to minimise Upstash bandwidth under lock contention.
 
 `asyncMutex` — in-process fallback for local dev when Redis is unavailable.
 
@@ -384,6 +385,10 @@ Accounts are linked per user per guild. The `puuid` (not the deprecated summoner
 | `src/commandAccess.js` | `memberCanUseCommand` — role/channel/permission checks |
 | `src/bot/interactions.js` | Button/select-menu interaction router |
 | `src/bot/games.js` | Blackjack, coinflip, slots game logic |
+| `src/bot/emojiMap.js` | `EMOJI_MAP` + `resolveEmojiNames()` |
+| `src/bot/reminderWorker.js` | `startReminderWorker()` — 60 s polling worker |
+| `src/bot/xpHandler.js` | `handleXp()` — XP grant với in-memory cooldown |
+| `src/bot/autoMod.js` | `runAutoMod()` + `runMentionReact()` |
 | `src/bot/help.js` | Dynamic help text generation |
 | `src/bot/slash.js` | Slash command registration builder |
 | `src/bot/embeds.js` | Shared Discord embed helpers |
@@ -661,6 +666,10 @@ src/bot.js
   ├── src/cooldowns.js
   ├── src/commandAccess.js
   ├── src/bot/slash.js
+  ├── src/bot/emojiMap.js           (resolveEmojiNames)
+  ├── src/bot/reminderWorker.js     (startReminderWorker)
+  ├── src/bot/xpHandler.js          (handleXp)
+  ├── src/bot/autoMod.js            (runAutoMod, runMentionReact)
   ├── src/bot/commands/index.js
   │     ├── src/bot/commands/runtime.js
   │     └── handlers/

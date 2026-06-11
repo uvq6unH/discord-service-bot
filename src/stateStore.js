@@ -273,10 +273,18 @@ export class StateStore {
     return guild.gameSessions?.[type]?.[messageId] ?? null;
   }
 
+  // Game sessions có TTL 3 giờ trên Redis — auto-expire nếu bot crash trước khi xử lý xong.
+  // purgeStaleGameSessions() dùng để refund ngay khi bot khởi động, không chờ TTL.
+  static GAME_SESSION_TTL_S = 3 * 60 * 60; // 3 giờ
+
   async setGameSession(guildId, type, messageId, session) {
     if (this._useRedis) {
       await this._registerGuild(guildId);
-      await this._rSet(this._k.game(guildId, type, messageId), session);
+      await this._redis.set(
+        this._k.game(guildId, type, messageId),
+        JSON.stringify(session),
+        'EX', StateStore.GAME_SESSION_TTL_S
+      );
       return session;
     }
     const guild = await this._fileGetGuild(guildId);
@@ -357,17 +365,48 @@ export class StateStore {
       return;
     }
 
-    // Redis: không thể SCAN granular keys tanpa SCAN command
-    // Upstash REST không support SCAN — dùng guild index thay thế
-    const guildIds = await this._listGuildIds();
+    // Redis: dùng KEYS pattern để tìm tất cả game sessions
+    // Upstash REST hỗ trợ KEYS (đã thêm vào UpstashClient).
+    // Với số lượng guilds / game sessions thấp, KEYS an toàn hơn SCAN cho Upstash.
     const now = Date.now();
+    let purged = 0;
 
-    for (const guildId of guildIds) {
-      // Không có SCAN → skip automatic purge cho Redis
-      // Game sessions có TTL tự nhiên sau khi bot xử lý xong
-      // Nếu cần purge: implement SCAN qua pipeline hoặc dùng TTL khi SET
-      void guildId; void now;
+    for (const type of ['blackjack', 'poker']) {
+      let keys;
+      try {
+        keys = await this._redis.keys(`guild:*:game:${type}:*`);
+      } catch (err) {
+        console.warn(`[StateStore] purge: KEYS failed for ${type}:`, err.message);
+        continue;
+      }
+
+      for (const key of (keys ?? [])) {
+        try {
+          const session = await this._rGet(key);
+          if (!session || session.status !== 'active') {
+            await this._rDel(key);
+            purged++;
+            continue;
+          }
+          const age = session.createdAt ? now - session.createdAt : maxAgeMs + 1;
+          if (age >= maxAgeMs) {
+            // Parse guildId + messageId dari key: guild:{guildId}:game:{type}:{msgId}
+            const parts = key.split(':');
+            if (parts.length >= 5) {
+              const guildId   = parts[1];
+              const messageId = parts[4];
+              await this._refundGameSession(guildId, type, messageId, session);
+            }
+            await this._rDel(key);
+            purged++;
+          }
+        } catch (err) {
+          console.warn(`[StateStore] purge: failed for key ${key}:`, err.message);
+        }
+      }
     }
+
+    if (purged > 0) console.log(`[StateStore] Purged ${purged} stale game session(s) from Redis.`);
   }
 
   // ════════════════════════════════════════════════════════════════════════════
@@ -772,27 +811,6 @@ export class StateStore {
     return guild.tftAccounts?.[userId] ?? null;
   }
 
-  // ════════════════════════════════════════════════════════════════════════════
-  // Legacy compat: getGuild (dùng bởi một số command handler trực tiếp)
-  // Giữ lại để không break code hiện tại, nhưng đánh dấu deprecated
-  // ════════════════════════════════════════════════════════════════════════════
-
-  /** @deprecated Dùng các method cụ thể thay vì getGuild trực tiếp */
-  async getGuild(guildId) {
-    if (!this._useRedis) {
-      return this._fileGetGuild(guildId);
-    }
-    // Redis: assemble một guild object tổng hợp từ các granular keys
-    // (chậm hơn, chỉ dùng cho backward compat)
-    return {
-      warnings:    {},
-      levels:      {},
-      tickets:     { nextNumber: 1 },
-      economy:     { users: {} },
-      gameSessions: { blackjack: {}, poker: {} },
-      lolAccounts: {},
-      tftAccounts: {},
-      _granular: true, // flag để biết data thực sự nằm ở granular keys
-    };
-  }
 }
+// getGuild() đã bị xoá (deprecated từ v1.3, không còn caller nào).
+// Dùng các method cụ thể: getEconomyUser, getLevels, getWarnings, ...

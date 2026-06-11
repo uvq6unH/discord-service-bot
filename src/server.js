@@ -116,31 +116,34 @@ export function createServer({ configStore, stateStore, botClient, redis = null 
   // Redis guild_cache TTL — phải khớp với GUILD_CACHE_TTL_S trong bot.js (900s)
   const GUILD_CACHE_TTL_S = 900;
 
-  // In-process guild list cache (userId -> {guilds, expiresAt}, 5-min TTL)
-  // Shared between routes in this server instance.
-  const _guildCache = new Map();
-  const GUILD_CACHE_TTL = 5 * 60 * 1000;
-  function getCachedGuilds(userId) {
-    const e = _guildCache.get(userId);
-    if (!e || Date.now() > e.expiresAt) { _guildCache.delete(userId); return null; }
-    return e.guilds;
+  // ── In-process short-lived cache ──────────────────────────────────────────
+  // Single generic helper keyed by arbitrary string.
+  // Dùng để tránh repeated OAuth / Discord API calls trong cùng server instance.
+  //   guilds:{userId}     → 5 min (OAuth /users/@me/guilds)
+  //   guild-data:{guildId} → 2 min (botClient.members.fetch fallback)
+  const _memCache = new Map();
+  function _cacheGet(key) {
+    const e = _memCache.get(key);
+    if (!e || Date.now() > e.expiresAt) { _memCache.delete(key); return null; }
+    return e.value;
   }
-  function setCachedGuilds(userId, guilds) {
-    _guildCache.set(userId, { guilds, expiresAt: Date.now() + GUILD_CACHE_TTL });
+  function _cacheSet(key, value, ttlMs) {
+    _memCache.set(key, { value, expiresAt: Date.now() + ttlMs });
   }
+  // Periodic prune — tránh memory leak trên instance chạy lâu
+  setInterval(() => {
+    const now = Date.now();
+    for (const [k, e] of _memCache.entries()) {
+      if (now > e.expiresAt) _memCache.delete(k);
+    }
+  }, 5 * 60_000).unref();
 
-  // In-process guild-data cache (guildId -> {data, expiresAt}, 2-min TTL)
-  // Avoids repeated guild.members.fetch() calls to Discord API for the same guild.
-  const _guildDataCache = new Map();
-  const GUILD_DATA_CACHE_TTL = 2 * 60 * 1000;
-  function getCachedGuildData(guildId) {
-    const e = _guildDataCache.get(guildId);
-    if (!e || Date.now() > e.expiresAt) { _guildDataCache.delete(guildId); return null; }
-    return e.data;
-  }
-  function setCachedGuildData(guildId, data) {
-    _guildDataCache.set(guildId, { data, expiresAt: Date.now() + GUILD_DATA_CACHE_TTL });
-  }
+  const GUILDS_CACHE_TTL    = 5 * 60_000;
+  const GUILD_DATA_CACHE_TTL = 2 * 60_000;
+  const getCachedGuilds    = (uid)    => _cacheGet(`guilds:${uid}`);
+  const setCachedGuilds    = (uid, v) => _cacheSet(`guilds:${uid}`, v, GUILDS_CACHE_TTL);
+  const getCachedGuildData = (gid)    => _cacheGet(`guild-data:${gid}`);
+  const setCachedGuildData = (gid, v) => _cacheSet(`guild-data:${gid}`, v, GUILD_DATA_CACHE_TTL);
 
   const auth = createAuthRouter(botClient, redis);
   if (auth.attachTo) auth.attachTo(app);

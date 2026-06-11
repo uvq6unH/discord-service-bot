@@ -1,167 +1,108 @@
+/**
+ * bot.js — Discord Client factory
+ *
+ * createBot(configStore, stateStore, redis?) → discord.js Client
+ *
+ * Tất cả logic phụ đã tách vào sub-modules:
+ *   src/bot/emojiMap.js       → resolveEmojiNames
+ *   src/bot/reminderWorker.js → startReminderWorker
+ *   src/bot/xpHandler.js      → handleXp
+ *   src/bot/autoMod.js        → runAutoMod, runMentionReact
+ */
+
 import {
   Client,
   Events,
   GatewayIntentBits,
   Partials,
-  PermissionFlagsBits
+  PermissionFlagsBits,
 } from 'discord.js';
+
 import { CommandCooldowns, formatRetryAfter } from './cooldowns.js';
-import { buildSlashCommands } from './bot/slash.js';
-import { renderCommandResponse } from './bot/responses.js';
-import { formatMessage, sendLog } from './bot/logging.js';
-import { runBuiltInCommand } from './bot/commands.js';
-import { sanitizeAnnouncementText } from './commandAccess.js';
-
-// ── Emoji name → unicode resolver ─────────────────────────────────────────────
-// Converts :emoji_name: tokens in a string to their unicode equivalents.
-// Covers common emoji used in reminders; unknown names are left unchanged.
-const EMOJI_MAP = {
-  smile: '😊', grinning: '😀', laughing: '😆', joy: '😂', rofl: '🤣',
-  wink: '😉', blush: '😊', heart_eyes: '😍', kissing_heart: '😘',
-  yum: '😋', sunglasses: '😎', thinking: '🤔', raised_eyebrow: '🤨',
-  neutral_face: '😐', expressionless: '😑', unamused: '😒', roll_eyes: '🙄',
-  hushed: '😯', astonished: '😲', flushed: '😳', pleading_face: '🥺',
-  cry: '😢', sob: '😭', angry: '😠', rage: '😡', skull: '💀',
-  ghost: '👻', alien: '👽', robot: '🤖', poop: '💩', clown: '🤡',
-  thumbsup: '👍', thumbsdown: '👎', clap: '👏', wave: '👋',
-  raised_hands: '🙌', pray: '🙏', muscle: '💪', point_right: '👉',
-  point_left: '👈', point_up: '☝️', point_down: '👇', ok_hand: '👌',
-  v: '✌️', crossed_fingers: '🤞', metal: '🤘', call_me_hand: '🤙',
-  writing_hand: '✍️', open_hands: '👐', handshake: '🤝',
-  heart: '❤️', orange_heart: '🧡', yellow_heart: '💛', green_heart: '💚',
-  blue_heart: '💙', purple_heart: '💜', black_heart: '🖤', white_heart: '🤍',
-  broken_heart: '💔', sparkling_heart: '💖', heartbeat: '💓', two_hearts: '💕',
-  star: '⭐', star2: '🌟', dizzy: '💫', sparkles: '✨', fire: '🔥',
-  tada: '🎉', confetti_ball: '🎊', balloon: '🎈', gift: '🎁',
-  trophy: '🏆', medal: '🥇', first_place: '🥇', second_place: '🥈', third_place: '🥉',
-  bell: '🔔', no_bell: '🔕', alarm_clock: '⏰', stopwatch: '⏱️',
-  calendar: '📅', date: '📅', spiral_calendar: '🗓️',
-  memo: '📝', pencil: '✏️', pencil2: '✏️', pen: '🖊️',
-  email: '📧', envelope: '✉️', mailbox: '📬', inbox_tray: '📥',
-  outbox_tray: '📤', telephone: '☎️', iphone: '📱', computer: '💻',
-  desktop_computer: '🖥️', printer: '🖨️', keyboard: '⌨️',
-  mag: '🔍', mag_large: '🔎', lock: '🔒', unlock: '🔓', key: '🔑',
-  warning: '⚠️', stop_sign: '🛑', no_entry: '⛔', x: '❌', white_check_mark: '✅',
-  ballot_box_with_check: '☑️', heavy_check_mark: '✔️', heavy_plus_sign: '➕',
-  heavy_minus_sign: '➖', question: '❓', grey_question: '❔',
-  exclamation: '❗', grey_exclamation: '❕', bangbang: '‼️',
-  arrow_up: '⬆️', arrow_down: '⬇️', arrow_left: '⬅️', arrow_right: '➡️',
-  repeat: '🔁', repeat_one: '🔂', arrows_counterclockwise: '🔄',
-  information_source: 'ℹ️', new: '🆕', up: '🆙', cool: '🆒', free: '🆓',
-  sos: '🆘', ok: '🆗', ng: '🆖', id: '🆔',
-  sun: '☀️', moon: '🌙', cloud: '☁️', snowflake: '❄️', umbrella: '☂️',
-  rainbow: '🌈', zap: '⚡', ocean: '🌊', earth_asia: '🌏',
-  cat: '🐱', dog: '🐶', fox_face: '🦊', bear: '🐻', panda_face: '🐼',
-  pizza: '🍕', hamburger: '🍔', fries: '🍟', sushi: '🍣', ramen: '🍜',
-  cake: '🎂', coffee: '☕', tea: '🍵', beer: '🍺', wine_glass: '🍷',
-  soccer: '⚽', basketball: '🏀', football: '🏈', tennis: '🎾', golf: '⛳',
-  video_game: '🎮', joystick: '🕹️', dice: '🎲', chess_pawn: '♟️',
-  musical_note: '🎵', notes: '🎶', microphone: '🎤', headphones: '🎧',
-  guitar: '🎸', drum: '🥁', trumpet: '🎺', violin: '🎻',
-  house: '🏠', office: '🏢', school: '🏫', hospital: '🏥',
-  car: '🚗', bus: '🚌', train: '🚆', airplane: '✈️', rocket: '🚀',
-  moneybag: '💰', dollar: '💵', euro: '💶', gem: '💎',
-  100: '💯', infinity: '♾️', recycle: '♻️', white_flag: '🏳️', crossed_flags: '🎌',
-};
-
-/**
- * Replaces :emoji_name: tokens in a string with their unicode equivalents.
- * Tries guild custom emojis first, then falls back to EMOJI_MAP.
- * Unknown names are left as-is (e.g. :lui2: stays if not found).
- */
-function resolveEmojiNames(text, guild = null) {
-  if (!text) return text;
-  return text.replace(/:([a-zA-Z0-9_]+):/g, (match, name) => {
-    // 1. Try guild custom emoji (case-insensitive)
-    if (guild) {
-      const custom = guild.emojis.cache.find(e => e.name.toLowerCase() === name.toLowerCase());
-      if (custom) return custom.toString(); // renders as <:name:id> or <a:name:id>
-    }
-    // 2. Fallback to static unicode map
-    return EMOJI_MAP[name] ?? match;
-  });
-}
-
-// In-memory XP cooldown cache — prevents redundant Redis reads when levelsEnabled
-// Key: `guildId:userId`, Value: timestamp of last XP grant
-const xpCache = new Map();
-const XP_COOLDOWN_MS = 60_000;
-// Prune expired entries every 5 minutes to prevent memory leak on long-running instances
-setInterval(() => {
-  const now = Date.now();
-  for (const [key, ts] of xpCache.entries()) {
-    if (now - ts >= XP_COOLDOWN_MS) xpCache.delete(key);
-  }
-}, 5 * 60 * 1000).unref();
-import { handleComponentInteraction } from './bot/interactions.js';
-import { handleMusicCommand } from './bot/commands/handlers/music.js';
-import { initLavalink, forwardVoiceEvent } from './bot/music/lavalink.js';
+import { buildSlashCommands }                  from './bot/slash.js';
+import { renderCommandResponse }               from './bot/responses.js';
+import { formatMessage, sendLog }              from './bot/logging.js';
+import { runBuiltInCommand }                   from './bot/commands.js';
+import { sanitizeAnnouncementText }            from './commandAccess.js';
+import { handleComponentInteraction }          from './bot/interactions.js';
+import { handleMusicCommand }                  from './bot/commands/handlers/music.js';
+import { initLavalink, forwardVoiceEvent }     from './bot/music/lavalink.js';
+import { startReminderWorker }                 from './bot/reminderWorker.js';
+import { handleXp }                            from './bot/xpHandler.js';
+import { runAutoMod, runMentionReact }         from './bot/autoMod.js';
 
 const commandCooldowns = new CommandCooldowns();
 
-// ── Guild Cache helpers ────────────────────────────────────────────────────────
-// Two separate Redis keys to avoid Upstash 1MB REST request limit on large guilds:
-//
-//   guild_cache:{guildId}         → meta  (name, iconURL, channels[], roles[], memberCount)
-//   guild_cache:{guildId}:members → members[] only
-//
-// /api/guild-data reads only the meta key  (~5–20 KB regardless of guild size)
-// /api/members    reads only the members key (~200 bytes × N members)
-//
-// TTL: 15 min on both. Bot refreshes every 10 min + on GuildCreate/GuildUpdate.
-const GUILD_CACHE_KEY = (id) => `guild_cache:${id}`;
+// ── Guild Cache ───────────────────────────────────────────────────────────────
+// Hai key tách biệt để tránh Upstash 1 MB REST limit trên guild lớn:
+//   guild_cache:{id}         → meta (name, iconURL, channels[], roles[], memberCount)
+//   guild_cache:{id}:members → members[] riêng biệt
+// TTL: 15 phút. Bot refresh mỗi 10 phút + GuildCreate/GuildUpdate.
+
+const GUILD_CACHE_KEY         = (id) => `guild_cache:${id}`;
 const GUILD_CACHE_MEMBERS_KEY = (id) => `guild_cache:${id}:members`;
-const GUILD_CACHE_TTL_S = 900;              // 15 min
-const GUILD_CACHE_REFRESH_MS = 10 * 60 * 1000;  // refresh every 10 min
+const GUILD_CACHE_TTL_S       = 900;
+const GUILD_CACHE_REFRESH_MS  = 10 * 60_000;
 
 async function writeGuildCache(guild, redis) {
   if (!redis) return;
   try {
     const channels = guild.channels.cache.map((c) => ({ id: c.id, name: c.name, type: c.type }));
     const roles = guild.roles.cache
-      .map((r) => ({ id: r.id, name: r.name, rawPosition: r.rawPosition, color: r.color ? `#${r.color.toString(16).padStart(6, '0')}` : null }))
+      .map((r) => ({
+        id: r.id, name: r.name, rawPosition: r.rawPosition,
+        color: r.color ? `#${r.color.toString(16).padStart(6, '0')}` : null,
+      }))
       .sort((a, b) => b.rawPosition - a.rawPosition);
 
-    // ── Key 1: meta (small, always fast — used by /api/guild-data) ────────────
+    // Key 1: meta — kích thước nhỏ, dùng cho /api/guild-data
     const metaPayload = JSON.stringify({
-      name: guild.name,
-      iconURL: guild.iconURL({ size: 64 }) ?? null,
+      name:        guild.name,
+      iconURL:     guild.iconURL({ size: 64 }) ?? null,
       channels,
       roles,
       memberCount: guild.memberCount,
-      ownerId: guild.ownerId,
-      updatedAt: new Date().toISOString(),
+      ownerId:     guild.ownerId,
+      updatedAt:   new Date().toISOString(),
     });
     await redis.set(GUILD_CACHE_KEY(guild.id), metaPayload, 'EX', GUILD_CACHE_TTL_S);
 
-    // ── Key 2: members (scales with guild size — used only by /api/members) ───
-    // Fetch members — tolerate failures (fallback to cache)
+    // Key 2: members — scale theo kích thước guild, dùng cho /api/members
     let membersFetched;
     try {
-      const fetchPromise = guild.members.fetch();
-      const timeout = new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), 8000));
-      membersFetched = await Promise.race([fetchPromise, timeout]);
+      membersFetched = await Promise.race([
+        guild.members.fetch(),
+        new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), 8_000)),
+      ]);
     } catch {
       membersFetched = guild.members.cache;
     }
-    const members = [...membersFetched.values()].map((m) => ({
-      id: m.user.id,
-      username: m.user.username,
-      displayName: m.displayName,
-      avatar: m.user.avatar ?? null,
-      joinedAt: m.joinedAt ? m.joinedAt.toISOString() : null,
-      // roles của từng member không cache — giảm size, redundant với guild_cache meta
-    })).sort((a, b) => a.displayName.localeCompare(b.displayName));
+
+    const members = [...membersFetched.values()]
+      .map((m) => ({
+        id:          m.user.id,
+        username:    m.user.username,
+        displayName: m.displayName,
+        avatar:      m.user.avatar ?? null,
+        joinedAt:    m.joinedAt ? m.joinedAt.toISOString() : null,
+      }))
+      .sort((a, b) => a.displayName.localeCompare(b.displayName));
 
     const membersPayload = JSON.stringify(members);
     await redis.set(GUILD_CACHE_MEMBERS_KEY(guild.id), membersPayload, 'EX', GUILD_CACHE_TTL_S);
     redis.incr('stats:guild_cache_refresh').catch(() => null);
 
-    console.log(`[guild-cache] ✅ ${guild.name} (${guild.id}) — meta ${Math.round(Buffer.byteLength(metaPayload) / 1024)}KB, members ${members.length} (${Math.round(Buffer.byteLength(membersPayload) / 1024)}KB)`);
+    console.log(
+      `[guild-cache] ✅ ${guild.name} (${guild.id})` +
+      ` — meta ${Math.round(Buffer.byteLength(metaPayload) / 1024)}KB,` +
+      ` members ${members.length} (${Math.round(Buffer.byteLength(membersPayload) / 1024)}KB)`
+    );
   } catch (err) {
     console.error(`[guild-cache] ❌ Failed to write cache for ${guild.id}:`, err.message);
   }
 }
+
+// ── Bot factory ───────────────────────────────────────────────────────────────
 
 export function createBot(configStore, stateStore, redis = null) {
   const client = new Client({
@@ -170,35 +111,32 @@ export function createBot(configStore, stateStore, redis = null) {
       GatewayIntentBits.GuildMessages,
       GatewayIntentBits.GuildMembers,
       GatewayIntentBits.GuildVoiceStates,
-      GatewayIntentBits.MessageContent
+      GatewayIntentBits.MessageContent,
     ],
-    partials: [Partials.Channel]
+    partials: [Partials.Channel],
   });
   client.stateStore = stateStore;
 
+  // ── ClientReady ─────────────────────────────────────────────────────────────
   client.once(Events.ClientReady, (readyClient) => {
     console.log(`Discord bot logged in as ${readyClient.user.tag}`);
 
-    // Run async startup tasks without blocking the event loop
     (async () => {
-      // 1. Wait for stores to finish loading from disk before doing anything
       await configStore.ready;
       await stateStore.ready;
 
-      // 1b. Init Lavalink manager (must run after client is ready)
-      await initLavalink(readyClient).catch(err =>
+      await initLavalink(readyClient).catch((err) =>
         console.error('[bot] Failed to init Lavalink:', err.message)
       );
 
-      // 2. Purge stale game sessions and refund bets
       await stateStore.purgeStaleGameSessions().catch((err) =>
         console.error('[bot] Failed to purge stale game sessions:', err.message)
       );
 
-      // 3. Sync slash commands for every guild — await each one so errors surface clearly
-      const guilds = [...readyClient.guilds.cache.values()];
+      // Sync slash commands cho mỗi guild
+      const guilds  = [...readyClient.guilds.cache.values()];
+      let   synced  = 0;
       console.log(`[bot] Syncing slash commands for ${guilds.length} guild(s)...`);
-      let synced = 0;
       for (const guild of guilds) {
         try {
           const config = await configStore.getGuildConfig(guild.id);
@@ -206,254 +144,109 @@ export function createBot(configStore, stateStore, redis = null) {
           console.log(`[bot] ✅ Synced ${result.count} commands → ${guild.name} (${guild.id})`);
           synced += 1;
         } catch (error) {
-          console.error(`[bot] ❌ Failed to sync commands for ${guild.name} (${guild.id}): ${error.message}`);
+          console.error(`[bot] ❌ Failed to sync commands for ${guild.name}: ${error.message}`);
         }
       }
       console.log(`[bot] Command sync complete: ${synced}/${guilds.length} guilds OK`);
 
-      // 5. Write guild cache to Redis for all guilds (dashboard reads from here in split mode)
+      // Guild cache initial write
       if (redis) {
         console.log(`[guild-cache] Writing initial cache for ${guilds.length} guild(s)...`);
-        for (const guild of guilds) {
-          await writeGuildCache(guild, redis);
-        }
-        // Refresh cache every 10 minutes
+        for (const guild of guilds) await writeGuildCache(guild, redis);
+
         setInterval(async () => {
-          const activeGuilds = [...readyClient.guilds.cache.values()];
-          for (const guild of activeGuilds) {
+          for (const guild of [...readyClient.guilds.cache.values()]) {
             await writeGuildCache(guild, redis);
           }
         }, GUILD_CACHE_REFRESH_MS).unref();
       }
 
-      setInterval(async () => {
-        const now = new Date();
-        const guildIds = await configStore.listGuildIds();
-        for (const guildId of guildIds) {
-          try {
-            const config = await configStore.getGuildConfig(guildId);
-            if (!config.enabled || !config.remindersEnabled || !config.reminders?.length) continue;
-
-            let modified = false;
-            const nextReminders = [];
-            for (const reminder of config.reminders) {
-              const time = new Date(reminder.time);
-              if (!isNaN(time) && time <= now) {
-                modified = true;
-                const guild = await readyClient.guilds.fetch(guildId).catch(() => null);
-                if (guild) {
-                  const channel = await guild.channels.fetch(reminder.channelId).catch(() => null);
-                  if (channel?.isTextBased()) {
-                    // Support both legacy userId and new userIds array
-                    const ids = Array.isArray(reminder.userIds) && reminder.userIds.length
-                      ? reminder.userIds
-                      : (reminder.userId ? [reminder.userId] : []);
-                    const mentions = ids.map(id => `<@${id}>`).join(' ');
-                    const repeatLabel = { hourly: ' 🔁 (mỗi giờ)', daily: ' 🔁 (mỗi ngày)', weekly: ' 🔁 (mỗi tuần)' }[reminder.repeat] ?? '';
-                    const resolvedMessage = resolveEmojiNames(reminder.message, guild);
-                    await channel.send(`${mentions} ${resolvedMessage}${repeatLabel}`).catch(() => null);
-                  }
-                }
-                // ── Reschedule if repeat is set ──
-                const repeat = reminder.repeat || 'none';
-                if (repeat !== 'none') {
-                  const intervals = { hourly: 60 * 60 * 1000, daily: 24 * 60 * 60 * 1000, weekly: 7 * 24 * 60 * 60 * 1000 };
-                  const ms = intervals[repeat];
-                  if (ms) {
-                    // Advance time by N intervals so next fire is always in the future
-                    let nextTime = time.getTime() + ms;
-                    while (nextTime <= now.getTime()) nextTime += ms;
-                    const nextTimeStr = new Date(nextTime).toISOString();
-                    nextReminders.push({ ...reminder, time: nextTimeStr });
-                  }
-                }
-                // If repeat === 'none', we don't push → reminder is consumed and removed
-              } else {
-                nextReminders.push(reminder);
-              }
-            }
-            if (modified) {
-              await configStore.updateGuildConfig(guildId, { reminders: nextReminders });
-            }
-          } catch (err) {
-            console.error(`[reminder] Error processing guild ${guildId}:`, err.message);
-          }
-        }
-      }, 60 * 1000).unref();
+      // Workers
+      startReminderWorker(readyClient, configStore);
+      _startSlashSyncWorker(readyClient, configStore, redis);
+      _startHeartbeat(readyClient, redis);
     })().catch((err) => console.error('[bot] Startup error:', err));
   });
 
-  // ── Resilience: log disconnects and errors instead of silently dying ────────
-  client.on(Events.ShardDisconnect, (event, shardId) => {
-    console.warn(`[bot] Shard ${shardId} disconnected (code ${event.code}). Discord.js will auto-reconnect.`);
-  });
-
-  client.on(Events.ShardReconnecting, (shardId) => {
-    console.log(`[bot] Shard ${shardId} reconnecting…`);
-  });
-
-  client.on(Events.ShardResume, (shardId, replayedEvents) => {
-    console.log(`[bot] Shard ${shardId} resumed (${replayedEvents} events replayed).`);
-  });
-
-  client.on(Events.ShardError, (error, shardId) => {
-    console.error(`[bot] Shard ${shardId} error:`, error.message);
-    if (redis) redis.incr('stats:discord_errors').catch(() => null);
-    // Do NOT re-throw — discord.js handles its own reconnect logic.
-  });
-
-  client.on(Events.Error, (error) => {
-    console.error('[bot] Client error:', error.message);
+  // ── Resilience ──────────────────────────────────────────────────────────────
+  client.on(Events.ShardDisconnect,   (ev, id) => console.warn(`[bot] Shard ${id} disconnected (code ${ev.code}). Will auto-reconnect.`));
+  client.on(Events.ShardReconnecting, (id)      => console.log(`[bot] Shard ${id} reconnecting…`));
+  client.on(Events.ShardResume,       (id, n)   => console.log(`[bot] Shard ${id} resumed (${n} events replayed).`));
+  client.on(Events.ShardError,        (err, id) => {
+    console.error(`[bot] Shard ${id} error:`, err.message);
     if (redis) redis.incr('stats:discord_errors').catch(() => null);
   });
-
-  client.on(Events.Warn, (info) => {
-    console.warn('[bot] Warning:', info);
+  client.on(Events.Error, (err) => {
+    console.error('[bot] Client error:', err.message);
+    if (redis) redis.incr('stats:discord_errors').catch(() => null);
   });
+  client.on(Events.Warn, (info) => console.warn('[bot] Warning:', info));
 
-  // ── Lavalink: forward raw voice gateway events ─────────────────────────────
-  // Lavalink needs VOICE_STATE_UPDATE and VOICE_SERVER_UPDATE to manage
-  // voice connections. discord.js does not expose these as typed events,
-  // so we listen on the raw packet stream.
+  // Lavalink cần VOICE_STATE_UPDATE / VOICE_SERVER_UPDATE từ raw packet stream
   client.on(Events.Raw, (packet) => {
     if (packet.t === 'VOICE_STATE_UPDATE' || packet.t === 'VOICE_SERVER_UPDATE') {
       forwardVoiceEvent(packet, 0);
     }
   });
-  // ────────────────────────────────────────────────────────────────────────────
 
+  // ── Slash command sync helper ───────────────────────────────────────────────
   client.syncGuildCommands = async (guildId, config) => {
     const guild = await client.guilds.fetch(guildId).catch(() => null);
-    if (!guild) {
-      return { synced: false, reason: 'guild_not_found' };
-    }
+    if (!guild) return { synced: false, reason: 'guild_not_found' };
 
-    const commands = buildSlashCommands(config);
-
-    // Validate: Discord requires name 1-32 chars, description 1-100 chars
-    for (const cmd of commands) {
+    const commands      = buildSlashCommands(config);
+    const validCommands = commands.filter((cmd) => {
       if (!cmd.name || cmd.name.length > 32) {
         console.warn(`[sync] Skipping invalid command name: "${cmd.name}"`);
-        continue;
+        return false;
       }
       if (!cmd.description || cmd.description.length > 100) {
         cmd.description = (cmd.description ?? cmd.name).slice(0, 100);
       }
-    }
+      return true;
+    });
 
-    const validCommands = commands.filter((cmd) => cmd.name && cmd.name.length <= 32);
     await guild.commands.set(validCommands);
     return { synced: true, count: validCommands.length };
   };
 
-  // ── Guild cache: refresh on join / update ──────────────────────────────────
+  // ── Guild cache: refresh on join / update ───────────────────────────────────
   client.on(Events.GuildCreate, async (guild) => {
     console.log(`[bot] Joined guild: ${guild.name} (${guild.id})`);
     if (redis) await writeGuildCache(guild, redis);
   });
-
-  client.on(Events.GuildUpdate, async (_oldGuild, newGuild) => {
+  client.on(Events.GuildUpdate, async (_old, newGuild) => {
     if (redis) await writeGuildCache(newGuild, redis);
   });
 
-  // ── Slash sync queue worker ────────────────────────────────────────────────
-  // Dashboard pushes jobs to Redis list `slash_sync_queue` when botClient is null.
-  // Bot polls every 5 s. On Discord API failure, job is re-queued up to 3 times.
-  if (redis) {
-    const SLASH_SYNC_QUEUE = 'slash_sync_queue';
-    const MAX_RETRIES = 3;
-
-    setInterval(async () => {
-      try {
-        const raw = await redis.lpop(SLASH_SYNC_QUEUE);
-        if (!raw) return;
-        let job;
-        try { job = typeof raw === 'string' ? JSON.parse(raw) : raw; } catch { return; }
-
-        const { guildId, retries = 0, requestedAt } = job;
-        if (!guildId) return;
-
-        const config = await configStore.getGuildConfig(guildId).catch(() => null);
-        if (!config) return;
-
-        try {
-          const result = await client.syncGuildCommands(guildId, config);
-          redis.incr('stats:slash_sync_processed').catch(() => null);
-          console.log(`[slash-queue] Synced ${guildId}:`, result);
-        } catch (err) {
-          if (retries < MAX_RETRIES) {
-            // Re-queue with incremented retry count
-            await redis.rpush(SLASH_SYNC_QUEUE, JSON.stringify({
-              guildId, retries: retries + 1, requestedAt,
-              lastError: err.message, retriedAt: new Date().toISOString(),
-            }));
-            console.warn(`[slash-queue] Retry ${retries + 1}/${MAX_RETRIES} queued for ${guildId}: ${err.message}`);
-          } else {
-            console.error(`[slash-queue] Giving up on ${guildId} after ${MAX_RETRIES} retries: ${err.message}`);
-            redis.incr('stats:slash_sync_failed').catch(() => null);
-          }
-        }
-      } catch (err) {
-        console.error('[slash-queue] Worker error:', err.message);
-      }
-    }, 5000).unref();
-    console.log('[slash-queue] Worker started — polling every 5s, max 3 retries');
-  }
-
-  // ── Bot heartbeat ──────────────────────────────────────────────────────────
-  // Writes heartbeat:bot to Redis every 30 s so the dashboard can show
-  // real bot online/offline status and cache freshness even in split mode.
-  if (redis) {
-    const writeHeartbeat = async () => {
-      try {
-        await redis.set('heartbeat:bot', JSON.stringify({
-          ts: new Date().toISOString(),
-          uptimeS: Math.floor(process.uptime()),
-          guilds: client.guilds.cache.size,
-          ready: Boolean(client.user),
-          tag: client.user?.tag ?? null,
-          commit: process.env.RENDER_GIT_COMMIT?.slice(0, 7) ?? process.env.GIT_COMMIT?.slice(0, 7) ?? 'unknown',
-          version: process.env.npm_package_version ?? 'unknown',
-          riotApiKeyConfigured: Boolean(process.env.RIOT_API_KEY),
-          tftApiKeyConfigured: Boolean(process.env.TFT_API_KEY),
-        }), 'EX', 90);
-      } catch { /* non-fatal */ }
-    };
-    writeHeartbeat();
-    setInterval(writeHeartbeat, 30_000).unref();
-    console.log('[heartbeat] Bot heartbeat started — writing every 30s');
-  }
-
+  // ── Member auto-role + welcome ──────────────────────────────────────────────
   client.on(Events.GuildMemberAdd, async (member) => {
     const config = await configStore.getGuildConfig(member.guild.id);
+
     if (config.rolesEnabled && config.autoRoleId) {
       await member.roles.add(config.autoRoleId).catch(() => null);
     }
 
-    if (!config.enabled || !config.welcomeEnabled || !config.welcomeChannelId) {
-      return;
-    }
+    if (!config.enabled || !config.welcomeEnabled || !config.welcomeChannelId) return;
 
     const channel = await member.guild.channels.fetch(config.welcomeChannelId).catch(() => null);
-    if (!channel?.isTextBased()) {
-      return;
-    }
+    if (!channel?.isTextBased()) return;
 
     await channel.send(formatMessage(config.welcomeMessage, member)).catch(() => null);
     await sendLog(member.guild, config, `Welcomed ${member.user.tag}.`);
   });
 
+  // ── Interaction handler ─────────────────────────────────────────────────────
   client.on(Events.InteractionCreate, async (interaction) => {
     try {
+      // Component interactions (buttons, select menus)
       if ((interaction.isStringSelectMenu() || interaction.isButton()) && interaction.guild) {
         const config = await configStore.getGuildConfig(interaction.guild.id);
         await handleComponentInteraction(interaction, { client, config, stateStore });
         return;
       }
 
-      if (!interaction.isChatInputCommand() || !interaction.guild) {
-        return;
-      }
+      if (!interaction.isChatInputCommand() || !interaction.guild) return;
 
       const config = await configStore.getGuildConfig(interaction.guild.id);
       if (!config.enabled) {
@@ -470,27 +263,27 @@ export function createBot(configStore, stateStore, redis = null) {
       const bypassCooldown =
         interaction.memberPermissions?.has(PermissionFlagsBits.Administrator) ||
         interaction.memberPermissions?.has(PermissionFlagsBits.ManageGuild);
+
       const cooldown = commandCooldowns.check({
-        guildId: interaction.guild.id,
-        userId: interaction.user.id,
+        guildId:     interaction.guild.id,
+        userId:      interaction.user.id,
         commandType: command.type,
-        bypass: bypassCooldown
+        bypass:      bypassCooldown,
       });
       if (!cooldown.allowed) {
         await interaction.reply({
           content: `Please wait ${formatRetryAfter(cooldown.retryAfterMs)} before using this command again.`,
-          ephemeral: true
+          ephemeral: true,
         });
         return;
       }
 
-      const args = interaction.options.getString('args') ?? '';
       await runBuiltInCommand({
         client,
         config,
         command,
         source: interaction,
-        args
+        args: interaction.options.getString('args') ?? '',
       });
     } catch (error) {
       console.error('[bot] Interaction handler error:', error);
@@ -505,80 +298,28 @@ export function createBot(configStore, stateStore, redis = null) {
     }
   });
 
+  // ── Message handler ─────────────────────────────────────────────────────────
   client.on(Events.MessageCreate, async (message) => {
     try {
-      if (!message.guild || message.author.bot) {
-        return;
-      }
+      if (!message.guild || message.author.bot) return;
 
       const config = await configStore.getGuildConfig(message.guild.id);
-      if (!config.enabled) {
-        return;
-      }
+      if (!config.enabled) return;
 
       const content = message.content.trim();
-      const prefix = config.prefix || '!';
+      const prefix  = config.prefix || '!';
 
-      if (config.autoModEnabled && !message.member?.permissions?.has(PermissionFlagsBits.ManageMessages)) {
-        const lowerContent = content.toLowerCase();
-        const hasBadWord = config.badWords.some((word) => lowerContent.includes(word.toLowerCase()));
-        const hasBlockedLink = config.antiLinkEnabled && /https?:\/\/|discord\.gg\//i.test(content);
+      // 1. AutoMod — block nếu vi phạm
+      const blocked = await runAutoMod(message, config, client);
+      if (blocked) return;
 
-        if (hasBadWord || hasBlockedLink) {
-          if (config.deleteBlockedMessages) {
-            await message.delete().catch(() => null);
-          }
+      // 2. Mention react — luôn chạy, không return sớm
+      await runMentionReact(message, config, client);
 
-          const blocked = renderCommandResponse(config.blockedMessage, {
-            client,
-            config,
-            args: '',
-            context: {
-              channelId: message.channel.id,
-              guildName: message.guild.name,
-              userId: message.author.id,
-              username: message.author.username
-            }
-          });
-          await message.channel.send(blocked).catch(() => null);
-          await sendLog(message.guild, config, `AutoMod blocked ${message.author.tag}: ${hasBlockedLink ? 'link' : 'bad word'}`);
-          return;
-        }
-      }
-
-      // ── Mention react ────────────────────────────────────────────────────
-      // Chạy trước mọi early-return để mention luôn được xử lý
-      if (config.mentionReactEnabled && config.mentionReactEmoji) {
-        const botId = client.user.id;
-        const botRoles = message.guild.members.me?.roles.cache;
-        const mentionedBot =
-          message.mentions.users.has(botId) ||
-          content.includes(`<@${botId}>`) ||
-          content.includes(`<@!${botId}>`);
-        const mentionedViaRole = botRoles
-          ? message.mentions.roles.some((r) => botRoles.has(r.id))
-          : false;
-        if (mentionedBot || mentionedViaRole) {
-          const resolveEmoji = (raw, guild) => {
-            const s = raw.trim();
-            if (/^<a?:\w+:\d+>$/.test(s)) return s;
-            const name = s.replace(/^:(.+):$/, '$1');
-            const found = guild.emojis.cache.find(
-              (e) => e.name.toLowerCase() === name.toLowerCase()
-            );
-            return found ?? s;
-          };
-          const emoji = resolveEmoji(config.mentionReactEmoji, message.guild);
-          await message.react(emoji).catch((err) => {
-            console.error('[mention-react] Failed:', err.message, '| raw:', config.mentionReactEmoji);
-          });
-        }
-      }
-
-      // ── Music prefix ───────────────────────────────────────────────────────
-      if (config.musicEnabled !== false) { // default true nếu chưa có trong config
+      // 3. Music prefix
+      if (config.musicEnabled !== false) {
         const mPrefix = (config.musicPrefix || 'hb').toLowerCase();
-        const lc = content.toLowerCase();
+        const lc      = content.toLowerCase();
         if (lc === mPrefix || lc.startsWith(mPrefix + ' ')) {
           const musicBody = content.slice(mPrefix.length).trim();
           const [subcommand, ...musicArgParts] = musicBody.split(/\s+/);
@@ -586,68 +327,56 @@ export function createBot(configStore, stateStore, redis = null) {
             message,
             subcommand: (subcommand || '').toLowerCase(),
             args: musicArgParts.join(' '),
-            config
+            config,
           });
           return;
         }
       }
 
+      // 4. Prefix command
       if (content.startsWith(prefix)) {
         const body = content.slice(prefix.length).trim();
         const [commandName, ...argParts] = body.split(/\s+/);
-        const command = config.commands.find((item) => item.enabled && item.name === commandName?.toLowerCase());
+        const command = config.commands.find(
+          (item) => item.enabled && item.name === commandName?.toLowerCase()
+        );
 
         if (command) {
           const bypassCooldown =
             message.member?.permissions?.has(PermissionFlagsBits.Administrator) ||
             message.member?.permissions?.has(PermissionFlagsBits.ManageGuild);
+
           const cooldown = commandCooldowns.check({
-            guildId: message.guild.id,
-            userId: message.author.id,
+            guildId:     message.guild.id,
+            userId:      message.author.id,
             commandType: command.type,
-            bypass: bypassCooldown
+            bypass:      bypassCooldown,
           });
           if (!cooldown.allowed) {
-            await message.reply(`Please wait ${formatRetryAfter(cooldown.retryAfterMs)} before using this command again.`).catch(() => null);
+            await message.reply(
+              `Please wait ${formatRetryAfter(cooldown.retryAfterMs)} before using this command again.`
+            ).catch(() => null);
             return;
           }
-          await runBuiltInCommand({
-            client,
-            config,
-            command,
-            source: message,
-            args: argParts.join(' ')
-          });
+
+          await runBuiltInCommand({ client, config, command, source: message, args: argParts.join(' ') });
           return;
         }
-        // Unknown prefix command — do NOT return here.
-        // Fall through so XP tracking and autoReply still run for this message.
+        // Unknown prefix → fall through to XP + autoReply
       }
 
-      if (config.levelsEnabled) {
-        const xpKey = `${message.guild.id}:${message.author.id}`;
-        const lastXp = xpCache.get(xpKey) ?? 0;
-        if (Date.now() - lastXp < XP_COOLDOWN_MS) return;
-        xpCache.set(xpKey, Date.now());
-        const rank = await stateStore.addXp(message.guild.id, message.author.id, config.xpPerMessage);
-        if (rank.leveledUp) {
-          const levelMessage = config.levelUpMessage
-            .replaceAll('{user}', `<@${message.author.id}>`)
-            .replaceAll('{username}', message.author.username)
-            .replaceAll('{level}', String(rank.level))
-            .replaceAll('{xp}', String(rank.xp));
-          await message.channel.send(levelMessage).catch(() => null);
-        }
-      }
+      // 5. XP (với in-memory cooldown)
+      await handleXp(message, config, stateStore);
 
-      if (!config.autoReplyEnabled) {
-        return;
-      }
-
+      // 6. AutoReply
+      if (!config.autoReplyEnabled) return;
       const lowerContent = content.toLowerCase();
-      const match = config.autoReplies.find((reply) => lowerContent.includes(reply.keyword.toLowerCase()));
+      const match = config.autoReplies.find((r) => lowerContent.includes(r.keyword.toLowerCase()));
       if (match) {
-        await message.reply({ content: sanitizeAnnouncementText(match.response), allowedMentions: { parse: [] } });
+        await message.reply({
+          content: sanitizeAnnouncementText(match.response),
+          allowedMentions: { parse: [] },
+        });
       }
     } catch (error) {
       console.error('[bot] Message handler error:', error);
@@ -657,32 +386,101 @@ export function createBot(configStore, stateStore, redis = null) {
   return client;
 }
 
-// ── Self-ping keepalive (export riêng) ────────────────────────────────────────
+// ── Internal workers (private) ────────────────────────────────────────────────
+
+function _startSlashSyncWorker(client, configStore, redis) {
+  if (!redis) return;
+
+  const SLASH_SYNC_QUEUE = 'slash_sync_queue';
+  const MAX_RETRIES      = 3;
+
+  const handle = setInterval(async () => {
+    try {
+      const raw = await redis.lpop(SLASH_SYNC_QUEUE);
+      if (!raw) return;
+
+      let job;
+      try { job = typeof raw === 'string' ? JSON.parse(raw) : raw; } catch { return; }
+
+      const { guildId, retries = 0, requestedAt } = job;
+      if (!guildId) return;
+
+      const config = await configStore.getGuildConfig(guildId).catch(() => null);
+      if (!config) return;
+
+      try {
+        const result = await client.syncGuildCommands(guildId, config);
+        redis.incr('stats:slash_sync_processed').catch(() => null);
+        console.log(`[slash-queue] Synced ${guildId}:`, result);
+      } catch (err) {
+        if (retries < MAX_RETRIES) {
+          await redis.rpush(SLASH_SYNC_QUEUE, JSON.stringify({
+            guildId, retries: retries + 1, requestedAt,
+            lastError: err.message, retriedAt: new Date().toISOString(),
+          }));
+          console.warn(`[slash-queue] Retry ${retries + 1}/${MAX_RETRIES} for ${guildId}: ${err.message}`);
+        } else {
+          console.error(`[slash-queue] Giving up on ${guildId} after ${MAX_RETRIES} retries: ${err.message}`);
+          redis.incr('stats:slash_sync_failed').catch(() => null);
+        }
+      }
+    } catch (err) {
+      console.error('[slash-queue] Worker error:', err.message);
+    }
+  }, 5_000);
+
+  handle.unref();
+  console.log('[slash-queue] Worker started — polling every 5 s, max 3 retries');
+}
+
+function _startHeartbeat(client, redis) {
+  if (!redis) return;
+
+  const write = async () => {
+    try {
+      await redis.set('heartbeat:bot', JSON.stringify({
+        ts:                    new Date().toISOString(),
+        uptimeS:               Math.floor(process.uptime()),
+        guilds:                client.guilds.cache.size,
+        ready:                 Boolean(client.user),
+        tag:                   client.user?.tag ?? null,
+        commit:                process.env.RENDER_GIT_COMMIT?.slice(0, 7) ?? process.env.GIT_COMMIT?.slice(0, 7) ?? 'unknown',
+        version:               process.env.npm_package_version ?? 'unknown',
+        riotApiKeyConfigured:  Boolean(process.env.RIOT_API_KEY),
+        tftApiKeyConfigured:   Boolean(process.env.TFT_API_KEY),
+      }), 'EX', 90);
+    } catch { /* non-fatal */ }
+  };
+
+  write();
+  const handle = setInterval(write, 30_000);
+  handle.unref();
+  console.log('[heartbeat] Bot heartbeat started — writing every 30 s');
+}
+
+// ── Self-ping keepalive ────────────────────────────────────────────────────────
 // Render free tier spin down sau 15 phút không có HTTP traffic.
 // Gọi startKeepalive() từ entry point SAU KHI HTTP server đã listen.
-// index.js (monolith) gọi nó. index.bot.js KHÔNG gọi vì không có HTTP server.
 export function startKeepalive(port = process.env.PORT ?? 10000) {
-  const INTERVAL_MS = 5 * 60 * 1000;
-  const RETRY_DELAY_MS = 10_000;
-  const MAX_RETRIES = 3;
+  const INTERVAL_MS   = 5 * 60_000;
+  const RETRY_DELAY   = 10_000;
+  const MAX_RETRIES   = 3;
 
   async function ping(attempt = 1) {
     try {
       const res = await fetch(`http://localhost:${port}/health`);
       console.log(`[keepalive] /health → ${res.status}, uptime ${Math.floor(process.uptime())}s`);
       if (!res.ok && attempt < MAX_RETRIES) {
-        setTimeout(() => ping(attempt + 1), RETRY_DELAY_MS);
+        setTimeout(() => ping(attempt + 1), RETRY_DELAY);
       }
     } catch (err) {
       console.warn(`[keepalive] attempt ${attempt} failed: ${err.message}`);
-      if (attempt < MAX_RETRIES) {
-        setTimeout(() => ping(attempt + 1), RETRY_DELAY_MS);
-      }
+      if (attempt < MAX_RETRIES) setTimeout(() => ping(attempt + 1), RETRY_DELAY);
     }
   }
 
   const handle = setInterval(() => ping(), INTERVAL_MS);
   handle.unref();
-  console.log(`[keepalive] Started — pinging /health every ${INTERVAL_MS / 60000} min on port ${port}`);
+  console.log(`[keepalive] Started — pinging /health every ${INTERVAL_MS / 60_000} min on port ${port}`);
   return handle;
 }

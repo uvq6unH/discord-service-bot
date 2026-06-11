@@ -89,3 +89,42 @@ Format: `[vX.Y] — Mô tả ngắn` → chi tiết thay đổi.
 - `pm2.config.cjs` — 2 processes, memory limits, log rotation
 - `src/distributedLock.js` — Redis-based distributed lock (Lua atomic)
 - `src/asyncMutex.js` — in-process fallback cho local dev
+
+---
+
+## [v1.4] — Refactor: module tách nhỏ, lock cải tiến, purge game sessions
+
+### `src/bot.js` — Tách thành pipeline modules
+- **Trước:** 1 file 687 dòng ôm toàn bộ logic (reminder, XP, automod, mention-react, slash queue, heartbeat)
+- **Sau:** Mỗi concern có module riêng — `bot.js` chỉ giữ wiring và event registration
+
+**Modules mới:**
+- `src/bot/emojiMap.js` — `EMOJI_MAP` + `resolveEmojiNames()`, lazy-loaded
+- `src/bot/reminderWorker.js` — `startReminderWorker()`, tách hoàn toàn khỏi `ClientReady`
+- `src/bot/xpHandler.js` — `handleXp()`, in-memory cooldown cache
+- `src/bot/autoMod.js` — `runAutoMod()` + `runMentionReact()`, dễ test độc lập
+
+### `src/upstash.js` — Migrate sang `fetch`
+- Thay `https.request` bằng `fetch` + `AbortController` — gọn hơn ~60 dòng
+- Retry: exponential backoff 200 ms → 400 ms thay vì fixed delay
+- Thêm commands còn thiếu: `keys(pattern)`, `ttl(key)`, `srem(key, ...members)`
+- Timeout qua `AbortController` thay vì `req.setTimeout`
+
+### `src/distributedLock.js` — Exponential backoff
+- **Trước:** Fixed 25 ms retry → tối đa 200 lần gọi Redis trong 5 s window
+- **Sau:** Exponential 50 ms → max 400 ms → ~15–30 lần gọi cùng window
+- Giảm ~85% Upstash requests khi có lock contention
+
+### `src/stateStore.js` — Xoá deprecated + purge đúng cách
+- Xoá `getGuild()` (`@deprecated` từ v1.3, không còn caller nào)
+- `purgeStaleGameSessions()` trên Redis: dùng `keys('guild:*:game:*:*')` thay vì no-op
+- `setGameSession()` thêm TTL 3 giờ (`EX 10800`) — sessions tự expire nếu bot crash
+
+### `src/server.js` — Gom cache helpers
+- Thay 2 Map riêng biệt (`_guildCache` + `_guildDataCache`) bằng 1 generic `_memCache` helper
+- Thêm prune interval để tránh memory leak trên instance chạy lâu
+- Không thay đổi behavior — TTL giữ nguyên (5 min / 2 min)
+
+### `src/index.js` + `src/index.bot.js` — Fix transient error detection
+- **Trước:** `err.message.includes('connect')` — string match dễ false-positive
+- **Sau:** `Set(['ECONNRESET', 'ETIMEDOUT', 'ENOTFOUND', 'ECONNREFUSED', 'EAI_AGAIN'])` + `err.status >= 500`

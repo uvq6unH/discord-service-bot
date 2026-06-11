@@ -123,3 +123,69 @@
 - Redis key: `guild:{id}:lolAccount:{userId}` → `{ riotId, puuid, region, linkedAt }`
 - Không cần migration nếu account đổi riot ID (puuid không đổi)
 - Các account đã link trước migration cần re-link nếu lưu summonerId cũ
+
+---
+
+## ADR-006 — Bot.js middleware pipeline (tách sub-modules)
+
+**Quyết định:** Tách các concern trong `bot.js` (reminder, XP, automod, mention-react, emoji map) thành các module riêng tại `src/bot/`.
+
+**Lý do:**
+- `bot.js` gốc có 687 dòng, ôm quá nhiều trách nhiệm trong một file — khó test, khó đọc
+- Mỗi concern (XP, reminder, automod) có state và lifecycle khác nhau: nên độc lập
+- `EMOJI_MAP` hardcode 120 entries ở top-level `bot.js` → load cùng file dù không dùng tới
+- Sub-modules có thể import và unit test độc lập mà không cần Discord client
+
+**Lý do không dùng EventEmitter pattern:**
+- Discord.js đã dùng EventEmitter — thêm một lớp nữa sẽ tăng complexity không cần thiết
+- Các handlers đã có đủ context qua tham số — không cần global event bus
+- Pipeline đơn giản (automod → mention-react → music → prefix → XP → autoReply) dễ trace hơn event bus
+
+**Hệ quả:**
+- `bot.js` còn ~220 dòng — chỉ giữ Discord event registration và wiring
+- `reminderWorker.js`, `xpHandler.js`, `autoMod.js` test được mà không cần Discord client mock
+- `emojiMap.js` lazy-loaded — không tốn memory khi không dùng reminder feature
+
+---
+
+## ADR-007 — Upstash client dùng `fetch` thay `https.request`
+
+**Quyết định:** Rewrite `UpstashClient._request()` và `pipeline()` dùng `fetch` + `AbortController` thay vì `https.request` thủ công.
+
+**Lý do:**
+- `fetch` built-in từ Node 18+ — không cần import, ít boilerplate hơn ~60 dòng
+- `AbortController` cho timeout sạch hơn `req.setTimeout` (không cần gọi `req.destroy()`)
+- Retry logic gọn hơn — không cần nested callback
+- Thêm được `keys()`, `ttl()`, `srem()` dễ dàng hơn
+
+**Lý do không dùng `@upstash/redis` SDK:**
+- SDK thêm ~50 KB dependency
+- Custom client đủ nhỏ (~100 dòng) và cover đủ commands cần dùng
+- Không muốn phụ thuộc vào SDK update/breaking change
+
+**Hệg quả:**
+- Yêu cầu Node 18+ (đã dùng sẵn)
+- `keys(pattern)`, `ttl(key)`, `srem(key, members)` available → purgeStaleGameSessions() dùng được KEYS
+- Exponential backoff (50 ms → 200 ms → 400 ms) thay vì fixed 200 ms/400 ms
+
+---
+
+## ADR-008 — Game sessions TTL trên Redis
+
+**Quyết định:** `setGameSession()` thêm `EX 10800` (3 giờ) khi SET vào Redis. `purgeStaleGameSessions()` dùng `KEYS guild:*:game:*:*` để tìm và refund sessions còn tồn tại khi bot khởi động.
+
+**Lý do:**
+- **Trước:** Game sessions không có TTL → nếu bot crash, sessions tồn tại mãi trong Redis, bet không được refund
+- **Trước:** `purgeStaleGameSessions()` Redis branch là no-op (comment "TODO")
+- TTL 3 giờ đủ dài để player hoàn thành game, đủ ngắn để không chiếm Redis memory mãi mãi
+- `purgeStaleGameSessions()` chạy lúc bot startup → refund ngay trước khi nhận button click mới
+
+**Lý do không dùng SCAN:**
+- Upstash REST hỗ trợ `KEYS` trực tiếp
+- Số lượng active game sessions thấp (<<1000) → `KEYS` không gây performance issue
+- `SCAN` cursor phức tạp hơn và không cần thiết ở quy mô này
+
+**Hệ quả:**
+- Bot restart không còn mất bet: sessions auto-expire sau 3 giờ nếu bot crash giữa chừng
+- `purgeStaleGameSessions()` thực sự refund tất cả active sessions cũ khi bot startup
+- Redis memory: game sessions chiếm ~1 KB/session × max vài chục sessions = negligible

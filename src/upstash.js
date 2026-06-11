@@ -1,8 +1,16 @@
 /**
  * Minimal Upstash Redis REST client (shared by state + rate limiting).
+ *
+ * Sử dụng fetch thay vì https.request — gọn hơn, timeout qua AbortController.
+ * Retry logic: exponential backoff 200 ms → 400 ms (tối đa 2 lần).
  */
-import https from 'node:https';
-import { URL } from 'node:url';
+
+const REQUEST_TIMEOUT_MS = 8_000;
+const MAX_RETRIES = 2;
+
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
 
 export class UpstashClient {
   constructor(url, token) {
@@ -10,141 +18,101 @@ export class UpstashClient {
     this.token = token;
   }
 
-  _request(body, retries = 2) {
-    return new Promise((resolve, reject) => {
-      const attempt = () => {
-        const parsed = new URL(this.url);
-        const payload = JSON.stringify(body);
-        const req = https.request({
-          hostname: parsed.hostname,
-          path: parsed.pathname + parsed.search,
-          method: 'POST',
-          headers: {
-            Authorization: `Bearer ${this.token}`,
-            'Content-Type': 'application/json',
-            'Content-Length': Buffer.byteLength(payload)
-          }
-        }, (res) => {
-          const chunks = [];
-          res.on('data', (c) => chunks.push(c));
-          res.on('end', () => {
-            try {
-              const data = JSON.parse(Buffer.concat(chunks).toString());
-              if (data.error) return reject(new Error(data.error));
-              resolve(data.result);
-            } catch (e) {
-              reject(e);
-            }
-          });
-        });
-        req.on('error', (err) => {
-          if (retries > 0) {
-            const delay = 200 * (3 - retries);
-            setTimeout(() => { retries--; attempt(); }, delay);
-          } else {
-            reject(err);
-          }
-        });
-        req.setTimeout(8000, () => { req.destroy(); reject(new Error('Upstash timeout')); });
-        req.write(payload);
-        req.end();
-      };
-      attempt();
-    });
+  async _request(body, retries = MAX_RETRIES) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+
+    try {
+      const res = await fetch(this.url, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${this.token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(body),
+        signal: controller.signal,
+      });
+
+      const data = await res.json();
+      if (data.error) throw new Error(data.error);
+      return data.result;
+    } catch (err) {
+      if (retries > 0) {
+        const delay = 200 * (MAX_RETRIES - retries + 1);
+        await sleep(delay);
+        return this._request(body, retries - 1);
+      }
+      throw err;
+    } finally {
+      clearTimeout(timer);
+    }
   }
 
-  pipeline(commands, retries = 2) {
-    return new Promise((resolve, reject) => {
-      const attempt = () => {
-        const parsed = new URL(`${this.url}/pipeline`);
-        const payload = JSON.stringify(commands.map((cmd) => cmd));
-        const req = https.request({
-          hostname: parsed.hostname,
-          path: parsed.pathname + parsed.search,
-          method: 'POST',
-          headers: {
-            Authorization: `Bearer ${this.token}`,
-            'Content-Type': 'application/json',
-            'Content-Length': Buffer.byteLength(payload)
-          }
-        }, (res) => {
-          const chunks = [];
-          res.on('data', (c) => chunks.push(c));
-          res.on('end', () => {
-            try {
-              const data = JSON.parse(Buffer.concat(chunks).toString());
-              if (data.error) return reject(new Error(data.error));
-              const failed = Array.isArray(data) ? data.find((item) => item?.error) : null;
-              if (failed) return reject(new Error(failed.error));
-              resolve(data);
-            } catch (e) {
-              reject(e);
-            }
-          });
-        });
-        req.on('error', (err) => {
-          if (retries > 0) {
-            const delay = 200 * (3 - retries);
-            setTimeout(() => { retries--; attempt(); }, delay);
-          } else {
-            reject(err);
-          }
-        });
-        req.setTimeout(8000, () => { req.destroy(); reject(new Error('Upstash pipeline timeout')); });
-        req.write(payload);
-        req.end();
-      };
-      attempt();
-    });
+  async pipeline(commands, retries = MAX_RETRIES) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+
+    try {
+      const res = await fetch(`${this.url}/pipeline`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${this.token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(commands),
+        signal: controller.signal,
+      });
+
+      const data = await res.json();
+      if (data.error) throw new Error(data.error);
+      const failed = Array.isArray(data) ? data.find((item) => item?.error) : null;
+      if (failed) throw new Error(failed.error);
+      return data;
+    } catch (err) {
+      if (retries > 0) {
+        const delay = 200 * (MAX_RETRIES - retries + 1);
+        await sleep(delay);
+        return this.pipeline(commands, retries - 1);
+      }
+      throw err;
+    } finally {
+      clearTimeout(timer);
+    }
   }
 
-  get(key) {
-    return this._request(['GET', key]);
-  }
+  // ── String / key commands ──────────────────────────────────────────────────
 
-  set(key, value, ...args) {
-    return this._request(['SET', key, value, ...args]);
-  }
+  get(key)                          { return this._request(['GET', key]); }
+  set(key, value, ...args)          { return this._request(['SET', key, value, ...args]); }
+  del(key)                          { return this._request(['DEL', key]); }
+  incr(key)                         { return this._request(['INCR', key]); }
+  expire(key, seconds)              { return this._request(['EXPIRE', key, String(seconds)]); }
+  ttl(key)                          { return this._request(['TTL', key]); }
 
-  del(key) {
-    return this._request(['DEL', key]);
-  }
+  /** Trả về mảng key khớp với pattern (dùng scan khi có; Upstash REST hỗ trợ KEYS). */
+  keys(pattern)                     { return this._request(['KEYS', pattern]); }
 
-  incr(key) {
-    return this._request(['INCR', key]);
-  }
+  // ── Set commands ───────────────────────────────────────────────────────────
 
-  expire(key, seconds) {
-    return this._request(['EXPIRE', key, String(seconds)]);
-  }
+  smembers(key)                     { return this._request(['SMEMBERS', key]); }
+  sadd(key, ...members)             { return this._request(['SADD', key, ...members]); }
+  srem(key, ...members)             { return this._request(['SREM', key, ...members]); }
 
-  smembers(key) {
-    return this._request(['SMEMBERS', key]);
-  }
+  // ── List commands ──────────────────────────────────────────────────────────
 
-  sadd(key, ...members) {
-    return this._request(['SADD', key, ...members]);
-  }
+  lpop(key)                         { return this._request(['LPOP', key]); }
+  rpush(key, ...values)             { return this._request(['RPUSH', key, ...values]); }
+  llen(key)                         { return this._request(['LLEN', key]); }
+
+  // ── Scripting ──────────────────────────────────────────────────────────────
 
   eval(script, numKeys, ...keysAndArgs) {
     return this._request(['EVAL', script, numKeys, ...keysAndArgs]);
   }
-
-  lpop(key) {
-    return this._request(['LPOP', key]);
-  }
-
-  rpush(key, ...values) {
-    return this._request(['RPUSH', key, ...values]);
-  }
-
-  llen(key) {
-    return this._request(['LLEN', key]);
-  }
 }
 
 export function createUpstashFromEnv(env = process.env) {
-  const url = env.UPSTASH_REDIS_REST_URL;
+  const url   = env.UPSTASH_REDIS_REST_URL;
   const token = env.UPSTASH_REDIS_REST_TOKEN;
   if (!url || !token) return null;
   return new UpstashClient(url, token);
