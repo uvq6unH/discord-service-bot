@@ -4,7 +4,7 @@ import { AuthProvider, useAuth } from './contexts/AuthContext.jsx';
 import { GuildProvider, useGuild } from './contexts/GuildContext.jsx';
 import ServerRail from './components/ServerRail.jsx';
 import PluginNav from './components/PluginNav.jsx';
-import { SaveBar, EmptyState } from './components/ui.jsx';
+import { SaveBar, EmptyState, useTheme, ThemeToggle } from './components/ui.jsx';
 import OverviewPage from './pages/Overview.jsx';
 import MembersPage from './pages/Members.jsx';
 import CommandsPage from './pages/Commands.jsx';
@@ -14,7 +14,7 @@ import LolPage    from './pages/Lol.jsx';
 import SystemPage from './pages/System.jsx';
 import { api } from './api.js';
 
-function DashboardLayout() {
+function DashboardLayout({ theme, toggleTheme }) {
   const { user, loading: authLoading } = useAuth();
   const { selectedGuild, dirty, saveConfig, saveStatus } = useGuild();
   const [guilds, setGuilds] = useState([]);
@@ -47,6 +47,11 @@ function DashboardLayout() {
           <>
             <PluginNav guildId={selectedGuild.id} />
             <main className="content">
+              {/* Toggle nằm một chỗ duy nhất — hiển thị trên tất cả các page */}
+              <div className="content-topbar">
+                <ThemeToggle theme={theme} onToggle={toggleTheme} />
+              </div>
+
               <Routes>
                 <Route path="/" element={<Navigate to="/overview" replace />} />
                 <Route path="/overview"    element={<OverviewPage />} />
@@ -70,10 +75,12 @@ function DashboardLayout() {
 }
 
 export default function App() {
+  const { theme, toggle } = useTheme();
+
   return (
     <AuthProvider>
       <GuildProvider>
-        <DashboardLayout />
+        <DashboardLayout theme={theme} toggleTheme={toggle} />
       </GuildProvider>
     </AuthProvider>
   );

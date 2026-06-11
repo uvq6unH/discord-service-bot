@@ -1,5 +1,40 @@
 import React from 'react';
 
+// ── useTheme ──────────────────────────────────────────────────────────────────
+// Hook duy nhất quản lý theme — dùng trong App.jsx, không cần truyền xuống pages
+
+export function useTheme() {
+  const [theme, setTheme] = React.useState(() => {
+    try { return localStorage.getItem('theme') || 'dark'; } catch { return 'dark'; }
+  });
+
+  React.useEffect(() => {
+    const html = document.documentElement;
+    html.classList.remove('theme-light', 'theme-dark');
+    html.classList.add(theme === 'light' ? 'theme-light' : 'theme-dark');
+    try { localStorage.setItem('theme', theme); } catch {}
+  }, [theme]);
+
+  const toggle = () => setTheme(t => (t === 'dark' ? 'light' : 'dark'));
+  return { theme, toggle };
+}
+
+// ── ThemeToggle ───────────────────────────────────────────────────────────────
+
+export function ThemeToggle({ theme, onToggle }) {
+  const isLight = theme === 'light';
+  return (
+    <button
+      className="theme-toggle"
+      onClick={onToggle}
+      title={isLight ? 'Chuyển sang dark mode' : 'Chuyển sang light mode'}
+      aria-label={isLight ? 'Chuyển sang dark mode' : 'Chuyển sang light mode'}
+    >
+      <i className={`ti ${isLight ? 'ti-moon' : 'ti-sun'}`} />
+    </button>
+  );
+}
+
 // ── SaveBar ───────────────────────────────────────────────────────────────────
 
 export function SaveBar({ onSave, status }) {
