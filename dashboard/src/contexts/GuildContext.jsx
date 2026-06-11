@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useCallback } from 'react';
+import React, { createContext, useContext, useState, useCallback, useRef } from 'react';
 import { api } from '../api.js';
 
 const GuildContext = createContext(null);
@@ -11,10 +11,16 @@ export function GuildProvider({ children }) {
   const [dirty, setDirty]                 = useState(false);
   const [saveStatus, setSaveStatus]       = useState('idle');
 
+  // Race condition guard: nếu user click guild khác trong khi đang fetch,
+  // bỏ qua kết quả của fetch cũ (stale fetch).
+  const fetchIdRef = useRef(0);
+
   const selectGuild = useCallback(async (guild) => {
     // Chỉ load dashboard cho server bot đang có mặt
     // Server không có bot sẽ được xử lý bởi ServerRail (show invite modal)
     if (!guild.botPresent) return;
+
+    const myFetchId = ++fetchIdRef.current;
 
     setSelectedGuild(guild);
     setConfig(null);
@@ -28,12 +34,19 @@ export function GuildProvider({ children }) {
         api.config(guild.id),
         api.guildData(guild.id).catch(() => ({ channels: [], roles: [] })),
       ]);
+
+      // Nếu user đã click guild khác trong khi đang fetch → bỏ qua kết quả cũ
+      if (fetchIdRef.current !== myFetchId) return;
+
       setConfig(cfg);
       setGuildData(data);
     } catch (err) {
+      if (fetchIdRef.current !== myFetchId) return;
       console.error('[GuildContext] Failed to load config:', err);
     } finally {
-      setConfigLoading(false);
+      if (fetchIdRef.current === myFetchId) {
+        setConfigLoading(false);
+      }
     }
   }, []);
 

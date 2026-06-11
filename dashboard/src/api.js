@@ -46,13 +46,24 @@ export async function apiFetch(url, init = {}, { allowNotOk = false } = {}) {
 
   let res = await fetch(url, { ...init, headers });
 
-  // Retry một lần nếu CSRF expired
+  // Retry một lần nếu CSRF expired — phân biệt với 403 do thiếu quyền guild.
+  // Server trả { error: 'Invalid CSRF token' } khi CSRF hết hạn; còn lại là
+  // permission denied → không retry (sẽ fail lần 2 giống hệt, waste 1 request).
   if (res.status === 403 && !['GET', 'HEAD', 'OPTIONS'].includes(method)) {
-    csrfToken = null;
+    let iscsrfError = false;
     try {
-      headers.set('X-CSRF-Token', await ensureCsrfToken());
-      res = await fetch(url, { ...init, headers });
-    } catch { /* ignore */ }
+      const clone = res.clone();
+      const body = await clone.json();
+      iscsrfError = /csrf/i.test(body?.error ?? '');
+    } catch { /* ignore parse error */ }
+
+    if (iscsrfError) {
+      csrfToken = null;
+      try {
+        headers.set('X-CSRF-Token', await ensureCsrfToken());
+        res = await fetch(url, { ...init, headers });
+      } catch { /* ignore */ }
+    }
   }
 
   // Auth expired

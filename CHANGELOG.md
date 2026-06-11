@@ -4,7 +4,53 @@ Format: `[vX.Y] — Mô tả ngắn` → chi tiết thay đổi.
 
 ---
 
-## [v1.6.0] — commandCooldowns scope fix + API validation layer
+## [v1.7.0] — Dashboard refactor: bug fixes + light theme
+
+**`dashboard/src/contexts/GuildContext.jsx`** — fix race condition khi switch guild nhanh
+- Thêm `fetchIdRef` (useRef counter) để track fetch in-flight
+- Nếu user click guild B trong khi đang fetch guild A: kết quả của fetch A bị bỏ qua, không ghi đè config của guild B đang hiển thị
+- `setConfigLoading(false)` cũng chỉ chạy nếu fetch còn valid — tránh spinner stuck
+
+**`dashboard/src/pages/System.jsx`** — fix CSS token mismatch (broken UI)
+- Thay toàn bộ `var(--color-success/danger/warning/muted/text/border/surface-2/radius-md)` bằng token đúng từ `globals.css`:
+  - `--color-success` → `--green`
+  - `--color-danger` → `--red`
+  - `--color-warning` → `--yellow`
+  - `--color-muted` → `--text-3`
+  - `--color-text` → `--text-1`
+  - `--color-border` → `--border`
+  - `--color-surface-2` → `--surface-2`
+  - `--radius-md` → `--r3`
+- Status dots, text màu và card backgrounds trong System page giờ render đúng
+
+**`dashboard/src/pages/Members.jsx`** — debounce search + BigInt guard
+- `handleSearch` trước đây gọi `load()` mỗi keystroke (1 HTTP request/ký tự)
+- Đổi sang debounce 300ms dùng `useRef` timer — giảm ~90% API calls khi gõ nhanh
+- Cleanup timer khi unmount tránh memory leak
+- `BigInt(member.id)` throw nếu id là undefined/non-numeric → wrap trong try/catch, fallback về index 0
+
+**`dashboard/src/pages/Overview.jsx`** — fix timezone bug trong ReminderEditor
+- `new Date(...).toISOString().slice(0, 16)` trả về UTC string → datetime-local input hiển thị sai giờ
+- Đổi sang `localISOString()` helper tính theo local timezone của user
+- Cũng fix `var(--color-warning)` / `var(--color-muted)` → `--yellow` / `--text-3`
+
+**`dashboard/src/api.js`** — CSRF retry thông minh hơn
+- Retry CSRF trước đây chạy mù khi bất kỳ 403 nào — kể cả 403 do `requireGuildAccess` (thiếu quyền guild)
+- Đổi sang đọc response body: chỉ retry khi error message match `/csrf/i`
+- User thiếu quyền giờ thấy error ngay sau 1 request thay vì 2
+
+**`dashboard/src/styles/globals.css`** — thêm light theme
+- Thêm token set đầy đủ cho light mode trong `@media (prefers-color-scheme: light)` — tự động theo OS
+- Thêm class override `.theme-light` / `.theme-dark` cho toggle thủ công bằng JS
+- Thêm CSS class `.theme-toggle` cho nút toggle
+- `--shadow-*` tokens mới: dark dùng shadow nặng, light dùng shadow nhẹ — dùng thống nhất trong save-bar, modal, login card
+- `datetime-local` color-scheme giờ theo theme thay vì hardcode `dark`
+- Select arrow stroke đổi sang `#888899` — hoạt động tốt cả hai theme
+- Thêm `color-scheme: dark` cho `html.theme-dark` để browser chrome (scrollbar, input) match
+- Bỏ import Google Fonts Inter không dùng (file đã dùng Geist)
+
+---
+
 
 **`src/bot.js`** — fix `commandCooldowns` scope
 - `CommandCooldowns` instance được tạo ở module scope (ngoài factory) → tất cả bot instance trong cùng process share chung cooldown state

@@ -3,11 +3,16 @@
    Design: Dark tech, Linear-inspired, Discord blurple accent
    Font: Geist (sans) + Geist Mono (numbers/code)
    DESIGN_VARIANCE: 6 | MOTION_INTENSITY: 4 | VISUAL_DENSITY: 6
+
+   Theme: Dark-first, light mode via @media prefers-color-scheme.
+   Intentional choice: default to dark (Discord-style app) even
+   when OS is in light mode — user can toggle via .theme-light
+   class on <html> if explicit toggle is added later.
    ============================================================ */
 
 @import url('https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700&family=Geist+Mono:wght@400;500;600&display=swap');
 
-/* ── Tokens ──────────────────────────────────────────────────────────────── */
+/* ── Dark tokens (default) ───────────────────────────────────────────────── */
 :root {
   /* Base palette — not pure black, layered depths */
   --bg:          #09090b;
@@ -34,6 +39,12 @@
   --red:    #ef4444;
   --green-dim: rgba(34,197,94,.12);
   --red-dim:   rgba(239,68,68,.12);
+
+  /* Shadows */
+  --shadow-sm:  0 1px 3px rgba(0,0,0,.4);
+  --shadow-md:  0 4px 16px rgba(0,0,0,.5);
+  --shadow-lg:  0 24px 64px rgba(0,0,0,.6);
+  --shadow-modal: 0 24px 64px rgba(0,0,0,.6);
 
   /* Layout */
   --rail-w:      64px;
@@ -68,6 +79,73 @@
   --dur-fast: 120ms;
   --dur-mid:  200ms;
   --dur-slow: 350ms;
+}
+
+/* ── Light tokens ────────────────────────────────────────────────────────── */
+/* Applied when OS is in light mode OR when html.theme-light class is set.  */
+@media (prefers-color-scheme: light) {
+  :root:not(.theme-dark) {
+    --bg:          #f5f5f7;
+    --surface-0:   #ffffff;
+    --surface-1:   #f0f0f4;
+    --surface-2:   #e8e8ee;
+    --surface-3:   #dddde8;
+    --border:      rgba(0,0,0,.08);
+    --border-strong: rgba(0,0,0,.14);
+
+    --text-1:   #111116;
+    --text-2:   #4a4a68;
+    --text-3:   #8888a8;
+
+    --accent:      #5865f2;
+    --accent-dim:  rgba(88,101,242,.1);
+    --accent-glow: rgba(88,101,242,.2);
+
+    --green:  #16a34a;
+    --yellow: #ca8a04;
+    --red:    #dc2626;
+    --green-dim: rgba(22,163,74,.1);
+    --red-dim:   rgba(220,38,38,.1);
+
+    --shadow-sm:  0 1px 3px rgba(0,0,0,.08);
+    --shadow-md:  0 4px 16px rgba(0,0,0,.1);
+    --shadow-lg:  0 24px 64px rgba(0,0,0,.15);
+    --shadow-modal: 0 24px 64px rgba(0,0,0,.2);
+  }
+}
+
+/* Explicit class override — dùng khi muốn toggle theme bằng JS */
+html.theme-light {
+  --bg:          #f5f5f7;
+  --surface-0:   #ffffff;
+  --surface-1:   #f0f0f4;
+  --surface-2:   #e8e8ee;
+  --surface-3:   #dddde8;
+  --border:      rgba(0,0,0,.08);
+  --border-strong: rgba(0,0,0,.14);
+
+  --text-1:   #111116;
+  --text-2:   #4a4a68;
+  --text-3:   #8888a8;
+
+  --accent:      #5865f2;
+  --accent-dim:  rgba(88,101,242,.1);
+  --accent-glow: rgba(88,101,242,.2);
+
+  --green:  #16a34a;
+  --yellow: #ca8a04;
+  --red:    #dc2626;
+  --green-dim: rgba(22,163,74,.1);
+  --red-dim:   rgba(220,38,38,.1);
+
+  --shadow-sm:  0 1px 3px rgba(0,0,0,.08);
+  --shadow-md:  0 4px 16px rgba(0,0,0,.1);
+  --shadow-lg:  0 24px 64px rgba(0,0,0,.15);
+  --shadow-modal: 0 24px 64px rgba(0,0,0,.2);
+}
+
+html.theme-dark {
+  color-scheme: dark;
 }
 
 /* ── Reset ───────────────────────────────────────────────────────────────── */
@@ -380,6 +458,22 @@ a:hover { text-decoration: underline; }
   border-radius: 0 2px 2px 0;
 }
 
+/* ── Theme toggle button ─────────────────────────────────────────────────── */
+.theme-toggle {
+  display: flex; align-items: center; justify-content: center;
+  width: 28px; height: 28px;
+  border-radius: var(--r2);
+  border: none;
+  background: transparent;
+  color: var(--text-3);
+  cursor: pointer;
+  transition: background var(--dur-fast), color var(--dur-fast);
+}
+.theme-toggle:hover {
+  background: var(--surface-3);
+  color: var(--text-1);
+}
+
 /* ── Content area ────────────────────────────────────────────────────────── */
 .content {
   flex: 1;
@@ -511,9 +605,9 @@ textarea.form-input {
   line-height: 1.5;
 }
 
-/* Styled select arrow */
+/* Styled select arrow — dùng màu trung tính hoạt động cả dark + light */
 .form-select {
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%23606078' stroke-width='1.5' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%23888899' stroke-width='1.5' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
   background-repeat: no-repeat;
   background-position: right 10px center;
   padding-right: 28px;
@@ -556,7 +650,7 @@ textarea.form-input {
   background: var(--text-2);
   border-radius: 50%;
   transition: transform var(--dur-mid) var(--ease-out), background var(--dur-mid);
-  box-shadow: 0 1px 3px rgba(0,0,0,.4);
+  box-shadow: var(--shadow-sm);
 }
 
 .toggle--on .toggle-thumb {
@@ -654,7 +748,7 @@ textarea.form-input {
   justify-content: space-between;
   gap: var(--s4);
   z-index: 200;
-  box-shadow: 0 8px 32px rgba(0,0,0,.5), 0 0 0 1px var(--border);
+  box-shadow: var(--shadow-md), 0 0 0 1px var(--border);
   min-width: 340px;
   animation: save-bar-in var(--dur-slow) var(--ease-out);
   backdrop-filter: blur(12px);
@@ -737,6 +831,13 @@ textarea.form-input {
   animation: modal-bg-in var(--dur-mid) ease;
 }
 
+@media (prefers-color-scheme: light) {
+  :root:not(.theme-dark) .modal-overlay {
+    background: rgba(0,0,0,.4);
+  }
+}
+html.theme-light .modal-overlay { background: rgba(0,0,0,.4); }
+
 @keyframes modal-bg-in {
   from { opacity: 0; }
   to   { opacity: 1; }
@@ -749,7 +850,7 @@ textarea.form-input {
   padding: var(--s6);
   width: 100%;
   max-width: 400px;
-  box-shadow: 0 24px 64px rgba(0,0,0,.6);
+  box-shadow: var(--shadow-modal);
   display: flex; flex-direction: column; gap: var(--s4);
   animation: modal-in var(--dur-slow) var(--ease-out);
 }
@@ -985,7 +1086,7 @@ textarea.form-input {
   flex-direction: column;
   align-items: center;
   gap: var(--s5);
-  box-shadow: 0 24px 64px rgba(0,0,0,.5);
+  box-shadow: var(--shadow-lg);
 }
 
 .login-logo {
@@ -1109,7 +1210,10 @@ code {
   min-height: 36px;
 }
 
-/* datetime-local input color fix */
-input[type="datetime-local"] {
-  color-scheme: dark;
+/* datetime-local input: follow theme mode.
+   Khi dark → dark picker; khi light → light picker. */
+@media (prefers-color-scheme: dark) {
+  :root:not(.theme-light) input[type="datetime-local"] { color-scheme: dark; }
 }
+html.theme-dark input[type="datetime-local"] { color-scheme: dark; }
+html.theme-light input[type="datetime-local"] { color-scheme: light; }

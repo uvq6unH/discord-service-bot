@@ -24,7 +24,8 @@ function StatusDot({ online }) {
     <span style={{
       display: 'inline-block',
       width: 8, height: 8, borderRadius: '50%',
-      background: online ? 'var(--color-success)' : 'var(--color-danger)',
+      // Dùng đúng token từ globals.css: --green / --red
+      background: online ? 'var(--green)' : 'var(--red)',
       marginRight: 6, flexShrink: 0,
     }} />
   );
@@ -33,13 +34,13 @@ function StatusDot({ online }) {
 function KV({ label, value, highlight }) {
   return (
     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-      padding: '8px 0', borderBottom: '1px solid var(--color-border)' }}>
-      <span style={{ color: 'var(--color-muted)', fontSize: 13 }}>{label}</span>
+      padding: '8px 0', borderBottom: '1px solid var(--border)' }}>
+      <span style={{ color: 'var(--text-3)', fontSize: 13 }}>{label}</span>
       <span style={{
         fontWeight: 600, fontSize: 13,
-        color: highlight === 'danger' ? 'var(--color-danger)'
-             : highlight === 'warn'  ? 'var(--color-warning)'
-             : 'var(--color-text)',
+        color: highlight === 'danger' ? 'var(--red)'
+             : highlight === 'warn'  ? 'var(--yellow)'
+             : 'var(--text-1)',
       }}>{value}</span>
     </div>
   );
@@ -81,7 +82,7 @@ export default function SystemPage() {
       <div style={{ display: 'flex', alignItems: 'baseline', gap: 12, marginBottom: 4 }}>
         <h1 className="page-title" style={{ margin: 0 }}>Hệ thống</h1>
         {lastRefresh && (
-          <span style={{ fontSize: 12, color: 'var(--color-muted)' }}>
+          <span style={{ fontSize: 12, color: 'var(--text-3)' }}>
             cập nhật lúc {lastRefresh.toLocaleTimeString('vi-VN')}
           </span>
         )}
@@ -95,15 +96,15 @@ export default function SystemPage() {
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12, paddingTop: 4 }}>
 
             {/* Bot */}
-            <div style={{ background: 'var(--color-surface-2)', borderRadius: 'var(--radius-md)', padding: '12px 14px' }}>
+            <div style={{ background: 'var(--surface-2)', borderRadius: 'var(--r3)', padding: '12px 14px' }}>
               <div style={{ display: 'flex', alignItems: 'center', marginBottom: 10 }}>
                 <StatusDot online={botOnline} />
                 <span style={{ fontWeight: 600 }}>Bot</span>
                 <span style={{
                   marginLeft: 8, fontSize: 11, padding: '2px 8px',
                   borderRadius: 99, fontWeight: 600,
-                  background: botOnline ? 'rgba(59,165,92,.2)' : 'rgba(237,66,69,.2)',
-                  color: botOnline ? 'var(--color-success)' : 'var(--color-danger)',
+                  background: botOnline ? 'var(--green-dim)' : 'var(--red-dim)',
+                  color: botOnline ? 'var(--green)' : 'var(--red)',
                 }}>
                   {botOnline ? 'ONLINE' : 'OFFLINE'}
                 </span>
@@ -115,15 +116,15 @@ export default function SystemPage() {
             </div>
 
             {/* Dashboard */}
-            <div style={{ background: 'var(--color-surface-2)', borderRadius: 'var(--radius-md)', padding: '12px 14px' }}>
+            <div style={{ background: 'var(--surface-2)', borderRadius: 'var(--r3)', padding: '12px 14px' }}>
               <div style={{ display: 'flex', alignItems: 'center', marginBottom: 10 }}>
                 <StatusDot online={!!dash} />
                 <span style={{ fontWeight: 600 }}>Dashboard</span>
                 <span style={{
                   marginLeft: 8, fontSize: 11, padding: '2px 8px',
                   borderRadius: 99, fontWeight: 600,
-                  background: dash ? 'rgba(59,165,92,.2)' : 'rgba(237,66,69,.2)',
-                  color: dash ? 'var(--color-success)' : 'var(--color-danger)',
+                  background: dash ? 'var(--green-dim)' : 'var(--red-dim)',
+                  color: dash ? 'var(--green)' : 'var(--red)',
                 }}>
                   {dash ? 'ONLINE' : 'OFFLINE'}
                 </span>
@@ -146,7 +147,7 @@ export default function SystemPage() {
 
         {/* ── Stats counters ── */}
         <SectionCard title="Thống kê hoạt động" icon="ti-chart-bar">
-          <p style={{ fontSize: 12, color: 'var(--color-muted)', marginBottom: 10 }}>
+          <p style={{ fontSize: 12, color: 'var(--text-3)', marginBottom: 10 }}>
             Tích luỹ từ lần khởi động — reset khi Redis xoá key.
           </p>
           <KV label="Slash sync đã xử lý" value={stats?.slashSyncProcessed ?? '—'} />

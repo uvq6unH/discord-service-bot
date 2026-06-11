@@ -1,7 +1,16 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import { useGuild } from '../contexts/GuildContext.jsx';
 import { Spinner } from '../components/ui.jsx';
 import { api } from '../api.js';
+
+function getDefaultAvatarIndex(id) {
+  try {
+    // BigInt() throw nếu id undefined hoặc không phải số hợp lệ — guard lại
+    return Number(BigInt(id || '0') % 5n);
+  } catch {
+    return 0;
+  }
+}
 
 function MemberRow({ member }) {
   return (
@@ -10,7 +19,7 @@ function MemberRow({ member }) {
         className="member-avatar"
         src={member.avatar
           ? `https://cdn.discordapp.com/avatars/${member.id}/${member.avatar}.png?size=32`
-          : `https://cdn.discordapp.com/embed/avatars/${Number(BigInt(member.id) % 5n)}.png`
+          : `https://cdn.discordapp.com/embed/avatars/${getDefaultAvatarIndex(member.id)}.png`
         }
         alt=""
       />
@@ -52,10 +61,17 @@ export default function MembersPage() {
 
   useEffect(() => { load(1, ''); }, [load]);
 
+  // Debounce 300ms — tránh gửi HTTP request cho mỗi keystroke
+  const debounceTimer = useRef(null);
   const handleSearch = (e) => {
-    setSearch(e.target.value);
-    load(1, e.target.value);
+    const val = e.target.value;
+    setSearch(val);
+    clearTimeout(debounceTimer.current);
+    debounceTimer.current = setTimeout(() => load(1, val), 300);
   };
+
+  // Cleanup debounce khi unmount
+  useEffect(() => () => clearTimeout(debounceTimer.current), []);
 
   const pageCount = Math.ceil(total / 20);
 

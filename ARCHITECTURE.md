@@ -429,7 +429,17 @@ dashboard/src/
 
 `GuildContext.saveConfig()` → `PUT /api/config` → `configStore.updateGuildConfig()` → `SET config:guild:{guildId}` in Redis.
 
-### Dev workflow
+### Theming
+
+CSS tokens live in `src/styles/globals.css`. Dark mode is the default; light mode applies via:
+
+1. **Auto (OS):** `@media (prefers-color-scheme: light)` — khi OS ở light mode và không có class override
+2. **Manual:** `html.theme-light` class (set bằng JS toggle) — override `prefers-color-scheme`
+3. **Force dark:** `html.theme-dark` class — giữ dark kể cả khi OS là light
+
+Token naming: `--bg`, `--surface-{0-3}`, `--text-{1-3}`, `--border`, `--border-strong`, `--green/yellow/red`, `--accent*`. Không có `--color-*` hay `--radius-*` — những tên đó không tồn tại trong design system.
+
+
 
 ```bash
 # Terminal 1: Express API (no bot)

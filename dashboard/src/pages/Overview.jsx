@@ -6,6 +6,15 @@ import { Spinner, Toggle, SectionCard, ChannelSelect } from '../components/ui.js
 function ReminderEditor({ reminders, onChange, channels }) {
   const textChannels = channels.filter(c => c.type === 0 || c.type === 5);
 
+  // Tính thời gian mặc định = bây giờ + 1 giờ, theo local timezone của user.
+  // toISOString() trả về UTC nên khi hiển thị trong datetime-local input sẽ
+  // sai lệch múi giờ. Thay bằng chuỗi local ISO để input hiển thị đúng.
+  const localISOString = (date) => {
+    const pad = n => String(n).padStart(2, '0');
+    return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}` +
+           `T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+  };
+
   const add = () => onChange([
     ...reminders,
     {
@@ -13,7 +22,7 @@ function ReminderEditor({ reminders, onChange, channels }) {
       userIds: [],
       channelId: '',
       message: '',
-      time: new Date(Date.now() + 3600_000).toISOString().slice(0, 16),
+      time: localISOString(new Date(Date.now() + 3600_000)),
       repeat: 'none',
     },
   ]);
@@ -123,7 +132,7 @@ export default function OverviewPage() {
       <p className="page-subtitle">
         Cài đặt chung cho {selectedGuild.name}
         {cacheLabel && (
-          <span style={{ marginLeft: 10, fontSize: 12, color: stale ? 'var(--color-warning)' : 'var(--color-muted)' }}>
+          <span style={{ marginLeft: 10, fontSize: 12, color: stale ? 'var(--yellow)' : 'var(--text-3)' }}>
             · {cacheLabel}
           </span>
         )}
