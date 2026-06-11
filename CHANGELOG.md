@@ -4,34 +4,64 @@ Format: `[vX.Y] — Mô tả ngắn` → chi tiết thay đổi.
 
 ---
 
-## [v1.3] — Riot API puuid migration + Documentation freeze
+## [v1.5] — Patch: sửa toàn bộ vấn đề tồn đọng từ v1.4
 
-**Riot/TFT API:**
-- Migrate toàn bộ endpoints sang puuid-based: `League-v4 /by-puuid`, `Champion-Mastery-v4 /by-puuid`, `Match-v5 /by-puuid`
-- Loại bỏ summonerId khỏi stored account records — chỉ lưu `{ riotId, puuid, region, linkedAt }`
-- Region routing tách thành hai map: `accountRouting` (Account-v1, VN2→asia) và `routing` (Match-v5, VN2→sea)
+**`src/utils/loginWithRetry.js`** _(mới)_
+- Extract `loginWithRetry` ra shared utility — xóa bỏ ~20 dòng duplicate giữa `index.js` và `index.bot.js`
+- Signature mới: `loginWithRetry(client, token, { maxRetries, baseDelay, logPrefix })` — `logPrefix` phân biệt log `[app:login]` vs `[bot:login]`
 
-**Bot (`src/index.bot.js`):**
-- HTTP health server bind trước `client.login()` — bắt buộc để Render detect port ngay khi process start
-- Graceful shutdown: `SIGINT`/`SIGTERM` → destroy Discord client → `process.exit(0)`
+**`src/utils/keepalive.js`** _(mới)_
+- Extract `startKeepalive` ra khỏi `bot.js` — `index.server.js` không còn kéo theo Discord client dependency graph
 
-**Dashboard (`src/pages/Lol.jsx`):**
-- API key status badge (đã cấu hình / chưa cài)
-- Command reference card cho LoL và TFT commands
+**`src/index.server.js`**
+- Import `startKeepalive` từ `utils/keepalive.js` thay vì `bot.js` — coupling sai đã được fix
 
-**Documentation:**
-- `ARCHITECTURE.md` — rewrite đầy đủ, bổ sung Riot integration, command system, data flows
-- `PLAN.md` — cập nhật priority order, thêm operational framing (monolith vs split trade-off)
-- `DEPLOYMENT.md` — tài liệu vận hành mới: env vars, boot sequence, expected logs, checklist
-- `SYSTEM_DEBUG.md` — debug guide mới: 7 failure scenarios, Redis diagnostic commands, log patterns
-- `render.yaml` — bot đổi từ `type: worker` sang `type: web` (canonical, không còn điều kiện)
-- `CHANGELOG.md` — file này
-- `ADR.md` — Architecture Decision Records
-- `BACKUP.md` — Backup và recovery strategy
+**`src/upstash.js`**
+- Fix comment: delay là `200ms → 400ms` (không phải `200ms → 400ms → 800ms` như comment cũ ghi sai)
+- Header comment cập nhật để phản ánh đúng `MAX_RETRIES=2`
+
+**`src/bot/emojiMap.js`**
+- Sửa comment "Lazy-loaded" → "module-separated" kèm giải thích rõ sự khác biệt và migration path nếu cần lazy thật
+
+**`src/bot/reminderWorker.js`**
+- Thêm `⚠️ SINGLE-INSTANCE ASSUMPTION` block — document rõ rủi ro double-fire nếu horizontal scale, để lại migration path (`withRedisLock`)
+
+**`ADR.md`**
+- Fix đánh số: ADR-006 (pipeline) → ADR-007, ADR-007 → ADR-008, ADR-008 → ADR-009
+- Sửa typo "Hệg quả" → "Hệ quả" trong ADR-008
+- Cập nhật nội dung ADR-007 và ADR-008 phản ánh các fix trong v1.5
 
 ---
 
-## [v1.2] — Heartbeat + Observability
+## [v1.4] — Refactor: tách module bot.js + fix game session loss
+
+**`src/bot.js`** — giảm từ 687 → 486 dòng
+- Tách `reminderWorker.js`, `xpHandler.js`, `autoMod.js`, `emojiMap.js` ra `src/bot/`
+- Pipeline MessageCreate rõ ràng: `runAutoMod → runMentionReact → music → prefix → handleXp → autoReply`
+
+**`src/upstash.js`** — rewrite
+- Đổi `https.request` → `fetch` + `AbortController` (~30 dòng ít hơn)
+- Thêm `ttl()`, `keys()`, `srem()` — cần cho purge game sessions
+- Retry: fixed delay → pseudo-exponential (200ms → 400ms)
+
+**`src/distributedLock.js`**
+- Đổi fixed 25ms polling → exponential backoff `50ms → 75ms → ... → 400ms`
+- Giảm ~8–13× Upstash requests khi nhiều operation tranh lock đồng thời
+
+**`src/stateStore.js`** — fix lỗi quan trọng
+- `setGameSession()` thêm `EX 10800` (3 giờ TTL) — trước đây sessions tồn tại mãi khi bot crash
+- `purgeStaleGameSessions()` Redis branch implement đầy đủ thay vì TODO no-op — refund bet khi bot restart
+
+**`src/server.js`**
+- 2 Map cache riêng biệt (`_guildCache`, `_guildDataCache`) → 1 unified `_memCache` với namespace key
+- Prune interval `.unref()` để tránh memory leak
+
+**`src/index.js` / `src/index.bot.js`**
+- `loginWithRetry`: string match `err.message` → `TRANSIENT_CODES` Set + `err.status >= 500 || 429`
+
+---
+
+## [v1.3] — Riot API puuid migration + Documentation freeze
 
 **Bot (`src/bot.js`):**
 - `heartbeat:bot` — ghi Redis mỗi 30 s, TTL 90 s, payload `{ ts, uptimeS, guilds, ready }`
@@ -89,42 +119,3 @@ Format: `[vX.Y] — Mô tả ngắn` → chi tiết thay đổi.
 - `pm2.config.cjs` — 2 processes, memory limits, log rotation
 - `src/distributedLock.js` — Redis-based distributed lock (Lua atomic)
 - `src/asyncMutex.js` — in-process fallback cho local dev
-
----
-
-## [v1.4] — Refactor: module tách nhỏ, lock cải tiến, purge game sessions
-
-### `src/bot.js` — Tách thành pipeline modules
-- **Trước:** 1 file 687 dòng ôm toàn bộ logic (reminder, XP, automod, mention-react, slash queue, heartbeat)
-- **Sau:** Mỗi concern có module riêng — `bot.js` chỉ giữ wiring và event registration
-
-**Modules mới:**
-- `src/bot/emojiMap.js` — `EMOJI_MAP` + `resolveEmojiNames()`, lazy-loaded
-- `src/bot/reminderWorker.js` — `startReminderWorker()`, tách hoàn toàn khỏi `ClientReady`
-- `src/bot/xpHandler.js` — `handleXp()`, in-memory cooldown cache
-- `src/bot/autoMod.js` — `runAutoMod()` + `runMentionReact()`, dễ test độc lập
-
-### `src/upstash.js` — Migrate sang `fetch`
-- Thay `https.request` bằng `fetch` + `AbortController` — gọn hơn ~60 dòng
-- Retry: exponential backoff 200 ms → 400 ms thay vì fixed delay
-- Thêm commands còn thiếu: `keys(pattern)`, `ttl(key)`, `srem(key, ...members)`
-- Timeout qua `AbortController` thay vì `req.setTimeout`
-
-### `src/distributedLock.js` — Exponential backoff
-- **Trước:** Fixed 25 ms retry → tối đa 200 lần gọi Redis trong 5 s window
-- **Sau:** Exponential 50 ms → max 400 ms → ~15–30 lần gọi cùng window
-- Giảm ~85% Upstash requests khi có lock contention
-
-### `src/stateStore.js` — Xoá deprecated + purge đúng cách
-- Xoá `getGuild()` (`@deprecated` từ v1.3, không còn caller nào)
-- `purgeStaleGameSessions()` trên Redis: dùng `keys('guild:*:game:*:*')` thay vì no-op
-- `setGameSession()` thêm TTL 3 giờ (`EX 10800`) — sessions tự expire nếu bot crash
-
-### `src/server.js` — Gom cache helpers
-- Thay 2 Map riêng biệt (`_guildCache` + `_guildDataCache`) bằng 1 generic `_memCache` helper
-- Thêm prune interval để tránh memory leak trên instance chạy lâu
-- Không thay đổi behavior — TTL giữ nguyên (5 min / 2 min)
-
-### `src/index.js` + `src/index.bot.js` — Fix transient error detection
-- **Trước:** `err.message.includes('connect')` — string match dễ false-positive
-- **Sau:** `Set(['ECONNRESET', 'ETIMEDOUT', 'ENOTFOUND', 'ECONNREFUSED', 'EAI_AGAIN'])` + `err.status >= 500`
