@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { useGuild } from '../contexts/GuildContext.jsx';
-import { Spinner, Toggle, SectionCard, TextInput } from '../components/ui.jsx';
+import { Spinner, Toggle, SectionCard, TextInput, ThemeToggle} from '../components/ui.jsx';
+import { useAppTheme } from '../App.jsx';
 
 // ── Group definitions (thêm đủ server/announce/levels) ─────────────────────
 const COMMAND_GROUPS = {
@@ -85,6 +86,7 @@ function CustomCommandEditor({ commands, onChange }) {
     ));
   };
 
+  const { theme, toggleTheme } = useAppTheme();
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--s3)' }}>
       {customs.length === 0 && (
@@ -193,7 +195,10 @@ export default function CommandsPage() {
 
   return (
     <div className="page">
-      <h1 className="page-title">Lệnh & Custom</h1>
+      <div className="page-header-row">
+        <h1 className="page-title">Lệnh & Custom</h1>
+        <ThemeToggle theme={theme} onToggle={toggleTheme} />
+      </div>
       <p className="page-subtitle">
         {enabledCount}/{ALL_COMMANDS.length} lệnh đang bật
       </p>

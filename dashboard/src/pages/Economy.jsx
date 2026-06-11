@@ -1,9 +1,11 @@
 import React from 'react';
 import { useGuild } from '../contexts/GuildContext.jsx';
-import { Spinner, Toggle, SectionCard, NumberInput, TextInput } from '../components/ui.jsx';
+import { Spinner, Toggle, SectionCard, NumberInput, TextInput, ThemeToggle} from '../components/ui.jsx';
+import { useAppTheme } from '../App.jsx';
 
 // ── Currency row ─────────────────────────────────────────────────────────────
 function CurrencySection({ name, prefix, config, updateConfig }) {
+  const { theme, toggleTheme } = useAppTheme();
   return (
     <div className="currency-section">
       <div className="form-row">
@@ -92,7 +94,10 @@ export default function EconomyPage() {
 
   return (
     <div className="page">
-      <h1 className="page-title">Kinh tế & XP</h1>
+      <div className="page-header-row">
+        <h1 className="page-title">Kinh tế & XP</h1>
+        <ThemeToggle theme={theme} onToggle={toggleTheme} />
+      </div>
       <p className="page-subtitle">
         Hệ thống kinh tế 3 loại tiền + XP levels. Distributed Redis lock đảm bảo an toàn concurrency.
       </p>

@@ -1,34 +1,61 @@
-import React from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 
 // ── useTheme ──────────────────────────────────────────────────────────────────
 
 export function useTheme() {
-  const [theme, setTheme] = React.useState(() => {
-    try { return localStorage.getItem('theme') || 'dark'; } catch { return 'dark'; }
+  const [theme, setTheme] = useState(() => {
+    const saved = localStorage.getItem('theme');
+    if (saved) return saved;
+    return window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
   });
 
-  React.useEffect(() => {
+  useEffect(() => {
     const html = document.documentElement;
-    html.classList.remove('theme-light', 'theme-dark');
-    html.classList.add(theme === 'light' ? 'theme-light' : 'theme-dark');
-    try { localStorage.setItem('theme', theme); } catch {}
+    if (theme === 'light') {
+      html.classList.add('theme-light');
+      html.classList.remove('theme-dark');
+    } else {
+      html.classList.add('theme-dark');
+      html.classList.remove('theme-light');
+    }
+    localStorage.setItem('theme', theme);
   }, [theme]);
 
-  return { theme, toggle: () => setTheme(t => t === 'dark' ? 'light' : 'dark') };
+  const toggleTheme = useCallback(() => {
+    setTheme(t => t === 'dark' ? 'light' : 'dark');
+  }, []);
+
+  return { theme, toggleTheme };
 }
 
 // ── ThemeToggle ───────────────────────────────────────────────────────────────
 
 export function ThemeToggle({ theme, onToggle }) {
-  const isLight = theme === 'light';
   return (
     <button
       className="theme-toggle"
       onClick={onToggle}
-      title={isLight ? 'Chuyển sang dark mode' : 'Chuyển sang light mode'}
+      title={theme === 'dark' ? 'Chuyển sang Light mode' : 'Chuyển sang Dark mode'}
+      aria-label="Toggle theme"
     >
-      <i className={`ti ${isLight ? 'ti-moon' : 'ti-sun'}`} />
+      <i className={`ti ${theme === 'dark' ? 'ti-sun' : 'ti-moon'}`} />
     </button>
+  );
+}
+
+// ── PageHeader ────────────────────────────────────────────────────────────────
+// Dùng chung cho tất cả pages: bọc page-title + ThemeToggle bên cạnh
+
+export function PageHeader({ title, subtitle, theme, onThemeToggle, children }) {
+  return (
+    <div className="page-header">
+      <div className="page-header-row">
+        <h1 className="page-title">{title}</h1>
+        {onThemeToggle && <ThemeToggle theme={theme} onToggle={onThemeToggle} />}
+        {children}
+      </div>
+      {subtitle && <p className="page-subtitle">{subtitle}</p>}
+    </div>
   );
 }
 

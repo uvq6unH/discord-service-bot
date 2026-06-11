@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useGuild } from '../contexts/GuildContext.jsx';
-import { Spinner, Toggle, SectionCard, ChannelSelect } from '../components/ui.jsx';
+import { Spinner, Toggle, SectionCard, ChannelSelect, ThemeToggle} from '../components/ui.jsx';
+import { useAppTheme } from '../App.jsx';
 
 // ── Reminder editor ─────────────────────────────────────────────────────────
 function ReminderEditor({ reminders, onChange, channels }) {
@@ -30,6 +31,7 @@ function ReminderEditor({ reminders, onChange, channels }) {
   const remove = (id) => onChange(reminders.filter(r => r.id !== id));
   const update = (id, patch) => onChange(reminders.map(r => r.id === id ? { ...r, ...patch } : r));
 
+  const { theme, toggleTheme } = useAppTheme();
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--s3)' }}>
       {reminders.length === 0 && (
@@ -128,7 +130,10 @@ export default function OverviewPage() {
 
   return (
     <div className="page">
-      <h1 className="page-title">Dashboard</h1>
+      <div className="page-header-row">
+        <h1 className="page-title">Dashboard</h1>
+        <ThemeToggle theme={theme} onToggle={toggleTheme} />
+      </div>
       <p className="page-subtitle">
         Cài đặt chung cho {selectedGuild.name}
         {cacheLabel && (

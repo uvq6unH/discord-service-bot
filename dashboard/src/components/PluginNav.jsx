@@ -62,7 +62,6 @@ export default function PluginNav() {
           <span>{label}</span>
         </NavLink>
       ))}
-
     </nav>
   );
 }

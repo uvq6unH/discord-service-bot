@@ -1,10 +1,10 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, createContext, useContext } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './contexts/AuthContext.jsx';
 import { GuildProvider, useGuild } from './contexts/GuildContext.jsx';
 import ServerRail from './components/ServerRail.jsx';
 import PluginNav from './components/PluginNav.jsx';
-import { SaveBar, EmptyState, useTheme, ThemeToggle } from './components/ui.jsx';
+import { SaveBar, EmptyState, useTheme } from './components/ui.jsx';
 import OverviewPage from './pages/Overview.jsx';
 import MembersPage from './pages/Members.jsx';
 import CommandsPage from './pages/Commands.jsx';
@@ -14,7 +14,11 @@ import LolPage    from './pages/Lol.jsx';
 import SystemPage from './pages/System.jsx';
 import { api } from './api.js';
 
-function DashboardLayout({ theme, toggleTheme }) {
+// Context để share theme xuống tất cả pages
+export const ThemeContext = createContext({ theme: 'dark', toggleTheme: () => {} });
+export function useAppTheme() { return useContext(ThemeContext); }
+
+function DashboardLayout() {
   const { user, loading: authLoading } = useAuth();
   const { selectedGuild, dirty, saveConfig, saveStatus } = useGuild();
   const [guilds, setGuilds] = useState([]);
@@ -47,9 +51,6 @@ function DashboardLayout({ theme, toggleTheme }) {
           <>
             <PluginNav guildId={selectedGuild.id} />
             <main className="content">
-              <div className="content-topbar">
-                <ThemeToggle theme={theme} onToggle={toggleTheme} />
-              </div>
               <Routes>
                 <Route path="/" element={<Navigate to="/overview" replace />} />
                 <Route path="/overview"    element={<OverviewPage />} />
@@ -73,12 +74,15 @@ function DashboardLayout({ theme, toggleTheme }) {
 }
 
 export default function App() {
-  const { theme, toggle } = useTheme();
+  const { theme, toggleTheme } = useTheme();
+
   return (
-    <AuthProvider>
-      <GuildProvider>
-        <DashboardLayout theme={theme} toggleTheme={toggle} />
-      </GuildProvider>
-    </AuthProvider>
+    <ThemeContext.Provider value={{ theme, toggleTheme }}>
+      <AuthProvider>
+        <GuildProvider>
+          <DashboardLayout />
+        </GuildProvider>
+      </AuthProvider>
+    </ThemeContext.Provider>
   );
 }

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useGuild } from '../contexts/GuildContext.jsx';
-import { Spinner, Toggle, SectionCard, ChannelSelect, RoleSelect } from '../components/ui.jsx';
+import { Spinner, Toggle, SectionCard, ChannelSelect, RoleSelect, ThemeToggle} from '../components/ui.jsx';
+import { useAppTheme } from '../App.jsx';
 
 // ── BadWords editor ──────────────────────────────────────────────────────────
 function BadWordsEditor({ words, onChange }) {
@@ -13,6 +14,7 @@ function BadWordsEditor({ words, onChange }) {
     setInput('');
   };
 
+  const { theme, toggleTheme } = useAppTheme();
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--s2)' }}>
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--s1)' }}>
@@ -108,7 +110,10 @@ export default function ModerationPage() {
 
   return (
     <div className="page">
-      <h1 className="page-title">Kiểm duyệt</h1>
+      <div className="page-header-row">
+        <h1 className="page-title">Kiểm duyệt</h1>
+        <ThemeToggle theme={theme} onToggle={toggleTheme} />
+      </div>
 
       <div className="cards-grid">
 

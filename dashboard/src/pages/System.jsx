@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { SectionCard, Spinner } from '../components/ui.jsx';
+import { SectionCard, Spinner, ThemeToggle } from '../components/ui.jsx';
+import { useAppTheme } from '../App.jsx';
 import { api } from '../api.js';
 
 function fmtUptime(s) {
@@ -32,6 +33,7 @@ function StatusDot({ online }) {
 }
 
 function KV({ label, value, highlight }) {
+  const { theme, toggleTheme } = useAppTheme();
   return (
     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center',
       padding: '8px 0', borderBottom: '1px solid var(--border)' }}>
@@ -79,13 +81,16 @@ export default function SystemPage() {
 
   return (
     <div className="page">
-      <div style={{ display: 'flex', alignItems: 'baseline', gap: 12, marginBottom: 4 }}>
-        <h1 className="page-title" style={{ margin: 0 }}>Hệ thống</h1>
-        {lastRefresh && (
-          <span style={{ fontSize: 12, color: 'var(--text-3)' }}>
-            cập nhật lúc {lastRefresh.toLocaleTimeString('vi-VN')}
-          </span>
-        )}
+      <div className="page-header-row">
+        <h1 className="page-title">Hệ thống</h1>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--s3)' }}>
+          {lastRefresh && (
+            <span style={{ fontSize: 12, color: 'var(--text-3)' }}>
+              cập nhật lúc {lastRefresh.toLocaleTimeString('vi-VN')}
+            </span>
+          )}
+          <ThemeToggle theme={theme} onToggle={toggleTheme} />
+        </div>
       </div>
       <p className="page-subtitle">Trạng thái thời gian thực của bot và dashboard</p>
 

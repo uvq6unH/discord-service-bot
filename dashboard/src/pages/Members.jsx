@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import { useGuild } from '../contexts/GuildContext.jsx';
-import { Spinner } from '../components/ui.jsx';
+import { Spinner, ThemeToggle} from '../components/ui.jsx';
+import { useAppTheme } from '../App.jsx';
 import { api } from '../api.js';
 
 function getDefaultAvatarIndex(id) {
@@ -13,6 +14,7 @@ function getDefaultAvatarIndex(id) {
 }
 
 function MemberRow({ member }) {
+  const { theme, toggleTheme } = useAppTheme();
   return (
     <div className="member-row">
       <img
@@ -77,7 +79,10 @@ export default function MembersPage() {
 
   return (
     <div className="page">
-      <h1 className="page-title">Thành viên</h1>
+      <div className="page-header-row">
+        <h1 className="page-title">Thành viên</h1>
+        <ThemeToggle theme={theme} onToggle={toggleTheme} />
+      </div>
       <p className="page-subtitle">{total} thành viên</p>
 
       <div className="members-toolbar">
