@@ -1,4 +1,5 @@
 import React from 'react';
+import { Award, CalendarCheck, CreditCard, Dice6, CircleDollarSign, Joystick, Coins } from 'lucide-react';
 import { useGuild } from '../contexts/GuildContext.jsx';
 import { Spinner, Toggle, SectionCard, NumberInput, TextInput, ThemeToggle} from '../components/ui.jsx';
 import { useAppTheme } from '../App.jsx';
@@ -107,7 +108,7 @@ export default function EconomyPage() {
         {/* ── XP & Levels ── */}
         <SectionCard
           title="XP & Levels"
-          icon="ti-award"
+          icon={<Award size={16} />}
           enabled={config.levelsEnabled}
           onToggle={v => updateConfig({ levelsEnabled: v })}
         >
@@ -137,7 +138,7 @@ export default function EconomyPage() {
         {/* ── Economy toggle + currency names ── */}
         <SectionCard
           title="Hệ thống tiền ảo"
-          icon="ti-coin"
+          icon={<Coins size={16} />}
           enabled={config.economyEnabled}
           onToggle={v => updateConfig({ economyEnabled: v })}
         >
@@ -151,7 +152,7 @@ export default function EconomyPage() {
         {/* ── Daily reward ── */}
         <SectionCard
           title="Điểm danh hàng ngày"
-          icon="ti-calendar-check"
+          icon={<CalendarCheck size={16} />}
           enabled={config.dailyEnabled}
           onToggle={v => updateConfig({ dailyEnabled: v })}
         >
@@ -199,11 +200,11 @@ export default function EconomyPage() {
         </SectionCard>
 
         {/* ── Games ── */}
-        <GameSection title="Blackjack"  icon="ti-cards"       prefix="blackjack"  config={config} updateConfig={updateConfig} />
-        <GameSection title="Poker"      icon="ti-poker-chip"  prefix="poker"      config={config} updateConfig={updateConfig} />
-        <GameSection title="Coinflip"   icon="ti-coin"        prefix="coinflip"   config={config} updateConfig={updateConfig} />
-        <GameSection title="Dice"       icon="ti-dice-6"      prefix="dice"       config={config} updateConfig={updateConfig} />
-        <GameSection title="Slots"      icon="ti-slot"        prefix="slots"      config={config} updateConfig={updateConfig} />
+        <GameSection title="Blackjack"  icon={<CreditCard size={16} />}       prefix="blackjack"  config={config} updateConfig={updateConfig} />
+        <GameSection title="Poker"      icon={<CircleDollarSign size={16} />}  prefix="poker"      config={config} updateConfig={updateConfig} />
+        <GameSection title="Coinflip"   icon={<Coins size={16} />}        prefix="coinflip"   config={config} updateConfig={updateConfig} />
+        <GameSection title="Dice"       icon={<Dice6 size={16} />}      prefix="dice"       config={config} updateConfig={updateConfig} />
+        <GameSection title="Slots"      icon={<Joystick size={16} />}        prefix="slots"      config={config} updateConfig={updateConfig} />
 
       </div>
     </div>

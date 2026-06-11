@@ -1,4 +1,5 @@
 import React from 'react';
+import { Key, Sword, Crown, Database } from 'lucide-react';
 import { useGuild } from '../contexts/GuildContext.jsx';
 import { Spinner, SectionCard, ThemeToggle} from '../components/ui.jsx';
 import { useAppTheme } from '../App.jsx';
@@ -74,7 +75,7 @@ export default function LolPage() {
       <div className="cards-grid">
 
         {/* ── API Keys ── */}
-        <SectionCard title="Riot API Keys" icon="ti-key">
+        <SectionCard title="Riot API Keys" icon={<Key size={16} />}>
           <form autoComplete="off" onSubmit={e => e.preventDefault()}>
             {/* Hidden username trick để tắt browser autofill */}
             <input type="text" name="username" autoComplete="username" style={{ display: 'none' }} readOnly />
@@ -108,7 +109,7 @@ export default function LolPage() {
         </SectionCard>
 
         {/* ── LoL commands ── */}
-        <SectionCard title="Lệnh League of Legends" icon="ti-sword">
+        <SectionCard title="Lệnh League of Legends" icon={<Sword size={16} />}>
           <CmdRef cmds={['lsd', 'lol', 'lolmatch', 'lolchamp', 'lolitem', 'lolrunes', 'lolpatch', 'lollink', 'lolunlink']} />
           <div style={{ marginTop: 'var(--s3)', display: 'flex', flexDirection: 'column', gap: 'var(--s1)' }}>
             {[
@@ -134,7 +135,7 @@ export default function LolPage() {
         </SectionCard>
 
         {/* ── TFT commands ── */}
-        <SectionCard title="Lệnh Teamfight Tactics" icon="ti-chess-knight">
+        <SectionCard title="Lệnh Teamfight Tactics" icon={<Crown size={16} />}>
           <CmdRef cmds={['tftlsd', 'tft', 'tftmatch', 'tftlink', 'tftunlink']} />
           <div style={{ marginTop: 'var(--s3)', display: 'flex', flexDirection: 'column', gap: 'var(--s1)' }}>
             {[
@@ -153,7 +154,7 @@ export default function LolPage() {
         </SectionCard>
 
         {/* ── Rate limit info ── */}
-        <SectionCard title="Rate limits & Cache" icon="ti-database">
+        <SectionCard title="Rate limits & Cache" icon={<Database size={16} />}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--s2)' }}>
             {[
               ['Development key',   '20 req/s, 100 req/2min'],

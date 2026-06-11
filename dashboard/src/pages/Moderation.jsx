@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { ShieldCheck, Bot, Ticket, Tag } from 'lucide-react';
 import { useGuild } from '../contexts/GuildContext.jsx';
 import { Spinner, Toggle, SectionCard, ChannelSelect, RoleSelect, ThemeToggle} from '../components/ui.jsx';
 import { useAppTheme } from '../App.jsx';
@@ -120,7 +121,7 @@ export default function ModerationPage() {
         {/* ── Moderation commands ── */}
         <SectionCard
           title="Lệnh kiểm duyệt"
-          icon="ti-shield-check"
+          icon={<ShieldCheck size={16} />}
           enabled={config.moderationEnabled}
           onToggle={v => updateConfig({ moderationEnabled: v })}
         >
@@ -140,7 +141,7 @@ export default function ModerationPage() {
         {/* ── AutoMod ── */}
         <SectionCard
           title="AutoMod"
-          icon="ti-robot"
+          icon={<Bot size={16} />}
           enabled={config.autoModEnabled}
           onToggle={v => updateConfig({ autoModEnabled: v })}
         >
@@ -178,7 +179,7 @@ export default function ModerationPage() {
         {/* ── Ticket System ── */}
         <SectionCard
           title="Ticket System"
-          icon="ti-ticket"
+          icon={<Ticket size={16} />}
           enabled={config.ticketsEnabled}
           onToggle={v => updateConfig({ ticketsEnabled: v })}
         >
@@ -225,7 +226,7 @@ export default function ModerationPage() {
         {/* ── Self-Role Panel ── */}
         <SectionCard
           title="Self-Role Panel"
-          icon="ti-tag"
+          icon={<Tag size={16} />}
           enabled={config.rolesEnabled}
           onToggle={v => updateConfig({ rolesEnabled: v })}
         >

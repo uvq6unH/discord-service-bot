@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { Settings, LogIn, Megaphone, Music, Bell } from 'lucide-react';
 import { useGuild } from '../contexts/GuildContext.jsx';
 import { Spinner, Toggle, SectionCard, ChannelSelect, ThemeToggle} from '../components/ui.jsx';
 import { useAppTheme } from '../App.jsx';
@@ -146,7 +147,7 @@ export default function OverviewPage() {
       <div className="cards-grid">
 
         {/* ── Cài đặt chung ── */}
-        <SectionCard title="Cài đặt chung" icon="ti-settings">
+        <SectionCard title="Cài đặt chung" icon={<Settings size={16} />}>
           <Toggle
             label="Bật bot"
             hint="Bật/tắt toàn bộ tính năng bot"
@@ -175,7 +176,7 @@ export default function OverviewPage() {
         {/* ── Welcome ── */}
         <SectionCard
           title="Chào mừng thành viên"
-          icon="ti-door-enter"
+          icon={<LogIn size={16} />}
           enabled={config.welcomeEnabled}
           onToggle={v => updateConfig({ welcomeEnabled: v })}
         >
@@ -201,7 +202,7 @@ export default function OverviewPage() {
         {/* ── Thông báo ── */}
         <SectionCard
           title="Thông báo"
-          icon="ti-speakerphone"
+          icon={<Megaphone size={16} />}
           enabled={config.announcementsEnabled}
           onToggle={v => updateConfig({ announcementsEnabled: v })}
         >
@@ -225,7 +226,7 @@ export default function OverviewPage() {
         {/* ── Music ── */}
         <SectionCard
           title="Music"
-          icon="ti-music"
+          icon={<Music size={16} />}
           enabled={config.musicEnabled}
           onToggle={v => updateConfig({ musicEnabled: v })}
         >
@@ -246,7 +247,7 @@ export default function OverviewPage() {
         {/* ── Reminders ── */}
         <SectionCard
           title="Reminders"
-          icon="ti-bell"
+          icon={<Bell size={16} />}
           enabled={config.remindersEnabled}
           onToggle={v => updateConfig({ remindersEnabled: v })}
         >

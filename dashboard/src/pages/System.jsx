@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react';
+import { Server, Database, BarChart } from 'lucide-react';
 import { SectionCard, Spinner, ThemeToggle } from '../components/ui.jsx';
 import { useAppTheme } from '../App.jsx';
 import { api } from '../api.js';
@@ -97,7 +98,7 @@ export default function SystemPage() {
       <div className="cards-grid">
 
         {/* ── Services ── */}
-        <SectionCard title="Dịch vụ" icon="ti-server">
+        <SectionCard title="Dịch vụ" icon={<Server size={16} />}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12, paddingTop: 4 }}>
 
             {/* Bot */}
@@ -141,7 +142,7 @@ export default function SystemPage() {
         </SectionCard>
 
         {/* ── Queue & Cache ── */}
-        <SectionCard title="Queue & Cache" icon="ti-database">
+        <SectionCard title="Queue & Cache" icon={<Database size={16} />}>
           <KV
             label="Slash sync queue"
             value={queueLen === 0 ? '0 (sạch)' : `${queueLen} job đang chờ`}
@@ -151,7 +152,7 @@ export default function SystemPage() {
         </SectionCard>
 
         {/* ── Stats counters ── */}
-        <SectionCard title="Thống kê hoạt động" icon="ti-chart-bar">
+        <SectionCard title="Thống kê hoạt động" icon={<BarChart size={16} />}>
           <p style={{ fontSize: 12, color: 'var(--text-3)', marginBottom: 10 }}>
             Tích luỹ từ lần khởi động — reset khi Redis xoá key.
           </p>

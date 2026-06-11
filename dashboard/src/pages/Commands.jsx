@@ -1,4 +1,4 @@
-import { Terminal, Award, Server, ShieldCheck, Coins, Ticket, Sword, Search } from 'lucide-react';
+import { Terminal, Award, Server, ShieldCheck, Coins, Ticket, Sword, Search, FilePlus2, MessageSquareReply, Smile } from 'lucide-react';
 import React, { useState, useMemo } from 'react';
 import { useGuild } from '../contexts/GuildContext.jsx';
 import { Spinner, Toggle, SectionCard, TextInput, ThemeToggle} from '../components/ui.jsx';
@@ -262,7 +262,7 @@ export default function CommandsPage() {
 
           {/* Custom command editor — show khi đang ở group general hoặc search */}
           {(activeGroup === 'general' && !search) && (
-            <SectionCard title="Lệnh custom" icon="ti-code-plus">
+            <SectionCard title="Lệnh custom" icon={<FilePlus2 size={16} />}>
               <p style={{ fontSize: 12, color: 'var(--text-3)', marginBottom: 'var(--s3)' }}>
                 Lệnh tự tạo với prefix. Hỗ trợ template: <code>{'{user}'}</code> <code>{'{args}'}</code> <code>{'{server}'}</code>
               </p>
@@ -277,7 +277,7 @@ export default function CommandsPage() {
           {(activeGroup === 'general' && !search) && (
             <SectionCard
               title="Tự động trả lời"
-              icon="ti-message-reply"
+              icon={<MessageSquareReply size={16} />}
               enabled={config.autoReplyEnabled}
               onToggle={v => updateConfig({ autoReplyEnabled: v })}
             >
@@ -292,7 +292,7 @@ export default function CommandsPage() {
           {(activeGroup === 'general' && !search) && (
             <SectionCard
               title="Reaction khi nhắc bot"
-              icon="ti-mood-smile"
+              icon={<Smile size={16} />}
               enabled={config.mentionReactEnabled}
               onToggle={v => updateConfig({ mentionReactEnabled: v })}
             >
