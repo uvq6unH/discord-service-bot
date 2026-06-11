@@ -664,6 +664,64 @@ export function createServer({ configStore, stateStore, botClient, redis = null 
     }
   });
 
+
+  // GET /api/my-role?guildId=xxx
+  // Trả về role của user hiện tại trong guild — dùng cho PermissionGuard trên dashboard.
+  // Tái dùng logic đã có sẵn: OAuth guilds cache → botClient fallback → Redis fallback.
+  // Không fetch member list bulk nên không hit rate limit.
+  app.get('/api/my-role', auth.requireAuth, readRateLimit, requireGuildId, async (req, res) => {
+    const userId  = req.session.user.id;
+    const guildId = req.guildId;
+
+    try {
+      // 1. Check via OAuth guilds cache (đã có sẵn từ /api/guilds, không tốn request mới)
+      const userGuilds = await getCachedGuilds(userId);
+      if (userGuilds) {
+        const g = userGuilds.find(g => g.id === guildId);
+        if (g) {
+          if (g.owner) return res.json({ role: 'owner' });
+          const perms = BigInt(g.permissions ?? 0);
+          if ((perms & 0x8n) === 0x8n) return res.json({ role: 'admin' });       // ADMINISTRATOR
+          if ((perms & 0x20n) === 0x20n) return res.json({ role: 'admin' });     // MANAGE_GUILD
+          if ((perms & 0x2n) === 0x2n) return res.json({ role: 'moderator' });   // KICK_MEMBERS
+          if ((perms & 0x4n) === 0x4n) return res.json({ role: 'moderator' });   // BAN_MEMBERS
+          if ((perms & 0x2000n) === 0x2000n) return res.json({ role: 'moderator' }); // MANAGE_MESSAGES
+          return res.json({ role: 'viewer' });
+        }
+      }
+
+      // 2. Fallback: botClient trực tiếp
+      const botGuild = botClient?.guilds?.cache?.get(guildId);
+      if (botGuild) {
+        if (botGuild.ownerId === userId) return res.json({ role: 'owner' });
+        const member = await botGuild.members.fetch(userId).catch(() => null);
+        if (member) {
+          if (member.permissions.has('Administrator')) return res.json({ role: 'admin' });
+          if (member.permissions.has('ManageGuild'))   return res.json({ role: 'admin' });
+          if (member.permissions.has('KickMembers') ||
+              member.permissions.has('BanMembers')  ||
+              member.permissions.has('ManageMessages')) return res.json({ role: 'moderator' });
+          return res.json({ role: 'viewer' });
+        }
+      }
+
+      // 3. Fallback: Redis guild_cache (owner check only)
+      if (redis) {
+        const raw = await redis.get(`guild_cache:${guildId}`).catch(() => null);
+        if (raw) {
+          const meta = JSON.parse(raw);
+          if (meta.ownerId === userId) return res.json({ role: 'owner' });
+        }
+      }
+
+      // Không xác định được — trả viewer để không block hoàn toàn
+      return res.json({ role: 'viewer' });
+    } catch (err) {
+      console.error('[my-role] error:', err.message);
+      res.status(500).json({ error: 'Không thể xác định quyền.' });
+    }
+  });
+
   app.get('/api/keepalive-status', auth.requireAuth, (_req, res) => {
     const channelId = process.env.KEEPALIVE_CHANNEL_ID ?? null;
     let channelName = null;
