@@ -1,24 +1,25 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useContext } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { api } from '../api.js';
 
 const AuthContext = createContext(null);
 
 export function AuthProvider({ children }) {
-  const [user, setUser]       = useState(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    api.me()
-      .then((me) => {
-        if (me.loggedIn) setUser(me);
-        else window.location.href = '/login';
-      })
-      .catch(() => { window.location.href = '/login'; })
-      .finally(() => setLoading(false));
-  }, []);
+  const { data: user, isLoading: loading } = useQuery({
+    queryKey: ['me'],
+    queryFn: async () => {
+      const me = await api.me();
+      if (!me.loggedIn) {
+        window.location.href = '/login';
+        return null;
+      }
+      return me;
+    },
+    retry: false,
+  });
 
   return (
-    <AuthContext.Provider value={{ user, loading }}>
+    <AuthContext.Provider value={{ user: user ?? null, loading }}>
       {children}
     </AuthContext.Provider>
   );

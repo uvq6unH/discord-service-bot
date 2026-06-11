@@ -1,15 +1,20 @@
 import React from 'react';
 import { NavLink } from 'react-router-dom';
+import { motion } from 'motion/react';
+import {
+  LayoutDashboard, Users, Terminal, Coins,
+  ShieldCheck, Sword, Activity,
+} from 'lucide-react';
 import { useGuild } from '../contexts/GuildContext.jsx';
 
 const NAV_ITEMS = [
-  { to: '/overview',    icon: 'ti-layout-dashboard', label: 'Dashboard' },
-  { to: '/members',     icon: 'ti-users',            label: 'Thành viên' },
-  { to: '/commands',    icon: 'ti-terminal-2',       label: 'Lệnh' },
-  { to: '/economy',     icon: 'ti-coin',             label: 'Kinh tế' },
-  { to: '/moderation',  icon: 'ti-shield-check',     label: 'Kiểm duyệt' },
-  { to: '/lol',         icon: 'ti-sword',            label: 'LoL & TFT' },
-  { to: '/system',      icon: 'ti-activity',         label: 'Hệ thống' },
+  { to: '/overview',   Icon: LayoutDashboard, label: 'Dashboard' },
+  { to: '/members',    Icon: Users,           label: 'Thành viên' },
+  { to: '/commands',   Icon: Terminal,        label: 'Lệnh' },
+  { to: '/economy',    Icon: Coins,           label: 'Kinh tế' },
+  { to: '/moderation', Icon: ShieldCheck,     label: 'Kiểm duyệt' },
+  { to: '/lol',        Icon: Sword,           label: 'LoL & TFT' },
+  { to: '/system',     Icon: Activity,        label: 'Hệ thống' },
 ];
 
 export default function PluginNav() {
@@ -52,15 +57,21 @@ export default function PluginNav() {
 
       <div className="nav-section-label">Menu</div>
 
-      {NAV_ITEMS.map(({ to, icon, label }) => (
-        <NavLink
+      {NAV_ITEMS.map(({ to, Icon, label }, index) => (
+        <motion.div
           key={to}
-          to={to}
-          className={({ isActive }) => `nav-item${isActive ? ' active' : ''}`}
+          initial={{ opacity: 0, x: -8 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ delay: index * 0.04, duration: 0.2 }}
         >
-          <i className={`ti ${icon}`} />
-          <span>{label}</span>
-        </NavLink>
+          <NavLink
+            to={to}
+            className={({ isActive }) => `nav-item${isActive ? ' active' : ''}`}
+          >
+            <Icon size={16} />
+            <span>{label}</span>
+          </NavLink>
+        </motion.div>
       ))}
     </nav>
   );

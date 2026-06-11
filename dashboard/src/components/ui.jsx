@@ -1,4 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { motion, AnimatePresence } from 'motion/react';
+import { Sun, Moon, Bot } from 'lucide-react';
 
 // ── useTheme ──────────────────────────────────────────────────────────────────
 
@@ -38,13 +40,12 @@ export function ThemeToggle({ theme, onToggle }) {
       title={theme === 'dark' ? 'Chuyển sang Light mode' : 'Chuyển sang Dark mode'}
       aria-label="Toggle theme"
     >
-      <i className={`ti ${theme === 'dark' ? 'ti-sun' : 'ti-moon'}`} />
+      {theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
     </button>
   );
 }
 
 // ── PageHeader ────────────────────────────────────────────────────────────────
-// Dùng chung cho tất cả pages: bọc page-title + ThemeToggle bên cạnh
 
 export function PageHeader({ title, subtitle, theme, onThemeToggle, children }) {
   return (
@@ -86,7 +87,7 @@ export function SaveBar({ onSave, status }) {
 export function EmptyState() {
   return (
     <div className="empty-state">
-      <i className="ti ti-robot empty-state__icon" />
+      <Bot size={48} className="empty-state__icon" />
       <h2>Chọn một server</h2>
       <p>Chọn server từ thanh bên trái để bắt đầu cấu hình bot.</p>
     </div>
@@ -98,7 +99,7 @@ export function EmptyState() {
 export function InviteBanner({ inviteUrl }) {
   return (
     <div className="invite-banner">
-      <i className="ti ti-robot-off" />
+      <Bot size={20} />
       <div>
         <h3>Bot chưa ở trong server này</h3>
         <p>Mời bot để sử dụng dashboard.</p>
@@ -210,12 +211,15 @@ export function TextInput({ value, onChange, label, placeholder, type = 'text' }
 }
 
 // ── SectionCard ───────────────────────────────────────────────────────────────
+// icon prop now accepts a Lucide component (Icon) OR a legacy "ti-xxx" string
+// Pass Icon={SomeIcon} for new usage; icon="ti-xxx" still works via <i> fallback
 
-export function SectionCard({ title, icon, children, enabled, onToggle }) {
+export function SectionCard({ title, icon, Icon: IconComponent, children, enabled, onToggle }) {
   return (
     <div className={`section-card ${enabled === false ? 'section-card--disabled' : ''}`}>
       <div className="section-card__header">
-        {icon && <i className={`ti ${icon}`} />}
+        {IconComponent && <IconComponent size={16} />}
+        {!IconComponent && icon && <i className={`ti ${icon}`} />}
         <h3 className="section-card__title">{title}</h3>
         {onToggle != null && (
           <Toggle

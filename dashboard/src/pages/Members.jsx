@@ -1,3 +1,4 @@
+import { Search } from 'lucide-react';
 import React, { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import { useGuild } from '../contexts/GuildContext.jsx';
 import { Spinner, ThemeToggle} from '../components/ui.jsx';
@@ -87,7 +88,7 @@ export default function MembersPage() {
 
       <div className="members-toolbar">
         <div className="search-box">
-          <i className="ti ti-search" />
+          <Search size={14} />
           <input
             className="form-input"
             placeholder="Tìm thành viên…"

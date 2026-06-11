@@ -1,3 +1,4 @@
+import { Terminal, Award, Server, ShieldCheck, Coins, Ticket, Sword, Search } from 'lucide-react';
 import React, { useState, useMemo } from 'react';
 import { useGuild } from '../contexts/GuildContext.jsx';
 import { Spinner, Toggle, SectionCard, TextInput, ThemeToggle} from '../components/ui.jsx';
@@ -5,13 +6,13 @@ import { useAppTheme } from '../App.jsx';
 
 // ── Group definitions (thêm đủ server/announce/levels) ─────────────────────
 const COMMAND_GROUPS = {
-  general:      { title: 'Lệnh chung',         icon: 'ti-terminal-2'   },
-  user:         { title: 'Người dùng & XP',    icon: 'ti-award'        },
-  server:       { title: 'Máy chủ',            icon: 'ti-server'       },
-  moderation:   { title: 'Kiểm duyệt',         icon: 'ti-shield-check' },
-  economy:      { title: 'Kinh tế',            icon: 'ti-coin'         },
-  interactions: { title: 'Ticket & Roles',     icon: 'ti-ticket'       },
-  lol:          { title: 'LoL & TFT',          icon: 'ti-sword'        },
+  general:      { title: 'Lệnh chung',         Icon: Terminal   },
+  user:         { title: 'Người dùng & XP',    Icon: Award        },
+  server:       { title: 'Máy chủ',            Icon: Server       },
+  moderation:   { title: 'Kiểm duyệt',         Icon: ShieldCheck },
+  economy:      { title: 'Kinh tế',            Icon: Coins         },
+  interactions: { title: 'Ticket & Roles',     Icon: Ticket       },
+  lol:          { title: 'LoL & TFT',          Icon: Sword        },
 };
 
 // Danh sách đầy đủ từ configDefaults
@@ -206,7 +207,7 @@ export default function CommandsPage() {
       <div className="commands-layout">
         {/* Group tabs */}
         <div className="group-tabs">
-          {Object.entries(COMMAND_GROUPS).map(([key, { title, icon }]) => {
+          {Object.entries(COMMAND_GROUPS).map(([key, { title, Icon }]) => {
             const groupCmds = ALL_COMMANDS.filter(c => c.group === key);
             const groupEnabled = groupCmds.filter(c => (getCmd(c.type).enabled ?? true)).length;
             return (
@@ -215,7 +216,7 @@ export default function CommandsPage() {
                 className={`group-tab${activeGroup === key && !search ? ' group-tab--active' : ''}`}
                 onClick={() => { setActiveGroup(key); setSearch(''); }}
               >
-                <i className={`ti ${icon}`} />
+                <Icon size={14} />
                 <span>{title}</span>
                 <span style={{
                   marginLeft: 'auto', fontSize: 11, fontVariantNumeric: 'tabular-nums',
@@ -232,7 +233,7 @@ export default function CommandsPage() {
         <div className="commands-content">
           {/* Search */}
           <div className="commands-search">
-            <i className="ti ti-search" />
+            <Search size={14} />
             <input
               className="form-input"
               placeholder="Tìm lệnh…"

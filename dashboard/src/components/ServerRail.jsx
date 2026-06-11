@@ -1,4 +1,6 @@
 import React, { useState } from 'react';
+import { motion, AnimatePresence } from 'motion/react';
+import { Bot, BotOff, Plus, LogOut, ExternalLink } from 'lucide-react';
 import { useGuild } from '../contexts/GuildContext.jsx';
 import { api } from '../api.js';
 
@@ -22,29 +24,46 @@ function InviteModal({ guild, onClose }) {
   }
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal" onClick={e => e.stopPropagation()}>
-        <div className="modal__icon">
-          <i className="ti ti-robot-off" />
-        </div>
-        <h3>Bot chưa ở trong server này</h3>
-        <p>
-          <strong style={{ color: 'var(--text-1)' }}>{guild.name}</strong> chưa có bot.
-          Mời bot vào server để sử dụng dashboard và các tính năng.
-        </p>
-        <div className="modal__actions">
-          <button className="btn btn-ghost btn-sm" onClick={onClose}>Hủy</button>
-          <button
-            className="btn btn-primary btn-sm"
-            onClick={handleInvite}
-            disabled={loading}
+    <AnimatePresence>
+      {guild && (
+        <motion.div
+          className="modal-overlay"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          onClick={onClose}
+        >
+          <motion.div
+            className="modal"
+            initial={{ scale: 0.95, opacity: 0, y: 8 }}
+            animate={{ scale: 1, opacity: 1, y: 0 }}
+            exit={{ scale: 0.95, opacity: 0, y: 8 }}
+            transition={{ type: 'spring', stiffness: 300, damping: 25 }}
+            onClick={e => e.stopPropagation()}
           >
-            <i className="ti ti-external-link" />
-            {loading ? 'Đang mở…' : 'Mời Bot'}
-          </button>
-        </div>
-      </div>
-    </div>
+            <div className="modal__icon">
+              <BotOff size={24} />
+            </div>
+            <h3>Bot chưa ở trong server này</h3>
+            <p>
+              <strong style={{ color: 'var(--text-1)' }}>{guild.name}</strong> chưa có bot.
+              Mời bot vào server để sử dụng dashboard và các tính năng.
+            </p>
+            <div className="modal__actions">
+              <button className="btn btn-ghost btn-sm" onClick={onClose}>Hủy</button>
+              <button
+                className="btn btn-primary btn-sm"
+                onClick={handleInvite}
+                disabled={loading}
+              >
+                <ExternalLink size={14} />
+                {loading ? 'Đang mở…' : 'Mời Bot'}
+              </button>
+            </div>
+          </motion.div>
+        </motion.div>
+      )}
+    </AnimatePresence>
   );
 }
 
@@ -56,7 +75,7 @@ function GuildIcon({ guild, onInviteRequest }) {
 
   function handleClick() {
     if (notPresent) {
-      onInviteRequest(guild);   // show modal, không block dashboard
+      onInviteRequest(guild);
     } else {
       selectGuild(guild);
     }
@@ -66,8 +85,8 @@ function GuildIcon({ guild, onInviteRequest }) {
     <button
       className={[
         'guild-btn',
-        isSelected    ? 'guild-btn--active' : '',
-        notPresent    ? 'guild-btn--invite' : '',
+        isSelected ? 'guild-btn--active' : '',
+        notPresent ? 'guild-btn--invite' : '',
       ].filter(Boolean).join(' ')}
       onClick={handleClick}
       title={notPresent ? `${guild.name} — Mời bot vào server` : guild.name}
@@ -92,7 +111,7 @@ function GuildIcon({ guild, onInviteRequest }) {
       </span>
       {notPresent && (
         <span className="guild-badge guild-badge--invite">
-          <i className="ti ti-plus" />
+          <Plus size={10} />
         </span>
       )}
     </button>
@@ -111,7 +130,7 @@ export default function ServerRail({ guilds, loading, user }) {
       <nav className="server-rail">
         <div className="rail-top">
           <div className="rail-logo" title="Bot Dashboard">
-            <i className="ti ti-robot" />
+            <Bot size={20} />
           </div>
           <div className="rail-divider" />
 
@@ -165,18 +184,16 @@ export default function ServerRail({ guilds, loading, user }) {
             )}
             <span className="user-name-sm">{user?.username}</span>
             <a href="/auth/logout" className="logout-icon" title="Đăng xuất">
-              <i className="ti ti-logout" style={{ fontSize: 14 }} />
+              <LogOut size={14} />
             </a>
           </div>
         </div>
       </nav>
 
-      {inviteTarget && (
-        <InviteModal
-          guild={inviteTarget}
-          onClose={() => setInviteTarget(null)}
-        />
-      )}
+      <InviteModal
+        guild={inviteTarget}
+        onClose={() => setInviteTarget(null)}
+      />
     </>
   );
 }
