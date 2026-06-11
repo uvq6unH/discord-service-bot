@@ -1125,6 +1125,30 @@ html.theme-light .modal-overlay { background: rgba(0,0,0,.4); }
   height: 100%;
 }
 
+/* ── Fullscreen loader (block render cho đến khi auth + guilds ready) ──── */
+.fullscreen-loader {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg-app, #1a1b1e);
+  z-index: 9999;
+}
+
+.fullscreen-loader__inner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+}
+
+.fullscreen-loader__label {
+  font-size: 13px;
+  color: var(--text-muted);
+  letter-spacing: 0.02em;
+}
+
 /* ── Error banner ────────────────────────────────────────────────────────── */
 .error-banner {
   background: var(--red-dim);

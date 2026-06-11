@@ -18,6 +18,18 @@ import { api } from './api.js';
 export const ThemeContext = createContext({ theme: 'dark', toggleTheme: () => {} });
 export function useAppTheme() { return useContext(ThemeContext); }
 
+// Màn hình loading toàn trang — hiện khi chưa có đủ data
+function FullscreenLoader({ label = 'Đang tải...' }) {
+  return (
+    <div className="fullscreen-loader">
+      <div className="fullscreen-loader__inner">
+        <div className="spinner" />
+        <span className="fullscreen-loader__label">{label}</span>
+      </div>
+    </div>
+  );
+}
+
 function DashboardLayout() {
   const { user, loading: authLoading } = useAuth();
   const { selectedGuild, dirty, saveConfig, saveStatus } = useGuild();
@@ -26,23 +38,21 @@ function DashboardLayout() {
 
   useEffect(() => {
     if (!user) return;
-    api.guilds().then(r => Array.isArray(r) ? r : (r.guilds ?? []))
+    api.guilds()
+      .then(r => Array.isArray(r) ? r : (r.guilds ?? []))
       .then(setGuilds)
       .catch(console.error)
       .finally(() => setGuildsLoading(false));
   }, [user]);
 
-  if (authLoading) {
-    return (
-      <div className="loading-screen">
-        <div className="spinner" />
-      </div>
-    );
+  // Block render hoàn toàn cho đến khi auth + guilds list đều xong
+  if (authLoading || guildsLoading) {
+    return <FullscreenLoader label={authLoading ? 'Đang xác thực...' : 'Đang tải servers...'} />;
   }
 
   return (
     <div className="app">
-      <ServerRail guilds={guilds} loading={guildsLoading} user={user} />
+      <ServerRail guilds={guilds} loading={false} user={user} />
 
       <div className="main-area">
         {!selectedGuild ? (
