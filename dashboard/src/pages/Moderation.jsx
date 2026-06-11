@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
 import { ShieldCheck, Bot, Ticket, Tag } from 'lucide-react';
 import { useGuild } from '../contexts/GuildContext.jsx';
-import { Spinner, Toggle, SectionCard, ChannelSelect, RoleSelect, ThemeToggle} from '../components/ui.jsx';
-import { useAppTheme } from '../App.jsx';
+import { useAuth } from '../contexts/AuthContext.jsx';
+import { Spinner, Toggle, SectionCard, ChannelSelect, RoleSelect, ThemeToggle, PermissionGuard } from '../components/ui.jsx';
+
 
 // ── BadWords editor ──────────────────────────────────────────────────────────
 function BadWordsEditor({ words, onChange }) {
@@ -48,6 +49,7 @@ function BadWordsEditor({ words, onChange }) {
         <button className="btn btn-secondary btn-sm" onClick={add}>Thêm</button>
       </div>
     </div>
+    </PermissionGuard>
   );
 }
 
@@ -100,7 +102,7 @@ function SelfRoleEditor({ roles, allRoles, onChange }) {
 
 // ── Main page ───────────────────────────────────────────────────────────────
 export default function ModerationPage() {
-  const { theme, toggleTheme } = useAppTheme();
+  const { user } = useAuth();
   const { config, guildData, configLoading, updateConfig } = useGuild();
 
   if (configLoading || !config) return <div className="page-loading"><Spinner /></div>;
@@ -110,10 +112,11 @@ export default function ModerationPage() {
   const categoryChannels = (guildData?.channels ?? []).filter(c => c.type === 4);
 
   return (
+    <PermissionGuard user={user} required="moderator">
     <div className="page">
       <div className="page-header-row">
         <h1 className="page-title">Kiểm duyệt</h1>
-        <ThemeToggle theme={theme} onToggle={toggleTheme} />
+        <ThemeToggle />
       </div>
 
       <div className="cards-grid">
@@ -268,5 +271,6 @@ export default function ModerationPage() {
 
       </div>
     </div>
+    </PermissionGuard>
   );
 }

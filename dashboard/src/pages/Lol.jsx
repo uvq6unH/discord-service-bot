@@ -2,7 +2,7 @@ import React from 'react';
 import { Key, Sword, Crown, Database } from 'lucide-react';
 import { useGuild } from '../contexts/GuildContext.jsx';
 import { Spinner, SectionCard, ThemeToggle} from '../components/ui.jsx';
-import { useAppTheme } from '../App.jsx';
+
 
 // ── API key row với status badge ─────────────────────────────────────────────
 function ApiKeyInput({ label, valueKey, configuredKey, config, updateConfig, placeholder }) {
@@ -57,7 +57,7 @@ function CmdRef({ cmds }) {
 
 // ── Main page ─────────────────────────────────────────────────────────────────
 export default function LolPage() {
-  const { theme, toggleTheme } = useAppTheme();
+  
   const { config, configLoading, updateConfig } = useGuild();
 
   if (configLoading || !config) return <div className="page-loading"><Spinner /></div>;
@@ -66,7 +66,7 @@ export default function LolPage() {
     <div className="page">
       <div className="page-header-row">
         <h1 className="page-title">LoL & TFT</h1>
-        <ThemeToggle theme={theme} onToggle={toggleTheme} />
+        <ThemeToggle />
       </div>
       <p className="page-subtitle">
         Tích hợp Riot API — hỗ trợ TTL cache, token bucket, account linking qua Discord ID.

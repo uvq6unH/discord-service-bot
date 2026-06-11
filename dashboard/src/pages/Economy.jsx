@@ -2,7 +2,7 @@ import React from 'react';
 import { Award, CalendarCheck, CreditCard, Dice6, CircleDollarSign, Joystick, Coins } from 'lucide-react';
 import { useGuild } from '../contexts/GuildContext.jsx';
 import { Spinner, Toggle, SectionCard, NumberInput, TextInput, ThemeToggle} from '../components/ui.jsx';
-import { useAppTheme } from '../App.jsx';
+
 
 // ── Currency row ─────────────────────────────────────────────────────────────
 function CurrencySection({ name, prefix, config, updateConfig }) {
@@ -88,7 +88,7 @@ const UTC_OFFSETS = [
 
 // ── Main page ─────────────────────────────────────────────────────────────────
 export default function EconomyPage() {
-  const { theme, toggleTheme } = useAppTheme();
+  
   const { config, configLoading, updateConfig } = useGuild();
 
   if (configLoading || !config) return <div className="page-loading"><Spinner /></div>;
@@ -97,7 +97,7 @@ export default function EconomyPage() {
     <div className="page">
       <div className="page-header-row">
         <h1 className="page-title">Kinh tế & XP</h1>
-        <ThemeToggle theme={theme} onToggle={toggleTheme} />
+        <ThemeToggle />
       </div>
       <p className="page-subtitle">
         Hệ thống kinh tế 3 loại tiền + XP levels. Distributed Redis lock đảm bảo an toàn concurrency.

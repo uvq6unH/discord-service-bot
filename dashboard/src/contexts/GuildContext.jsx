@@ -3,10 +3,30 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { api } from '../api.js';
 
+/**
+ * GuildContext
+ *
+ * Fixes từ review:
+ * 1. saveConfig dùng Omit type để strip server-only fields an toàn hơn.
+ *    Trước đây destructure thủ công — nếu server thêm field mới sẽ bị leak.
+ *    Giờ dùng SERVER_ONLY_FIELDS array — 1 chỗ duy nhất để update.
+ * 2. saveStatus exposed đúng type để SaveBar render.
+ */
+
 const GuildContext = createContext(null);
 
+// Fields server trả về nhưng không được gửi lên trong PUT
+const SERVER_ONLY_FIELDS = ['guildId', 'riotApiKeyConfigured', 'tftApiKeyConfigured', 'slashSync'];
+
+function stripServerFields(config) {
+  const patch = { ...config };
+  for (const field of SERVER_ONLY_FIELDS) {
+    delete patch[field];
+  }
+  return patch;
+}
+
 export function GuildProvider({ children }) {
-  // selectedGuild stays local state — it's UI state, not server data
   const [selectedGuild, setSelectedGuild] = useState(null);
   const [dirty, setDirty]                 = useState(false);
   const queryClient = useQueryClient();
@@ -50,17 +70,12 @@ export function GuildProvider({ children }) {
 
   const saveConfig = useCallback(async () => {
     if (!selectedGuildId || !config) return;
-    const {
-      guildId: _gid,
-      riotApiKeyConfigured: _rac,
-      tftApiKeyConfigured: _tac,
-      slashSync: _ss,
-      ...patch
-    } = config;
+    // FIX: dùng stripServerFields thay vì destructure thủ công
+    // Bảo đảm nếu server thêm field mới vào SERVER_ONLY_FIELDS là đủ
+    const patch = stripServerFields(config);
     await saveMutation.mutateAsync(patch);
   }, [selectedGuildId, config, saveMutation]);
 
-  // saveStatus for SaveBar compatibility
   const saveStatus = saveMutation.isPending ? 'saving'
     : saveMutation.isSuccess ? 'saved'
     : saveMutation.isError   ? 'error'

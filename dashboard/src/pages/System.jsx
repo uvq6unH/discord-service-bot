@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { Server, Database, BarChart } from 'lucide-react';
 import { SectionCard, Spinner, ThemeToggle } from '../components/ui.jsx';
-import { useAppTheme } from '../App.jsx';
+
 import { api } from '../api.js';
 
 function fmtUptime(s) {
@@ -49,7 +49,7 @@ function KV({ label, value, highlight }) {
 }
 
 export default function SystemPage() {
-  const { theme, toggleTheme } = useAppTheme();
+  
   const [status, setStatus] = useState(null);
   const [loading, setLoading] = useState(true);
   const [lastRefresh, setLastRefresh] = useState(null);
@@ -90,7 +90,7 @@ export default function SystemPage() {
               cập nhật lúc {lastRefresh.toLocaleTimeString('vi-VN')}
             </span>
           )}
-          <ThemeToggle theme={theme} onToggle={toggleTheme} />
+          <ThemeToggle />
         </div>
       </div>
       <p className="page-subtitle">Trạng thái thời gian thực của bot và dashboard</p>

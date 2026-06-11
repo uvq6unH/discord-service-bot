@@ -3,7 +3,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useGuild } from '../contexts/GuildContext.jsx';
 import { Spinner, ThemeToggle} from '../components/ui.jsx';
-import { useAppTheme } from '../App.jsx';
+
 import { api } from '../api.js';
 
 function getDefaultAvatarIndex(id) {
@@ -38,7 +38,7 @@ function MemberRow({ member }) {
 }
 
 export default function MembersPage() {
-  const { theme, toggleTheme } = useAppTheme();
+  
   const { selectedGuild } = useGuild();
   const [page, setPage]     = useState(1);
   const [search, setSearch] = useState('');
@@ -72,7 +72,7 @@ export default function MembersPage() {
     <div className="page">
       <div className="page-header-row">
         <h1 className="page-title">Thành viên</h1>
-        <ThemeToggle theme={theme} onToggle={toggleTheme} />
+        <ThemeToggle />
       </div>
       <p className="page-subtitle">{total} thành viên</p>
 

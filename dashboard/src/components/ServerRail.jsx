@@ -2,9 +2,9 @@ import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Bot, BotOff, Plus, LogOut, ExternalLink } from 'lucide-react';
 import { useGuild } from '../contexts/GuildContext.jsx';
+import { RoleBadge } from './ui.jsx';
 import { api } from '../api.js';
 
-/* ── Invite modal khi bot chưa trong server ─────────────────────────────── */
 function InviteModal({ guild, onClose }) {
   const [loading, setLoading] = useState(false);
 
@@ -41,9 +41,7 @@ function InviteModal({ guild, onClose }) {
             transition={{ type: 'spring', stiffness: 300, damping: 25 }}
             onClick={e => e.stopPropagation()}
           >
-            <div className="modal__icon">
-              <BotOff size={24} />
-            </div>
+            <div className="modal__icon"><BotOff size={24} /></div>
             <h3>Bot chưa ở trong server này</h3>
             <p>
               <strong style={{ color: 'var(--text-1)' }}>{guild.name}</strong> chưa có bot.
@@ -51,11 +49,7 @@ function InviteModal({ guild, onClose }) {
             </p>
             <div className="modal__actions">
               <button className="btn btn-ghost btn-sm" onClick={onClose}>Hủy</button>
-              <button
-                className="btn btn-primary btn-sm"
-                onClick={handleInvite}
-                disabled={loading}
-              >
+              <button className="btn btn-primary btn-sm" onClick={handleInvite} disabled={loading}>
                 <ExternalLink size={14} />
                 {loading ? 'Đang mở…' : 'Mời Bot'}
               </button>
@@ -67,18 +61,14 @@ function InviteModal({ guild, onClose }) {
   );
 }
 
-/* ── Guild icon button ───────────────────────────────────────────────────── */
 function GuildIcon({ guild, onInviteRequest }) {
   const { selectedGuild, selectGuild } = useGuild();
   const isSelected = selectedGuild?.id === guild.id;
   const notPresent = !guild.botPresent;
 
   function handleClick() {
-    if (notPresent) {
-      onInviteRequest(guild);
-    } else {
-      selectGuild(guild);
-    }
+    if (notPresent) onInviteRequest(guild);
+    else selectGuild(guild);
   }
 
   return (
@@ -93,9 +83,7 @@ function GuildIcon({ guild, onInviteRequest }) {
     >
       {guild.icon ? (
         <img
-          src={guild.icon}
-          alt={guild.name}
-          className="guild-icon"
+          src={guild.icon} alt={guild.name} className="guild-icon"
           onError={e => {
             e.currentTarget.style.display = 'none';
             const sib = e.currentTarget.nextElementSibling;
@@ -110,15 +98,12 @@ function GuildIcon({ guild, onInviteRequest }) {
         {guild.name.slice(0, 2).toUpperCase()}
       </span>
       {notPresent && (
-        <span className="guild-badge guild-badge--invite">
-          <Plus size={10} />
-        </span>
+        <span className="guild-badge guild-badge--invite"><Plus size={10} /></span>
       )}
     </button>
   );
 }
 
-/* ── Server Rail ─────────────────────────────────────────────────────────── */
 export default function ServerRail({ guilds, loading, user }) {
   const [inviteTarget, setInviteTarget] = useState(null);
 
@@ -140,22 +125,13 @@ export default function ServerRail({ guilds, loading, user }) {
             ) : (
               <>
                 {present.map(g => (
-                  <GuildIcon
-                    key={g.id}
-                    guild={g}
-                    onInviteRequest={setInviteTarget}
-                  />
+                  <GuildIcon key={g.id} guild={g} onInviteRequest={setInviteTarget} />
                 ))}
-
                 {notPresent.length > 0 && (
                   <>
                     {present.length > 0 && <div className="rail-divider" style={{ margin: '6px auto' }} />}
                     {notPresent.map(g => (
-                      <GuildIcon
-                        key={g.id}
-                        guild={g}
-                        onInviteRequest={setInviteTarget}
-                      />
+                      <GuildIcon key={g.id} guild={g} onInviteRequest={setInviteTarget} />
                     ))}
                   </>
                 )}
@@ -165,6 +141,7 @@ export default function ServerRail({ guilds, loading, user }) {
         </div>
 
         <div className="rail-bottom">
+          {/* User info + role badge */}
           <div className="user-pill">
             {user?.avatar ? (
               <img
@@ -174,15 +151,21 @@ export default function ServerRail({ guilds, loading, user }) {
               />
             ) : (
               <div className="user-avatar-sm" style={{
-                background: 'var(--surface-3)',
-                borderRadius: '50%',
+                background: 'var(--surface-3)', borderRadius: '50%',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
                 fontSize: 12, color: 'var(--text-3)',
               }}>
                 {user?.username?.slice(0, 1)?.toUpperCase() ?? '?'}
               </div>
             )}
-            <span className="user-name-sm">{user?.username}</span>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <span className="user-name-sm">{user?.username}</span>
+              {user?.role && (
+                <div style={{ marginTop: 2 }}>
+                  <RoleBadge role={user.role} />
+                </div>
+              )}
+            </div>
             <a href="/auth/logout" className="logout-icon" title="Đăng xuất">
               <LogOut size={14} />
             </a>
@@ -190,10 +173,7 @@ export default function ServerRail({ guilds, loading, user }) {
         </div>
       </nav>
 
-      <InviteModal
-        guild={inviteTarget}
-        onClose={() => setInviteTarget(null)}
-      />
+      <InviteModal guild={inviteTarget} onClose={() => setInviteTarget(null)} />
     </>
   );
 }

@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Settings, LogIn, Megaphone, Music, Bell } from 'lucide-react';
 import { useGuild } from '../contexts/GuildContext.jsx';
 import { Spinner, Toggle, SectionCard, ChannelSelect, ThemeToggle} from '../components/ui.jsx';
-import { useAppTheme } from '../App.jsx';
+
 
 // ── Reminder editor ─────────────────────────────────────────────────────────
 function ReminderEditor({ reminders, onChange, channels }) {
@@ -113,7 +113,7 @@ function ReminderEditor({ reminders, onChange, channels }) {
 
 // ── Main page ───────────────────────────────────────────────────────────────
 export default function OverviewPage() {
-  const { theme, toggleTheme } = useAppTheme();
+  
   const { config, guildData, configLoading, updateConfig, selectedGuild } = useGuild();
 
   if (configLoading || !config) return <div className="page-loading"><Spinner /></div>;
@@ -133,7 +133,7 @@ export default function OverviewPage() {
     <div className="page">
       <div className="page-header-row">
         <h1 className="page-title">Dashboard</h1>
-        <ThemeToggle theme={theme} onToggle={toggleTheme} />
+        <ThemeToggle />
       </div>
       <p className="page-subtitle">
         Cài đặt chung cho {selectedGuild.name}

@@ -12,6 +12,9 @@ export default defineConfig({
     alias: { '@': path.resolve(__dirname, './src') },
   },
   build: {
+    // Output ra ngoài project — cùng cấp với thư mục dashboard/
+    // Tức là: <repo-root>/public-react/
+    // Đây là thư mục static được Express serve trực tiếp.
     outDir: '../public-react',
     emptyOutDir: true,
   },
