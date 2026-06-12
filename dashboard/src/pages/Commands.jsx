@@ -1,4 +1,4 @@
-import { Terminal, Medal, HardDrives, ShieldCheck, Coins, Ticket, Sword, MagnifyingGlass, FilePlus, ChatCenteredDots, Smiley } from "@phosphor-icons/react";
+import { Terminal, Award, Server, ShieldCheck, Coins, Ticket, Sword, Search, FilePlus2, MessageSquareReply, Smile } from 'lucide-react';
 import React, { useState, useMemo } from 'react';
 import { useGuild } from '../contexts/GuildContext.jsx';
 import { Spinner, Toggle, SectionCard, TextInput, ThemeToggle} from '../components/ui.jsx';
@@ -6,8 +6,8 @@ import { useAppTheme } from '../App.jsx';
 
 const COMMAND_GROUPS = {
   general:      { title: 'Lệnh chung',         Icon: Terminal   },
-  user:         { title: 'Người dùng & XP',    Icon: Medal      },
-  server:       { title: 'Máy chủ',            Icon: HardDrives     },
+  user:         { title: 'Người dùng & XP',    Icon: Award      },
+  server:       { title: 'Máy chủ',            Icon: Server     },
   moderation:   { title: 'Kiểm duyệt',         Icon: ShieldCheck },
   economy:      { title: 'Kinh tế',            Icon: Coins      },
   interactions: { title: 'Ticket & Roles',     Icon: Ticket     },
@@ -21,7 +21,7 @@ const ALL_COMMANDS = [
   { type: 'avatar',             group: 'user',         label: 'Avatar' },
   { type: 'rank',               group: 'user',         label: 'Rank (XP)' },
   { type: 'leaderboard',        group: 'user',         label: 'XP Leaderboard' },
-  { type: 'server',             group: 'server',       label: 'HardDrives info' },
+  { type: 'server',             group: 'server',       label: 'Server info' },
   { type: 'say',                group: 'server',       label: 'Say (bot nói)' },
   { type: 'purge',              group: 'server',       label: 'Purge messages' },
   { type: 'announce',           group: 'server',       label: 'Announce' },
@@ -38,7 +38,7 @@ const ALL_COMMANDS = [
   { type: 'blackjack',          group: 'economy',      label: 'Blackjack' },
   { type: 'poker',              group: 'economy',      label: 'Poker' },
   { type: 'coinflip',           group: 'economy',      label: 'Coinflip' },
-  { type: 'dice',               group: 'economy',      label: 'Dice' },
+  { type: 'dice',               group: 'economy',      label: 'Smile' },
   { type: 'slots',              group: 'economy',      label: 'Slots' },
   { type: 'ecoadd',             group: 'economy',      label: 'Eco Add (admin)' },
   { type: 'ecoset',             group: 'economy',      label: 'Eco Set (admin)' },
@@ -232,7 +232,7 @@ export default function CommandsPage() {
 
         <div className="commands-content">
           <div className="commands-search">
-            <MagnifyingGlass size={14} />
+            <Search size={14} />
             <input
               className="form-input"
               placeholder="Tìm lệnh…"
@@ -259,7 +259,7 @@ export default function CommandsPage() {
           </div>
 
           {(activeGroup === 'general' && !search) && (
-            <SectionCard title="Lệnh custom" icon={<FilePlus size={16} />}>
+            <SectionCard title="Lệnh custom" icon={<FilePlus2 size={16} />}>
               <p style={{ fontSize: 12, color: 'var(--text-3)', marginBottom: 'var(--s3)' }}>
                 Lệnh tự tạo với prefix. Hỗ trợ template: <code>{'{user}'}</code> <code>{'{args}'}</code> <code>{'{server}'}</code>
               </p>
@@ -273,7 +273,7 @@ export default function CommandsPage() {
           {(activeGroup === 'general' && !search) && (
             <SectionCard
               title="Tự động trả lời"
-              icon={<ChatCenteredDots size={16} />}
+              icon={<MessageSquareReply size={16} />}
               enabled={config.autoReplyEnabled}
               onToggle={v => updateConfig({ autoReplyEnabled: v })}
             >
@@ -287,7 +287,7 @@ export default function CommandsPage() {
           {(activeGroup === 'general' && !search) && (
             <SectionCard
               title="Reaction khi nhắc bot"
-              icon={<Smiley size={16} />}
+              icon={<Smile size={16} />}
               enabled={config.mentionReactEnabled}
               onToggle={v => updateConfig({ mentionReactEnabled: v })}
             >

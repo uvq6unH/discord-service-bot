@@ -1,5 +1,5 @@
 import React from 'react';
-import { Key, Sword, Crown, Database } from "@phosphor-icons/react";
+import { Key, Sword, Crown, Database } from 'lucide-react';
 import { useGuild } from '../contexts/GuildContext.jsx';
 import { Spinner, SectionCard, ThemeToggle} from '../components/ui.jsx';
 

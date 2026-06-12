@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Gear, SignIn, Megaphone, MusicNote, Bell } from "@phosphor-icons/react";
+import { Settings, LogIn, Megaphone, Music, Bell } from 'lucide-react';
 import { useGuild } from '../contexts/GuildContext.jsx';
 import { Spinner, Toggle, SectionCard, ChannelSelect, ThemeToggle} from '../components/ui.jsx';
 
@@ -147,7 +147,7 @@ export default function OverviewPage() {
       <div className="cards-grid">
 
         {/* ── Cài đặt chung ── */}
-        <SectionCard title="Cài đặt chung" icon={<Gear size={16} />}>
+        <SectionCard title="Cài đặt chung" icon={<Settings size={16} />}>
           <Toggle
             label="Bật bot"
             hint="Bật/tắt toàn bộ tính năng bot"
@@ -176,7 +176,7 @@ export default function OverviewPage() {
         {/* ── Welcome ── */}
         <SectionCard
           title="Chào mừng thành viên"
-          icon={<SignIn size={16} />}
+          icon={<LogIn size={16} />}
           enabled={config.welcomeEnabled}
           onToggle={v => updateConfig({ welcomeEnabled: v })}
         >
@@ -223,15 +223,15 @@ export default function OverviewPage() {
           </div>
         </SectionCard>
 
-        {/* ── MusicNote ── */}
+        {/* ── Music ── */}
         <SectionCard
-          title="MusicNote"
-          icon={<MusicNote size={16} />}
+          title="Music"
+          icon={<Music size={16} />}
           enabled={config.musicEnabled}
           onToggle={v => updateConfig({ musicEnabled: v })}
         >
           <div className="form-group">
-            <label className="form-label">MusicNote prefix</label>
+            <label className="form-label">Music prefix</label>
             <input
               className="form-input form-input--sm"
               value={config.musicPrefix ?? 'hb'}

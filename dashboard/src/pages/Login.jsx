@@ -1,5 +1,5 @@
 import React from 'react';
-import { Robot } from "@phosphor-icons/react";
+import { Bot } from 'lucide-react';
 
 // Custom Discord icon as SVG (not in Lucide)
 function DiscordIcon({ size = 16 }) {
@@ -15,7 +15,7 @@ export default function Login() {
     <div className="login-page">
       <div className="login-card">
         <div className="login-logo">
-          <Robot size={32} />
+          <Bot size={32} />
         </div>
         <h1>Bot Dashboard</h1>
         <p>Đăng nhập bằng tài khoản Discord để quản lý bot.</p>

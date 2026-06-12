@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useContext, createContext } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Sun, Moon, Robot, ShieldSlash } from '@phosphor-icons/react';
+import { Sun, Moon, Bot, ShieldOff } from 'lucide-react';
 
 // ThemeContext (defined here, re-exported tu App.jsx)
 export const ThemeContext = createContext({ theme: 'dark', toggleTheme: () => {} });
@@ -42,7 +42,7 @@ export function ThemeToggle() {
       title={theme === 'dark' ? 'Chuyen sang Light mode' : 'Chuyen sang Dark mode'}
       aria-label="Toggle theme"
     >
-      {theme === 'dark' ? <Sun size={16} weight="regular" /> : <Moon size={16} weight="regular" />}
+      {theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
     </button>
   );
 }
@@ -86,7 +86,7 @@ export function SaveBar({ onSave, status }) {
 export function EmptyState() {
   return (
     <div className="empty-state">
-      <Robot size={48} className="empty-state__icon" />
+      <Bot size={48} className="empty-state__icon" />
       <h2>Chon mot server</h2>
       <p>Chon server tu thanh ben trai de bat dau cau hinh bot.</p>
     </div>
@@ -97,7 +97,7 @@ export function EmptyState() {
 export function InviteBanner({ inviteUrl }) {
   return (
     <div className="invite-banner">
-      <Robot size={20} />
+      <Bot size={20} />
       <div>
         <h3>Bot chua o trong server nay</h3>
         <p>Moi bot de su dung dashboard.</p>
@@ -241,7 +241,7 @@ export function PermissionGuard({ user, required, children, fallback }) {
         gap: 'var(--s2)', padding: 'var(--s5)', color: 'var(--text-3)',
         textAlign: 'center',
       }}>
-        <ShieldSlash size={32} />
+        <ShieldOff size={32} />
         <p style={{ fontSize: 14, margin: 0 }}>
           Ban can quyen <strong style={{ color: 'var(--text-2)' }}>{required}</strong> de xem muc nay.
         </p>

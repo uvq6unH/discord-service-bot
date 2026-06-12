@@ -1,4 +1,4 @@
-import { MagnifyingGlass } from "@phosphor-icons/react";
+import { Search } from 'lucide-react';
 import React, { useState, useRef, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useGuild } from '../contexts/GuildContext.jsx';
@@ -78,7 +78,7 @@ export default function MembersPage() {
 
       <div className="members-toolbar">
         <div className="search-box">
-          <MagnifyingGlass size={14} />
+          <Search size={14} />
           <input
             className="form-input"
             placeholder="Tìm thành viên…"

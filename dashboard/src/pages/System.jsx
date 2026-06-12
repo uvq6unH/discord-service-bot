@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { HardDrives, Database, ChartBar } from "@phosphor-icons/react";
+import { Server, Database, BarChart2 } from 'lucide-react';
 import { SectionCard, Spinner, ThemeToggle } from '../components/ui.jsx';
 
 import { api } from '../api.js';
@@ -98,7 +98,7 @@ export default function SystemPage() {
       <div className="cards-grid">
 
         {/* ── Services ── */}
-        <SectionCard title="Dịch vụ" icon={<HardDrives size={16} />}>
+        <SectionCard title="Dịch vụ" icon={<Server size={16} />}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12, paddingTop: 4 }}>
 
             {/* Bot */}
@@ -152,7 +152,7 @@ export default function SystemPage() {
         </SectionCard>
 
         {/* ── Stats counters ── */}
-        <SectionCard title="Thống kê hoạt động" icon={<ChartBar size={16} />}>
+        <SectionCard title="Thống kê hoạt động" icon={<BarChart2 size={16} />}>
           <p style={{ fontSize: 12, color: 'var(--text-3)', marginBottom: 10 }}>
             Tich luy tu lan khoi dong, reset khi Redis xoá key.
           </p>

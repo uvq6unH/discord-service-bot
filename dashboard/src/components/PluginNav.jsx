@@ -2,19 +2,19 @@ import React from 'react';
 import { NavLink } from 'react-router-dom';
 import { motion } from 'motion/react';
 import {
-  SquaresFour, Users, Terminal, Coins,
-  Shield, Sword, Activity, ChartBar,
-} from '@phosphor-icons/react';
+  LayoutDashboard, Users, Terminal, Coins,
+  Shield, Sword, Activity, BarChart2,
+} from 'lucide-react';
 import { useGuild } from '../contexts/GuildContext.jsx';
 
 const NAV_ITEMS = [
-  { to: '/overview',   Icon: SquaresFour, label: 'Dashboard' },
+  { to: '/overview',   Icon: LayoutDashboard, label: 'Dashboard' },
   { to: '/members',    Icon: Users,       label: 'Thanh vien' },
   { to: '/commands',   Icon: Terminal,    label: 'Lenh' },
   { to: '/economy',    Icon: Coins,       label: 'Kinh te' },
   { to: '/moderation', Icon: Shield,      label: 'Kiem duyet' },
   { to: '/lol',        Icon: Sword,       label: 'LoL & TFT' },
-  { to: '/analytics',  Icon: ChartBar,    label: 'Analytics' },
+  { to: '/analytics',  Icon: BarChart2,    label: 'Analytics' },
   { to: '/system',     Icon: Activity,    label: 'He thong' },
 ];
 
@@ -68,7 +68,7 @@ export default function PluginNav() {
             to={to}
             className={({ isActive }) => `nav-item${isActive ? ' active' : ''}`}
           >
-            <Icon size={16} weight="regular" />
+            <Icon size={16} />
             <span>{label}</span>
           </NavLink>
         </motion.div>

@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import {
-  ChartBar as ChartBarIcon, Users, Terminal, Coins, ShieldCheck,
-  TrendingUp, TrendingDown, Minus, ArrowClockwise,
-} from '@phosphor-icons/react';
+  BarChart2 as BarChart2, Users, Terminal, Coins, ShieldCheck,
+  TrendingUp, TrendingDown, Minus, RefreshCw,
+} from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { useGuild } from '../contexts/GuildContext.jsx';
 import { ThemeToggle, Spinner, PermissionGuard } from '../components/ui.jsx';
@@ -104,7 +104,7 @@ function StatCard({ icon, label, value, delta, color }) {
 }
 
 // Mini bar chart dùng thuần CSS/SVG - không cần Chart.js
-function ChartBar({ data, color = 'var(--accent)', height = 120, labelKey = 'date', valueKey = 'count' }) {
+function BarChart2({ data, color = 'var(--accent)', height = 120, labelKey = 'date', valueKey = 'count' }) {
   const max = Math.max(...data.map(d => d[valueKey]), 1);
   const showEvery = Math.ceil(data.length / 8);
 
@@ -257,7 +257,7 @@ export default function AnalyticsPage() {
             disabled={isFetching}
             style={{ display: 'flex', alignItems: 'center', gap: 4 }}
           >
-            <ArrowClockwise size={13} style={{ animation: isFetching ? 'spin 1s linear infinite' : 'none' }} />
+            <RefreshCw size={13} style={{ animation: isFetching ? 'spin 1s linear infinite' : 'none' }} />
             Làm mới
           </button>
           <ThemeToggle />
@@ -319,10 +319,10 @@ export default function AnalyticsPage() {
           borderRadius: 'var(--r3)', padding: 'var(--s3)',
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--s2)', marginBottom: 'var(--s3)' }}>
-            <ChartBarIcon size={14} style={{ color: 'var(--accent)' }} />
+            <BarChart2 size={14} style={{ color: 'var(--accent)' }} />
             <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-1)' }}>Lệnh theo ngày</span>
           </div>
-          <ChartBar
+          <BarChart2
             data={data.commandsChart}
             color="var(--accent)"
             height={100}
