@@ -104,7 +104,7 @@ function StatCard({ icon, label, value, delta, color }) {
 }
 
 // Mini bar chart dùng thuần CSS/SVG - không cần Chart.js
-function BarChart({ data, color = 'var(--accent)', height = 120, labelKey = 'date', valueKey = 'count' }) {
+function ChartBar({ data, color = 'var(--accent)', height = 120, labelKey = 'date', valueKey = 'count' }) {
   const max = Math.max(...data.map(d => d[valueKey]), 1);
   const showEvery = Math.ceil(data.length / 8);
 
@@ -322,7 +322,7 @@ export default function AnalyticsPage() {
             <ChartBar size={14} style={{ color: 'var(--accent)' }} />
             <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-1)' }}>Lệnh theo ngày</span>
           </div>
-          <BarChart
+          <ChartBar
             data={data.commandsChart}
             color="var(--accent)"
             height={100}

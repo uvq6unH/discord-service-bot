@@ -2,20 +2,20 @@ import React from 'react';
 import { NavLink } from 'react-router-dom';
 import { motion } from 'motion/react';
 import {
-  LayoutDashboard, Users, Terminal, Coins,
+  SquaresFour, Users, Terminal, Coins,
   Shield, Sword, Activity, ChartBar,
 } from '@phosphor-icons/react';
 import { useGuild } from '../contexts/GuildContext.jsx';
 
 const NAV_ITEMS = [
-  { to: '/overview',   Icon: LayoutDashboard, label: 'Dashboard' },
-  { to: '/members',    Icon: Users,           label: 'Thành viên' },
-  { to: '/commands',   Icon: Terminal,        label: 'Lệnh' },
-  { to: '/economy',    Icon: Coins,           label: 'Kinh tế' },
-  { to: '/moderation', Icon: Shield,          label: 'Kiểm duyệt' },
-  { to: '/lol',        Icon: Sword,           label: 'LoL & TFT' },
-  { to: '/analytics',  Icon: ChartBar,        label: 'Analytics' },
-  { to: '/system',     Icon: Activity,        label: 'Hệ thống' },
+  { to: '/overview',   Icon: SquaresFour, label: 'Dashboard' },
+  { to: '/members',    Icon: Users,       label: 'Thanh vien' },
+  { to: '/commands',   Icon: Terminal,    label: 'Lenh' },
+  { to: '/economy',    Icon: Coins,       label: 'Kinh te' },
+  { to: '/moderation', Icon: Shield,      label: 'Kiem duyet' },
+  { to: '/lol',        Icon: Sword,       label: 'LoL & TFT' },
+  { to: '/analytics',  Icon: ChartBar,    label: 'Analytics' },
+  { to: '/system',     Icon: Activity,    label: 'He thong' },
 ];
 
 export default function PluginNav() {

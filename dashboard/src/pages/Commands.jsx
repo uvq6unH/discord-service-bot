@@ -21,7 +21,7 @@ const ALL_COMMANDS = [
   { type: 'avatar',             group: 'user',         label: 'Avatar' },
   { type: 'rank',               group: 'user',         label: 'Rank (XP)' },
   { type: 'leaderboard',        group: 'user',         label: 'XP Leaderboard' },
-  { type: 'server',             group: 'server',       label: 'Server info' },
+  { type: 'server',             group: 'server',       label: 'HardDrives info' },
   { type: 'say',                group: 'server',       label: 'Say (bot nói)' },
   { type: 'purge',              group: 'server',       label: 'Purge messages' },
   { type: 'announce',           group: 'server',       label: 'Announce' },

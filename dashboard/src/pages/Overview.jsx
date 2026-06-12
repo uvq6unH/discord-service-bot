@@ -223,15 +223,15 @@ export default function OverviewPage() {
           </div>
         </SectionCard>
 
-        {/* ── Music ── */}
+        {/* ── MusicNote ── */}
         <SectionCard
-          title="Music"
+          title="MusicNote"
           icon={<MusicNote size={16} />}
           enabled={config.musicEnabled}
           onToggle={v => updateConfig({ musicEnabled: v })}
         >
           <div className="form-group">
-            <label className="form-label">Music prefix</label>
+            <label className="form-label">MusicNote prefix</label>
             <input
               className="form-input form-input--sm"
               value={config.musicPrefix ?? 'hb'}
