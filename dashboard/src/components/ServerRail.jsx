@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Robot, RobotOff, Plus, SignOut, ArrowSquareOut } from '@phosphor-icons/react';
+import { Robot, Plus, SignOut, ArrowSquareOut } from '@phosphor-icons/react';
 import { useGuild } from '../contexts/GuildContext.jsx';
 import { RoleBadge } from './ui.jsx';
 import { api } from '../api.js';
@@ -41,7 +41,7 @@ function InviteModal({ guild, onClose }) {
             transition={{ type: 'spring', stiffness: 300, damping: 25 }}
             onClick={e => e.stopPropagation()}
           >
-            <div className="modal__icon"><RobotOff size={24} /></div>
+            <div className="modal__icon"><Robot size={24} /></div>
             <h3>Bot chua o trong server nay</h3>
             <p>
               <strong style={{ color: 'var(--text-1)' }}>{guild.name}</strong> chua co bot.

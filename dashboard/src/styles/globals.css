@@ -1,3 +1,4 @@
+@import url('https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700&family=Geist+Mono:wght@400;500;600&display=swap');
 @import "tailwindcss";
 
 /* ============================================================
@@ -12,9 +13,7 @@
    class on <html> if explicit toggle is added later.
    ============================================================ */
 
-/* TASTE.md §3.A: production nên self-host font với @font-face + font-display:swap.
-   Hiện dùng Google Fonts CDN để dev — khi production: download và dùng @font-face. */
-@import url('https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700&family=Geist+Mono:wght@400;500;600&display=swap');
+
 
 /* ── Dark tokens (default) ───────────────────────────────────────────────── */
 :root {
