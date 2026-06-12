@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Bot, Plus, LogOut, ExternalLink } from 'lucide-react';
+import { Bot, BotOff, Plus, LogOut, ExternalLink } from 'lucide-react';
 import { useGuild } from '../contexts/GuildContext.jsx';
 import { RoleBadge } from './ui.jsx';
 import { api } from '../api.js';
@@ -41,17 +41,17 @@ function InviteModal({ guild, onClose }) {
             transition={{ type: 'spring', stiffness: 300, damping: 25 }}
             onClick={e => e.stopPropagation()}
           >
-            <div className="modal__icon"><Bot size={24} /></div>
-            <h3>Bot chua o trong server nay</h3>
+            <div className="modal__icon"><BotOff size={24} /></div>
+            <h3>Bot chưa ở trong server này</h3>
             <p>
-              <strong style={{ color: 'var(--text-1)' }}>{guild.name}</strong> chua co bot.
-              Moi bot vao server de su dung dashboard va cac tinh nang.
+              <strong style={{ color: 'var(--text-1)' }}>{guild.name}</strong> chưa có bot.
+              Mời bot vào server để sử dụng dashboard và các tính năng.
             </p>
             <div className="modal__actions">
-              <button className="btn btn-ghost btn-sm" onClick={onClose}>Huy</button>
+              <button className="btn btn-ghost btn-sm" onClick={onClose}>Hủy</button>
               <button className="btn btn-primary btn-sm" onClick={handleInvite} disabled={loading}>
                 <ExternalLink size={14} />
-                {loading ? 'Dang mo...' : 'Moi Bot'}
+                {loading ? 'Đang mở…' : 'Mời Bot'}
               </button>
             </div>
           </motion.div>
@@ -79,7 +79,7 @@ function GuildIcon({ guild, onInviteRequest }) {
         notPresent ? 'guild-btn--invite' : '',
       ].filter(Boolean).join(' ')}
       onClick={handleClick}
-      title={notPresent ? `${guild.name} - Moi bot vao server` : guild.name}
+      title={notPresent ? `${guild.name} — Mời bot vào server` : guild.name}
     >
       {guild.icon ? (
         <img
@@ -141,6 +141,7 @@ export default function ServerRail({ guilds, loading, user }) {
         </div>
 
         <div className="rail-bottom">
+          {/* User info + role badge */}
           <div className="user-pill">
             {user?.avatar ? (
               <img
@@ -165,7 +166,7 @@ export default function ServerRail({ guilds, loading, user }) {
                 </div>
               )}
             </div>
-            <a href="/auth/logout" className="logout-icon" title="Dang xuat">
+            <a href="/auth/logout" className="logout-icon" title="Đăng xuất">
               <LogOut size={14} />
             </a>
           </div>

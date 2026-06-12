@@ -38,7 +38,7 @@ const ALL_COMMANDS = [
   { type: 'blackjack',          group: 'economy',      label: 'Blackjack' },
   { type: 'poker',              group: 'economy',      label: 'Poker' },
   { type: 'coinflip',           group: 'economy',      label: 'Coinflip' },
-  { type: 'dice',               group: 'economy',      label: 'Smile' },
+  { type: 'dice',               group: 'economy',      label: 'Dice' },
   { type: 'slots',              group: 'economy',      label: 'Slots' },
   { type: 'ecoadd',             group: 'economy',      label: 'Eco Add (admin)' },
   { type: 'ecoset',             group: 'economy',      label: 'Eco Set (admin)' },

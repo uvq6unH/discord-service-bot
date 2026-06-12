@@ -241,7 +241,7 @@ export default function OverviewPage() {
             />
             <span className="form-hint">Ví dụ: <code>hb play tên bài</code></span>
           </div>
-          <p className="form-hint">Bot dùng Lavalink - không xử lý audio trực tiếp, CPU thấp.</p>
+          <p className="form-hint">Bot dùng Lavalink — không xử lý audio trực tiếp, CPU thấp.</p>
         </SectionCard>
 
         {/* ── Reminders ── */}

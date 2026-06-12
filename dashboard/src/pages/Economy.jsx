@@ -1,5 +1,5 @@
 import React from 'react';
-import { Award, CalendarCheck, CreditCard, Smile, CircleDollarSign, Joystick, Coins } from 'lucide-react';
+import { Award, CalendarCheck, CreditCard, Dice6, CircleDollarSign, Joystick, Coins } from 'lucide-react';
 import { useGuild } from '../contexts/GuildContext.jsx';
 import { Spinner, Toggle, SectionCard, NumberInput, TextInput, ThemeToggle} from '../components/ui.jsx';
 
@@ -203,7 +203,7 @@ export default function EconomyPage() {
         <GameSection title="Blackjack"  icon={<CreditCard size={16} />}       prefix="blackjack"  config={config} updateConfig={updateConfig} />
         <GameSection title="Poker"      icon={<CircleDollarSign size={16} />}  prefix="poker"      config={config} updateConfig={updateConfig} />
         <GameSection title="Coinflip"   icon={<Coins size={16} />}        prefix="coinflip"   config={config} updateConfig={updateConfig} />
-        <GameSection title="Smile"       icon={<Smile size={16} />}      prefix="dice"       config={config} updateConfig={updateConfig} />
+        <GameSection title="Dice"       icon={<Dice6 size={16} />}      prefix="dice"       config={config} updateConfig={updateConfig} />
         <GameSection title="Slots"      icon={<Joystick size={16} />}        prefix="slots"      config={config} updateConfig={updateConfig} />
 
       </div>

@@ -69,7 +69,7 @@ export default function LolPage() {
         <ThemeToggle />
       </div>
       <p className="page-subtitle">
-        Tich hop Riot API - ho tro TTL cache, token bucket, account linking qua Discord ID.
+        Tích hợp Riot API — hỗ trợ TTL cache, token bucket, account linking qua Discord ID.
       </p>
 
       <div className="cards-grid">
@@ -101,7 +101,7 @@ export default function LolPage() {
             <a href="https://developer.riotgames.com" target="_blank" rel="noreferrer">
               developer.riotgames.com
             </a>.{' '}
-            Key <strong>Development</strong> bi rate limit thap. Production key cần approval của Riot.
+            Key <strong>Development</strong> bị rate limit thấp — Production key cần approval của Riot.
           </p>
           <p className="form-hint" style={{ marginTop: 4 }}>
             Key được lưu vào Redis và persist qua restart. Nhập key rồi bấm <strong>Lưu thay đổi</strong> ở cuối trang.

@@ -2,10 +2,13 @@ import React, { useState, useEffect, useCallback, useContext, createContext } fr
 import { motion, AnimatePresence } from 'motion/react';
 import { Sun, Moon, Bot, ShieldOff } from 'lucide-react';
 
-// ThemeContext (defined here, re-exported tu App.jsx)
+// ── ThemeContext (defined here, re-exported từ App.jsx) ───────────────────────
+// Đặt ở ui.jsx để tránh circular dep: ui.jsx ← App.jsx ← ui.jsx
+
 export const ThemeContext = createContext({ theme: 'dark', toggleTheme: () => {} });
 
-// useTheme
+// ── useTheme ──────────────────────────────────────────────────────────────────
+
 export function useTheme() {
   const [theme, setTheme] = useState(() => {
     const saved = localStorage.getItem('theme');
@@ -32,14 +35,16 @@ export function useTheme() {
   return { theme, toggleTheme };
 }
 
-// ThemeToggle
+// ── ThemeToggle ───────────────────────────────────────────────────────────────
+// FIX: đọc context trực tiếp — không cần prop drilling qua từng page nữa
+
 export function ThemeToggle() {
   const { theme, toggleTheme } = useContext(ThemeContext);
   return (
     <button
       className="theme-toggle"
       onClick={toggleTheme}
-      title={theme === 'dark' ? 'Chuyen sang Light mode' : 'Chuyen sang Dark mode'}
+      title={theme === 'dark' ? 'Chuyển sang Light mode' : 'Chuyển sang Dark mode'}
       aria-label="Toggle theme"
     >
       {theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
@@ -47,7 +52,8 @@ export function ThemeToggle() {
   );
 }
 
-// PageHeader
+// ── PageHeader ────────────────────────────────────────────────────────────────
+
 export function PageHeader({ title, subtitle, children }) {
   return (
     <div className="page-header">
@@ -61,57 +67,61 @@ export function PageHeader({ title, subtitle, children }) {
   );
 }
 
-// SaveBar
+// ── SaveBar ───────────────────────────────────────────────────────────────────
+
 export function SaveBar({ onSave, status }) {
   return (
     <div className={`save-bar save-bar--${status}`}>
       <span className="save-bar__msg">
-        {status === 'saving' && 'Dang luu...'}
-        {status === 'saved'  && 'Da luu thanh cong'}
-        {status === 'error'  && 'Loi khi luu - thu lai'}
-        {status === 'idle'   && 'Co thay doi chua luu'}
+        {status === 'saving' && 'Đang lưu…'}
+        {status === 'saved'  && '✓ Đã lưu thành công'}
+        {status === 'error'  && '✗ Lỗi khi lưu — thử lại'}
+        {status === 'idle'   && 'Có thay đổi chưa lưu'}
       </span>
       <button
         className="btn btn-primary"
         onClick={onSave}
         disabled={status === 'saving'}
       >
-        {status === 'saving' ? 'Dang luu...' : 'Luu thay doi'}
+        {status === 'saving' ? 'Đang lưu…' : 'Lưu thay đổi'}
       </button>
     </div>
   );
 }
 
-// EmptyState
+// ── EmptyState ────────────────────────────────────────────────────────────────
+
 export function EmptyState() {
   return (
     <div className="empty-state">
       <Bot size={48} className="empty-state__icon" />
-      <h2>Chon mot server</h2>
-      <p>Chon server tu thanh ben trai de bat dau cau hinh bot.</p>
+      <h2>Chọn một server</h2>
+      <p>Chọn server từ thanh bên trái để bắt đầu cấu hình bot.</p>
     </div>
   );
 }
 
-// InviteBanner
+// ── InviteBanner ──────────────────────────────────────────────────────────────
+
 export function InviteBanner({ inviteUrl }) {
   return (
     <div className="invite-banner">
       <Bot size={20} />
       <div>
-        <h3>Bot chua o trong server nay</h3>
-        <p>Moi bot de su dung dashboard.</p>
+        <h3>Bot chưa ở trong server này</h3>
+        <p>Mời bot để sử dụng dashboard.</p>
       </div>
       {inviteUrl && (
         <a href={inviteUrl} target="_blank" rel="noreferrer" className="btn btn-primary">
-          Moi Bot
+          Mời Bot
         </a>
       )}
     </div>
   );
 }
 
-// Toggle
+// ── Toggle ────────────────────────────────────────────────────────────────────
+
 export function Toggle({ checked, onChange, label, hint }) {
   return (
     <label className="toggle-row">
@@ -126,8 +136,9 @@ export function Toggle({ checked, onChange, label, hint }) {
   );
 }
 
-// ChannelSelect
-export function ChannelSelect({ value, onChange, channels, label, placeholder = '-- Chon kenh --', type }) {
+// ── ChannelSelect ─────────────────────────────────────────────────────────────
+
+export function ChannelSelect({ value, onChange, channels, label, placeholder = '-- Chọn kênh --', type }) {
   const filtered = type != null ? channels.filter(c => c.type === type) : channels;
   return (
     <div className="form-group">
@@ -140,8 +151,9 @@ export function ChannelSelect({ value, onChange, channels, label, placeholder = 
   );
 }
 
-// RoleSelect
-export function RoleSelect({ value, onChange, roles, label, placeholder = '-- Chon role --' }) {
+// ── RoleSelect ────────────────────────────────────────────────────────────────
+
+export function RoleSelect({ value, onChange, roles, label, placeholder = '-- Chọn role --' }) {
   const visible = roles.filter(r => r.name !== '@everyone');
   return (
     <div className="form-group">
@@ -154,7 +166,8 @@ export function RoleSelect({ value, onChange, roles, label, placeholder = '-- Ch
   );
 }
 
-// NumberInput
+// ── NumberInput ───────────────────────────────────────────────────────────────
+
 export function NumberInput({ value, onChange, label, min, max, step = 1 }) {
   return (
     <div className="form-group">
@@ -168,7 +181,8 @@ export function NumberInput({ value, onChange, label, min, max, step = 1 }) {
   );
 }
 
-// TextInput
+// ── TextInput ─────────────────────────────────────────────────────────────────
+
 export function TextInput({ value, onChange, label, placeholder, type = 'text' }) {
   return (
     <div className="form-group">
@@ -182,7 +196,8 @@ export function TextInput({ value, onChange, label, placeholder, type = 'text' }
   );
 }
 
-// SectionCard
+// ── SectionCard ───────────────────────────────────────────────────────────────
+
 export function SectionCard({ title, icon, children, enabled, onToggle }) {
   return (
     <div className={`section-card ${enabled === false ? 'section-card--disabled' : ''}`}>
@@ -200,12 +215,14 @@ export function SectionCard({ title, icon, children, enabled, onToggle }) {
   );
 }
 
-// Spinner
+// ── Spinner ───────────────────────────────────────────────────────────────────
+
 export function Spinner() {
   return <div className="spinner" />;
 }
 
-// RoleBadge
+// ── RoleBadge — hiển thị role của user ───────────────────────────────────────
+
 const ROLE_COLORS = {
   owner:     { bg: 'rgba(234,179,8,.15)',   border: 'rgba(234,179,8,.3)',   color: '#eab308' },
   admin:     { bg: 'rgba(239,68,68,.12)',   border: 'rgba(239,68,68,.25)',  color: '#ef4444' },
@@ -227,7 +244,9 @@ export function RoleBadge({ role }) {
   );
 }
 
-// PermissionGuard
+// ── PermissionGuard ───────────────────────────────────────────────────────────
+// Dùng: <PermissionGuard user={user} required="admin">...</PermissionGuard>
+
 const ROLE_RANK = { owner: 4, admin: 3, moderator: 2, viewer: 1 };
 
 export function PermissionGuard({ user, required, children, fallback }) {
@@ -243,7 +262,7 @@ export function PermissionGuard({ user, required, children, fallback }) {
       }}>
         <ShieldOff size={32} />
         <p style={{ fontSize: 14, margin: 0 }}>
-          Ban can quyen <strong style={{ color: 'var(--text-2)' }}>{required}</strong> de xem muc nay.
+          Bạn cần quyền <strong style={{ color: 'var(--text-2)' }}>{required}</strong> để xem mục này.
         </p>
       </div>
     );
