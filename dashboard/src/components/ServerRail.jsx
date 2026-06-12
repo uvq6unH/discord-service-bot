@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Bot, BotOff, Plus, LogOut, ExternalLink } from 'lucide-react';
+import { Robot, RobotOff, Plus, SignOut, ArrowSquareOut } from '@phosphor-icons/react';
 import { useGuild } from '../contexts/GuildContext.jsx';
 import { RoleBadge } from './ui.jsx';
 import { api } from '../api.js';
@@ -31,6 +31,7 @@ function InviteModal({ guild, onClose }) {
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
+          transition={{ duration: 0.15 }}
           onClick={onClose}
         >
           <motion.div
@@ -38,20 +39,23 @@ function InviteModal({ guild, onClose }) {
             initial={{ scale: 0.95, opacity: 0, y: 8 }}
             animate={{ scale: 1, opacity: 1, y: 0 }}
             exit={{ scale: 0.95, opacity: 0, y: 8 }}
-            transition={{ type: 'spring', stiffness: 300, damping: 25 }}
+            transition={{ type: 'spring', stiffness: 320, damping: 26 }}
             onClick={e => e.stopPropagation()}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="invite-modal-title"
           >
-            <div className="modal__icon"><BotOff size={24} /></div>
-            <h3>Bot chưa ở trong server này</h3>
+            <div className="modal__icon"><RobotOff size={24} weight="regular" /></div>
+            <h3 id="invite-modal-title">Bot chưa ở trong server này</h3>
             <p>
               <strong style={{ color: 'var(--text-1)' }}>{guild.name}</strong> chưa có bot.
-              Mời bot vào server để sử dụng dashboard và các tính năng.
+              Mời bot vào server để sử dụng dashboard.
             </p>
             <div className="modal__actions">
               <button className="btn btn-ghost btn-sm" onClick={onClose}>Hủy</button>
               <button className="btn btn-primary btn-sm" onClick={handleInvite} disabled={loading}>
-                <ExternalLink size={14} />
-                {loading ? 'Đang mở…' : 'Mời Bot'}
+                <ArrowSquareOut size={14} />
+                {loading ? 'Đang mở...' : 'Mời bot'}
               </button>
             </div>
           </motion.div>
@@ -79,7 +83,9 @@ function GuildIcon({ guild, onInviteRequest }) {
         notPresent ? 'guild-btn--invite' : '',
       ].filter(Boolean).join(' ')}
       onClick={handleClick}
-      title={notPresent ? `${guild.name} — Mời bot vào server` : guild.name}
+      title={notPresent ? `${guild.name} - Mời bot vào server` : guild.name}
+      aria-label={notPresent ? `${guild.name} - Mời bot` : `Chọn ${guild.name}`}
+      aria-pressed={isSelected}
     >
       {guild.icon ? (
         <img
@@ -94,11 +100,14 @@ function GuildIcon({ guild, onInviteRequest }) {
       <span
         className="guild-icon guild-icon--text"
         style={{ display: guild.icon ? 'none' : 'flex' }}
+        aria-hidden="true"
       >
         {guild.name.slice(0, 2).toUpperCase()}
       </span>
       {notPresent && (
-        <span className="guild-badge guild-badge--invite"><Plus size={10} /></span>
+        <span className="guild-badge guild-badge--invite" aria-hidden="true">
+          <Plus size={10} weight="bold" />
+        </span>
       )}
     </button>
   );
@@ -112,16 +121,18 @@ export default function ServerRail({ guilds, loading, user }) {
 
   return (
     <>
-      <nav className="server-rail">
+      <nav className="server-rail" aria-label="Server list">
         <div className="rail-top">
-          <div className="rail-logo" title="Bot Dashboard">
-            <Bot size={20} />
+          <div className="rail-logo" title="Bot Dashboard" aria-label="Bot Dashboard">
+            <Robot size={20} weight="fill" />
           </div>
-          <div className="rail-divider" />
+          <div className="rail-divider" role="separator" />
 
-          <div className="server-list">
+          <div className="server-list" role="list">
             {loading ? (
-              [1, 2, 3].map(i => <div key={i} className="server-skeleton" />)
+              [1, 2, 3].map(i => (
+                <div key={i} className="server-skeleton" role="presentation" aria-hidden="true" />
+              ))
             ) : (
               <>
                 {present.map(g => (
@@ -129,7 +140,9 @@ export default function ServerRail({ guilds, loading, user }) {
                 ))}
                 {notPresent.length > 0 && (
                   <>
-                    {present.length > 0 && <div className="rail-divider" style={{ margin: '6px auto' }} />}
+                    {present.length > 0 && (
+                      <div className="rail-divider" role="separator" style={{ margin: '6px auto' }} />
+                    )}
                     {notPresent.map(g => (
                       <GuildIcon key={g.id} guild={g} onInviteRequest={setInviteTarget} />
                     ))}
@@ -141,12 +154,11 @@ export default function ServerRail({ guilds, loading, user }) {
         </div>
 
         <div className="rail-bottom">
-          {/* User info + role badge */}
           <div className="user-pill">
             {user?.avatar ? (
               <img
                 src={`https://cdn.discordapp.com/avatars/${user.id}/${user.avatar}.png?size=64`}
-                alt=""
+                alt={user.username ?? 'User avatar'}
                 className="user-avatar-sm"
               />
             ) : (
@@ -154,7 +166,7 @@ export default function ServerRail({ guilds, loading, user }) {
                 background: 'var(--surface-3)', borderRadius: '50%',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
                 fontSize: 12, color: 'var(--text-3)',
-              }}>
+              }} aria-hidden="true">
                 {user?.username?.slice(0, 1)?.toUpperCase() ?? '?'}
               </div>
             )}
@@ -166,8 +178,8 @@ export default function ServerRail({ guilds, loading, user }) {
                 </div>
               )}
             </div>
-            <a href="/auth/logout" className="logout-icon" title="Đăng xuất">
-              <LogOut size={14} />
+            <a href="/auth/logout" className="logout-icon" title="Đăng xuất" aria-label="Đăng xuất">
+              <SignOut size={14} />
             </a>
           </div>
         </div>

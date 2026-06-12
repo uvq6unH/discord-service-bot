@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Settings, LogIn, Megaphone, Music, Bell } from 'lucide-react';
+import { Gear, SignIn, Megaphone, MusicNote, Bell } from '@phosphor-icons/react';
 import { useGuild } from '../contexts/GuildContext.jsx';
 import { Spinner, Toggle, SectionCard, ChannelSelect, ThemeToggle} from '../components/ui.jsx';
 
@@ -147,7 +147,7 @@ export default function OverviewPage() {
       <div className="cards-grid">
 
         {/* ── Cài đặt chung ── */}
-        <SectionCard title="Cài đặt chung" icon={<Settings size={16} />}>
+        <SectionCard title="Cài đặt chung" icon={<Gear size={16} weight="regular" />}>
           <Toggle
             label="Bật bot"
             hint="Bật/tắt toàn bộ tính năng bot"
@@ -176,7 +176,7 @@ export default function OverviewPage() {
         {/* ── Welcome ── */}
         <SectionCard
           title="Chào mừng thành viên"
-          icon={<LogIn size={16} />}
+          icon={<SignIn size={16} weight="regular" />}
           enabled={config.welcomeEnabled}
           onToggle={v => updateConfig({ welcomeEnabled: v })}
         >
@@ -202,7 +202,7 @@ export default function OverviewPage() {
         {/* ── Thông báo ── */}
         <SectionCard
           title="Thông báo"
-          icon={<Megaphone size={16} />}
+          icon={<Megaphone size={16} weight="regular" />}
           enabled={config.announcementsEnabled}
           onToggle={v => updateConfig({ announcementsEnabled: v })}
         >
@@ -226,7 +226,7 @@ export default function OverviewPage() {
         {/* ── Music ── */}
         <SectionCard
           title="Music"
-          icon={<Music size={16} />}
+          icon={<MusicNote size={16} weight="regular" />}
           enabled={config.musicEnabled}
           onToggle={v => updateConfig({ musicEnabled: v })}
         >
@@ -241,13 +241,13 @@ export default function OverviewPage() {
             />
             <span className="form-hint">Ví dụ: <code>hb play tên bài</code></span>
           </div>
-          <p className="form-hint">Bot dùng Lavalink — không xử lý audio trực tiếp, CPU thấp.</p>
+          <p className="form-hint">Bot dùng Lavalink - không xử lý audio trực tiếp, CPU thấp.</p>
         </SectionCard>
 
         {/* ── Reminders ── */}
         <SectionCard
           title="Reminders"
-          icon={<Bell size={16} />}
+          icon={<Bell size={16} weight="regular" />}
           enabled={config.remindersEnabled}
           onToggle={v => updateConfig({ remindersEnabled: v })}
         >

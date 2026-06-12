@@ -59,7 +59,7 @@ function DashboardLayout() {
         ) : (
           <>
             <PluginNav guildId={selectedGuild.id} />
-            <main className="content">
+            <main id="main-content" className="content">
               <ErrorBoundary key={location.pathname}>
                 <AnimatePresence mode="wait">
                   <motion.div

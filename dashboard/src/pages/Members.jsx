@@ -1,4 +1,4 @@
-import { Search } from 'lucide-react';
+import { MagnifyingGlass } from '@phosphor-icons/react';
 import React, { useState, useRef, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useGuild } from '../contexts/GuildContext.jsx';
@@ -31,7 +31,7 @@ function MemberRow({ member }) {
         <span className="member-tag">{member.username}</span>
       </div>
       <div className="member-joined">
-        {member.joinedAt ? new Date(member.joinedAt).toLocaleDateString('vi-VN') : '—'}
+        {member.joinedAt ? new Date(member.joinedAt).toLocaleDateString('vi-VN') : '-'}
       </div>
     </div>
   );
@@ -78,7 +78,7 @@ export default function MembersPage() {
 
       <div className="members-toolbar">
         <div className="search-box">
-          <Search size={14} />
+          <MagnifyingGlass size={14} />
           <input
             className="form-input"
             placeholder="Tìm thành viên…"

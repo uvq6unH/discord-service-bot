@@ -2,20 +2,26 @@ import React from 'react';
 import { NavLink } from 'react-router-dom';
 import { motion } from 'motion/react';
 import {
-  LayoutDashboard, Users, Terminal, Coins,
-  ShieldCheck, Sword, Activity, BarChart2,
-} from 'lucide-react';
+  SquaresFour,
+  Users,
+  Terminal,
+  Coins,
+  ShieldCheck,
+  Sword,
+  Activity,
+  ChartBar,
+} from '@phosphor-icons/react';
 import { useGuild } from '../contexts/GuildContext.jsx';
 
 const NAV_ITEMS = [
-  { to: '/overview',   Icon: LayoutDashboard, label: 'Dashboard' },
-  { to: '/members',    Icon: Users,           label: 'Thành viên' },
-  { to: '/commands',   Icon: Terminal,        label: 'Lệnh' },
-  { to: '/economy',    Icon: Coins,           label: 'Kinh tế' },
-  { to: '/moderation', Icon: ShieldCheck,     label: 'Kiểm duyệt' },
-  { to: '/lol',        Icon: Sword,           label: 'LoL & TFT' },
-  { to: '/analytics',  Icon: BarChart2,       label: 'Analytics' },
-  { to: '/system',     Icon: Activity,        label: 'Hệ thống' },
+  { to: '/overview',   Icon: SquaresFour,  label: 'Dashboard' },
+  { to: '/members',    Icon: Users,        label: 'Thành viên' },
+  { to: '/commands',   Icon: Terminal,     label: 'Lệnh' },
+  { to: '/economy',    Icon: Coins,        label: 'Kinh tế' },
+  { to: '/moderation', Icon: ShieldCheck,  label: 'Kiểm duyệt' },
+  { to: '/lol',        Icon: Sword,        label: 'LoL & TFT' },
+  { to: '/analytics',  Icon: ChartBar,     label: 'Analytics' },
+  { to: '/system',     Icon: Activity,     label: 'Hệ thống' },
 ];
 
 export default function PluginNav() {
@@ -23,7 +29,7 @@ export default function PluginNav() {
   if (!selectedGuild) return null;
 
   return (
-    <nav className="plugin-nav">
+    <nav className="plugin-nav" aria-label="Plugin navigation">
       <div style={{
         display: 'flex', alignItems: 'center', gap: 'var(--s2)',
         padding: 'var(--s2) var(--s3) var(--s4)',
@@ -60,15 +66,15 @@ export default function PluginNav() {
       {NAV_ITEMS.map(({ to, Icon, label }, index) => (
         <motion.div
           key={to}
-          initial={{ opacity: 0, x: -8 }}
+          initial={{ opacity: 0, x: -6 }}
           animate={{ opacity: 1, x: 0 }}
-          transition={{ delay: index * 0.04, duration: 0.2 }}
+          transition={{ delay: index * 0.03, duration: 0.18, ease: [0.16, 1, 0.3, 1] }}
         >
           <NavLink
             to={to}
             className={({ isActive }) => `nav-item${isActive ? ' active' : ''}`}
           >
-            <Icon size={16} />
+            <Icon size={16} weight="regular" />
             <span>{label}</span>
           </NavLink>
         </motion.div>

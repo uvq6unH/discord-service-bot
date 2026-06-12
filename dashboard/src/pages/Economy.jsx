@@ -1,5 +1,5 @@
 import React from 'react';
-import { Award, CalendarCheck, CreditCard, Dice6, CircleDollarSign, Joystick, Coins } from 'lucide-react';
+import { Trophy, CalendarCheck, CreditCard, Dice, CurrencyDollar, GameController, Coins } from '@phosphor-icons/react';
 import { useGuild } from '../contexts/GuildContext.jsx';
 import { Spinner, Toggle, SectionCard, NumberInput, TextInput, ThemeToggle} from '../components/ui.jsx';
 
@@ -108,7 +108,7 @@ export default function EconomyPage() {
         {/* ── XP & Levels ── */}
         <SectionCard
           title="XP & Levels"
-          icon={<Award size={16} />}
+          icon={<Trophy size={16} />}
           enabled={config.levelsEnabled}
           onToggle={v => updateConfig({ levelsEnabled: v })}
         >
@@ -201,10 +201,10 @@ export default function EconomyPage() {
 
         {/* ── Games ── */}
         <GameSection title="Blackjack"  icon={<CreditCard size={16} />}       prefix="blackjack"  config={config} updateConfig={updateConfig} />
-        <GameSection title="Poker"      icon={<CircleDollarSign size={16} />}  prefix="poker"      config={config} updateConfig={updateConfig} />
+        <GameSection title="Poker"      icon={<CurrencyDollar size={16} />}  prefix="poker"      config={config} updateConfig={updateConfig} />
         <GameSection title="Coinflip"   icon={<Coins size={16} />}        prefix="coinflip"   config={config} updateConfig={updateConfig} />
-        <GameSection title="Dice"       icon={<Dice6 size={16} />}      prefix="dice"       config={config} updateConfig={updateConfig} />
-        <GameSection title="Slots"      icon={<Joystick size={16} />}        prefix="slots"      config={config} updateConfig={updateConfig} />
+        <GameSection title="Dice"       icon={<Dice size={16} />}      prefix="dice"       config={config} updateConfig={updateConfig} />
+        <GameSection title="Slots"      icon={<GameController size={16} />}        prefix="slots"      config={config} updateConfig={updateConfig} />
 
       </div>
     </div>
