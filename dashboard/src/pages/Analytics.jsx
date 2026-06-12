@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import {
-  ChartBar, Users, Terminal, Coins, ShieldCheck,
+  ChartBar as ChartBarIcon, Users, Terminal, Coins, ShieldCheck,
   TrendingUp, TrendingDown, Minus, ArrowClockwise,
 } from '@phosphor-icons/react';
 import { useQuery } from '@tanstack/react-query';
@@ -319,7 +319,7 @@ export default function AnalyticsPage() {
           borderRadius: 'var(--r3)', padding: 'var(--s3)',
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--s2)', marginBottom: 'var(--s3)' }}>
-            <ChartBar size={14} style={{ color: 'var(--accent)' }} />
+            <ChartBarIcon size={14} style={{ color: 'var(--accent)' }} />
             <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-1)' }}>Lệnh theo ngày</span>
           </div>
           <ChartBar
