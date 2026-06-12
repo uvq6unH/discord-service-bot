@@ -6,6 +6,7 @@ import {
   ShieldCheck, Sword, Activity, BarChart2,
 } from 'lucide-react';
 import { useGuild } from '../contexts/GuildContext.jsx';
+import { ThemePicker } from './ui.jsx';
 
 const NAV_ITEMS = [
   { to: '/overview',   Icon: LayoutDashboard, label: 'Dashboard' },
@@ -58,6 +59,9 @@ export default function PluginNav() {
           </NavLink>
         </motion.div>
       ))}
+
+      {/* Theme picker — bottom of nav */}
+      <ThemePicker />
     </nav>
   );
 }

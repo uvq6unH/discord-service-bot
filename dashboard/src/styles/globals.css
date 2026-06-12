@@ -4,9 +4,9 @@
    globals.css — Discord Bot Dashboard
    Design: Dark tech, Linear-inspired, Discord blurple accent
    Font: Geist (sans) + Geist Mono (numbers/code)
-   DESIGN_VARIANCE: 6 | MOTION_INTENSITY: 5 | VISUAL_DENSITY: 6
+   DESIGN_VARIANCE: 7 | MOTION_INTENSITY: 5 | VISUAL_DENSITY: 6
 
-   Theme: Dark-first, light mode via .theme-light class on <html>
+   Themes: dark (default) | light | midnight | discord
    ============================================================ */
 
 /* Self-hosted Geist via CDN with font-display: swap */
@@ -43,7 +43,7 @@
 
 /* ── Dark tokens (default) ───────────────────────────────────────────────── */
 :root {
-  /* Base palette — true OLED-inspired dark, layered depths */
+  /* Base palette */
   --bg:          #08080b;
   --surface-0:   #0c0c10;
   --surface-1:   #101014;
@@ -59,7 +59,7 @@
   --text-2:   #9898b8;
   --text-3:   #555570;
 
-  /* Accent — Discord blurple, desaturated for refinement */
+  /* Accent — Discord blurple */
   --accent:      #5865f2;
   --accent-hover: #4752c4;
   --accent-dim:  rgba(88,101,242,.12);
@@ -74,7 +74,7 @@
   --red-dim:   rgba(239,68,68,.1);
   --yellow-dim: rgba(234,179,8,.1);
 
-  /* Tinted shadows (hue-matched, not pure black) */
+  /* Tinted shadows */
   --shadow-sm:    0 1px 3px rgba(4,4,20,.5), 0 0 0 1px rgba(255,255,255,.04);
   --shadow-md:    0 4px 16px rgba(4,4,20,.6), 0 1px 3px rgba(4,4,20,.4);
   --shadow-lg:    0 20px 56px rgba(4,4,20,.7), 0 4px 12px rgba(4,4,20,.4);
@@ -86,28 +86,13 @@
   --nav-w:       212px;
   --content-max: 920px;
 
-  /* Spacing scale */
-  --s1: 4px;
-  --s2: 8px;
-  --s3: 12px;
-  --s4: 16px;
-  --s5: 20px;
-  --s6: 24px;
-  --s8: 32px;
-  --s10: 40px;
-  --s12: 48px;
+  /* Spacing */
+  --s1: 4px;  --s2: 8px;   --s3: 12px; --s4: 16px;
+  --s5: 20px; --s6: 24px;  --s8: 32px; --s10: 40px; --s12: 48px;
 
-  /* Radius — varied per REDESIGN.md */
-  --r1: 4px;
-  --r2: 6px;
-  --r3: 8px;
-  --r4: 10px;
-  --r5: 12px;
-  --r6: 16px;
-  --r7: 20px;
-  --r8: 24px;
-
-  /* Outer shell radius for double-bezel (SOFT.md) */
+  /* Radius — varied */
+  --r1: 4px;  --r2: 6px;   --r3: 8px;  --r4: 10px;
+  --r5: 12px; --r6: 16px;  --r7: 20px; --r8: 24px;
   --r-outer: 18px;
   --r-inner: calc(18px - 4px);
 
@@ -115,18 +100,21 @@
   --font:      'Geist', system-ui, -apple-system, sans-serif;
   --font-mono: 'Geist Mono', 'Fira Code', 'Consolas', monospace;
 
-  /* Motion — spring-like custom cubic-beziers (SOFT.md) */
+  /* Motion */
   --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
   --ease-spring: cubic-bezier(0.32, 0.72, 0, 1);
   --ease-in: cubic-bezier(0.4, 0, 1, 1);
   --dur-fast: 130ms;
   --dur-mid:  220ms;
   --dur-slow: 380ms;
+
+  /* Brand grain overlay opacity */
+  --grain-opacity: 0.028;
 }
 
 /* ── Light tokens ────────────────────────────────────────────────────────── */
 @media (prefers-color-scheme: light) {
-  :root:not(.theme-dark) {
+  :root:not(.theme-dark):not(.theme-midnight):not(.theme-discord) {
     --bg:          #f4f4f7;
     --surface-0:   #ffffff;
     --surface-1:   #f8f8fb;
@@ -136,16 +124,15 @@
     --border:      rgba(0,0,0,.07);
     --border-strong: rgba(0,0,0,.12);
     --border-accent: rgba(88,101,242,.3);
-
     --text-1:   #0e0e18;
     --text-2:   #4a4a68;
     --text-3:   #8080a0;
-
     --accent-shadow: rgba(88,101,242,.2);
     --shadow-sm:  0 1px 3px rgba(0,0,20,.08), 0 0 0 1px rgba(0,0,0,.04);
     --shadow-md:  0 4px 16px rgba(0,0,20,.1);
     --shadow-lg:  0 20px 56px rgba(0,0,20,.12);
     --shadow-modal: 0 24px 64px rgba(0,0,20,.15);
+    --grain-opacity: 0.015;
   }
 }
 
@@ -167,11 +154,64 @@ html.theme-light {
   --shadow-md:  0 4px 16px rgba(0,0,20,.1);
   --shadow-lg:  0 20px 56px rgba(0,0,20,.12);
   --shadow-modal: 0 24px 64px rgba(0,0,20,.15);
+  --grain-opacity: 0.015;
+}
+
+/* ── Midnight theme — OLED deep, blue-tinted ─────────────────────────────── */
+html.theme-midnight {
+  --bg:          #000008;
+  --surface-0:   #04040f;
+  --surface-1:   #07071a;
+  --surface-2:   #0d0d25;
+  --surface-3:   #141430;
+  --surface-4:   #1c1c3c;
+  --border:      rgba(120,140,255,.06);
+  --border-strong: rgba(120,140,255,.12);
+  --border-accent: rgba(88,101,242,.45);
+  --text-1:   #e8e8ff;
+  --text-2:   #8888cc;
+  --text-3:   #44447a;
+  --accent:      #7c8df2;
+  --accent-hover: #6677e8;
+  --accent-dim:  rgba(124,141,242,.14);
+  --accent-glow: rgba(124,141,242,.28);
+  --accent-shadow: rgba(124,141,242,.32);
+  --shadow-sm:    0 1px 3px rgba(0,0,30,.7), 0 0 0 1px rgba(120,140,255,.05);
+  --shadow-md:    0 4px 16px rgba(0,0,30,.8), 0 1px 3px rgba(0,0,30,.6);
+  --shadow-lg:    0 20px 56px rgba(0,0,30,.9), 0 4px 12px rgba(0,0,30,.6);
+  --shadow-modal: 0 24px 64px rgba(0,0,30,.95), 0 4px 16px rgba(124,141,242,.1);
+  --grain-opacity: 0.04;
+}
+
+/* ── Discord theme — faithful to Discord UI ─────────────────────────────── */
+html.theme-discord {
+  --bg:          #313338;
+  --surface-0:   #2b2d31;
+  --surface-1:   #232428;
+  --surface-2:   #1e1f22;
+  --surface-3:   #2e3035;
+  --surface-4:   #383a40;
+  --border:      rgba(255,255,255,.06);
+  --border-strong: rgba(255,255,255,.1);
+  --border-accent: rgba(88,101,242,.4);
+  --text-1:   #dbdee1;
+  --text-2:   #949ba4;
+  --text-3:   #5c5f66;
+  --accent:      #5865f2;
+  --accent-hover: #4752c4;
+  --accent-dim:  rgba(88,101,242,.15);
+  --accent-glow: rgba(88,101,242,.22);
+  --accent-shadow: rgba(88,101,242,.30);
+  --shadow-sm:    0 1px 3px rgba(0,0,0,.4);
+  --shadow-md:    0 4px 16px rgba(0,0,0,.5);
+  --shadow-lg:    0 20px 56px rgba(0,0,0,.6);
+  --shadow-modal: 0 24px 64px rgba(0,0,0,.7);
+  --grain-opacity: 0.02;
 }
 
 /* ── Reset ───────────────────────────────────────────────────────────────── */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-html { height: 100%; }
+html { height: 100%; scroll-behavior: smooth; }
 body {
   font-family: var(--font);
   background: var(--bg);
@@ -184,6 +224,17 @@ body {
 a { color: inherit; }
 button { font-family: var(--font); }
 #root { height: 100%; display: flex; flex-direction: column; }
+
+/* ── Grain overlay — subtle brand texture ────────────────────────────────── */
+body::after {
+  content: '';
+  position: fixed; inset: 0;
+  pointer-events: none;
+  z-index: 9999;
+  opacity: var(--grain-opacity);
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  background-size: 192px;
+}
 
 /* ── App shell ───────────────────────────────────────────────────────────── */
 .app {
@@ -236,7 +287,7 @@ button { font-family: var(--font); }
   margin-top: var(--s2);
 }
 
-/* Logo */
+/* Logo — brand mark */
 .rail-logo {
   width: 40px; height: 40px;
   background: var(--accent);
@@ -247,6 +298,17 @@ button { font-family: var(--font); }
   flex-shrink: 0;
   box-shadow: 0 0 0 1px var(--accent-glow), var(--shadow-accent);
   transition: transform var(--dur-mid) var(--ease-spring);
+  position: relative;
+  overflow: hidden;
+}
+/* Inner shine on logo */
+.rail-logo::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg, rgba(255,255,255,.18) 0%, transparent 55%);
+  border-radius: inherit;
+  pointer-events: none;
 }
 .rail-logo:hover { transform: scale(1.06); }
 
@@ -268,7 +330,6 @@ button { font-family: var(--font); }
   padding: var(--s2) 0 var(--s1);
 }
 
-/* Guild list */
 .server-list {
   display: flex;
   flex-direction: column;
@@ -277,7 +338,6 @@ button { font-family: var(--font); }
   width: 100%;
 }
 
-/* Guild button */
 .guild-btn {
   position: relative;
   width: 42px; height: 42px;
@@ -289,7 +349,6 @@ button { font-family: var(--font); }
   transition: transform var(--dur-fast) var(--ease-spring);
   flex-shrink: 0;
 }
-
 .guild-btn:hover { transform: scale(1.08); }
 .guild-btn:active { transform: scale(0.95); }
 
@@ -314,7 +373,6 @@ button { font-family: var(--font); }
               background var(--dur-fast), color var(--dur-fast);
 }
 
-/* Active state */
 .guild-btn--active .guild-icon,
 .guild-btn--active .guild-icon--text {
   border-radius: var(--r5);
@@ -333,7 +391,6 @@ button { font-family: var(--font); }
   border-radius: var(--r5);
 }
 
-/* Not-present (invite) state */
 .guild-btn--invite .guild-icon,
 .guild-btn--invite .guild-icon--text {
   opacity: 0.42;
@@ -345,7 +402,6 @@ button { font-family: var(--font); }
   filter: grayscale(0%);
 }
 
-/* Badge */
 .guild-badge {
   position: absolute;
   bottom: -2px; right: -2px;
@@ -360,7 +416,6 @@ button { font-family: var(--font); }
   color: #fff;
 }
 
-/* Skeleton */
 .server-skeleton {
   width: 42px; height: 42px;
   border-radius: var(--r4);
@@ -373,7 +428,6 @@ button { font-family: var(--font); }
   50% { opacity: 0.25; }
 }
 
-/* User pill at bottom of rail */
 .user-pill {
   display: flex;
   flex-direction: column;
@@ -500,21 +554,34 @@ button { font-family: var(--font); }
   background: rgba(88,101,242,.16);
 }
 
-/* ── Theme toggle button ─────────────────────────────────────────────────── */
-.theme-toggle {
-  display: flex; align-items: center; justify-content: center;
-  width: 30px; height: 30px;
-  border-radius: var(--r2);
+/* ── Theme picker ────────────────────────────────────────────────────────── */
+.theme-picker {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: var(--s2);
+  border-top: 1px solid var(--border);
+  margin-top: auto;
+}
+
+.theme-dot {
+  width: 22px; height: 22px;
+  border-radius: 50%;
   border: none;
-  background: transparent;
-  color: var(--text-3);
   cursor: pointer;
-  transition: background var(--dur-fast), color var(--dur-fast);
+  padding: 0;
+  transition: transform var(--dur-fast) var(--ease-spring), box-shadow var(--dur-fast);
+  flex-shrink: 0;
 }
-.theme-toggle:hover {
-  background: var(--surface-3);
-  color: var(--text-1);
+.theme-dot:hover { transform: scale(1.15); }
+.theme-dot--active {
+  box-shadow: 0 0 0 2px var(--surface-0), 0 0 0 3.5px var(--accent);
+  transform: scale(1.08);
 }
+.theme-dot--dark     { background: #08080b; border: 1px solid rgba(255,255,255,.15); }
+.theme-dot--light    { background: #f4f4f7; border: 1px solid rgba(0,0,0,.15); }
+.theme-dot--midnight { background: #000008; border: 1px solid rgba(120,140,255,.3); }
+.theme-dot--discord  { background: #313338; border: 1px solid rgba(88,101,242,.4); }
 
 /* ── Content area ────────────────────────────────────────────────────────── */
 .content {
@@ -529,7 +596,26 @@ button { font-family: var(--font); }
 
 .page { display: flex; flex-direction: column; gap: var(--s6); width: 100%; }
 
-.page-header { display: flex; flex-direction: column; gap: var(--s2); }
+/* ── Page header — redesigned with brand presence ────────────────────────── */
+.page-header {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s2);
+  padding-bottom: var(--s4);
+  border-bottom: 1px solid var(--border);
+  position: relative;
+}
+
+/* Accent bar — visual brand stripe */
+.page-header::before {
+  content: '';
+  position: absolute;
+  left: 0; bottom: -1px;
+  width: 40px; height: 2px;
+  background: var(--accent);
+  border-radius: 1px;
+  opacity: 0.9;
+}
 
 .page-header-row {
   display: flex;
@@ -537,18 +623,21 @@ button { font-family: var(--font); }
   gap: var(--s3);
 }
 
+/* Page title — stronger, display-weight presence */
 .page-title {
-  font-size: 19px;
-  font-weight: 600;
-  letter-spacing: -.028em;
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: -.038em;
   color: var(--text-1);
   flex: 1;
+  line-height: 1.1;
 }
 
 .page-subtitle {
-  font-size: 13px;
+  font-size: 12.5px;
   color: var(--text-3);
   line-height: 1.5;
+  letter-spacing: .005em;
 }
 
 .page-loading {
@@ -566,8 +655,7 @@ button { font-family: var(--font); }
   width: 100%;
 }
 
-/* ── Section card — Double-Bezel architecture (SOFT.md) ──────────────────── */
-/* Outer shell */
+/* ── Section card — Double-Bezel architecture ────────────────────────────── */
 .section-card {
   background: var(--surface-0);
   border: 1px solid var(--border);
@@ -582,7 +670,6 @@ button { font-family: var(--font); }
 }
 .section-card--disabled { opacity: 0.52; pointer-events: none; }
 
-/* Inner core */
 .section-card__inner {
   background: var(--surface-1);
   border-radius: var(--r-inner);
@@ -635,7 +722,7 @@ button { font-family: var(--font); }
 .form-label {
   font-size: 11px;
   font-weight: 600;
-  letter-spacing: .04em;
+  letter-spacing: .05em;
   text-transform: uppercase;
   color: var(--text-3);
 }
@@ -915,7 +1002,7 @@ button { font-family: var(--font); }
 }
 .invite-banner p { font-size: 13px; max-width: 280px; line-height: 1.65; }
 
-/* ── Invite modal ────────────────────────────────────────────────────────── */
+/* ── Modal ───────────────────────────────────────────────────────────────── */
 .modal-overlay {
   position: fixed; inset: 0;
   background: rgba(0,0,0,.65);
@@ -1155,7 +1242,6 @@ html.theme-light .modal-overlay { background: rgba(0,0,0,.35); }
   align-items: center;
   justify-content: center;
   background: var(--bg);
-  /* Dot grid — subtle, not generic plain grid */
   background-image: radial-gradient(circle, var(--border-strong) 1px, transparent 1px);
   background-size: 28px 28px;
   position: relative;
@@ -1185,7 +1271,6 @@ html.theme-light .modal-overlay { background: rgba(0,0,0,.35); }
   position: relative; z-index: 1;
 }
 
-/* Inner shine on login card */
 .login-card::before {
   content: '';
   position: absolute;
@@ -1307,7 +1392,7 @@ html.theme-light .modal-overlay { background: rgba(0,0,0,.35); }
   font-family: var(--font-mono);
 }
 
-/* ── Stat block ──────────────────────────────────────────────────────────── */
+/* ── Stat block — data-first typography ─────────────────────────────────── */
 .stat-block {
   display: flex;
   flex-direction: column;
@@ -1322,14 +1407,15 @@ html.theme-light .modal-overlay { background: rgba(0,0,0,.35); }
   font-size: 11px;
   color: var(--text-3);
   font-weight: 500;
-  letter-spacing: .02em;
+  letter-spacing: .04em;
+  text-transform: uppercase;
 }
 
 .stat-block__value {
-  font-size: 22px;
+  font-size: 26px;
   font-weight: 700;
   color: var(--text-1);
-  letter-spacing: -.04em;
+  letter-spacing: -.05em;
   font-variant-numeric: tabular-nums;
   font-family: var(--font-mono);
   line-height: 1.1;
@@ -1340,6 +1426,62 @@ html.theme-light .modal-overlay { background: rgba(0,0,0,.35); }
   color: var(--text-3);
 }
 
+/* ── Analytics page — more visual variety ───────────────────────────────── */
+
+/* Wide stat card with accent left border */
+.stat-card-wide {
+  background: var(--surface-1);
+  border: 1px solid var(--border);
+  border-radius: var(--r4);
+  padding: var(--s4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--s2);
+  position: relative;
+  overflow: hidden;
+  transition: box-shadow var(--dur-mid), border-color var(--dur-mid);
+}
+.stat-card-wide::before {
+  content: '';
+  position: absolute;
+  left: 0; top: 0; bottom: 0;
+  width: 3px;
+  background: var(--stat-color, var(--accent));
+  border-radius: 3px 0 0 3px;
+}
+.stat-card-wide:hover {
+  border-color: var(--border-strong);
+  box-shadow: var(--shadow-md);
+}
+
+/* Chart container */
+.chart-panel {
+  background: var(--surface-1);
+  border: 1px solid var(--border);
+  border-radius: var(--r4);
+  padding: var(--s4);
+  transition: box-shadow var(--dur-mid);
+}
+.chart-panel:hover { box-shadow: var(--shadow-md); }
+
+.chart-panel__header {
+  display: flex;
+  align-items: center;
+  gap: var(--s2);
+  margin-bottom: var(--s3);
+  padding-bottom: var(--s3);
+  border-bottom: 1px solid var(--border);
+}
+
+.chart-panel__title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-2);
+  letter-spacing: .02em;
+  text-transform: uppercase;
+  flex: 1;
+}
+
 /* ── Responsive ──────────────────────────────────────────────────────────── */
 @media (max-width: 768px) {
   .plugin-nav { display: none; }
@@ -1348,29 +1490,19 @@ html.theme-light .modal-overlay { background: rgba(0,0,0,.35); }
   .group-tabs { width: 100%; flex-direction: row; flex-wrap: wrap; }
 }
 
-/* ── Misc patches ────────────────────────────────────────────────────────── */
-
-/* Smooth scroll for anchor links */
-html { scroll-behavior: smooth; }
-
-/* Tabular numbers for data contexts */
+/* ── Misc ────────────────────────────────────────────────────────────────── */
 .tabular { font-variant-numeric: tabular-nums; }
-
-/* Text balance for headings */
 h1, h2, h3 { text-wrap: balance; }
 
-/* Accessible focus ring */
 :focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
   border-radius: var(--r1);
 }
 
-/* Skip link */
 .skip-link {
   position: absolute;
-  top: -40px;
-  left: 0;
+  top: -40px; left: 0;
   background: var(--accent);
   color: #fff;
   padding: 6px 12px;
@@ -1380,28 +1512,18 @@ h1, h2, h3 { text-wrap: balance; }
 }
 .skip-link:focus { top: 0; }
 
-/* ── Page header row (title + theme toggle) ──────────────────────────────── */
-.page-header-row {
-  display: flex;
-  align-items: center;
-  gap: var(--s3);
-  margin-bottom: 0;
-}
-
-/* ── Divider ─────────────────────────────────────────────────────────────── */
 .divider {
   height: 1px;
   background: var(--border);
   width: 100%;
 }
 
-/* ── Section card backward compat (for old usage without .section-card__inner) */
+/* Backward compat */
 .section-card > .section-card__header:first-child,
 .section-card > .section-card__body:first-child {
   border-radius: var(--r-inner) var(--r-inner) 0 0;
 }
 
-/* ── Permission denied state ─────────────────────────────────────────────── */
 .permission-denied {
   display: flex;
   flex-direction: column;

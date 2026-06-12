@@ -1,7 +1,7 @@
 import React from 'react';
 import { Award, CalendarCheck, CreditCard, Dice6, CircleDollarSign, Joystick, Coins } from 'lucide-react';
 import { useGuild } from '../contexts/GuildContext.jsx';
-import { Spinner, Toggle, SectionCard, NumberInput, TextInput, ThemeToggle} from '../components/ui.jsx';
+import { Spinner, Toggle, SectionCard, NumberInput, TextInput} from '../components/ui.jsx';
 
 
 // ── Currency row ─────────────────────────────────────────────────────────────
@@ -95,13 +95,14 @@ export default function EconomyPage() {
 
   return (
     <div className="page">
+      <div className="page-header">
       <div className="page-header-row">
         <h1 className="page-title">Kinh tế & XP</h1>
-        <ThemeToggle />
       </div>
       <p className="page-subtitle">
         Hệ thống kinh tế 3 loại tiền + XP levels. Distributed Redis lock đảm bảo an toàn concurrency.
       </p>
+      </div>
 
       <div className="cards-grid">
 

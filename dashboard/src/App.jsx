@@ -6,7 +6,7 @@ import { AuthProvider, useAuth } from './contexts/AuthContext.jsx';
 import { GuildProvider, useGuild } from './contexts/GuildContext.jsx';
 import ServerRail from './components/ServerRail.jsx';
 import PluginNav from './components/PluginNav.jsx';
-import { SaveBar, EmptyState, useTheme, ThemeContext } from './components/ui.jsx';
+import { SaveBar, EmptyState, useTheme, ThemeContext, ThemePicker } from './components/ui.jsx';
 import { ErrorBoundary } from './components/ErrorBoundary.jsx';
 import OverviewPage   from './pages/Overview.jsx';
 import MembersPage    from './pages/Members.jsx';
@@ -106,10 +106,10 @@ function DashboardLayout() {
 }
 
 export default function App() {
-  const { theme, toggleTheme } = useTheme();
+  const { theme, setTheme, toggleTheme } = useTheme();
 
   return (
-    <ThemeContext.Provider value={{ theme, toggleTheme }}>
+    <ThemeContext.Provider value={{ theme, setTheme, toggleTheme }}>
       <AuthProvider>
         <GuildProvider>
           <DashboardLayout />

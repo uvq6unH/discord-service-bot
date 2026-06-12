@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Settings, LogIn, Megaphone, Music, Bell } from 'lucide-react';
 import { useGuild } from '../contexts/GuildContext.jsx';
-import { Spinner, Toggle, SectionCard, ChannelSelect, ThemeToggle} from '../components/ui.jsx';
+import { Spinner, Toggle, SectionCard, ChannelSelect} from '../components/ui.jsx';
 
 
 // ── Reminder editor ─────────────────────────────────────────────────────────
@@ -131,9 +131,9 @@ export default function OverviewPage() {
 
   return (
     <div className="page">
+      <div className="page-header">
       <div className="page-header-row">
         <h1 className="page-title">Dashboard</h1>
-        <ThemeToggle />
       </div>
       <p className="page-subtitle">
         Cài đặt chung cho {selectedGuild.name}
@@ -143,6 +143,7 @@ export default function OverviewPage() {
           </span>
         )}
       </p>
+      </div>
 
       <div className="cards-grid">
 

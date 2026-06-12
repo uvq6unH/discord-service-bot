@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { ShieldCheck, Bot, Ticket, Tag } from 'lucide-react';
 import { useGuild } from '../contexts/GuildContext.jsx';
-import { Spinner, Toggle, SectionCard, ChannelSelect, RoleSelect, ThemeToggle, PermissionGuard } from '../components/ui.jsx';
+import { Spinner, Toggle, SectionCard, ChannelSelect, RoleSelect, PermissionGuard } from '../components/ui.jsx';
 
 
 // ── BadWords editor ──────────────────────────────────────────────────────────
@@ -112,9 +112,10 @@ export default function ModerationPage() {
   return (
     <PermissionGuard user={user} required="moderator">
     <div className="page">
-      <div className="page-header-row">
-        <h1 className="page-title">Kiểm duyệt</h1>
-        <ThemeToggle />
+      <div className="page-header">
+        <div className="page-header-row">
+          <h1 className="page-title">Kiểm duyệt</h1>
+        </div>
       </div>
 
       <div className="cards-grid">

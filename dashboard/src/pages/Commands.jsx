@@ -1,7 +1,7 @@
 import { Terminal, Award, Server, ShieldCheck, Coins, Ticket, Sword, Search, FilePlus2, MessageSquareReply, Smile } from 'lucide-react';
 import React, { useState, useMemo } from 'react';
 import { useGuild } from '../contexts/GuildContext.jsx';
-import { Spinner, Toggle, SectionCard, TextInput, ThemeToggle} from '../components/ui.jsx';
+import { Spinner, Toggle, SectionCard, TextInput} from '../components/ui.jsx';
 import { useAppTheme } from '../App.jsx';
 
 const COMMAND_GROUPS = {
@@ -197,13 +197,14 @@ export default function CommandsPage() {
 
   return (
     <div className="page">
+      <div className="page-header">
       <div className="page-header-row">
         <h1 className="page-title">Lệnh & Custom</h1>
-        <ThemeToggle theme={theme} onToggle={toggleTheme} />
       </div>
       <p className="page-subtitle">
         {enabledCount}/{ALL_COMMANDS.length} lệnh đang bật
       </p>
+      </div>
 
       <div className="commands-layout">
         <div className="group-tabs">

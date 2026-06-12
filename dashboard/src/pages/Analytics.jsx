@@ -5,7 +5,7 @@ import {
 } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { useGuild } from '../contexts/GuildContext.jsx';
-import { ThemeToggle, Spinner, PermissionGuard } from '../components/ui.jsx';
+import { Spinner, PermissionGuard } from '../components/ui.jsx';
 import { useAuth } from '../contexts/AuthContext.jsx';
 import { apiFetch } from '../api.js';
 
@@ -237,35 +237,34 @@ export default function AnalyticsPage() {
 
   return (
     <div className="page">
-      <div className="page-header-row">
-        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--s2)' }}>
-          <h1 className="page-title">Analytics</h1>
-          {data?.isMock && (
-            <span style={{
-              fontSize: 11, padding: '2px 8px', borderRadius: 99, fontWeight: 600,
-              background: 'rgba(234,179,8,.12)', color: 'var(--yellow)',
-              border: '1px solid rgba(234,179,8,.25)',
-            }}>
-              Demo data
-            </span>
-          )}
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--s2)' }}>
+      <div className="page-header">
+        <div className="page-header-row">
+          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--s2)' }}>
+            <h1 className="page-title">Analytics</h1>
+            {data?.isMock && (
+              <span style={{
+                fontSize: 11, padding: '2px 8px', borderRadius: 99, fontWeight: 600,
+                background: 'rgba(234,179,8,.12)', color: 'var(--yellow)',
+                border: '1px solid rgba(234,179,8,.25)',
+              }}>
+                Demo data
+              </span>
+            )}
+          </div>
           <button
             className="btn btn-ghost btn-sm"
             onClick={() => refetch()}
             disabled={isFetching}
-            style={{ display: 'flex', alignItems: 'center', gap: 4 }}
+            style={{ display: 'flex', alignItems: 'center', gap: 4, marginLeft: 'auto' }}
           >
             <RefreshCw size={13} style={{ animation: isFetching ? 'spin 1s linear infinite' : 'none' }} />
             Làm mới
           </button>
-          <ThemeToggle />
         </div>
+        <p className="page-subtitle">
+          Hoạt động của {selectedGuild?.name} — dữ liệu thực từ backend khi endpoint /api/analytics sẵn sàng.
+        </p>
       </div>
-      <p className="page-subtitle">
-        Hoạt động của {selectedGuild?.name} — dữ liệu thực từ backend khi endpoint /api/analytics sẵn sàng.
-      </p>
 
       {/* Range picker */}
       <div style={{ display: 'flex', gap: 'var(--s1)', marginBottom: 'var(--s4)' }}>

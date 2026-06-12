@@ -1,55 +1,73 @@
 import React, { useState, useEffect, useCallback, useContext, createContext } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Sun, Moon, Bot, ShieldOff } from 'lucide-react';
+import { Bot, ShieldOff } from 'lucide-react';
 
-// ── ThemeContext (defined here, re-exported từ App.jsx) ───────────────────────
-// Đặt ở ui.jsx để tránh circular dep: ui.jsx ← App.jsx ← ui.jsx
+// ── ThemeContext ───────────────────────────────────────────────────────────────
 
-export const ThemeContext = createContext({ theme: 'dark', toggleTheme: () => {} });
+export const ThemeContext = createContext({ theme: 'dark', setTheme: () => {} });
 
-// ── useTheme ──────────────────────────────────────────────────────────────────
+// ── useTheme — 4 themes: dark | light | midnight | discord ───────────────────
 
 export function useTheme() {
-  const [theme, setTheme] = useState(() => {
+  const THEMES = ['dark', 'light', 'midnight', 'discord'];
+
+  const [theme, setThemeState] = useState(() => {
     const saved = localStorage.getItem('theme');
-    if (saved) return saved;
+    if (saved && THEMES.includes(saved)) return saved;
     return window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
   });
 
   useEffect(() => {
     const html = document.documentElement;
-    if (theme === 'light') {
-      html.classList.add('theme-light');
-      html.classList.remove('theme-dark');
-    } else {
-      html.classList.add('theme-dark');
-      html.classList.remove('theme-light');
-    }
+    // Remove all theme classes first
+    THEMES.forEach(t => html.classList.remove(`theme-${t}`));
+    html.classList.add(`theme-${theme}`);
     localStorage.setItem('theme', theme);
   }, [theme]);
 
-  const toggleTheme = useCallback(() => {
-    setTheme(t => t === 'dark' ? 'light' : 'dark');
+  const setTheme = useCallback((t) => {
+    if (THEMES.includes(t)) setThemeState(t);
   }, []);
 
-  return { theme, toggleTheme };
+  // Legacy toggle (dark <-> light)
+  const toggleTheme = useCallback(() => {
+    setThemeState(t => t === 'light' ? 'dark' : 'light');
+  }, []);
+
+  return { theme, setTheme, toggleTheme };
 }
 
-// ── ThemeToggle ───────────────────────────────────────────────────────────────
-// FIX: đọc context trực tiếp — không cần prop drilling qua từng page nữa
+// ── ThemePicker — 4 color dots ────────────────────────────────────────────────
+
+export function ThemePicker() {
+  const { theme, setTheme } = useContext(ThemeContext);
+  const themes = [
+    { id: 'dark',     label: 'Dark' },
+    { id: 'light',    label: 'Light' },
+    { id: 'midnight', label: 'Midnight' },
+    { id: 'discord',  label: 'Discord' },
+  ];
+  return (
+    <div className="theme-picker" role="group" aria-label="Chọn theme">
+      {themes.map(t => (
+        <button
+          key={t.id}
+          className={`theme-dot theme-dot--${t.id} ${theme === t.id ? 'theme-dot--active' : ''}`}
+          onClick={() => setTheme(t.id)}
+          title={t.label}
+          aria-label={t.label}
+          aria-pressed={theme === t.id}
+        />
+      ))}
+    </div>
+  );
+}
+
+// ── ThemeToggle (legacy compat — được dùng ở page headers) ───────────────────
+// Giờ thay thế bằng ThemePicker ở sidebar, nhưng giữ lại để backward compat
 
 export function ThemeToggle() {
-  const { theme, toggleTheme } = useContext(ThemeContext);
-  return (
-    <button
-      className="theme-toggle"
-      onClick={toggleTheme}
-      title={theme === 'dark' ? 'Chuyển sang Light mode' : 'Chuyển sang Dark mode'}
-      aria-label="Toggle theme"
-    >
-      {theme === 'dark' ? <Sun size={16} strokeWidth={1.75} /> : <Moon size={16} strokeWidth={1.75} />}
-    </button>
-  );
+  return null; // Picker đã ở sidebar, không cần icon toggle nữa
 }
 
 // ── PageHeader ────────────────────────────────────────────────────────────────
@@ -59,7 +77,6 @@ export function PageHeader({ title, subtitle, children }) {
     <div className="page-header">
       <div className="page-header-row">
         <h1 className="page-title">{title}</h1>
-        <ThemeToggle />
         {children}
       </div>
       {subtitle && <p className="page-subtitle">{subtitle}</p>}
@@ -196,7 +213,7 @@ export function TextInput({ value, onChange, label, placeholder, type = 'text' }
   );
 }
 
-// ── SectionCard — Double-Bezel architecture ───────────────────────────────────
+// ── SectionCard — Double-Bezel ────────────────────────────────────────────────
 
 export function SectionCard({ title, icon, children, enabled, onToggle }) {
   return (
@@ -227,7 +244,7 @@ export function Spinner() {
   return <div className="spinner" />;
 }
 
-// ── RoleBadge — hiển thị role của user ───────────────────────────────────────
+// ── RoleBadge ─────────────────────────────────────────────────────────────────
 
 const ROLE_COLORS = {
   owner:     { bg: 'rgba(234,179,8,.15)',   border: 'rgba(234,179,8,.3)',   color: '#eab308' },
@@ -251,7 +268,6 @@ export function RoleBadge({ role }) {
 }
 
 // ── PermissionGuard ───────────────────────────────────────────────────────────
-// Dùng: <PermissionGuard user={user} required="admin">...</PermissionGuard>
 
 const ROLE_RANK = { owner: 4, admin: 3, moderator: 2, viewer: 1 };
 

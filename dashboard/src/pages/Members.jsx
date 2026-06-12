@@ -2,7 +2,7 @@ import { Search } from 'lucide-react';
 import React, { useState, useRef, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useGuild } from '../contexts/GuildContext.jsx';
-import { Spinner, ThemeToggle} from '../components/ui.jsx';
+import { Spinner} from '../components/ui.jsx';
 
 import { api } from '../api.js';
 
@@ -70,11 +70,12 @@ export default function MembersPage() {
 
   return (
     <div className="page">
+      <div className="page-header">
       <div className="page-header-row">
         <h1 className="page-title">Thành viên</h1>
-        <ThemeToggle />
       </div>
       <p className="page-subtitle">{total} thành viên</p>
+      </div>
 
       <div className="members-toolbar">
         <div className="search-box">

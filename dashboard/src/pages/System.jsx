@@ -82,6 +82,7 @@ export default function SystemPage() {
 
   return (
     <div className="page">
+      <div className="page-header">
       <div className="page-header-row">
         <h1 className="page-title">Hệ thống</h1>
         <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--s3)' }}>
@@ -90,10 +91,10 @@ export default function SystemPage() {
               cập nhật lúc {lastRefresh.toLocaleTimeString('vi-VN')}
             </span>
           )}
-          <ThemeToggle />
         </div>
       </div>
       <p className="page-subtitle">Trạng thái thời gian thực của bot và dashboard</p>
+      </div>
 
       <div className="cards-grid">
 
