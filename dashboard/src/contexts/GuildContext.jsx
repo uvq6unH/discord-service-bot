@@ -8,8 +8,8 @@ import { api } from '../api.js';
  *
  * Fixes từ review:
  * 1. saveConfig dùng Omit type để strip server-only fields an toàn hơn.
- *    Trước đây destructure thủ công — nếu server thêm field mới sẽ bị leak.
- *    Giờ dùng SERVER_ONLY_FIELDS array — 1 chỗ duy nhất để update.
+ *    Trước đây destructure thủ công - nếu server thêm field mới sẽ bị leak.
+ *    Giờ dùng SERVER_ONLY_FIELDS array - 1 chỗ duy nhất để update.
  * 2. saveStatus exposed đúng type để SaveBar render.
  */
 
@@ -45,7 +45,7 @@ export function GuildProvider({ children }) {
     enabled: !!selectedGuildId,
   });
 
-  // Role của user trong guild này — fetch riêng theo guild, tránh rate limit
+  // Role của user trong guild này - fetch riêng theo guild, tránh rate limit
   // khi load danh sách server. Cache 5 phút vì quyền thay đổi rất hiếm.
   const { data: userRole = null } = useQuery({
     queryKey: ['my-role', selectedGuildId],
@@ -61,7 +61,7 @@ export function GuildProvider({ children }) {
       setDirty(false);
       toast.success('Đã lưu thành công');
     },
-    onError: () => toast.error('Lỗi khi lưu — thử lại'),
+    onError: () => toast.error('Loi khi luu - thu lai'),
   });
 
   const selectGuild = useCallback((guild) => {

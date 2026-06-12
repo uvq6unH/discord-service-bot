@@ -1,15 +1,15 @@
 import React, { useState } from 'react';
 import {
-  BarChart2, Users, Terminal, Coins, ShieldCheck,
-  TrendingUp, TrendingDown, Minus, RefreshCw,
-} from 'lucide-react';
+  ChartBar, Users, Terminal, Coins, ShieldCheck,
+  TrendingUp, TrendingDown, Minus, ArrowClockwise,
+} from '@phosphor-icons/react';
 import { useQuery } from '@tanstack/react-query';
 import { useGuild } from '../contexts/GuildContext.jsx';
 import { ThemeToggle, Spinner, PermissionGuard } from '../components/ui.jsx';
 import { useAuth } from '../contexts/AuthContext.jsx';
 import { apiFetch } from '../api.js';
 
-// ── API call — dễ swap mock → real khi backend có sẵn ─────────────────────────
+// ── API call - dễ swap mock → real khi backend có sẵn ─────────────────────────
 
 async function fetchAnalytics(guildId, range) {
   try {
@@ -24,7 +24,7 @@ async function fetchAnalytics(guildId, range) {
   }
 }
 
-// Mock data — thay bằng API thật khi backend sẵn sàng
+// Mock data - thay bằng API thật khi backend sẵn sàng
 function getMockData(range) {
   const multiplier = range === '7d' ? 1 : range === '30d' ? 4 : 12;
   const now = Date.now();
@@ -103,7 +103,7 @@ function StatCard({ icon, label, value, delta, color }) {
   );
 }
 
-// Mini bar chart dùng thuần CSS/SVG — không cần Chart.js
+// Mini bar chart dùng thuần CSS/SVG - không cần Chart.js
 function BarChart({ data, color = 'var(--accent)', height = 120, labelKey = 'date', valueKey = 'count' }) {
   const max = Math.max(...data.map(d => d[valueKey]), 1);
   const showEvery = Math.ceil(data.length / 8);
@@ -257,14 +257,14 @@ export default function AnalyticsPage() {
             disabled={isFetching}
             style={{ display: 'flex', alignItems: 'center', gap: 4 }}
           >
-            <RefreshCw size={13} style={{ animation: isFetching ? 'spin 1s linear infinite' : 'none' }} />
+            <ArrowClockwise size={13} style={{ animation: isFetching ? 'spin 1s linear infinite' : 'none' }} />
             Làm mới
           </button>
           <ThemeToggle />
         </div>
       </div>
       <p className="page-subtitle">
-        Hoạt động của {selectedGuild?.name} — dữ liệu thực từ backend khi endpoint /api/analytics sẵn sàng.
+        Hoạt động của {selectedGuild?.name} - dữ liệu thực từ backend khi endpoint /api/analytics sẵn sàng.
       </p>
 
       {/* Range picker */}
@@ -319,7 +319,7 @@ export default function AnalyticsPage() {
           borderRadius: 'var(--r3)', padding: 'var(--s3)',
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--s2)', marginBottom: 'var(--s3)' }}>
-            <BarChart2 size={14} style={{ color: 'var(--accent)' }} />
+            <ChartBar size={14} style={{ color: 'var(--accent)' }} />
             <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-1)' }}>Lệnh theo ngày</span>
           </div>
           <BarChart
