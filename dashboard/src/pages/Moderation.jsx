@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ShieldCheck, Robot, Ticket, Tag } from '@phosphor-icons/react';
+import { ShieldCheck, Bot, Ticket, Tag } from 'lucide-react';
 import { useGuild } from '../contexts/GuildContext.jsx';
 import { Spinner, Toggle, SectionCard, ChannelSelect, RoleSelect, ThemeToggle, PermissionGuard } from '../components/ui.jsx';
 
@@ -142,7 +142,7 @@ export default function ModerationPage() {
         {/* ── AutoMod ── */}
         <SectionCard
           title="AutoMod"
-          icon={<Robot size={16} />}
+          icon={<Bot size={16} />}
           enabled={config.autoModEnabled}
           onToggle={v => updateConfig({ autoModEnabled: v })}
         >

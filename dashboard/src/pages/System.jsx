@@ -1,11 +1,11 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { Desktop, Database, ChartBar } from '@phosphor-icons/react';
+import { Server, Database, BarChart } from 'lucide-react';
 import { SectionCard, Spinner, ThemeToggle } from '../components/ui.jsx';
 
 import { api } from '../api.js';
 
 function fmtUptime(s) {
-  if (s == null) return '-';
+  if (s == null) return '—';
   const d = Math.floor(s / 86400);
   const h = Math.floor((s % 86400) / 3600);
   const m = Math.floor((s % 3600) / 60);
@@ -15,7 +15,7 @@ function fmtUptime(s) {
 }
 
 function fmtAge(ms) {
-  if (ms == null) return '-';
+  if (ms == null) return '—';
   const s = Math.floor(ms / 1000);
   if (s < 60) return `${s}s trước`;
   return `${Math.floor(s / 60)}m ${s % 60}s trước`;
@@ -98,7 +98,7 @@ export default function SystemPage() {
       <div className="cards-grid">
 
         {/* ── Services ── */}
-        <SectionCard title="Dịch vụ" icon={<Desktop size={16} />}>
+        <SectionCard title="Dịch vụ" icon={<Server size={16} />}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12, paddingTop: 4 }}>
 
             {/* Bot */}
@@ -116,7 +116,7 @@ export default function SystemPage() {
                 </span>
               </div>
               <KV label="Uptime"        value={fmtUptime(bot?.uptimeS)} />
-              <KV label="Guilds"        value={bot?.guilds ?? status?.guildCount ?? '-'} />
+              <KV label="Guilds"        value={bot?.guilds ?? status?.guildCount ?? '—'} />
               <KV label="Heartbeat"     value={fmtAge(bot?.lastSeenMs)} />
               {bot?.commit && <KV label="Commit" value={bot.commit} />}
             </div>
@@ -148,19 +148,19 @@ export default function SystemPage() {
             value={queueLen === 0 ? '0 (sạch)' : `${queueLen} job đang chờ`}
             highlight={queueLen > 5 ? 'danger' : queueLen > 0 ? 'warn' : null}
           />
-          <KV label="Guild được cấu hình" value={status?.configuredGuilds ?? '-'} />
+          <KV label="Guild được cấu hình" value={status?.configuredGuilds ?? '—'} />
         </SectionCard>
 
         {/* ── Stats counters ── */}
-        <SectionCard title="Thống kê hoạt động" icon={<ChartBar size={16} />}>
+        <SectionCard title="Thống kê hoạt động" icon={<BarChart size={16} />}>
           <p style={{ fontSize: 12, color: 'var(--text-3)', marginBottom: 10 }}>
-            Tích luỹ từ lần khởi động - reset khi Redis xoá key.
+            Tích luỹ từ lần khởi động — reset khi Redis xoá key.
           </p>
-          <KV label="Slash sync đã xử lý" value={stats?.slashSyncProcessed ?? '-'} />
-          <KV label="Guild cache refresh"  value={stats?.guildCacheRefresh  ?? '-'} />
+          <KV label="Slash sync đã xử lý" value={stats?.slashSyncProcessed ?? '—'} />
+          <KV label="Guild cache refresh"  value={stats?.guildCacheRefresh  ?? '—'} />
           <KV
             label="Discord errors"
-            value={stats?.discordErrors ?? '-'}
+            value={stats?.discordErrors ?? '—'}
             highlight={(stats?.discordErrors ?? 0) > 10 ? 'danger' : (stats?.discordErrors ?? 0) > 0 ? 'warn' : null}
           />
         </SectionCard>

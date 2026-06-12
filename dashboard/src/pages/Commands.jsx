@@ -1,4 +1,4 @@
-import { Terminal, Trophy, Desktop, ShieldCheck, Coins, Ticket, Sword, MagnifyingGlass, FilePlus, ChatText, Smiley } from '@phosphor-icons/react';
+import { Terminal, Award, Server, ShieldCheck, Coins, Ticket, Sword, Search, FilePlus2, MessageSquareReply, Smile } from 'lucide-react';
 import React, { useState, useMemo } from 'react';
 import { useGuild } from '../contexts/GuildContext.jsx';
 import { Spinner, Toggle, SectionCard, TextInput, ThemeToggle} from '../components/ui.jsx';
@@ -232,7 +232,7 @@ export default function CommandsPage() {
 
         <div className="commands-content">
           <div className="commands-search">
-            <MagnifyingGlass size={14} />
+            <Search size={14} />
             <input
               className="form-input"
               placeholder="Tìm lệnh…"
@@ -259,7 +259,7 @@ export default function CommandsPage() {
           </div>
 
           {(activeGroup === 'general' && !search) && (
-            <SectionCard title="Lệnh custom" icon={<FilePlus size={16} />}>
+            <SectionCard title="Lệnh custom" icon={<FilePlus2 size={16} />}>
               <p style={{ fontSize: 12, color: 'var(--text-3)', marginBottom: 'var(--s3)' }}>
                 Lệnh tự tạo với prefix. Hỗ trợ template: <code>{'{user}'}</code> <code>{'{args}'}</code> <code>{'{server}'}</code>
               </p>
@@ -273,7 +273,7 @@ export default function CommandsPage() {
           {(activeGroup === 'general' && !search) && (
             <SectionCard
               title="Tự động trả lời"
-              icon={<ChatText size={16} />}
+              icon={<MessageSquareReply size={16} />}
               enabled={config.autoReplyEnabled}
               onToggle={v => updateConfig({ autoReplyEnabled: v })}
             >
@@ -287,7 +287,7 @@ export default function CommandsPage() {
           {(activeGroup === 'general' && !search) && (
             <SectionCard
               title="Reaction khi nhắc bot"
-              icon={<Smiley size={16} />}
+              icon={<Smile size={16} />}
               enabled={config.mentionReactEnabled}
               onToggle={v => updateConfig({ mentionReactEnabled: v })}
             >
