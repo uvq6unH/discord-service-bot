@@ -47,7 +47,7 @@ export function ThemeToggle() {
       title={theme === 'dark' ? 'Chuyển sang Light mode' : 'Chuyển sang Dark mode'}
       aria-label="Toggle theme"
     >
-      {theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
+      {theme === 'dark' ? <Sun size={16} strokeWidth={1.75} /> : <Moon size={16} strokeWidth={1.75} />}
     </button>
   );
 }
@@ -94,7 +94,7 @@ export function SaveBar({ onSave, status }) {
 export function EmptyState() {
   return (
     <div className="empty-state">
-      <Bot size={48} className="empty-state__icon" />
+      <Bot size={44} strokeWidth={1.5} className="empty-state__icon" />
       <h2>Chọn một server</h2>
       <p>Chọn server từ thanh bên trái để bắt đầu cấu hình bot.</p>
     </div>
@@ -106,7 +106,7 @@ export function EmptyState() {
 export function InviteBanner({ inviteUrl }) {
   return (
     <div className="invite-banner">
-      <Bot size={20} />
+      <Bot size={20} strokeWidth={1.75} />
       <div>
         <h3>Bot chưa ở trong server này</h3>
         <p>Mời bot để sử dụng dashboard.</p>
@@ -196,21 +196,27 @@ export function TextInput({ value, onChange, label, placeholder, type = 'text' }
   );
 }
 
-// ── SectionCard ───────────────────────────────────────────────────────────────
+// ── SectionCard — Double-Bezel architecture ───────────────────────────────────
 
 export function SectionCard({ title, icon, children, enabled, onToggle }) {
   return (
     <div className={`section-card ${enabled === false ? 'section-card--disabled' : ''}`}>
-      <div className="section-card__header">
-        {icon && (typeof icon === 'string' ? <i className={`ti ${icon}`} /> : icon)}
-        <h3 className="section-card__title">{title}</h3>
-        {onToggle != null && (
-          <Toggle checked={enabled ?? false} onChange={onToggle} label="" />
+      <div className="section-card__inner">
+        <div className="section-card__header">
+          {icon && (
+            <div className="section-card__header-icon">
+              {typeof icon === 'string' ? <i className={`ti ${icon}`} /> : icon}
+            </div>
+          )}
+          <h3 className="section-card__title">{title}</h3>
+          {onToggle != null && (
+            <Toggle checked={enabled ?? false} onChange={onToggle} label="" />
+          )}
+        </div>
+        {(enabled !== false) && (
+          <div className="section-card__body">{children}</div>
         )}
       </div>
-      {(enabled !== false) && (
-        <div className="section-card__body">{children}</div>
-      )}
     </div>
   );
 }
@@ -255,14 +261,10 @@ export function PermissionGuard({ user, required, children, fallback }) {
 
   if (userRank < requiredRank) {
     return fallback ?? (
-      <div style={{
-        display: 'flex', flexDirection: 'column', alignItems: 'center',
-        gap: 'var(--s2)', padding: 'var(--s5)', color: 'var(--text-3)',
-        textAlign: 'center',
-      }}>
-        <ShieldOff size={32} />
-        <p style={{ fontSize: 14, margin: 0 }}>
-          Bạn cần quyền <strong style={{ color: 'var(--text-2)' }}>{required}</strong> để xem mục này.
+      <div className="permission-denied">
+        <ShieldOff size={28} strokeWidth={1.75} />
+        <p>
+          Bạn cần quyền <strong>{required}</strong> để xem mục này.
         </p>
       </div>
     );

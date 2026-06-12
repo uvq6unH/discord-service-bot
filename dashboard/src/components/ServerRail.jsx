@@ -41,7 +41,7 @@ function InviteModal({ guild, onClose }) {
             transition={{ type: 'spring', stiffness: 300, damping: 25 }}
             onClick={e => e.stopPropagation()}
           >
-            <div className="modal__icon"><BotOff size={24} /></div>
+            <div className="modal__icon"><BotOff size={22} strokeWidth={1.75} /></div>
             <h3>Bot chưa ở trong server này</h3>
             <p>
               <strong style={{ color: 'var(--text-1)' }}>{guild.name}</strong> chưa có bot.
@@ -50,7 +50,7 @@ function InviteModal({ guild, onClose }) {
             <div className="modal__actions">
               <button className="btn btn-ghost btn-sm" onClick={onClose}>Hủy</button>
               <button className="btn btn-primary btn-sm" onClick={handleInvite} disabled={loading}>
-                <ExternalLink size={14} />
+                <ExternalLink size={14} strokeWidth={1.75} />
                 {loading ? 'Đang mở…' : 'Mời Bot'}
               </button>
             </div>
@@ -98,7 +98,7 @@ function GuildIcon({ guild, onInviteRequest }) {
         {guild.name.slice(0, 2).toUpperCase()}
       </span>
       {notPresent && (
-        <span className="guild-badge guild-badge--invite"><Plus size={10} /></span>
+        <span className="guild-badge guild-badge--invite"><Plus size={10} strokeWidth={2.5} /></span>
       )}
     </button>
   );
@@ -115,7 +115,7 @@ export default function ServerRail({ guilds, loading, user }) {
       <nav className="server-rail">
         <div className="rail-top">
           <div className="rail-logo" title="Bot Dashboard">
-            <Bot size={20} />
+            <Bot size={20} strokeWidth={1.75} />
           </div>
           <div className="rail-divider" />
 
@@ -167,7 +167,7 @@ export default function ServerRail({ guilds, loading, user }) {
               )}
             </div>
             <a href="/auth/logout" className="logout-icon" title="Đăng xuất">
-              <LogOut size={14} />
+              <LogOut size={14} strokeWidth={1.75} />
             </a>
           </div>
         </div>

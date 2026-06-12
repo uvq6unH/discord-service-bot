@@ -24,35 +24,20 @@ export default function PluginNav() {
 
   return (
     <nav className="plugin-nav">
-      <div style={{
-        display: 'flex', alignItems: 'center', gap: 'var(--s2)',
-        padding: 'var(--s2) var(--s3) var(--s4)',
-        marginBottom: 'var(--s1)',
-      }}>
+      <div className="nav-guild-header">
         {selectedGuild.icon ? (
           <img
             src={selectedGuild.icon}
             alt=""
-            style={{ width: 24, height: 24, borderRadius: 'var(--r2)', flexShrink: 0 }}
+            className="nav-guild-icon"
             onError={e => { e.currentTarget.style.display = 'none'; }}
           />
         ) : (
-          <div style={{
-            width: 24, height: 24, borderRadius: 'var(--r2)', flexShrink: 0,
-            background: 'var(--surface-3)', display: 'flex',
-            alignItems: 'center', justifyContent: 'center',
-            fontSize: 10, fontWeight: 700, color: 'var(--text-3)',
-          }}>
+          <div className="nav-guild-icon--text">
             {selectedGuild.name.slice(0, 2).toUpperCase()}
           </div>
         )}
-        <span style={{
-          fontSize: 13, fontWeight: 600, color: 'var(--text-1)',
-          letterSpacing: '-.02em', overflow: 'hidden',
-          textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-        }}>
-          {selectedGuild.name}
-        </span>
+        <span className="nav-guild-name">{selectedGuild.name}</span>
       </div>
 
       <div className="nav-section-label">Menu</div>
@@ -62,13 +47,13 @@ export default function PluginNav() {
           key={to}
           initial={{ opacity: 0, x: -8 }}
           animate={{ opacity: 1, x: 0 }}
-          transition={{ delay: index * 0.04, duration: 0.2 }}
+          transition={{ delay: index * 0.035, duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
         >
           <NavLink
             to={to}
             className={({ isActive }) => `nav-item${isActive ? ' active' : ''}`}
           >
-            <Icon size={16} />
+            <Icon size={15} strokeWidth={1.75} />
             <span>{label}</span>
           </NavLink>
         </motion.div>
