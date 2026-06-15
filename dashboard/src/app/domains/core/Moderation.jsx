@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { ShieldCheck, ShieldAlert, Shield, Bot, Ticket, Tag, AlertTriangle, Link2Off } from 'lucide-react';
-import { useGuild } from '../../services/guild/GuildContext.jsx';
+import { useGuild } from '../../../contexts/GuildContext.jsx';
 import { Spinner, Toggle, ChannelSelect, RoleSelect, PermissionGuard } from '../../../components/ui.jsx';
 
 // ── SecBlock — security panel with threat-level left border ──────────────────

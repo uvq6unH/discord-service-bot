@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { Server, Database, Cpu, Activity, RefreshCw, Wifi, WifiOff, Clock, Hash } from 'lucide-react';
 import { Spinner } from '../../../components/ui.jsx';
-import { api } from '../../services/api/index.js';
+import { api } from '../../../api.js';
 
 function fmtUptime(s) {
   if (s == null) return '—';

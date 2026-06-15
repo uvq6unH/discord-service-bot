@@ -6,7 +6,7 @@
 import React from 'react';
 import { motion } from 'motion/react';
 import { Music, Radio, Settings } from 'lucide-react';
-import { useGuild } from '../../services/guild/GuildContext.jsx';
+import { useGuild } from '../../../contexts/GuildContext.jsx';
 import { Spinner, SectionCard, ChannelSelect } from '../../../components/ui.jsx';
 
 export default function MusicServicesPage() {

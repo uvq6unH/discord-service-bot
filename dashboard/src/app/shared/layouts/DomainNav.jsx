@@ -13,7 +13,7 @@ import React, { useState } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'motion/react';
 import { ChevronDown } from 'lucide-react';
-import { useGuild } from '../../services/guild/GuildContext.jsx';
+import { useGuild } from '../../../contexts/GuildContext.jsx';
 import { ThemePicker } from '../../../components/ui.jsx';
 import { DOMAINS, getDomainByPath } from './domains.js';
 

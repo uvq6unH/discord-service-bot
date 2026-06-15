@@ -14,8 +14,8 @@ import React, { createContext, useContext } from 'react';
 import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { motion, AnimatePresence } from 'motion/react';
-import { AuthProvider, useAuth } from './app/services/auth/AuthContext.jsx';
-import { GuildProvider, useGuild } from './app/services/guild/GuildContext.jsx';
+import { AuthProvider, useAuth } from './contexts/AuthContext.jsx';
+import { GuildProvider, useGuild } from './contexts/GuildContext.jsx';
 import ServerRail from './components/ServerRail.jsx';
 import DomainNav from './app/shared/layouts/DomainNav.jsx';
 import { SaveBar, EmptyState, useTheme, ThemeContext, ThemePicker } from './components/ui.jsx';
@@ -39,7 +39,7 @@ import MusicServicesPage from './app/domains/music/MusicServices.jsx';
 // ── Reminder Services domain ─────────────────────────────────────────────────
 import ReminderServicesPage from './app/domains/reminder/ReminderServices.jsx';
 
-import { api } from './app/services/api/index.js';
+import { api } from './api.js';
 
 // ThemeContext re-export — backward compat
 export { ThemeContext };

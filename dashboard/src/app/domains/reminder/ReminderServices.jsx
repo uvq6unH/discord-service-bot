@@ -7,7 +7,7 @@
 import React from 'react';
 import { motion } from 'motion/react';
 import { Bell, Plus, Trash2 } from 'lucide-react';
-import { useGuild } from '../../services/guild/GuildContext.jsx';
+import { useGuild } from '../../../contexts/GuildContext.jsx';
 import { Spinner, SectionCard, ChannelSelect } from '../../../components/ui.jsx';
 
 function localISOString(date) {

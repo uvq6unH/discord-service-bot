@@ -1,6 +1,6 @@
 import React from 'react';
 import { Award, CalendarCheck, CreditCard, Dice6, CircleDollarSign, Joystick, Coins, TrendingUp } from 'lucide-react';
-import { useGuild } from '../../services/guild/GuildContext.jsx';
+import { useGuild } from '../../../contexts/GuildContext.jsx';
 import { Spinner, Toggle, SectionCard, NumberInput, TextInput } from '../../../components/ui.jsx';
 
 // ── Currency ledger row ───────────────────────────────────────────────────────

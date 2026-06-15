@@ -7,7 +7,7 @@
 import React from 'react';
 import { motion } from 'motion/react';
 import { Sword, Key, Crown, Database } from 'lucide-react';
-import { useGuild } from '../../services/guild/GuildContext.jsx';
+import { useGuild } from '../../../contexts/GuildContext.jsx';
 import { Spinner, SectionCard } from '../../../components/ui.jsx';
 
 function ApiKeyInput({ label, valueKey, configuredKey, config, updateConfig, placeholder }) {

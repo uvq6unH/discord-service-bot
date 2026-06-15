@@ -4,10 +4,10 @@ import {
   TrendingUp, TrendingDown, Minus, RefreshCw,
 } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
-import { useGuild } from '../../services/guild/GuildContext.jsx';
+import { useGuild } from '../../../contexts/GuildContext.jsx';
 import { Spinner, PermissionGuard } from '../../../components/ui.jsx';
-import { useAuth } from '../../services/auth/AuthContext.jsx';
-import { apiFetch } from '../../services/api/index.js';
+import { useAuth } from '../../../contexts/AuthContext.jsx';
+import { apiFetch } from '../../../api.js';
 
 // ── API / Mock ─────────────────────────────────────────────────────────────────
 async function fetchAnalytics(guildId, range) {

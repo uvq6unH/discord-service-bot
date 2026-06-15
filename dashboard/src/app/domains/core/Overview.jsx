@@ -12,8 +12,8 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
 import { Activity, Users, Terminal, ShieldCheck, Coins } from 'lucide-react';
-import { useGuild } from '../../services/guild/GuildContext.jsx';
-import { api } from '../../services/api/index.js';
+import { useGuild } from '../../../contexts/GuildContext.jsx';
+import { api } from '../../../api.js';
 
 function StatusDot({ online }) {
   return (

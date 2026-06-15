@@ -109,5 +109,7 @@ export function GuildProvider({ children }) {
 }
 
 export function useGuild() {
-  return useContext(GuildContext);
+  const ctx = useContext(GuildContext);
+  if (!ctx) throw new Error('useGuild must be used inside <GuildProvider>');
+  return ctx;
 }

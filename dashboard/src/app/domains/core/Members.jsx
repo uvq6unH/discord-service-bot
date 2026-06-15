@@ -1,10 +1,10 @@
 import { Search } from 'lucide-react';
 import React, { useState, useRef, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { useGuild } from '../../services/guild/GuildContext.jsx';
+import { useGuild } from '../../../contexts/GuildContext.jsx';
 import { Spinner} from '../../../components/ui.jsx';
 
-import { api } from '../../services/api/index.js';
+import { api } from '../../../api.js';
 
 function getDefaultAvatarIndex(id) {
   try {

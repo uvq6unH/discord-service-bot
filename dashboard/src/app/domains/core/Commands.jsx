@@ -1,6 +1,6 @@
 import { Terminal, Award, Server, ShieldCheck, Coins, Ticket, Sword, Search, FilePlus2, MessageSquareReply, Smile } from 'lucide-react';
 import React, { useState, useMemo } from 'react';
-import { useGuild } from '../../services/guild/GuildContext.jsx';
+import { useGuild } from '../../../contexts/GuildContext.jsx';
 import { Spinner, Toggle, SectionCard, TextInput} from '../../../components/ui.jsx';
 import { useAppTheme } from '../../../App.jsx';
 
