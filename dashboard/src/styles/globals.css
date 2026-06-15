@@ -1542,3 +1542,238 @@ h1, h2, h3 { text-wrap: balance; }
   color: var(--text-2);
   font-weight: 600;
 }
+
+/* ============================================================
+   V4 MIGRATION — Domain Navigation CSS
+   Phase 3: DomainNav replaces PluginNav
+   ============================================================ */
+
+/* domain-nav — same width as old plugin-nav, new structure */
+.domain-nav {
+  width: var(--nav-w);
+  min-width: var(--nav-w);
+  height: 100%;
+  background: var(--surface-0);
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  padding: var(--s3) 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+.domain-nav__guild {
+  display: flex;
+  align-items: center;
+  gap: var(--s3);
+  padding: var(--s2) var(--s4);
+  margin-bottom: var(--s2);
+}
+
+.domain-nav__guild-icon {
+  width: 28px; height: 28px;
+  border-radius: var(--r3);
+  object-fit: cover;
+  flex-shrink: 0;
+}
+
+.domain-nav__guild-icon--text {
+  width: 28px; height: 28px;
+  border-radius: var(--r3);
+  background: var(--accent-dim);
+  border: 1px solid var(--border-accent);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 10px; font-weight: 700; color: var(--accent);
+  flex-shrink: 0;
+}
+
+.domain-nav__guild-info {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.domain-nav__guild-name {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-1);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.domain-nav__guild-domain {
+  font-size: 10px;
+  color: var(--text-3);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Domain switcher */
+.domain-switcher {
+  position: relative;
+  margin: 0 var(--s3);
+  margin-bottom: var(--s3);
+}
+
+.domain-switcher__trigger {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--s2) var(--s3);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--r3);
+  cursor: pointer;
+  color: var(--text-2);
+  font-size: 11px;
+  font-weight: 500;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.domain-switcher__trigger:hover {
+  background: var(--surface-3);
+  border-color: var(--border-strong);
+  color: var(--text-1);
+}
+
+.domain-switcher__label {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.domain-switcher__menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0; right: 0;
+  background: var(--surface-3);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--r4);
+  padding: var(--s1);
+  z-index: 200;
+  box-shadow: var(--shadow-lg);
+}
+
+.domain-switcher__item {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  padding: var(--s2) var(--s3);
+  border-radius: var(--r3);
+  cursor: pointer;
+  background: transparent;
+  border: none;
+  color: var(--text-2);
+  text-align: left;
+  transition: background 0.12s, color 0.12s;
+}
+
+.domain-switcher__item:hover {
+  background: var(--surface-4);
+  color: var(--text-1);
+}
+
+.domain-switcher__item--active {
+  background: var(--accent-dim);
+  color: var(--accent);
+  border: 1px solid var(--border-accent);
+}
+
+.domain-switcher__item-label {
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.domain-switcher__item-desc {
+  font-size: 10px;
+  opacity: 0.7;
+}
+
+/* Nav section label */
+.domain-nav__section-label {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-3);
+  padding: 0 var(--s4);
+  margin-bottom: var(--s2);
+}
+
+/* Domain nav pages */
+.domain-nav__pages {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 0 var(--s3);
+}
+
+.domain-nav__item {
+  display: flex;
+  align-items: center;
+  gap: var(--s3);
+  padding: var(--s2) var(--s3);
+  border-radius: var(--r3);
+  color: var(--text-2);
+  font-size: 13px;
+  font-weight: 450;
+  text-decoration: none;
+  transition: background 0.12s, color 0.12s;
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+.domain-nav__item:hover {
+  background: var(--surface-3);
+  color: var(--text-1);
+}
+
+.domain-nav__item.active {
+  background: var(--accent-dim);
+  color: var(--accent);
+  font-weight: 550;
+}
+
+.domain-nav__footer {
+  margin-top: auto;
+  padding: var(--s3);
+  border-top: 1px solid var(--border);
+}
+
+/* ============================================================
+   V4 MIGRATION — Token-based font (Phase 2)
+   ============================================================ */
+
+/* Space Grotesk for display — per MIGRATION.md typography spec */
+@font-face {
+  font-family: 'Space Grotesk';
+  src: url('https://fonts.gstatic.com/s/spacegrotesk/v16/V8mDoQDjQSkFtoMM3T6r8E7mF71Q-gOoraIAEj7aUXskPMBBSSJLm2E.woff2') format('woff2');
+  font-weight: 300 700;
+  font-display: swap;
+}
+
+/* IBM Plex Sans for body — per MIGRATION.md typography spec */
+@font-face {
+  font-family: 'IBM Plex Sans';
+  src: url('https://fonts.gstatic.com/s/ibmplexsans/v19/zYX9KVElMYYaJe8bpLHnCwDKjQ76AIFsdA.woff2') format('woff2');
+  font-weight: 400;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'IBM Plex Sans';
+  src: url('https://fonts.gstatic.com/s/ibmplexsans/v19/zYX8KVElMYYaJe8bpLHnCwDKjR7_MIZmdd_qFmo.woff2') format('woff2');
+  font-weight: 500 700;
+  font-display: swap;
+}
+
+:root {
+  --font-display: 'Space Grotesk', 'Geist', system-ui, sans-serif;
+  --font-body:    'IBM Plex Sans', 'Geist', system-ui, sans-serif;
+}

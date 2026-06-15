@@ -1,118 +1,400 @@
-# TypeScript Migration Guide
+# Dashboard V4 Migration Plan
 
-## Tình trạng hiện tại
+## Core Principle
 
-`tsconfig.json` đang ở **loose mode** — `allowJs: true`, `checkJs: false`, `strict: false`.
-Điều này có nghĩa là TypeScript đang hoạt động nhưng chưa enforce rules.
+Không còn thiết kế theo:
 
-`src/types.ts` đã có đầy đủ types cho toàn app.
+* Module = Feature
+* Sidebar = Danh sách chức năng bot
 
-## Thứ tự migrate
+Chuyển sang:
 
-### Bước 1 — Bắt đầu từ types và api (không có JSX)
-```bash
-# Rename
-mv src/api.js src/api.ts
-```
+* Product Domains
+* Operational Areas
+* Plugin Isolation
 
-Sau đó import types vào api.ts:
-```ts
-import type { DiscordUser, Guild, GuildConfig, GuildData, MembersResponse, InviteUrlResponse, StatusResponse } from './types';
+Mỗi domain là một khu vực độc lập.
 
-export const api = {
-  me: (): Promise<DiscordUser> => apiFetch('/auth/me').then(r => r.json()),
-  guilds: (): Promise<Guild[]> => apiFetch('/api/guilds').then(r => r.json()),
-  // ...
-};
-```
+Logic hiện tại giữ nguyên 100%.
 
-### Bước 2 — Contexts
-```bash
-mv src/contexts/AuthContext.jsx src/contexts/AuthContext.tsx
-mv src/contexts/GuildContext.jsx src/contexts/GuildContext.tsx
-```
+Chỉ thay Information Architecture, Design System và UI Layer.
 
-Import types từ `../types`:
-```ts
-import type { AuthContextValue, GuildContextValue } from '../types';
-const AuthContext = createContext<AuthContextValue | null>(null);
-```
+---
 
-### Bước 3 — Components
-```bash
-mv src/components/ui.jsx src/components/ui.tsx
-mv src/components/ServerRail.jsx src/components/ServerRail.tsx
-mv src/components/PluginNav.jsx src/components/PluginNav.tsx
-mv src/components/ErrorBoundary.jsx src/components/ErrorBoundary.tsx
-```
+# Product Vision
 
-### Bước 4 — Pages (thứ tự bất kỳ)
-```bash
-for f in src/pages/*.jsx; do mv "$f" "${f%.jsx}.tsx"; done
-```
+Tên sản phẩm không còn là:
 
-### Bước 5 — Bật strict mode
-Sau khi tất cả files là `.tsx`/`.ts`, update tsconfig.json:
-```json
-{
-  "compilerOptions": {
-    "strict": true,
-    "checkJs": false,
-    "noUnusedLocals": true,
-    "noUnusedParameters": true
-  }
-}
-```
+Discord Bot Dashboard
 
-Chạy `npm run typecheck` và fix từng lỗi.
+Mà là:
 
-## Lệnh hữu ích
+Community Operations Platform
 
-```bash
-# Kiểm tra lỗi type (không build)
-npm run typecheck
+Bot chỉ là một phần của hệ thống.
 
-# Xem lỗi chi tiết với file
-npx tsc --noEmit 2>&1 | head -50
+Dashboard là trung tâm điều hành.
 
-# Check một file cụ thể
-npx tsc --noEmit src/api.ts
-```
+---
 
-## Những lỗi phổ biến sẽ gặp
+# New Navigation Architecture
 
-### 1. `Object is possibly undefined`
-```ts
-// Trước
-const guild = selectedGuild;
-guild.id // ← lỗi vì guild có thể null
+## Core Operations
 
-// Sau  
-const guild = selectedGuild;
-if (!guild) return null;
-guild.id // ← OK
-```
+Đây là khu vực quản trị Discord server.
 
-### 2. `useContext` trả về `null`
-```ts
-// Trước
-export function useGuild() {
-  return useContext(GuildContext); // type: GuildContextValue | null
-}
+### Overview
 
-// Sau
-export function useGuild(): GuildContextValue {
-  const ctx = useContext(GuildContext);
-  if (!ctx) throw new Error('useGuild phải dùng trong GuildProvider');
-  return ctx;
-}
-```
+Tổng quan hệ thống.
 
-### 3. Event handlers
-```ts
-// Trước
-onChange={e => updateConfig({ prefix: e.target.value })}
+Bao gồm:
 
-// Sau
-onChange={(e: React.ChangeEvent<HTMLInputElement>) => updateConfig({ prefix: e.target.value })}
-```
+* Server Health
+* Member Growth
+* Command Activity
+* Moderation Events
+* Economy Snapshot
+
+### Members
+
+Quản lý thành viên.
+
+### Moderation
+
+Ban
+Mute
+Warn
+Logs
+Automod
+
+### Commands
+
+Slash Commands
+Permissions
+Categories
+
+### Economy
+
+Economy
+Leveling
+Rewards
+
+---
+
+# Integrations
+
+Mỗi hệ thống bên ngoài Discord là một domain riêng.
+
+Không được nhét vào Core Operations.
+
+## Riot Services
+
+Trang riêng.
+
+Bao gồm:
+
+* TFT
+* League
+* Match Tracking
+* Rank Monitoring
+* Player Lookup
+
+Sau này:
+
+Valorant
+
+vẫn nằm trong Riot Services.
+
+---
+
+## Music Services
+
+Trang riêng.
+
+Bao gồm:
+
+* Lavalink
+* Nodes
+* Queues
+* Audio Settings
+* Playback Config
+
+---
+
+## Reminder Services
+
+Trang riêng.
+
+Bao gồm:
+
+* Scheduled Jobs
+* Reminders
+* Recurring Tasks
+* Event Notifications
+
+---
+
+# Future Rule
+
+Mọi tính năng mới phải trả lời câu hỏi:
+
+"Đây có thuộc vận hành Discord Server không?"
+
+Nếu CÓ:
+
+=> nằm trong Core Operations.
+
+Nếu KHÔNG:
+
+=> tạo domain mới.
+
+Không sửa các trang cũ.
+
+Không thêm tab con vào các trang cũ.
+
+Không mở rộng vô hạn Members, Moderation, Commands.
+
+---
+
+Ví dụ:
+
+Giveaway System
+
+=> Core Operations
+
+Ticket System
+
+=> Core Operations
+
+Verification
+
+=> Core Operations
+
+---
+
+Riot
+
+=> Riot Services
+
+---
+
+Spotify Integration
+
+=> Music Services
+
+---
+
+AI Chat Module
+
+=> AI Services
+
+Trang mới.
+
+---
+
+Steam Tracking
+
+=> Gaming Services
+
+Trang mới.
+
+---
+
+YouTube Notifications
+
+=> Media Services
+
+Trang mới.
+
+---
+
+# UI Philosophy
+
+Không dùng Admin Dashboard.
+
+Không dùng SaaS Template.
+
+Không dùng Generic Cards.
+
+---
+
+Thiết kế theo Command Center.
+
+Cảm hứng:
+
+* Riot Client
+* Tactical Operations Console
+* Mission Control
+* Esports Analytics
+
+---
+
+# Layout
+
+## Left Rail
+
+Rất mỏng.
+
+Chỉ chứa:
+
+* Guild Switcher
+* Domain Navigation
+
+---
+
+## Main Canvas
+
+Toàn bộ chiều rộng.
+
+Không chia card đều nhau.
+
+Không grid 4 card.
+
+Ưu tiên:
+
+* Asymmetry
+* Large Metrics
+* Data Panels
+
+---
+
+# Typography
+
+Không dùng Inter.
+
+Gợi ý:
+
+Display:
+
+* Space Grotesk
+* Sora
+* Clash Display
+
+Body:
+
+* IBM Plex Sans
+* Manrope
+
+---
+
+# Design Tokens
+
+Không hardcode màu.
+
+Toàn bộ thông qua:
+
+tokens/
+
+* color.ts
+* spacing.ts
+* typography.ts
+* motion.ts
+
+---
+
+# Component Architecture
+
+src/
+
+app/
+
+domains/
+
+* core
+* riot
+* music
+* reminder
+
+shared/
+
+* ui
+* layouts
+* charts
+* forms
+
+services/
+
+* api
+* auth
+* guild
+
+contexts/
+
+---
+
+# Migration Order
+
+Phase 1
+
+Giữ nguyên logic.
+
+Refactor routes thành domain structure.
+
+---
+
+Phase 2
+
+Tạo Design System mới.
+
+Button
+Card
+Input
+Modal
+Panel
+
+---
+
+Phase 3
+
+Xây lại Layout Shell.
+
+Sidebar
+Top Navigation
+Guild Rail
+
+---
+
+Phase 4
+
+Xây lại Overview.
+
+Đây là trang thể hiện toàn bộ identity.
+
+---
+
+Phase 5
+
+Lần lượt migrate:
+
+Members
+Moderation
+Commands
+Economy
+
+---
+
+Phase 6
+
+Tách Riot thành domain độc lập.
+
+---
+
+Phase 7
+
+Tách Music thành domain độc lập.
+
+---
+
+Phase 8
+
+Tách Reminder thành domain độc lập.
+
+---
+
+Nguyên tắc bất biến:
+
+Tính năng mới khác bản chất với quản lý Discord Server = Domain mới.
+
+Không sửa domain cũ.
+
+Không biến sidebar thành bãi rác tính năng.
