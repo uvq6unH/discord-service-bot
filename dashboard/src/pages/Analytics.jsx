@@ -9,8 +9,7 @@ import { Spinner, PermissionGuard } from '../components/ui.jsx';
 import { useAuth } from '../contexts/AuthContext.jsx';
 import { apiFetch } from '../api.js';
 
-// ── API call — dễ swap mock → real khi backend có sẵn ─────────────────────────
-
+// ── API / Mock ─────────────────────────────────────────────────────────────────
 async function fetchAnalytics(guildId, range) {
   try {
     const res = await apiFetch(
@@ -24,12 +23,10 @@ async function fetchAnalytics(guildId, range) {
   }
 }
 
-// Mock data — thay bằng API thật khi backend sẵn sàng
 function getMockData(range) {
   const multiplier = range === '7d' ? 1 : range === '30d' ? 4 : 12;
   const now = Date.now();
   const days = range === '7d' ? 7 : range === '30d' ? 30 : 90;
-
   return {
     summary: {
       commandsExecuted:    { value: 1240 * multiplier, delta: +12.4 },
@@ -61,148 +58,115 @@ function getMockData(range) {
   };
 }
 
-// ── Sub-components ────────────────────────────────────────────────────────────
-
-function DeltaBadge({ delta }) {
-  if (delta === 0) return (
-    <span style={{ fontSize: 12, color: 'var(--text-3)', display: 'flex', alignItems: 'center', gap: 2 }}>
-      <Minus size={12} /> 0%
-    </span>
-  );
-  const up = delta > 0;
-  return (
-    <span style={{
-      fontSize: 12, display: 'flex', alignItems: 'center', gap: 2,
-      color: up ? 'var(--green)' : 'var(--red)',
-    }}>
-      {up ? <TrendingUp size={12} /> : <TrendingDown size={12} />}
-      {up ? '+' : ''}{delta.toFixed(1)}%
-    </span>
-  );
-}
-
-function StatCard({ icon, label, value, delta, color }) {
+// ── Big KPI number — hero metric ──────────────────────────────────────────────
+function KPI({ value, delta, label, color, wide }) {
+  const up = delta > 0, flat = delta === 0;
   return (
     <div style={{
-      background: 'var(--surface-1)', border: '1px solid var(--border)',
-      borderRadius: 'var(--r3)', padding: 'var(--s3)',
-      display: 'flex', flexDirection: 'column', gap: 'var(--s1)',
+      display: 'flex', flexDirection: 'column', gap: 6,
+      padding: wide ? 'var(--s5) var(--s6)' : 'var(--s4) var(--s5)',
+      background: 'var(--surface-1)',
+      border: '1px solid var(--border)',
       borderTop: `2px solid ${color}`,
+      borderRadius: 'var(--r4)',
+      gridColumn: wide ? 'span 2' : undefined,
     }}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <span style={{ color: 'var(--text-3)', fontSize: 12, fontWeight: 500 }}>{label}</span>
-        <span style={{ color }}>{icon}</span>
-      </div>
-      <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
-        <span style={{ fontSize: 28, fontWeight: 700, color: 'var(--text-1)', fontFamily: 'var(--font-mono)', letterSpacing: '-0.04em' }}>
+      <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '.1em', textTransform: 'uppercase', color: 'var(--text-3)', fontFamily: 'var(--font-mono)' }}>
+        {label}
+      </span>
+      <div style={{ display: 'flex', alignItems: 'baseline', gap: 12 }}>
+        <span style={{
+          fontSize: wide ? 42 : 32, fontWeight: 700, letterSpacing: '-.06em', lineHeight: 1,
+          fontVariantNumeric: 'tabular-nums', fontFamily: 'var(--font-mono)',
+          color: 'var(--text-1)',
+        }}>
           {value.toLocaleString('vi-VN')}
         </span>
-        <DeltaBadge delta={delta} />
+        <span style={{
+          display: 'inline-flex', alignItems: 'center', gap: 3,
+          fontSize: 12, fontWeight: 600, fontFamily: 'var(--font-mono)',
+          color: flat ? 'var(--text-3)' : up ? 'var(--green)' : 'var(--red)',
+        }}>
+          {flat ? <Minus size={11} /> : up ? <TrendingUp size={11} /> : <TrendingDown size={11} />}
+          {flat ? '—' : `${up ? '+' : ''}${delta.toFixed(1)}%`}
+        </span>
       </div>
     </div>
   );
 }
 
-// Mini bar chart dùng thuần CSS/SVG — không cần Chart.js
-function BarChart({ data, color = 'var(--accent)', height = 120, labelKey = 'date', valueKey = 'count' }) {
+// ── Bar chart — SVG ────────────────────────────────────────────────────────────
+function BarChart({ data, color = 'var(--accent)', height = 80, labelKey = 'date', valueKey = 'count' }) {
   const max = Math.max(...data.map(d => d[valueKey]), 1);
-  const showEvery = Math.ceil(data.length / 8);
-
+  const showEvery = Math.ceil(data.length / 7);
   return (
-    <div style={{ width: '100%' }}>
-      <svg
-        viewBox={`0 0 ${data.length * 14} ${height + 28}`}
-        style={{ width: '100%', overflow: 'visible' }}
-        role="img"
-        aria-label={`Biểu đồ ${labelKey}`}
-      >
-        {data.map((d, i) => {
-          const barH = Math.max((d[valueKey] / max) * height, 2);
-          const x = i * 14;
-          const y = height - barH;
-          return (
-            <g key={i}>
-              <rect
-                x={x + 1} y={y} width={11} height={barH}
-                rx={2}
-                fill={color}
-                opacity={0.85}
-              >
-                <title>{d[labelKey]}: {d[valueKey].toLocaleString('vi-VN')}</title>
-              </rect>
-              {i % showEvery === 0 && (
-                <text
-                  x={x + 7} y={height + 18}
-                  textAnchor="middle"
-                  fontSize={9}
-                  fill="var(--text-3)"
-                >
-                  {d[labelKey]}
-                </text>
-              )}
-            </g>
-          );
-        })}
-      </svg>
-    </div>
+    <svg viewBox={`0 0 ${data.length * 14} ${height + 24}`} style={{ width: '100%', overflow: 'visible' }} role="img">
+      {data.map((d, i) => {
+        const barH = Math.max((d[valueKey] / max) * height, 2);
+        return (
+          <g key={i}>
+            <rect x={i * 14 + 1} y={height - barH} width={11} height={barH} rx={2}
+              fill={color} opacity={0.82}>
+              <title>{d[labelKey]}: {d[valueKey].toLocaleString('vi-VN')}</title>
+            </rect>
+            {i % showEvery === 0 && (
+              <text x={i * 14 + 7} y={height + 16} textAnchor="middle" fontSize={8} fill="var(--text-3)">
+                {d[labelKey]}
+              </text>
+            )}
+          </g>
+        );
+      })}
+    </svg>
   );
 }
 
+// ── Heatmap ───────────────────────────────────────────────────────────────────
 function HeatmapRow({ data }) {
   const max = Math.max(...data.map(d => d.users), 1);
   return (
-    <div style={{ display: 'flex', gap: 3, alignItems: 'center', flexWrap: 'wrap' }}>
+    <div style={{ display: 'flex', gap: 2, alignItems: 'flex-end', height: 40 }}>
       {data.map((d, i) => {
-        const intensity = d.users / max;
+        const ratio = d.users / max;
         return (
-          <div
-            key={i}
-            title={`${d.hour}: ${d.users} users`}
-            style={{
-              width: 22, height: 22, borderRadius: 3, cursor: 'default',
-              background: `rgba(88,101,242,${0.08 + intensity * 0.85})`,
-              border: '1px solid rgba(88,101,242,0.1)',
-              position: 'relative',
-            }}
-          />
+          <div key={i} style={{ flex: 1, position: 'relative', height: '100%', display: 'flex', alignItems: 'flex-end' }}>
+            <div style={{
+              width: '100%',
+              height: `${Math.max(ratio * 100, 8)}%`,
+              background: `rgba(88,101,242,${0.12 + ratio * 0.78})`,
+              borderRadius: 2,
+              transition: 'height 0.3s',
+            }}>
+              <title>{d.hour}: {d.users} người</title>
+            </div>
+          </div>
         );
       })}
-      <div style={{ display: 'flex', gap: 12, marginTop: 6, width: '100%' }}>
-        {['00:00', '06:00', '12:00', '18:00', '23:00'].map(h => (
-          <span key={h} style={{ fontSize: 11, color: 'var(--text-3)' }}>{h}</span>
-        ))}
-      </div>
     </div>
   );
 }
 
+// ── Top commands — horizontal bars ────────────────────────────────────────────
 function TopCommandsTable({ commands }) {
   const max = commands[0]?.count ?? 1;
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
       {commands.map((c, i) => (
         <div key={c.name} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <span style={{
-            fontSize: 11, fontWeight: 600, color: 'var(--text-3)',
-            fontFamily: 'var(--font-mono)', width: 18, textAlign: 'right', flexShrink: 0,
-          }}>
+          <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-3)', fontFamily: 'var(--font-mono)', width: 14, textAlign: 'right', flexShrink: 0 }}>
             {i + 1}
           </span>
           <code style={{
-            fontSize: 12, color: 'var(--accent)', background: 'var(--accent-dim)',
+            fontSize: 11, color: 'var(--accent)', background: 'var(--accent-dim)',
             padding: '1px 6px', borderRadius: 'var(--r1)', flexShrink: 0,
-            border: '1px solid rgba(88,101,242,.2)',
+            border: '1px solid rgba(88,101,242,.18)', fontFamily: 'var(--font-mono)',
           }}>
             {c.name}
           </code>
-          <div style={{ flex: 1, height: 4, background: 'var(--surface-3)', borderRadius: 2 }}>
-            <div style={{
-              height: '100%', borderRadius: 2,
-              width: `${(c.count / max) * 100}%`,
-              background: 'var(--accent)',
-            }} />
+          <div style={{ flex: 1, height: 3, background: 'var(--surface-3)', borderRadius: 2, overflow: 'hidden' }}>
+            <div style={{ height: '100%', width: `${(c.count / max) * 100}%`, background: 'var(--accent)', borderRadius: 2 }} />
           </div>
-          <span style={{ fontSize: 12, color: 'var(--text-2)', fontFamily: 'var(--font-mono)', minWidth: 40, textAlign: 'right' }}>
+          <span style={{ fontSize: 11, fontFamily: 'var(--font-mono)', fontVariantNumeric: 'tabular-nums', color: 'var(--text-2)', minWidth: 38, textAlign: 'right' }}>
             {c.count.toLocaleString('vi-VN')}
           </span>
         </div>
@@ -211,7 +175,35 @@ function TopCommandsTable({ commands }) {
   );
 }
 
-// ── Main page ─────────────────────────────────────────────────────────────────
+// ── Panel wrapper ─────────────────────────────────────────────────────────────
+function Panel({ children, style, label, accent }) {
+  return (
+    <div style={{
+      background: 'var(--surface-1)',
+      border: '1px solid var(--border)',
+      borderRadius: 'var(--r4)',
+      overflow: 'hidden',
+      ...style,
+    }}>
+      {label && (
+        <div style={{
+          padding: '8px 14px',
+          borderBottom: '1px solid var(--border)',
+          display: 'flex', alignItems: 'center', gap: 6,
+          background: 'var(--surface-2)',
+        }}>
+          {accent && <span style={{ width: 6, height: 6, borderRadius: '50%', background: accent, flexShrink: 0 }} />}
+          <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '.09em', textTransform: 'uppercase', color: 'var(--text-3)', fontFamily: 'var(--font-mono)' }}>
+            {label}
+          </span>
+        </div>
+      )}
+      <div style={{ padding: 'var(--s4)' }}>
+        {children}
+      </div>
+    </div>
+  );
+}
 
 const RANGES = [
   { label: '7 ngày', value: '7d' },
@@ -221,7 +213,6 @@ const RANGES = [
 
 export default function AnalyticsPage() {
   const { selectedGuild } = useGuild();
-  const { user } = useAuth();
   const [range, setRange] = useState('7d');
 
   const { data, isLoading, refetch, isFetching } = useQuery({
@@ -242,123 +233,83 @@ export default function AnalyticsPage() {
           <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--s2)' }}>
             <h1 className="page-title">Analytics</h1>
             {data?.isMock && (
-              <span style={{
-                fontSize: 11, padding: '2px 8px', borderRadius: 99, fontWeight: 600,
-                background: 'rgba(234,179,8,.12)', color: 'var(--yellow)',
-                border: '1px solid rgba(234,179,8,.25)',
+              <span style={{ fontSize: 10, padding: '2px 8px', borderRadius: 3, fontWeight: 700, letterSpacing: '.06em',
+                background: 'rgba(234,179,8,.1)', color: 'var(--yellow)', border: '1px solid rgba(234,179,8,.2)',
+                fontFamily: 'var(--font-mono)', textTransform: 'uppercase',
               }}>
-                Demo data
+                DEMO
               </span>
             )}
           </div>
-          <button
-            className="btn btn-ghost btn-sm"
-            onClick={() => refetch()}
-            disabled={isFetching}
-            style={{ display: 'flex', alignItems: 'center', gap: 4, marginLeft: 'auto' }}
-          >
-            <RefreshCw size={13} style={{ animation: isFetching ? 'spin 1s linear infinite' : 'none' }} />
-            Làm mới
-          </button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--s2)', marginLeft: 'auto' }}>
+            {/* Range picker inline */}
+            <div style={{ display: 'flex', background: 'var(--surface-2)', borderRadius: 'var(--r2)', padding: 2, gap: 1 }}>
+              {RANGES.map(r => (
+                <button
+                  key={r.value}
+                  onClick={() => setRange(r.value)}
+                  style={{
+                    fontSize: 11, fontWeight: 600, padding: '3px 10px', borderRadius: 'var(--r1)',
+                    border: 'none', cursor: 'pointer', fontFamily: 'var(--font-mono)',
+                    background: range === r.value ? 'var(--accent)' : 'transparent',
+                    color: range === r.value ? '#fff' : 'var(--text-3)',
+                    transition: 'all 130ms',
+                  }}
+                >
+                  {r.label}
+                </button>
+              ))}
+            </div>
+            <button
+              className="btn btn-ghost btn-sm"
+              onClick={() => refetch()}
+              disabled={isFetching}
+              style={{ display: 'flex', alignItems: 'center', gap: 4 }}
+            >
+              <RefreshCw size={12} style={{ animation: isFetching ? 'spin 0.7s linear infinite' : 'none' }} strokeWidth={2} />
+            </button>
+          </div>
         </div>
-        <p className="page-subtitle">
-          Hoạt động của {selectedGuild?.name} — dữ liệu thực từ backend khi endpoint /api/analytics sẵn sàng.
-        </p>
+        <p className="page-subtitle">{selectedGuild?.name} — command center</p>
       </div>
 
-      {/* Range picker */}
-      <div style={{ display: 'flex', gap: 'var(--s1)', marginBottom: 'var(--s4)' }}>
-        {RANGES.map(r => (
-          <button
-            key={r.value}
-            className={`btn btn-sm ${range === r.value ? 'btn-primary' : 'btn-secondary'}`}
-            onClick={() => setRange(r.value)}
-          >
-            {r.label}
-          </button>
-        ))}
-      </div>
-
-      {/* Summary cards */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 'var(--s3)', marginBottom: 'var(--s4)' }}>
-        <StatCard
-          icon={<Terminal size={16} />}
-          label="Lệnh thực thi"
+      {/* ── KPI row — asymmetric: one big + three small ── */}
+      <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 1fr', gap: 'var(--s3)' }}>
+        <KPI
           value={s.commandsExecuted.value}
           delta={s.commandsExecuted.delta}
-          color="#5865f2"
+          label="Lệnh thực thi"
+          color="var(--accent)"
+          wide
         />
-        <StatCard
-          icon={<Users size={16} />}
-          label="Người dùng hoạt động"
-          value={s.activeUsers.value}
-          delta={s.activeUsers.delta}
-          color="#22c55e"
-        />
-        <StatCard
-          icon={<Coins size={16} />}
-          label="Giao dịch economy"
-          value={s.economyTransactions.value}
-          delta={s.economyTransactions.delta}
-          color="#eab308"
-        />
-        <StatCard
-          icon={<ShieldCheck size={16} />}
-          label="Hành động kiểm duyệt"
-          value={s.moderationActions.value}
-          delta={s.moderationActions.delta}
-          color="#ef4444"
-        />
+        <KPI value={s.activeUsers.value}         delta={s.activeUsers.delta}         label="Người dùng"    color="var(--green)" />
+        <KPI value={s.economyTransactions.value}  delta={s.economyTransactions.delta}  label="Giao dịch"     color="var(--yellow)" />
+        <KPI value={s.moderationActions.value}    delta={s.moderationActions.delta}    label="Kiểm duyệt"    color="var(--red)" />
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--s3)', marginBottom: 'var(--s3)' }}>
-        {/* Commands chart */}
-        <div style={{
-          background: 'var(--surface-1)', border: '1px solid var(--border)',
-          borderRadius: 'var(--r3)', padding: 'var(--s3)',
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--s2)', marginBottom: 'var(--s3)' }}>
-            <BarChart2 size={14} style={{ color: 'var(--accent)' }} />
-            <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-1)' }}>Lệnh theo ngày</span>
-          </div>
-          <BarChart
-            data={data.commandsChart}
-            color="var(--accent)"
-            height={100}
-            labelKey="date"
-            valueKey="count"
-          />
-        </div>
-
-        {/* Top commands */}
-        <div style={{
-          background: 'var(--surface-1)', border: '1px solid var(--border)',
-          borderRadius: 'var(--r3)', padding: 'var(--s3)',
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--s2)', marginBottom: 'var(--s3)' }}>
-            <Terminal size={14} style={{ color: 'var(--accent)' }} />
-            <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-1)' }}>Top lệnh</span>
-          </div>
+      {/* ── Main bento: chart spans 3 cols, top commands 1 col ── */}
+      <div style={{ display: 'grid', gridTemplateColumns: '3fr 1fr', gap: 'var(--s3)' }}>
+        <Panel label="Lệnh theo ngày" accent="var(--accent)">
+          <BarChart data={data.commandsChart} color="var(--accent)" height={110} />
+        </Panel>
+        <Panel label="Top lệnh">
           <TopCommandsTable commands={data.topCommands} />
-        </div>
+        </Panel>
       </div>
 
-      {/* Active hours heatmap */}
-      <div style={{
-        background: 'var(--surface-1)', border: '1px solid var(--border)',
-        borderRadius: 'var(--r3)', padding: 'var(--s3)',
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--s2)', marginBottom: 'var(--s3)' }}>
-          <Users size={14} style={{ color: 'var(--accent)' }} />
-          <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-1)' }}>Giờ hoạt động trong ngày</span>
-          <span style={{ fontSize: 12, color: 'var(--text-3)' }}>(màu đậm hơn = nhiều người hơn)</span>
+      {/* ── Activity heatmap — full width ── */}
+      <Panel label="Giờ hoạt động" accent="rgba(88,101,242,.6)">
+        <div style={{ marginBottom: 'var(--s2)' }}>
+          <HeatmapRow data={data.activeHours} />
         </div>
-        <HeatmapRow data={data.activeHours} />
-      </div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', paddingTop: 4 }}>
+          {['00:00', '06:00', '12:00', '18:00', '23:00'].map(h => (
+            <span key={h} style={{ fontSize: 9, color: 'var(--text-3)', fontFamily: 'var(--font-mono)' }}>{h}</span>
+          ))}
+        </div>
+      </Panel>
 
-      <style>{`
-        @keyframes spin { to { transform: rotate(360deg); } }
-      `}</style>
+      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
     </div>
   );
 }
