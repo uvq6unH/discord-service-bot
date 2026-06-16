@@ -30,6 +30,13 @@ createRoot(document.getElementById('root')).render(
         theme="dark"
         position="bottom-right"
         richColors
+        offset={24}
+        toastOptions={{
+          style: {
+            // Đảm bảo toast luôn trên SaveBar (z-index 180)
+            zIndex: 9999,
+          },
+        }}
       />
     </QueryClientProvider>
   </React.StrictMode>

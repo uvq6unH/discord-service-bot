@@ -590,6 +590,8 @@ body::after {
   overflow-y: auto;
   overflow-x: hidden;
   padding: var(--s8);
+  /* Extra bottom padding khi SaveBar hiện để nội dung không bị che */
+  padding-bottom: calc(var(--s8) + 72px);
   scrollbar-width: thin;
   scrollbar-color: var(--surface-3) transparent;
 }
@@ -919,16 +921,15 @@ body::after {
 }
 
 /* ── Save bar ────────────────────────────────────────────────────────────── */
-/* FIX: animation dùng CSS translate thay vì framer-motion transform wrapper   */
-/* Lý do: motion.div với transform tạo stacking context                        */
-/* → position:fixed bên trong bị offset theo parent thay vì viewport           */
-/* Solution: SaveBar tự animate qua CSS transition + translateY                 */
+/* KHÔNG dùng transform (kể cả translate) — sẽ tạo stacking context mới      */
+/* khiến Toaster (position:fixed) bị đặt sai hoặc bị clip                    */
+/* Animation: dùng bottom offset + opacity thay cho translateY                 */
 .save-bar {
   position: fixed;
-  /* Canh giữa màn hình, đủ xa Toaster bottom-right (320px) */
-  left: 50%;
-  bottom: var(--s6);
-  transform: translateX(-50%) translateY(calc(100% + var(--s6)));
+  /* Canh giữa bằng width cố định + left/right auto — không cần transform */
+  width: 380px;
+  left: calc(50% - 190px);
+  bottom: -80px;          /* ẩn bên dưới viewport */
   display: flex;
   align-items: center;
   gap: var(--s4);
@@ -937,21 +938,18 @@ body::after {
   border-radius: var(--r6);
   padding: var(--s3) var(--s5);
   box-shadow: 0 8px 32px rgba(0,0,0,0.45), 0 2px 8px rgba(0,0,0,0.3);
-  /* z-index dưới Toaster sonner (z=999) để toast hiện trên */
-  z-index: 180;
+  z-index: 180;           /* dưới Toaster sonner z=999 */
   backdrop-filter: blur(16px);
-  min-width: 300px;
-  max-width: 460px;
   opacity: 0;
   pointer-events: none;
   transition:
-    transform 0.28s cubic-bezier(0.16, 1, 0.3, 1),
-    opacity   0.22s ease;
+    bottom   0.28s cubic-bezier(0.16, 1, 0.3, 1),
+    opacity  0.22s ease;
 }
 
-/* Visible state — thêm class này thay vì dùng framer */
+/* Visible state — slide up bằng bottom, không transform */
 .save-bar--visible {
-  transform: translateX(-50%) translateY(0);
+  bottom: var(--s6);
   opacity: 1;
   pointer-events: auto;
 }
