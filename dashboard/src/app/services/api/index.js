@@ -39,9 +39,15 @@ export async function apiFetch(url, init = {}, { allowNotOk = false } = {}) {
   }
 
   // Default content-type cho JSON body
-  if (init.body && typeof init.body === 'object' && !(init.body instanceof FormData)) {
-    headers.set('Content-Type', 'application/json');
-    init = { ...init, body: JSON.stringify(init.body) };
+  if (init.body && !(init.body instanceof FormData)) {
+    if (typeof init.body === 'object') {
+      // Object → stringify
+      headers.set('Content-Type', 'application/json');
+      init = { ...init, body: JSON.stringify(init.body) };
+    } else if (typeof init.body === 'string' && !headers.has('Content-Type')) {
+      // String đã stringify → chỉ set header nếu chưa có
+      headers.set('Content-Type', 'application/json');
+    }
   }
 
   let res = await fetch(url, { ...init, headers });
@@ -74,7 +80,9 @@ export async function apiFetch(url, init = {}, { allowNotOk = false } = {}) {
 
   if (!res.ok && !allowNotOk) {
     const body = await res.json().catch(() => ({ error: res.statusText }));
-    throw new Error(body?.error ?? `HTTP ${res.status}`);
+    const msg = body?.error ?? body?.message ?? `HTTP ${res.status} ${res.statusText}`;
+    console.error('[apiFetch] error', res.status, url, body);
+    throw new Error(msg);
   }
 
   return res;
@@ -95,10 +103,23 @@ export const api = {
 
   /** Lưu config — trả về { config, slashSync } */
   saveConfig: async (guildId, config) => {
-    const res = await apiFetch(`/api/config?guildId=${encodeURIComponent(guildId)}`, { method: 'PUT', body: config });
-    const data = await res.json();
-    // Server trả về { config, slashSync } — trả nguyên để GuildContext dùng
-    return data.config ?? data; // backward compat nếu chưa deploy server mới
+    console.log('[api.saveConfig] sending PUT /api/config?guildId=' + guildId);
+    console.log('[api.saveConfig] body typeof:', typeof config);
+    const res = await apiFetch(
+      `/api/config?guildId=${encodeURIComponent(guildId)}`,
+      {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        // Đảm bảo body luôn là string — apiFetch chỉ stringify nếu typeof === 'object'
+        // nhưng nếu đã stringify rồi thì sẽ double-encode
+        body: typeof config === 'string' ? config : JSON.stringify(config),
+      }
+    );
+    const text = await res.text();
+    console.log('[api.saveConfig] raw response:', text);
+    let data;
+    try { data = JSON.parse(text); } catch { data = {}; }
+    return data.config ?? data;
   },
 
   /** Lấy channels + roles của guild (cho dropdown) */

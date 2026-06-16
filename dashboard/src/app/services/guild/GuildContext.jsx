@@ -57,9 +57,23 @@ export function GuildProvider({ children }) {
   const [saveStatus, setSaveStatus] = useState('idle');
 
   const saveMutation = useMutation({
-    mutationFn: (patch) => api.saveConfig(selectedGuildId, patch),
+    mutationFn: async (patch) => {
+      console.group('[GuildContext] saveConfig');
+      console.log('guildId:', selectedGuildId);
+      console.log('patch keys:', Object.keys(patch));
+      console.log('patch:', JSON.stringify(patch, null, 2));
+      try {
+        const result = await api.saveConfig(selectedGuildId, patch);
+        console.log('✅ response:', result);
+        console.groupEnd();
+        return result;
+      } catch (err) {
+        console.error('❌ error:', err);
+        console.groupEnd();
+        throw err;
+      }
+    },
     onSuccess: () => {
-      // Invalidate để refetch fresh data từ Upstash — tránh ghi đè sai format
       queryClient.invalidateQueries({ queryKey: ['config', selectedGuildId] });
       setDirty(false);
       setSaveStatus('saved');
@@ -68,7 +82,8 @@ export function GuildProvider({ children }) {
     },
     onError: (err) => {
       setSaveStatus('error');
-      toast.error('Lỗi khi lưu: ' + (err?.message ?? 'thử lại'));
+      console.error('[GuildContext] save failed:', err);
+      toast.error('Lỗi khi lưu: ' + (err?.message ?? 'unknown'));
       setTimeout(() => setSaveStatus('idle'), 3000);
     },
   });
