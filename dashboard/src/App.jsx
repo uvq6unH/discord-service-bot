@@ -128,18 +128,10 @@ function DashboardLayout() {
               </ErrorBoundary>
             </main>
 
-            <AnimatePresence>
-              {dirty && (
-                <motion.div
-                  initial={{ y: 80, opacity: 0 }}
-                  animate={{ y: 0, opacity: 1 }}
-                  exit={{ y: 80, opacity: 0 }}
-                  transition={{ type: 'spring', stiffness: 400, damping: 30 }}
-                >
-                  <SaveBar onSave={saveConfig} status={saveStatus} />
-                </motion.div>
-              )}
-            </AnimatePresence>
+            {/* SaveBar: luôn mount — CSS transition handle show/hide */}
+            {/* KHÔNG wrap bằng motion.div — transform tạo stacking context */}
+            {/* khiến position:fixed không còn relative với viewport */}
+            <SaveBar onSave={saveConfig} status={saveStatus} dirty={dirty} />
           </>
         )}
       </div>

@@ -85,10 +85,14 @@ export function PageHeader({ title, subtitle, children }) {
 }
 
 // ── SaveBar ───────────────────────────────────────────────────────────────────
+// FIX: SaveBar KHÔNG nằm trong motion.div có transform
+// → transform tạo stacking context → position:fixed bị offset theo parent
+// Dùng CSS transition + translateY trực tiếp trên .save-bar thay vì framer
 
-export function SaveBar({ onSave, status }) {
+export function SaveBar({ onSave, status, dirty }) {
+  const visible = dirty || status === 'saved' || status === 'error';
   return (
-    <div className={`save-bar save-bar--${status}`}>
+    <div className={`save-bar save-bar--${status}${visible ? ' save-bar--visible' : ''}`}>
       <span className="save-bar__msg">
         {status === 'saving' && 'Đang lưu…'}
         {status === 'saved'  && '✓ Đã lưu thành công'}

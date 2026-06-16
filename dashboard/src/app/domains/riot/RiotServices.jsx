@@ -64,12 +64,12 @@ export default function RiotServicesPage() {
       </SectionCard>
 
       <SectionCard title="League of Legends" icon={<Crown size={14} strokeWidth={1.75} />}
-        toggle={{ enabled: config.lolEnabled ?? false, onChange: v => updateConfig({ lolEnabled: v }) }}>
+        enabled={config.lolEnabled ?? false} onToggle={v => updateConfig({ lolEnabled: v })}>
         <CmdRef cmds={['rank', 'profile', 'mastery', 'live', 'history']} />
       </SectionCard>
 
       <SectionCard title="Teamfight Tactics" icon={<Database size={14} strokeWidth={1.75} />}
-        toggle={{ enabled: config.tftEnabled ?? false, onChange: v => updateConfig({ tftEnabled: v }) }}>
+        enabled={config.tftEnabled ?? false} onToggle={v => updateConfig({ tftEnabled: v })}>
         <CmdRef cmds={['tftrank', 'tftprofile', 'tftcomp', 'tftlive']} />
       </SectionCard>
     </motion.div>

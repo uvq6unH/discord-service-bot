@@ -919,23 +919,41 @@ body::after {
 }
 
 /* ── Save bar ────────────────────────────────────────────────────────────── */
+/* FIX: animation dùng CSS translate thay vì framer-motion transform wrapper   */
+/* Lý do: motion.div với transform tạo stacking context                        */
+/* → position:fixed bên trong bị offset theo parent thay vì viewport           */
+/* Solution: SaveBar tự animate qua CSS transition + translateY                 */
 .save-bar {
   position: fixed;
-  bottom: var(--s6);
+  /* Canh giữa màn hình, đủ xa Toaster bottom-right (320px) */
   left: 50%;
-  transform: translateX(-50%);
+  bottom: var(--s6);
+  transform: translateX(-50%) translateY(calc(100% + var(--s6)));
   display: flex;
   align-items: center;
   gap: var(--s4);
   background: var(--surface-2);
   border: 1px solid var(--border-strong);
   border-radius: var(--r6);
-  padding: var(--s3) var(--s4);
-  box-shadow: var(--shadow-lg);
-  z-index: 200;
-  backdrop-filter: blur(12px);
-  min-width: 280px;
-  max-width: 480px;
+  padding: var(--s3) var(--s5);
+  box-shadow: 0 8px 32px rgba(0,0,0,0.45), 0 2px 8px rgba(0,0,0,0.3);
+  /* z-index dưới Toaster sonner (z=999) để toast hiện trên */
+  z-index: 180;
+  backdrop-filter: blur(16px);
+  min-width: 300px;
+  max-width: 460px;
+  opacity: 0;
+  pointer-events: none;
+  transition:
+    transform 0.28s cubic-bezier(0.16, 1, 0.3, 1),
+    opacity   0.22s ease;
+}
+
+/* Visible state — thêm class này thay vì dùng framer */
+.save-bar--visible {
+  transform: translateX(-50%) translateY(0);
+  opacity: 1;
+  pointer-events: auto;
 }
 
 .save-bar__msg {

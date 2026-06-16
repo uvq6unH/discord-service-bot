@@ -106,7 +106,7 @@ export default function ReminderServicesPage() {
       </div>
 
       <SectionCard title="Reminder System" icon={<Bell size={14} strokeWidth={1.75} />}
-        toggle={{ enabled: config.remindersEnabled ?? false, onChange: v => updateConfig({ remindersEnabled: v }) }}>
+        enabled={config.remindersEnabled ?? false} onToggle={v => updateConfig({ remindersEnabled: v })}>
         <ReminderEditor
           reminders={config.reminders ?? []}
           onChange={v => updateConfig({ reminders: v })}

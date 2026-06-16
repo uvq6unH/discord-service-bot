@@ -54,14 +54,23 @@ export function GuildProvider({ children }) {
     staleTime: 5 * 60 * 1000,
   });
 
+  const [saveStatus, setSaveStatus] = useState('idle');
+
   const saveMutation = useMutation({
     mutationFn: (patch) => api.saveConfig(selectedGuildId, patch),
     onSuccess: (saved) => {
       queryClient.setQueryData(['config', selectedGuildId], saved);
       setDirty(false);
+      setSaveStatus('saved');
       toast.success('Đã lưu thành công');
+      // Giữ 'saved' state 2s để animation out hoàn thành, rồi reset
+      setTimeout(() => setSaveStatus('idle'), 2000);
     },
-    onError: () => toast.error('Lỗi khi lưu — thử lại'),
+    onError: () => {
+      setSaveStatus('error');
+      toast.error('Lỗi khi lưu — thử lại');
+      setTimeout(() => setSaveStatus('idle'), 3000);
+    },
   });
 
   const selectGuild = useCallback((guild) => {
@@ -71,11 +80,25 @@ export function GuildProvider({ children }) {
   }, []);
 
   const updateConfig = useCallback((patch) => {
-    queryClient.setQueryData(['config', selectedGuildId], prev =>
-      prev ? { ...prev, ...patch } : prev
-    );
+    queryClient.setQueryData(['config', selectedGuildId], prev => {
+      if (!prev) return prev;
+      // Deep merge 1 level: nếu value là object (và không phải array),
+      // merge vào key đó thay vì replace — ví dụ: updateConfig({ music: { defaultVolume: 70 } })
+      // sẽ giữ nguyên các field khác của config.music
+      const next = { ...prev };
+      for (const [k, v] of Object.entries(patch)) {
+        if (v !== null && typeof v === 'object' && !Array.isArray(v) && typeof prev[k] === 'object' && prev[k] !== null) {
+          next[k] = { ...prev[k], ...v };
+        } else {
+          next[k] = v;
+        }
+      }
+      return next;
+    });
     setDirty(true);
-  }, [queryClient, selectedGuildId]);
+    // Reset error state khi user thay đổi config mới
+    if (saveStatus === 'error') setSaveStatus('idle');
+  }, [queryClient, selectedGuildId, saveStatus]);
 
   const saveConfig = useCallback(async () => {
     if (!selectedGuildId || !config) return;
@@ -85,10 +108,9 @@ export function GuildProvider({ children }) {
     await saveMutation.mutateAsync(patch);
   }, [selectedGuildId, config, saveMutation]);
 
-  const saveStatus = saveMutation.isPending ? 'saving'
-    : saveMutation.isSuccess ? 'saved'
-    : saveMutation.isError   ? 'error'
-    : 'idle';
+  // saveStatus là state riêng — tránh React Query reset isSuccess quá nhanh
+  // Khi mutate đang chạy, override về 'saving'
+  const effectiveSaveStatus = saveMutation.isPending ? 'saving' : saveStatus;
 
   return (
     <GuildContext.Provider value={{
@@ -97,7 +119,7 @@ export function GuildProvider({ children }) {
       guildData,
       configLoading,
       dirty,
-      saveStatus,
+      saveStatus: effectiveSaveStatus,
       userRole,
       selectGuild,
       updateConfig,
