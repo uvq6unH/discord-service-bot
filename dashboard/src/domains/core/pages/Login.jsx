@@ -3,7 +3,7 @@ import { Bot } from 'lucide-react';
 
 export default function LoginPage() {
   const handleLogin = () => {
-    window.location.href = '/auth/discord';
+    window.location.href = '/auth/login';
   };
 
   return (

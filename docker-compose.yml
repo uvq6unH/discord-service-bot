@@ -1,0 +1,49 @@
+services:
+  # ── Discord Bot ─────────────────────────────────────────────────────────────
+  bot:
+    build: .
+    command: node src/index.bot.js
+    env_file: .env
+    environment:
+      NODE_ENV: development
+      PORT: 10000
+    volumes:
+      # Mount src/ → update code không cần rebuild image
+      - ./src:/app/src:ro
+      - bot-logs:/app/logs
+      - app-data:/app/data
+    restart: unless-stopped
+    networks:
+      - bot-net
+
+  # ── Dashboard (Express API + serve React UI) ─────────────────────────────────
+  dashboard:
+    build: .
+    command: node src/index.server.js
+    env_file: .env
+    environment:
+      NODE_ENV: development
+      PORT: 10001
+    ports:
+      - "10001:10001"
+    volumes:
+      # Mount src/ → update JS không cần rebuild
+      - ./src:/app/src:ro
+      # Mount dashboard/src/ → nếu muốn rebuild UI thủ công bên trong container
+      - ./dashboard:/app/dashboard:ro
+      # public-react/ từ image (build lần đầu) — override bằng bind mount khi
+      # muốn dev UI: uncomment dòng dưới rồi chạy `pnpm build:ui` tay
+      # - ./public-react:/app/public-react:ro
+      - bot-logs:/app/logs
+      - app-data:/app/data
+    restart: unless-stopped
+    networks:
+      - bot-net
+
+volumes:
+  bot-logs:
+  app-data:
+
+networks:
+  bot-net:
+    driver: bridge

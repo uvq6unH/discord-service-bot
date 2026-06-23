@@ -1,0 +1,12 @@
+node_modules
+dashboard/node_modules
+.env
+logs/
+data/configs.json
+data/state.json
+public-react/
+*.log
+*.bak
+.git
+.github
+.claude
