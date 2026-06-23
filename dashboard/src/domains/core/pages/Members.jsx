@@ -1,0 +1,160 @@
+import React from 'react';
+import Workspace, { HeaderZone, StatusZone, KpiTile } from '../../../shared/layouts/Workspace.jsx';
+import Panel from '../../../shared/primitives/Panel.jsx';
+import { useGuild } from '../hooks/useGuild.js';
+import { useMembers } from '../hooks/useMembers.js';
+import { Search } from 'lucide-react';
+
+function getDefaultAvatarIndex(id) {
+  try {
+    return Number(BigInt(id || '0') % 5n);
+  } catch {
+    return 0;
+  }
+}
+
+export default function MembersPage() {
+  const { selectedGuild } = useGuild();
+  const {
+    members,
+    total,
+    pageCount,
+    loading,
+    page,
+    setPage,
+    search,
+    handleSearch
+  } = useMembers(selectedGuild?.id);
+
+  return (
+    <Workspace>
+      {/* 1. Header Zone */}
+      <HeaderZone
+        title="MEMBERS REGISTRY"
+        subtitle="Operational directory of all registered server member accounts."
+      />
+
+      {/* 2. Status Zone */}
+      <StatusZone>
+        <KpiTile 
+          label="Total Guild Accounts" 
+          value={total} 
+          sub="DB_MEMBER_COUNT"
+        />
+        <KpiTile 
+          label="Active Session Page" 
+          value={`${page} / ${Math.max(pageCount, 1)}`} 
+          sub="REGISTRY_PAGINATION"
+        />
+      </StatusZone>
+
+      {/* 3. Workspace Zone */}
+      <div className="grid-12">
+        <div className="col-span-12">
+          <Panel title="REGISTRY DATABASE SEARCH" accent>
+            {/* Search Input Box */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', border: '1px solid var(--border)', padding: 'var(--space-2-5) var(--space-3-5)', backgroundColor: 'var(--surface-1)' }}>
+              <Search size={16} style={{ color: 'var(--text-3)' }} />
+              <input
+                className="form-input"
+                style={{ border: 'none', background: 'transparent', padding: 0 }}
+                placeholder="Query member handle or ID..."
+                value={search}
+                onChange={e => handleSearch(e.target.value)}
+              />
+            </div>
+
+            {/* Members List Table */}
+            {loading ? (
+              <div style={{ padding: 'var(--space-10)', textAlign: 'center', fontFamily: 'var(--font-mono)', fontSize: '12px', color: 'var(--text-3)' }}>
+                QUERYING DATABASE RECORD SETS...
+              </div>
+            ) : (
+              <div style={{ border: '1px solid var(--border)', display: 'flex', flexDirection: 'column' }}>
+                {/* Table Header */}
+                <div style={{
+                  display: 'grid',
+                  gridTemplateColumns: '48px 1fr 1fr 1fr',
+                  padding: 'var(--space-3) var(--space-4)',
+                  backgroundColor: 'var(--surface-1)',
+                  borderBottom: '1px solid var(--border)',
+                  fontFamily: 'var(--font-mono)',
+                  fontSize: '11px',
+                  fontWeight: 'bold',
+                  color: 'var(--text-3)'
+                }}>
+                  <span>AVATAR</span>
+                  <span>DISPLAY NAME</span>
+                  <span>USER HANDLE</span>
+                  <span style={{ textAlign: 'right' }}>TIMESTAMP JOINED</span>
+                </div>
+
+                {/* Table Rows */}
+                {members.map(member => (
+                  <div
+                    key={member.id}
+                    style={{
+                      display: 'grid',
+                      gridTemplateColumns: '48px 1fr 1fr 1fr',
+                      alignItems: 'center',
+                      padding: 'var(--space-3) var(--space-4)',
+                      borderBottom: '1px solid var(--border)',
+                      fontSize: '13px'
+                    }}
+                  >
+                    <img
+                      src={member.avatar
+                        ? `https://cdn.discordapp.com/avatars/${member.id}/${member.avatar}.png?size=64`
+                        : `https://discordapp.com/embed/avatars/${getDefaultAvatarIndex(member.id)}.png`
+                      }
+                      alt=""
+                      style={{ width: '24px', height: '24px', border: '1px solid var(--border)' }}
+                    />
+                    <span style={{ fontWeight: 'bold', color: 'var(--text-1)' }}>
+                      {member.displayName ?? member.username}
+                    </span>
+                    <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--text-2)', fontSize: '12px' }}>
+                      @{member.username}
+                    </span>
+                    <span style={{ textAlign: 'right', fontFamily: 'var(--font-mono)', color: 'var(--text-3)', fontSize: '12px' }}>
+                      {member.joinedAt ? new Date(member.joinedAt).toLocaleDateString('vi-VN') : '—'}
+                    </span>
+                  </div>
+                ))}
+
+                {members.length === 0 && (
+                  <div style={{ padding: 'var(--space-6)', textAlign: 'center', fontFamily: 'var(--font-mono)', fontSize: '12px', color: 'var(--text-3)' }}>
+                    NO DATA MATCHED THE RECORD QUERY.
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Pagination controls */}
+            {pageCount > 1 && (
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 'var(--space-4)' }}>
+                <button
+                  className="btn btn--secondary"
+                  disabled={page <= 1}
+                  onClick={() => setPage(p => p - 1)}
+                >
+                  &lt; prev
+                </button>
+                <span style={{ fontFamily: 'var(--font-mono)', fontSize: '12px' }}>
+                  PAGE {page} OF {pageCount}
+                </span>
+                <button
+                  className="btn btn--secondary"
+                  disabled={page >= pageCount}
+                  onClick={() => setPage(p => p + 1)}
+                >
+                  next &gt;
+                </button>
+              </div>
+            )}
+          </Panel>
+        </div>
+      </div>
+    </Workspace>
+  );
+}
