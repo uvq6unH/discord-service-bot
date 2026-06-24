@@ -75,6 +75,7 @@ export type RepeatInterval = 'none' | 'hourly' | 'daily' | 'weekly';
 export interface Reminder {
   id: string;
   userIds: string[];
+  roleIds?: string[];
   channelId: string;
   message: string;
   /** ISO 8601 string */

@@ -9,15 +9,9 @@ import { AuthProvider } from './app/providers/AuthProvider.jsx';
 import { GuildProvider } from './app/providers/GuildProvider.jsx';
 import './design/index.css';
 
-const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      staleTime: 30_000,
-      retry: 1,
-      refetchOnWindowFocus: false,
-    },
-  },
-});
+import { getQueryClient } from './app/services/queryClient.js';
+
+const queryClient = getQueryClient();
 
 createRoot(document.getElementById('root')).render(
   <React.StrictMode>

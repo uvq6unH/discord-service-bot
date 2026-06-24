@@ -1,26 +1,24 @@
 # syntax=docker/dockerfile:1
 FROM node:20-alpine
 
-# Install pnpm
-RUN corepack enable && corepack prepare pnpm@9.15.4 --activate
+RUN corepack enable && corepack prepare pnpm@9.15.4 --activate \
+ && npm install -g nodemon
 
 WORKDIR /app
 
-# Copy workspace manifests
-COPY package.json pnpm-workspace.yaml .npmrc ./
-COPY dashboard/package.json ./dashboard/
-
-# Install all deps (root + dashboard)
+# ── Root (bot) ────────────────────────────────────────────────────────────────
+COPY package.json .npmrc ./
 RUN pnpm install
 
-# Build dashboard UI → public-react/
+# ── Dashboard: COPY source trước, install sau ─────────────────────────────────
 COPY dashboard/ ./dashboard/
-RUN pnpm build:ui
+RUN cd dashboard && npm install
+RUN cd dashboard && npm run build
 
-# Copy source (node_modules đã có, chỉ cần src)
+# ── Bot source ────────────────────────────────────────────────────────────────
 COPY src/ ./src/
+COPY pnpm-workspace.yaml ./
 
-# Tạo thư mục cần thiết
 RUN mkdir -p logs data
 
 EXPOSE 10000 10001

@@ -103,8 +103,6 @@ export const api = {
 
   /** Lưu config — trả về { config, slashSync } */
   saveConfig: async (guildId, config) => {
-    console.log('[api.saveConfig] sending PUT /api/config?guildId=' + guildId);
-    console.log('[api.saveConfig] body typeof:', typeof config);
     const res = await apiFetch(
       `/api/config?guildId=${encodeURIComponent(guildId)}`,
       {
@@ -116,7 +114,6 @@ export const api = {
       }
     );
     const text = await res.text();
-    console.log('[api.saveConfig] raw response:', text);
     let data;
     try { data = JSON.parse(text); } catch { data = {}; }
     return data.config ?? data;
@@ -127,8 +124,8 @@ export const api = {
     apiFetch(`/api/guild-data?guildId=${encodeURIComponent(guildId)}`).then(r => r.json()),
 
   /** Lấy members page */
-  members: (guildId, page = 1, search = '') =>
-    apiFetch(`/api/members?guildId=${encodeURIComponent(guildId)}&page=${page}&search=${encodeURIComponent(search)}`).then(r => r.json()),
+  members: (guildId, page = 1, search = '', limit = 20) =>
+    apiFetch(`/api/members?guildId=${encodeURIComponent(guildId)}&page=${page}&search=${encodeURIComponent(search)}&limit=${limit}`).then(r => r.json()),
 
   /** Invite URL */
   inviteUrl: (guildId) =>

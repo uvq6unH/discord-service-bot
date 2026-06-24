@@ -1,8 +1,17 @@
 import { useGuild } from '../../../shared/hooks/useGuild.js';
 import { reminderService } from '../services/reminder.service.js';
+import { useQuery } from '@tanstack/react-query';
+import { api } from '../../../app/services/api/index.js';
 
 export function useReminders() {
   const { config, updateConfig, configLoading, guildData } = useGuild();
+  const selectedGuildId = config?.guildId ?? null;
+
+  const { data: members = [] } = useQuery({
+    queryKey: ['members', selectedGuildId, 1, '', 1000],
+    queryFn: () => api.members(selectedGuildId, 1, '', 1000).then(r => r.members ?? []),
+    enabled: !!selectedGuildId,
+  });
 
   const handleUpdate = (patch) => {
     updateConfig(patch);
@@ -35,6 +44,8 @@ export function useReminders() {
     config: config ?? null,
     loading: configLoading,
     channels: guildData?.channels ?? [],
+    roles: guildData?.roles ?? [],
+    members,
     updateConfig: handleUpdate,
     addReminder,
     removeReminder,

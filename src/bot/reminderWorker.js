@@ -35,10 +35,16 @@ async function processOneReminder(reminder, guild) {
     const ids = Array.isArray(reminder.userIds) && reminder.userIds.length
       ? reminder.userIds
       : (reminder.userId ? [reminder.userId] : []);
-    const mentions     = ids.map((id) => `<@${id}>`).join(' ');
+    const userMentions = ids.map((id) => `<@${id}>`).join(' ');
+
+    const roleIds = Array.isArray(reminder.roleIds) ? reminder.roleIds : [];
+    const roleMentions = roleIds.map((id) => `<@&${id}>`).join(' ');
+
+    const mentions = [userMentions, roleMentions].filter(Boolean).join(' ');
     const repeatLabel  = REPEAT_LABELS[reminder.repeat] ?? '';
     const resolvedMsg  = resolveEmojiNames(reminder.message, guild);
-    await channel.send(`${mentions} ${resolvedMsg}${repeatLabel}`).catch(() => null);
+    const finalText = mentions ? `${mentions} ${resolvedMsg}${repeatLabel}` : `${resolvedMsg}${repeatLabel}`;
+    await channel.send(finalText).catch(() => null);
   }
 
   const repeat = reminder.repeat ?? 'none';

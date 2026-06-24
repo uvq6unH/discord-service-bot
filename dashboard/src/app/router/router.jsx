@@ -1,5 +1,6 @@
 import React, { lazy } from 'react';
-import { Routes, Route, Navigate } from 'react-router-dom';
+import { Routes, Route, Navigate, Outlet } from 'react-router-dom';
+import GuildGuard from '../../shared/navigation/GuildGuard.jsx';
 
 // Core operations
 const OverviewPage = lazy(() => import('../../domains/core/pages/Overview.jsx'));
@@ -28,26 +29,22 @@ export default function AppRoutes() {
       {/* Default redirect to overview */}
       <Route path="/"            element={<Navigate to="/overview" replace />} />
 
-      {/* Core Operations */}
-      <Route path="/overview"    element={<OverviewPage />} />
-      <Route path="/members"     element={<MembersPage />} />
-      <Route path="/commands"    element={<CommandsPage />} />
-      <Route path="/economy"     element={<EconomyPage />} />
-      <Route path="/moderation"  element={<ModerationPage />} />
-      <Route path="/analytics"   element={<AnalyticsPage />} />
+      {/* Global System Telemetry (Guild-independent) */}
       <Route path="/system"      element={<SystemPage />} />
 
-      {/* Riot Services */}
-      <Route path="/riot"        element={<RiotServicesPage />} />
-
-      {/* Music Services */}
-      <Route path="/music"       element={<MusicServicesPage />} />
-
-      {/* Reminder Services */}
-      <Route path="/reminders"   element={<ReminderServicesPage />} />
-
-      {/* AI Services */}
-      <Route path="/ai"          element={<AiServicesPage />} />
+      {/* Guild-Scoped Sub-routes Guarded by GuildGuard */}
+      <Route element={<GuildGuard><Outlet /></GuildGuard>}>
+        <Route path="/overview"    element={<OverviewPage />} />
+        <Route path="/members"     element={<MembersPage />} />
+        <Route path="/commands"    element={<CommandsPage />} />
+        <Route path="/economy"     element={<EconomyPage />} />
+        <Route path="/moderation"  element={<ModerationPage />} />
+        <Route path="/analytics"   element={<AnalyticsPage />} />
+        <Route path="/riot"        element={<RiotServicesPage />} />
+        <Route path="/music"       element={<MusicServicesPage />} />
+        <Route path="/reminders"   element={<ReminderServicesPage />} />
+        <Route path="/ai"          element={<AiServicesPage />} />
+      </Route>
 
       {/* Fallback redirect */}
       <Route path="*"            element={<Navigate to="/overview" replace />} />

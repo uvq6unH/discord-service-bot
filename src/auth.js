@@ -25,7 +25,7 @@ function safeReturnTo(value) {
   }
 }
 
-export function createAuthRouter(botClient, redis = null) {
+export function createAuthRouter(botClient, redis = null, guildService = null) {
   const clientId = process.env.DISCORD_CLIENT_ID;
   const clientSecret = process.env.DISCORD_CLIENT_SECRET;
   const redirectUri = process.env.DISCORD_REDIRECT_URI;
@@ -78,33 +78,11 @@ export function createAuthRouter(botClient, redis = null) {
 
   const router = Router();
 
-  // Guild cache — Redis-backed để survive qua restart, tránh rate limit Discord API.
-  // Fallback về in-memory Map nếu Redis không có (local dev).
-  const GUILD_CACHE_TTL = 5 * 60; // 300 giây (Redis EX)
-  const GUILD_CACHE_TTL_MS = GUILD_CACHE_TTL * 1000;
-  const _guildCacheMem = new Map(); // fallback khi không có Redis
-
+  // Caching helpers linked to centralized guildService
   async function getCachedGuilds(userId) {
-    if (redis) {
-      try {
-        const raw = await redis.get(`auth:guild_cache:${userId}`);
-        return raw ? JSON.parse(raw) : null;
-      } catch { return null; }
-    }
-    const entry = _guildCacheMem.get(userId);
-    if (!entry) return null;
-    if (Date.now() > entry.expiresAt) { _guildCacheMem.delete(userId); return null; }
-    return entry.guilds;
-  }
-
-  async function setCachedGuilds(userId, guilds) {
-    if (redis) {
-      try {
-        await redis.set(`auth:guild_cache:${userId}`, JSON.stringify(guilds), 'EX', GUILD_CACHE_TTL);
-      } catch { /* non-fatal */ }
-      return;
-    }
-    _guildCacheMem.set(userId, { guilds, expiresAt: Date.now() + GUILD_CACHE_TTL_MS });
+    if (!guildService) return null;
+    const cache = await guildService.getCachedGuilds(userId);
+    return cache ? cache.guilds : null;
   }
 
   // GET /auth/login
@@ -295,26 +273,7 @@ export function createAuthRouter(botClient, redis = null) {
     }
   }
 
-  async function fetchUserGuilds(accessToken) {
-    const ctrl = new AbortController();
-    const t = setTimeout(() => ctrl.abort(), 10_000);
-    try {
-      const res = await fetch(`${DISCORD_API}/users/@me/guilds`, {
-        headers: { Authorization: `Bearer ${accessToken}` },
-        signal: ctrl.signal,
-      });
-      if (!res.ok) {
-        console.warn(`[auth] fetchUserGuilds → HTTP ${res.status}`);
-        return null;
-      }
-      return await res.json();
-    } catch (err) {
-      console.warn(`[auth] fetchUserGuilds → exception: ${err.message}`);
-      return null;
-    } finally {
-      clearTimeout(t);
-    }
-  }
+  // Removed old fetchUserGuilds in favor of guildService.fetchAndCacheUserGuilds
 
   // Kiểm tra user có permission ManageGuild (0x20) hoặc Administrator (0x8) trong guild không
   function hasManagePermission(userGuilds, guildId) {
@@ -337,58 +296,34 @@ export function createAuthRouter(botClient, redis = null) {
 
     try {
       if (!req.session.user.accessToken && !req.session.user.refreshToken) {
-        // Session cũ không có token — yêu cầu login lại
         return res.status(401).json({ error: 'Phiên đăng nhập hết hạn, vui lòng đăng nhập lại.', loginUrl: '/auth/login' });
       }
 
-      // Dùng cache guilds trong session để tránh gọi API liên tục
       const userId = req.session.user.id;
-      let userGuilds = await getCachedGuilds(userId);
-      if (!userGuilds) {
-        // Auto-refresh access token nếu đã expire
-        let accessToken = req.session.user.accessToken;
-        const expiresAt = req.session.user.expiresAt ?? 0;
-        if (Date.now() > expiresAt - 60_000) {
-          const newToken = await refreshAccessToken(req);
-          if (newToken) accessToken = newToken;
-        }
-        userGuilds = await fetchUserGuilds(accessToken);
-        if (userGuilds) {
-          await setCachedGuilds(userId, userGuilds);
-        } else {
-          // Discord API unavailable (rate limit / network).
-          // Fallback 1: botClient trực tiếp (monolith mode)
-          console.warn('[auth] fetchUserGuilds failed — falling back to guild cache for', userId);
-          const botGuild = botClient?.guilds?.cache?.get(guildId);
-          if (botGuild) {
-            try {
-              const member = await botGuild.members.fetch(userId).catch(() => null);
-              if (member && (botGuild.ownerId === userId || member.permissions.has('ManageGuild') || member.permissions.has('Administrator'))) {
-                console.log('[auth] botClient fallback granted for', userId, 'in', guildId);
-                return next();
-              }
-            } catch { /* ignore */ }
-          }
-          // Fallback 2: Redis guild_cache (split mode — botClient = null)
-          if (redis) {
-            try {
-              const raw = await redis.get(`guild_cache:${guildId}`);
-              if (raw) {
-                const meta = JSON.parse(raw);
-                if (meta.ownerId === userId) {
-                  console.log('[auth] Redis guild_cache fallback granted (owner) for', userId, 'in', guildId);
-                  return next();
-                }
-              }
-            } catch { /* ignore */ }
-          }
-          return res.status(403).json({ error: 'Không thể xác minh quyền truy cập. Vui lòng thử lại sau.' });
-        }
+      let accessToken = req.session.user.accessToken;
+      const expiresAt = req.session.user.expiresAt ?? 0;
+      if (Date.now() > expiresAt - 60_000) {
+        const newToken = await refreshAccessToken(req);
+        if (newToken) accessToken = newToken;
       }
 
+      if (!guildService) {
+        return res.status(500).json({ error: 'Guild service is not initialized.' });
+      }
+
+      // Authoritative unified pipeline call
+      const resState = await guildService.fetchAndCacheUserGuilds(userId, accessToken);
+
+      if (resState.status === 'syncing') {
+        return res.status(202).json({ status: 'syncing', retryAfter: resState.retryAfter ?? 2 });
+      }
+
+      if (resState.status === 'error' && (!resState.guilds || resState.guilds.length === 0)) {
+        return res.status(503).json({ error: 'Không thể tải danh sách server từ Discord. Vui lòng thử lại.' });
+      }
+
+      const userGuilds = resState.guilds || [];
       if (!hasManagePermission(userGuilds, guildId)) {
-        // Secondary fallback: if Discord OAuth list doesn't include the guild (e.g. cache stale),
-        // check via bot directly before hard-rejecting.
         const botGuild = botClient?.guilds?.cache?.get(guildId);
         if (botGuild) {
           try {

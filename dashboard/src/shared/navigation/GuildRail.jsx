@@ -43,19 +43,20 @@ export default function GuildRail({ guilds, selectedGuild, user, selectGuild, on
                 fontFamily: 'var(--font-mono)',
                 fontSize: '14px',
                 fontWeight: 'bold',
-                position: 'relative'
+                position: 'relative',
+                overflow: 'hidden'
               }}
               title={guild.name}
             >
+              <span>{guild.name.slice(0, 2).toUpperCase()}</span>
               {guild.icon ? (
                 <img 
                   src={guild.icon} 
                   alt="" 
-                  style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                  style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', objectFit: 'cover', zIndex: 2 }}
                   onError={(e) => { e.currentTarget.style.display = 'none'; }}
                 />
               ) : null}
-              <span>{guild.name.slice(0, 2).toUpperCase()}</span>
             </button>
           );
         })}
@@ -80,20 +81,21 @@ export default function GuildRail({ guilds, selectedGuild, user, selectGuild, on
                   justifyContent: 'center',
                   fontFamily: 'var(--font-mono)',
                   fontSize: '12px',
-                  position: 'relative'
+                  position: 'relative',
+                  overflow: 'hidden'
                 }}
                 title={`${guild.name} (Chưa cài bot)`}
               >
+                <span>{guild.name.slice(0, 2).toUpperCase()}</span>
                 {guild.icon ? (
                   <img 
                     src={guild.icon} 
                     alt="" 
-                    style={{ width: '100%', height: '100%', objectFit: 'cover', opacity: 0.4 }}
+                    style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', objectFit: 'cover', opacity: 0.4, zIndex: 2 }}
                     onError={(e) => { e.currentTarget.style.display = 'none'; }}
                   />
                 ) : null}
-                <span>{guild.name.slice(0, 2).toUpperCase()}</span>
-                <span style={{ position: 'absolute', right: '-2px', bottom: '-2px', background: 'var(--surface-3)', border: '1px solid var(--border)', width: '14px', height: '14px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '9px', color: 'var(--text-1)' }}>
+                <span style={{ position: 'absolute', right: '-2px', bottom: '-2px', background: 'var(--surface-3)', border: '1px solid var(--border)', width: '14px', height: '14px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '9px', color: 'var(--text-1)', zIndex: 3 }}>
                   <Plus size={8} />
                 </span>
               </button>

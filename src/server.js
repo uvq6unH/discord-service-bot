@@ -7,6 +7,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createAuthRouter } from './auth.js';
 import { createCsrfProtection } from './csrf.js';
+import { createGuildService } from './guildService.js';
 const snowflakePattern = /^\d{17,20}$/;
 // React build output (pnpm build:ui → public-react/)
 // Build trước khi deploy: pnpm build:ui
@@ -70,9 +71,9 @@ export function createServer({ configStore, stateStore, botClient, redis = null 
       directives: {
         defaultSrc: ["'self'"],
         scriptSrc: ["'self'"],
-        styleSrc: ["'self'", 'https://cdn.jsdelivr.net', 'https://fonts.googleapis.com'],
+        styleSrc: ["'self'", "'unsafe-inline'", 'https://cdn.jsdelivr.net', 'https://fonts.googleapis.com'],
         fontSrc: ["'self'", 'https://fonts.gstatic.com', 'https://cdn.jsdelivr.net'],
-        imgSrc: ["'self'", 'https://cdn.discordapp.com', 'data:'],
+        imgSrc: ["'self'", 'https://cdn.discordapp.com', 'https://discordapp.com', 'data:'],
         connectSrc: ["'self'", 'https://cdn.jsdelivr.net'],
         frameSrc: ["'none'"],
         objectSrc: ["'none'"],
@@ -140,12 +141,16 @@ export function createServer({ configStore, stateStore, botClient, redis = null 
 
   const GUILDS_CACHE_TTL    = 5 * 60_000;
   const GUILD_DATA_CACHE_TTL = 2 * 60_000;
-  const getCachedGuilds    = (uid)    => _cacheGet(`guilds:${uid}`);
-  const setCachedGuilds    = (uid, v) => _cacheSet(`guilds:${uid}`, v, GUILDS_CACHE_TTL);
+  const guildService = createGuildService(redis);
+
+  const getCachedGuilds    = async (uid) => {
+    const cache = await guildService.getCachedGuilds(uid);
+    return cache ? cache.guilds : null;
+  };
   const getCachedGuildData = (gid)    => _cacheGet(`guild-data:${gid}`);
   const setCachedGuildData = (gid, v) => _cacheSet(`guild-data:${gid}`, v, GUILD_DATA_CACHE_TTL);
 
-  const auth = createAuthRouter(botClient, redis);
+  const auth = createAuthRouter(botClient, redis, guildService);
   if (auth.attachTo) auth.attachTo(app);
 
   // GET /api/invite-url?guildId=xxx — trả về link mời bot vào server cụ thể
@@ -179,6 +184,7 @@ export function createServer({ configStore, stateStore, botClient, redis = null 
   app.get(/^\/(?!api|auth|health).*$/, (_req, res) => {
     const indexFile = path.join(publicDir, 'index.html');
     if (existsSync(indexFile)) {
+      res.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
       res.sendFile(indexFile);
     } else {
       res.status(503).send('Dashboard chưa được build. Chạy: pnpm build:ui');
@@ -197,6 +203,7 @@ export function createServer({ configStore, stateStore, botClient, redis = null 
     let botHeartbeat = null;
     let dashboardHeartbeat = null;
     let stats = null;
+    let redisConnected = false;
     if (redis) {
       try {
         const [rawBot, rawDash, slashSynced, cacheRefresh, discordErrors, queueLen] = await Promise.all([
@@ -207,6 +214,7 @@ export function createServer({ configStore, stateStore, botClient, redis = null 
           redis.get('stats:discord_errors').catch(() => null),
           redis.llen('slash_sync_queue').catch(() => null),
         ]);
+        redisConnected = true;
         if (rawBot) botHeartbeat = typeof rawBot === 'string' ? JSON.parse(rawBot) : rawBot;
         if (rawDash) dashboardHeartbeat = typeof rawDash === 'string' ? JSON.parse(rawDash) : rawDash;
         stats = {
@@ -229,6 +237,7 @@ export function createServer({ configStore, stateStore, botClient, redis = null 
       botUser: botClient?.user?.tag ?? botHeartbeat?.tag ?? null,
       guildCount: botClient?.guilds?.cache?.size ?? botHeartbeat?.guilds ?? 0,
       configuredGuilds: guildIds.length,
+      redisConnected,
       // Heartbeat fields (meaningful in split mode)
       bot: botHeartbeat ? {
         online: botHeartbeat.ready && botHeartbeatAgeMs < 90_000,
@@ -376,63 +385,35 @@ export function createServer({ configStore, stateStore, botClient, redis = null 
     }
   });
 
-  app.get('/api/guilds', auth.requireAuth, readRateLimit, async (req, res) => {
+  async function processGuildsList(userGuilds, isDev) {
     const configuredGuildIds = await configStore.listGuildIds();
-    const isDev = Boolean(req.session?.user?.dev);
     const guildsById = new Map();
 
-    // Lấy danh sách guilds user có quyền quản lý từ OAuth (cache trong session)
-    const _uid = req.session.user?.id;
-    let userGuilds = _uid ? getCachedGuilds(_uid) : null;
-    if (!userGuilds && !isDev) {
-      const accessToken = req.session.user?.accessToken;
-      if (accessToken) {
-        try {
-          const ctrl = new AbortController();
-          const t = setTimeout(() => ctrl.abort(), 10_000);
-          const oauthRes = await fetch('https://discord.com/api/v10/users/@me/guilds', {
-            headers: { Authorization: `Bearer ${accessToken}` },
-            signal: ctrl.signal,
-          }).finally(() => clearTimeout(t));
-          if (oauthRes.ok) {
-            userGuilds = await oauthRes.json();
-            if (_uid) setCachedGuilds(_uid, userGuilds);
-          }
-        } catch { /* fallback to empty */ }
-      }
-    }
-
-    // Build set của guild IDs user có ManageGuild hoặc Administrator
     const ADMINISTRATOR = 0x8n;
     const MANAGE_GUILD = 0x20n;
     const manageableIds = new Set(
       (userGuilds ?? [])
         .filter(g => {
-          if (g.owner) return true; // server owner
+          if (g.owner) return true;
           const p = BigInt(g.permissions ?? 0);
           return (p & ADMINISTRATOR) === ADMINISTRATOR || (p & MANAGE_GUILD) === MANAGE_GUILD;
         })
         .map(g => g.id)
     );
 
-    // Guilds bot đang có mặt — lấy từ botClient cache (monolith) hoặc Redis guild_cache (split mode)
     const botGuildIds = new Set();
     if (botClient?.guilds?.cache?.size) {
       for (const id of botClient.guilds.cache.keys()) botGuildIds.add(id);
     } else if (redis) {
-      // Split mode: bot đã write guild_cache:{id} khi khởi động
       try {
         const keys = await redis.keys('guild_cache:*');
         for (const key of (keys ?? [])) {
-          // Chỉ lấy key dạng guild_cache:{id} (không phải guild_cache:{id}:members)
           const parts = key.split(':');
           if (parts.length === 2) botGuildIds.add(parts[1]);
         }
-      } catch { /* fallback: botGuildIds rỗng */ }
+      } catch { /* ignore */ }
     }
 
-    // Fallback: guild đã có config = bot đã từng vào và setup → coi là botPresent
-    // Điều này tránh false-negative khi Redis TTL expire hoặc bot đang khởi động
     for (const guildId of configuredGuildIds) {
       botGuildIds.add(guildId);
     }
@@ -440,7 +421,7 @@ export function createServer({ configStore, stateStore, botClient, redis = null 
     for (const id of botGuildIds) {
       const canManage = isDev || manageableIds.has(id);
       if (!canManage) continue;
-      // Lấy meta từ botClient cache (monolith) > Redis (split mode) > OAuth userGuilds (fallback)
+
       const oauthMeta = (userGuilds ?? []).find(g => g.id === id);
       const oauthIcon = oauthMeta?.icon
         ? `https://cdn.discordapp.com/icons/${id}/${oauthMeta.icon}.png?size=64`
@@ -470,7 +451,6 @@ export function createServer({ configStore, stateStore, botClient, redis = null 
           });
         }
       } else {
-        // Không có Redis — lấy meta từ OAuth
         guildsById.set(id, {
           id,
           name: oauthMeta?.name ?? `Server ${id}`,
@@ -481,9 +461,8 @@ export function createServer({ configStore, stateStore, botClient, redis = null 
       }
     }
 
-    // Guilds user có quyền nhưng bot chưa có mặt — hiện để user có thể invite
     for (const g of (userGuilds ?? [])) {
-      if (guildsById.has(g.id)) continue; // đã có rồi
+      if (guildsById.has(g.id)) continue;
       const p = BigInt(g.permissions ?? 0);
       const canManage = g.owner || (p & ADMINISTRATOR) === ADMINISTRATOR || (p & MANAGE_GUILD) === MANAGE_GUILD;
       if (canManage) {
@@ -499,19 +478,58 @@ export function createServer({ configStore, stateStore, botClient, redis = null 
       }
     }
 
-    const guilds = [...guildsById.values()].sort((a, b) => {
-      // Ưu tiên: bot có mặt + đã configured > bot có mặt > chưa có bot
+    return [...guildsById.values()].sort((a, b) => {
       if (a.botPresent !== b.botPresent) return a.botPresent ? -1 : 1;
       if (a.configured !== b.configured) return a.configured ? -1 : 1;
       return a.name.localeCompare(b.name);
     });
-    res.json({ guilds });
+  }
+
+  app.get('/api/guilds', auth.requireAuth, readRateLimit, async (req, res) => {
+    const isDev = Boolean(req.session?.user?.dev);
+    const userId = req.session.user?.id;
+    const accessToken = req.session.user?.accessToken;
+
+    if (isDev) {
+      const configuredGuildIds = await configStore.listGuildIds();
+      const guilds = configuredGuildIds.map(id => ({
+        id,
+        name: `Server ${id}`,
+        icon: null,
+        configured: true,
+        botPresent: true
+      }));
+      return res.json({ status: 'ready', guilds });
+    }
+
+    const resState = await guildService.fetchAndCacheUserGuilds(userId, accessToken);
+
+    if (resState.status === 'syncing') {
+      return res.json({ status: 'syncing', guilds: [], retryAfter: resState.retryAfter ?? 2 });
+    }
+
+    if (resState.status === 'rate-limited') {
+      const cached = await guildService.getCachedGuilds(userId);
+      const guilds = cached ? cached.guilds : [];
+      return res.json({
+        status: 'rate-limited',
+        guilds: await processGuildsList(guilds, isDev),
+        retryAfter: 15
+      });
+    }
+
+    if (resState.status === 'error') {
+      return res.json({ status: 'error', guilds: [], error: resState.error || 'Unknown error' });
+    }
+
+    const processedGuilds = await processGuildsList(resState.guilds || [], isDev);
+    res.json({ status: 'ready', guilds: processedGuilds });
   });
 
   app.get('/api/members', auth.requireAuth, readRateLimit, requireGuildId, auth.requireGuildAccess, async (req, res) => {
     const page = Math.max(1, parseInt(req.query.page) || 1);
     const search = (req.query.search ?? '').toLowerCase().trim();
-    const PAGE_SIZE = 20;
+    const limit = Math.max(1, Math.min(1000, parseInt(req.query.limit) || 20));
 
     // Phase 1: Try Redis guild_cache:{id}:members (dedicated key — meta key no longer contains members[])
     if (redis) {
@@ -536,7 +554,7 @@ export function createServer({ configStore, stateStore, botClient, redis = null 
           } catch { /* non-fatal */ }
           return res.json({
             total, page,
-            members: members.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE),
+            members: members.slice((page - 1) * limit, page * limit),
             source: 'redis_cache',
             cacheAgeMs,
             stale: cacheAgeMs !== null ? cacheAgeMs > GUILD_CACHE_TTL_S * 1000 : false,
@@ -573,7 +591,7 @@ export function createServer({ configStore, stateStore, botClient, redis = null 
     members.sort((a, b) => (a.joinedTimestamp ?? 0) - (b.joinedTimestamp ?? 0));
 
     const total = members.length;
-    const slice = members.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+    const slice = members.slice((page - 1) * limit, page * limit);
 
     res.json({
       total,

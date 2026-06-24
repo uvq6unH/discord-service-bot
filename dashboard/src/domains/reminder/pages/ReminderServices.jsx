@@ -4,8 +4,33 @@ import Panel from '../../../shared/primitives/Panel.jsx';
 import { useReminders } from '../hooks/useReminders.js';
 import { Trash2, Plus } from 'lucide-react';
 
-function ReminderItemRow({ reminder, channels, onUpdate, onRemove }) {
+function ReminderItemRow({ reminder, channels, members, roles, onUpdate, onRemove }) {
   const textChannels = channels.filter(c => c.type === 0 || c.type === 5);
+
+  const uIds = Array.isArray(reminder.userIds) ? reminder.userIds : [];
+  const rIds = Array.isArray(reminder.roleIds) ? reminder.roleIds : [];
+
+  const selectedUsers = uIds.map(id => members.find(m => m.id === id) || { id, username: `User ${id}`, displayName: `User ${id}` });
+  const availableUsers = members.filter(m => !uIds.includes(m.id));
+
+  const selectedRoles = rIds.map(id => roles.find(r => r.id === id) || { id, name: `Role ${id}` });
+  const availableRoles = roles.filter(r => !rIds.includes(r.id) && r.name !== '@everyone');
+
+  const handleAddUser = (userId) => {
+    onUpdate(reminder.id, { userIds: [...uIds, userId] });
+  };
+
+  const handleRemoveUser = (userId) => {
+    onUpdate(reminder.id, { userIds: uIds.filter(id => id !== userId) });
+  };
+
+  const handleAddRole = (roleId) => {
+    onUpdate(reminder.id, { roleIds: [...rIds, roleId] });
+  };
+
+  const handleRemoveRole = (roleId) => {
+    onUpdate(reminder.id, { roleIds: rIds.filter(id => id !== roleId) });
+  };
 
   return (
     <div style={{
@@ -31,16 +56,123 @@ function ReminderItemRow({ reminder, channels, onUpdate, onRemove }) {
             />
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-3)' }}>
-            {/* Timestamp Target */}
+          {/* Targets */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-4)', borderTop: '1px solid var(--border)', paddingTop: 'var(--space-3)' }}>
+            {/* Users */}
+            <div className="form-group">
+              <label className="form-label" style={{ fontSize: '10px' }}>Mention Users</label>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--space-1-5)', marginBottom: 'var(--space-2)' }}>
+                {selectedUsers.map(u => (
+                  <span key={u.id} style={{
+                    backgroundColor: 'var(--surface-2)',
+                    border: '1px solid var(--border)',
+                    padding: 'var(--space-1) var(--space-2)',
+                    fontSize: '11px',
+                    color: 'var(--text-1)',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 'var(--space-1-5)'
+                  }}>
+                    {u.displayName || u.username}
+                    <span
+                      onClick={() => handleRemoveUser(u.id)}
+                      style={{ color: 'var(--red)', cursor: 'pointer', fontWeight: 'bold' }}
+                      title="Remove user"
+                    >
+                      ×
+                    </span>
+                  </span>
+                ))}
+                {selectedUsers.length === 0 && (
+                  <span style={{ fontSize: '11px', color: 'var(--text-3)' }}>No users selected</span>
+                )}
+              </div>
+              <select
+                className="form-select"
+                style={{ fontSize: '11px', padding: 'var(--space-1) var(--space-2)', height: 'auto', display: 'inline-block', width: 'auto' }}
+                value=""
+                onChange={e => {
+                  if (e.target.value) {
+                    handleAddUser(e.target.value);
+                    e.target.value = '';
+                  }
+                }}
+              >
+                <option value="">+ Add User...</option>
+                {availableUsers.map(u => (
+                  <option key={u.id} value={u.id}>{u.displayName || u.username}</option>
+                ))}
+              </select>
+            </div>
+
+            {/* Roles */}
+            <div className="form-group">
+              <label className="form-label" style={{ fontSize: '10px' }}>Mention Roles</label>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--space-1-5)', marginBottom: 'var(--space-2)' }}>
+                {selectedRoles.map(r => (
+                  <span key={r.id} style={{
+                    backgroundColor: 'var(--surface-2)',
+                    border: '1px solid var(--border)',
+                    padding: 'var(--space-1) var(--space-2)',
+                    fontSize: '11px',
+                    color: 'var(--text-1)',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 'var(--space-1-5)'
+                  }}>
+                    {r.name}
+                    <span
+                      onClick={() => handleRemoveRole(r.id)}
+                      style={{ color: 'var(--red)', cursor: 'pointer', fontWeight: 'bold' }}
+                      title="Remove role"
+                    >
+                      ×
+                    </span>
+                  </span>
+                ))}
+                {selectedRoles.length === 0 && (
+                  <span style={{ fontSize: '11px', color: 'var(--text-3)' }}>No roles selected</span>
+                )}
+              </div>
+              <select
+                className="form-select"
+                style={{ fontSize: '11px', padding: 'var(--space-1) var(--space-2)', height: 'auto', display: 'inline-block', width: 'auto' }}
+                value=""
+                onChange={e => {
+                  if (e.target.value) {
+                    handleAddRole(e.target.value);
+                    e.target.value = '';
+                  }
+                }}
+              >
+                <option value="">+ Add Role...</option>
+                {availableRoles.map(r => (
+                  <option key={r.id} value={r.id}>{r.name}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-3)', borderTop: '1px solid var(--border)', paddingTop: 'var(--space-3)' }}>
+            {/* Target Timestamp */}
             <div className="form-group">
               <label className="form-label" style={{ fontSize: '10px' }}>Target Timestamp</label>
               <input
                 type="datetime-local"
                 className="form-input"
                 style={{ fontSize: '12px', fontFamily: 'var(--font-mono)' }}
-                value={reminder.time ? reminder.time.slice(0, 16) : ''}
-                onChange={e => onUpdate(reminder.id, { time: new Date(e.target.value).toISOString() })}
+                value={(() => {
+                  if (!reminder.time) return '';
+                  const date = new Date(reminder.time);
+                  if (isNaN(date.getTime())) return '';
+                  const pad = n => String(n).padStart(2, '0');
+                  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+                })()}
+                onChange={e => {
+                  if (e.target.value) {
+                    onUpdate(reminder.id, { time: new Date(e.target.value).toISOString() });
+                  }
+                }}
               />
             </div>
 
@@ -62,7 +194,7 @@ function ReminderItemRow({ reminder, channels, onUpdate, onRemove }) {
           </div>
 
           {/* Target Channel */}
-          <div className="form-group">
+          <div className="form-group" style={{ borderTop: '1px solid var(--border)', paddingTop: 'var(--space-3)' }}>
             <label className="form-label" style={{ fontSize: '10px' }}>Target Channel Broadcast</label>
             <select
               className="form-select"
@@ -96,6 +228,8 @@ export default function ReminderServicesPage() {
     config,
     loading,
     channels,
+    roles,
+    members,
     updateConfig,
     addReminder,
     removeReminder,
@@ -178,6 +312,8 @@ export default function ReminderServicesPage() {
                   key={r.id}
                   reminder={r}
                   channels={channels}
+                  roles={roles}
+                  members={members}
                   onUpdate={updateReminder}
                   onRemove={removeReminder}
                 />

@@ -3,9 +3,11 @@ import Workspace, { HeaderZone, StatusZone, KpiTile } from '../../../shared/layo
 import Panel from '../../../shared/primitives/Panel.jsx';
 import DataSlab from '../../../shared/primitives/DataSlab.jsx';
 import { useSystem } from '../hooks/useSystem.js';
+import { useGuild } from '../../../shared/hooks/useGuild.js';
 import { RefreshCw } from 'lucide-react';
 
 export default function SystemPage() {
+  const { config } = useGuild();
   const { status, loading, refetch } = useSystem(10000); // Poll every 10s
 
   if (loading || !status) {

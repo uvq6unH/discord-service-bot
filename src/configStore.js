@@ -40,16 +40,28 @@ function normalizeReminders(reminders) {
       } else {
         userIds = [];
       }
+
+      let roleIds;
+      if (Array.isArray(item?.roleIds)) {
+        roleIds = item.roleIds.map(normalizeSnowflakeId).filter(Boolean);
+      } else if (item?.roleId) {
+        const single = normalizeSnowflakeId(item.roleId);
+        roleIds = single ? [single] : [];
+      } else {
+        roleIds = [];
+      }
+
       return {
         id: String(item?.id ?? '').trim(),
         userIds,
+        roleIds,
         channelId: normalizeSnowflakeId(item?.channelId),
         message: String(item?.message ?? '').trim(),
         time: String(item?.time ?? '').trim(),
         repeat: ['none', 'hourly', 'daily', 'weekly'].includes(item?.repeat) ? item.repeat : 'none',
       };
     })
-    .filter((item) => item.id && item.userIds.length && item.channelId && item.message && item.time)
+    .filter((item) => item.id && (item.userIds.length || item.roleIds.length) && item.channelId && item.message && item.time)
     .slice(0, 50);
 }
 
@@ -317,7 +329,22 @@ export class ConfigStore {
 
   async getGuildConfig(guildId) {
     await this.ready;
-    const stored = this.cache[guildId] ?? {};
+    let stored = null;
+    if (this._redis) {
+      try {
+        const val = await this._redis.get(this._keyFor(guildId));
+        if (val) {
+          stored = typeof val === 'string' ? JSON.parse(val) : val;
+          this.cache[guildId] = stored;
+        }
+      } catch (err) {
+        console.warn(`[ConfigStore] Failed to fetch fresh config for guild ${guildId}: ${err.message}`);
+      }
+    }
+    if (!stored) {
+      stored = this.cache[guildId] ?? {};
+    }
+
     const base = {
       guildId,
       ...clone(defaultConfig),
@@ -447,6 +474,23 @@ export class ConfigStore {
 
   async listGuildIds() {
     await this.ready;
+    if (this._redis) {
+      try {
+        const raw = await this._redis.get(this._KEY_INDEX).catch(() => null);
+        if (raw) {
+          const ids = JSON.parse(raw);
+          // Sync keys to this.cache to make sure they exist for fallback
+          for (const id of ids) {
+            if (!(id in this.cache)) {
+              this.cache[id] = {};
+            }
+          }
+          return ids;
+        }
+      } catch (err) {
+        console.warn(`[ConfigStore] Failed to list guild IDs from Redis: ${err.message}`);
+      }
+    }
     return Object.keys(this.cache);
   }
 }

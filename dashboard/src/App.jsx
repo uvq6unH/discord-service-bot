@@ -26,26 +26,76 @@ function TerminalLoader({ message }) {
 
 export default function App() {
   const { user, loading: authLoading } = useAuth();
-  const { selectedGuild, selectGuild, saveConfig, saveStatus, dirty } = useGuild();
+  const {
+    selectedGuild,
+    selectGuild,
+    saveConfig,
+    saveStatus,
+    dirty,
+    setAppReady,
+    setSyncing
+  } = useGuild();
 
-  const { data: guildsRaw, isLoading: guildsLoading } = useQuery({
+  const { data: guildsPayload, isLoading: guildsLoading } = useQuery({
     queryKey: ['guilds'],
-    queryFn: () => api.guilds().then(r => Array.isArray(r) ? r : (r.guilds ?? [])),
+    queryFn: () => api.guilds(),
     enabled: !!user,
+    refetchInterval: (query) => {
+      const data = query.state.data;
+      if (data?.status === 'syncing') {
+        return (data.retryAfter ?? 2) * 1000;
+      }
+      return false;
+    }
   });
-  const guilds = guildsRaw ?? [];
+
+  const guilds = guildsPayload?.guilds ?? [];
+  const status = guildsPayload?.status ?? 'ready';
+  const syncing = status === 'syncing';
+
+  // Deterministic ID-first sorting
+  const sortedGuilds = React.useMemo(() => {
+    const list = [...guilds];
+    return list.sort((a, b) => a.id.localeCompare(b.id) || a.name.localeCompare(b.name, 'en'));
+  }, [guilds]);
+
+  // Synchronize syncing state to provider
+  React.useEffect(() => {
+    setSyncing(syncing);
+  }, [syncing, setSyncing]);
+
+  // Resolve selection coordinate
+  React.useEffect(() => {
+    if (guildsLoading) return;
+    if (status === 'syncing') return;
+
+    try {
+      const storedId = localStorage.getItem('selectedGuildId');
+      if (storedId) {
+        const matched = guilds.find(g => g.id === storedId && g.botPresent);
+        if (matched) {
+          selectGuild(matched);
+          setAppReady(true);
+          return;
+        }
+      }
+    } catch {}
+
+    selectGuild(null);
+    setAppReady(true);
+  }, [guildsLoading, status, guilds, selectGuild, setAppReady]);
 
   if (authLoading) {
     return <TerminalLoader message="Checking security credentials" />;
   }
 
-  if (guildsLoading) {
+  if (guildsLoading && !guildsPayload) {
     return <TerminalLoader message="Syncing guild list" />;
   }
 
   return (
     <AppShell
-      guilds={guilds}
+      guilds={sortedGuilds}
       selectedGuild={selectedGuild}
       user={user}
       selectGuild={selectGuild}
