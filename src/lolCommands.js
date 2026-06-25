@@ -13,7 +13,10 @@
  *   /lolunlink                 — Bỏ liên kết tài khoản
  */
 
-import { EmbedBuilder, ApplicationCommandOptionType } from 'discord.js';
+import { EmbedBuilder, ApplicationCommandOptionType, AttachmentBuilder, ActionRowBuilder, StringSelectMenuBuilder } from 'discord.js';
+import { Jimp } from 'jimp';
+import path from 'node:path';
+import fs from 'node:fs';
 import {
   editOrReply,
   formatRiotError,
@@ -41,6 +44,17 @@ const C = {
 
 // DDragon base URL helper
 const DD = (patch) => `https://ddragon.leagueoflegends.com/cdn/${patch}`;
+
+// Strip diacritics and convert đ/Đ to d/D for accent-insensitive search
+function stripAccents(str) {
+  if (!str) return '';
+  return str
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/đ/g, 'd')
+    .replace(/Đ/g, 'd');
+}
 
 // ── Summoner resolution with linked account fallback ─────────────────────────
 async function resolveSummoner(source, args, isInteraction, stateStore, guildId, apiKey) {
@@ -340,11 +354,11 @@ export async function handleLolItem({ source, args, isInteraction, config, reply
   try {
     const patch = await getLatestPatch();
     const itemData = await getItemData('vi_VN');
-    const q = query.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    const q = stripAccents(query);
 
     let found = null, foundId = null;
     for (const [id, item] of Object.entries(itemData.data)) {
-      const name = item.name.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+      const name = stripAccents(item.name);
       if (name.includes(q)) { found = item; foundId = id; break; }
     }
 
@@ -376,13 +390,19 @@ export async function handleLolItem({ source, args, isInteraction, config, reply
 
 // ── /lolrunes — Rune trees ────────────────────────────────────────────────────
 export async function handleLolRunes({ source, args, isInteraction, config, reply }) {
-  const query = (isInteraction ? source.options.getString('tree') : args).trim().toLowerCase();
+  const rawQuery = isInteraction ? source.options.getString('tree') : args;
+  const query = (rawQuery ?? '').trim().toLowerCase();
 
   if (isInteraction) await source.deferReply();
 
   try {
     const patch = await getLatestPatch();
     const runeData = await getRuneData('vi_VN');
+    const targetUserId = source.user?.id ?? source.author?.id;
+
+    const selectMenu = new StringSelectMenuBuilder()
+      .setCustomId(`runes:select_menu:${targetUserId}`)
+      .setPlaceholder('👉 Chọn cây ngọc để xem chi tiết...');
 
     if (!query) {
       // Show all trees overview
@@ -395,21 +415,46 @@ export async function handleLolRunes({ source, args, isInteraction, config, repl
         .setTitle('💎 Bảng Ngọc League of Legends')
         .setDescription(desc)
         .setColor(C.rune)
-        .setFooter({ text: `Patch ${patch} • Dùng /lolrunes [tên cây] để xem chi tiết` });
+        .setFooter({ text: `Patch ${patch} • Chọn cây ngọc bên dưới để xem chi tiết kèm hình ảnh` });
 
-      return editOrReply(source, isInteraction, { embeds: [embed] });
+      selectMenu.addOptions(
+        runeData.map(tree => ({
+          label: `Hệ ${tree.name}`,
+          description: `Xem các ngọc thuộc nhánh ${tree.name}`,
+          value: String(tree.id)
+        }))
+      );
+
+      const row = new ActionRowBuilder().addComponents(selectMenu);
+
+      return editOrReply(source, isInteraction, { embeds: [embed], components: [row] });
     }
 
-    // Find specific tree
-    const tree = runeData.find((t) =>
-      t.name.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').includes(
-        query.normalize('NFD').replace(/[\u0300-\u036f]/g, '')
-      )
-    );
+    // Find specific tree by:
+    // 1. Vietnamese Name (e.g. "Áp Đảo")
+    // 2. English Key (e.g. "Domination")
+    // 3. Name or key of any individual rune inside slots (e.g. "Chinh Phục" / "Conqueror")
+    const queryNorm = stripAccents(query);
+    const tree = runeData.find((t) => {
+      const nameNorm = stripAccents(t.name);
+      const keyNorm = stripAccents(t.key ?? '');
+      if (nameNorm.includes(queryNorm) || keyNorm.includes(queryNorm)) return true;
 
-    if (!tree) return editOrReply(source, isInteraction, { content: `Không tìm thấy cây ngọc: **${query}**` });
+      return t.slots.some(slot =>
+        slot.runes.some(r => {
+          const rNameNorm = stripAccents(r.name);
+          const rKeyNorm = stripAccents(r.key ?? '');
+          return rNameNorm.includes(queryNorm) || rKeyNorm.includes(queryNorm);
+        })
+      );
+    });
 
-    const iconUrl = `https://ddragon.leagueoflegends.com/cdn/img/${tree.icon}`;
+    if (!tree) return editOrReply(source, isInteraction, { content: `Không tìm thấy cây ngọc hoặc ngọc nào tên là: **${query}**` });
+
+    const imagePath = await getOrCreateRuneTreeImage(tree, patch);
+    const attachment = imagePath ? new AttachmentBuilder(imagePath) : null;
+    const iconFilename = imagePath ? path.basename(imagePath) : null;
+
     const slotLines = tree.slots.map((slot, i) => {
       const runes = slot.runes.map((r) => `• **${r.name}** — ${r.shortDesc?.replace(/<[^>]+>/g, '').slice(0, 80) ?? ''}...`).join('\n');
       return `**${i === 0 ? 'Keystone' : `Hàng ${i}`}**\n${runes}`;
@@ -418,13 +463,149 @@ export async function handleLolRunes({ source, args, isInteraction, config, repl
     const embed = new EmbedBuilder()
       .setTitle(`💎 Cây Ngọc: ${tree.name}`)
       .setDescription(slotLines.slice(0, 4000))
-      .setThumbnail(iconUrl)
       .setColor(C.rune)
       .setFooter({ text: `Patch ${patch}` });
 
-    return editOrReply(source, isInteraction, { embeds: [embed] });
+    if (iconFilename) {
+      embed.setImage(`attachment://${iconFilename}`);
+    }
+
+    selectMenu.addOptions(
+      runeData.map(t => ({
+        label: `Hệ ${t.name}`,
+        description: `Xem các ngọc thuộc nhánh ${t.name}`,
+        value: String(t.id),
+        default: t.id === tree.id
+      }))
+    );
+
+    const row = new ActionRowBuilder().addComponents(selectMenu);
+
+    const payload = { embeds: [embed], components: [row] };
+    if (attachment) payload.files = [attachment];
+
+    return editOrReply(source, isInteraction, payload);
   } catch (err) {
     return editOrReply(source, isInteraction, { content: formatRiotError(err), ephemeral: true });
+  }
+}
+
+/**
+ * Generates and caches a layout image of a rune tree path
+ */
+async function getOrCreateRuneTreeImage(tree, patch) {
+  const tempDir = path.join(process.cwd(), 'data', 'temp');
+  if (!fs.existsSync(tempDir)) {
+    fs.mkdirSync(tempDir, { recursive: true });
+  }
+
+  const outPath = path.join(tempDir, `runes_tree_${tree.id}_${patch}.png`);
+  if (fs.existsSync(outPath)) {
+    return outPath;
+  }
+
+  try {
+    const canvasWidth = 360;
+    const canvasHeight = 350;
+    const baseImage = new Jimp({ width: canvasWidth, height: canvasHeight, color: 0x111217ff }); // Dark Discord background
+
+    const rowSpacing = 80;
+    const itemSpacing = 15;
+
+    const promises = [];
+
+    tree.slots.forEach((slot, rowIdx) => {
+      const isKeystone = rowIdx === 0;
+      const iconSize = isKeystone ? 64 : 48;
+      const count = slot.runes.length;
+
+      const totalWidth = count * iconSize + (count - 1) * itemSpacing;
+      const startX = (canvasWidth - totalWidth) / 2;
+      const y = 15 + rowIdx * rowSpacing + (isKeystone ? 0 : 8);
+
+      slot.runes.forEach((rune, colIdx) => {
+        const x = startX + colIdx * (iconSize + itemSpacing);
+        const url = `https://ddragon.leagueoflegends.com/cdn/img/${rune.icon}`;
+
+        promises.push(
+          Jimp.read(url)
+            .then(img => {
+              img.resize({ w: iconSize, h: iconSize });
+              baseImage.composite(img, x, y);
+            })
+            .catch(err => {
+              console.error(`[lolrunes] Failed to load rune icon for ${rune.name}:`, err.message);
+            })
+        );
+      });
+    });
+
+    await Promise.all(promises);
+    await baseImage.write(outPath);
+    return outPath;
+  } catch (err) {
+    console.error(`[lolrunes] Failed to generate rune tree image for ${tree.name}:`, err);
+    return null;
+  }
+}
+
+/**
+ * Handle dropdown interaction for runes select menu
+ */
+export async function handleRunesSelect(interaction) {
+  const treeId = parseInt(interaction.values[0], 10);
+  await interaction.deferUpdate();
+
+  try {
+    const patch = await getLatestPatch();
+    const runeData = await getRuneData('vi_VN');
+    const tree = runeData.find(t => t.id === treeId);
+    if (!tree) return;
+
+    const imagePath = await getOrCreateRuneTreeImage(tree, patch);
+    const attachment = imagePath ? new AttachmentBuilder(imagePath) : null;
+    const iconFilename = imagePath ? path.basename(imagePath) : null;
+
+    const slotLines = tree.slots.map((slot, i) => {
+      const runes = slot.runes.map((r) => `• **${r.name}** — ${r.shortDesc?.replace(/<[^>]+>/g, '').slice(0, 80) ?? ''}...`).join('\n');
+      return `**${i === 0 ? 'Keystone' : `Hàng ${i}`}**\n${runes}`;
+    }).join('\n\n');
+
+    const embed = new EmbedBuilder()
+      .setTitle(`💎 Cây Ngọc: ${tree.name}`)
+      .setDescription(slotLines.slice(0, 4000))
+      .setColor(C.rune)
+      .setFooter({ text: `Patch ${patch}` });
+
+    if (iconFilename) {
+      embed.setImage(`attachment://${iconFilename}`);
+    }
+
+    const selectMenu = new StringSelectMenuBuilder()
+      .setCustomId(interaction.customId)
+      .setPlaceholder(`Hệ ${tree.name}`)
+      .addOptions(
+        runeData.map(t => ({
+          label: `Hệ ${t.name}`,
+          description: `Xem các ngọc thuộc nhánh ${t.name}`,
+          value: String(t.id),
+          default: t.id === tree.id
+        }))
+      );
+
+    const row = new ActionRowBuilder().addComponents(selectMenu);
+
+    const payload = {
+      embeds: [embed],
+      components: [row]
+    };
+    if (attachment) {
+      payload.files = [attachment];
+    }
+
+    await interaction.editReply(payload);
+  } catch (err) {
+    console.error('[lolrunes] Error handling runes select menu:', err);
   }
 }
 

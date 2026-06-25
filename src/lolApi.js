@@ -375,7 +375,10 @@ export async function getSummonerSpellData(lang = 'vi_VN') {
 export async function findChampion(query) {
   const data = await getChampionData('vi_VN');
   const q = query.toLowerCase().trim()
-    .normalize('NFD').replace(/[\u0300-\u036f]/g, ''); // strip diacritics for accent-insensitive match
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/đ/g, 'd')
+    .replace(/Đ/g, 'd');
 
   // Exact key match first
   for (const [champKey, champ] of Object.entries(data.data)) {
@@ -384,7 +387,10 @@ export async function findChampion(query) {
   // Partial name match
   for (const [champKey, champ] of Object.entries(data.data)) {
     const name = champ.name.toLowerCase()
-      .normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/đ/g, 'd')
+      .replace(/Đ/g, 'd');
     if (name.includes(q) || champKey.toLowerCase().includes(q)) return { alias: champKey, ...champ };
   }
   return null;

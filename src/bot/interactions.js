@@ -15,6 +15,18 @@ import { sendTicketLog } from './logging.js';
 
 export async function handleComponentInteraction(interaction, { client, config, stateStore }) {
   if (interaction.isStringSelectMenu()) {
+    if (interaction.customId.startsWith('runes:select_menu:')) {
+      const targetUserId = interaction.customId.split(':')[2];
+      if (interaction.user.id !== targetUserId) {
+        await interaction.reply({
+          content: '❌ Chỉ người sử dụng lệnh ban đầu mới có thể tương tác với menu này!',
+          ephemeral: true
+        });
+        return;
+      }
+      const { handleRunesSelect } = await import('../lolCommands.js');
+      return handleRunesSelect(interaction);
+    }
     if (interaction.customId.startsWith('quiz:')) {
       const { handleQuizButton } = await import('./lolQuiz.js');
       return handleQuizButton(interaction);

@@ -164,6 +164,18 @@ export default function RiotServicesPage() {
   const isLolEnabled = config.lolEnabled ?? false;
   const isTftEnabled = config.tftEnabled ?? false;
 
+  const lolCommandTypes = ['lsd', 'lolprofile', 'lolmatch', 'lolchamp', 'lolitem', 'lolrunes', 'lolpatch', 'lollink', 'lolunlink', 'lolquiz'];
+  const tftCommandTypes = ['tftlsd', 'tftprofile', 'tftmatch', 'tftlink', 'tftunlink'];
+
+  const lolCommands = (config.riot?.commands ?? []).filter(c => lolCommandTypes.includes(c.type));
+  const tftCommands = (config.riot?.commands ?? []).filter(c => tftCommandTypes.includes(c.type));
+
+  const visibleCommands = (config.riot?.commands ?? []).filter(c => {
+    if (lolCommandTypes.includes(c.type)) return isLolEnabled;
+    if (tftCommandTypes.includes(c.type)) return isTftEnabled;
+    return false;
+  });
+
   return (
     <Workspace>
       {/* 1. Header Zone */}
@@ -275,9 +287,9 @@ export default function RiotServicesPage() {
                 <div style={{ paddingLeft: 'var(--space-4)', display: 'flex', flexDirection: 'column', gap: 'var(--space-1-5)', borderLeft: '2px solid var(--accent)' }}>
                   <span style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', color: 'var(--text-3)' }}>{t("AVAILABLE OPERATOR COMMANDS:")}</span>
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--space-1-5)' }}>
-                    {['/rank', '/profile', '/mastery', '/live', '/history'].map(cmd => (
-                      <code key={cmd} style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', padding: 'var(--space-half) var(--space-1-5)', backgroundColor: 'var(--surface-1)', border: '1px solid var(--border)' }}>
-                        {cmd}
+                    {lolCommands.map(cmd => (
+                      <code key={cmd.type} style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', padding: 'var(--space-half) var(--space-1-5)', backgroundColor: 'var(--surface-1)', border: '1px solid var(--border)' }}>
+                        /{cmd.name}
                       </code>
                     ))}
                   </div>
@@ -313,9 +325,9 @@ export default function RiotServicesPage() {
                 <div style={{ paddingLeft: 'var(--space-4)', display: 'flex', flexDirection: 'column', gap: 'var(--space-1-5)', borderLeft: '2px solid var(--accent)' }}>
                   <span style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', color: 'var(--text-3)' }}>{t("AVAILABLE OPERATOR COMMANDS:")}</span>
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--space-1-5)' }}>
-                    {['/tftrank', '/tftprofile', '/tftmatch', '/tftlink', '/tftunlink'].map(cmd => (
-                      <code key={cmd} style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', padding: 'var(--space-half) var(--space-1-5)', backgroundColor: 'var(--surface-1)', border: '1px solid var(--border)' }}>
-                        {cmd}
+                    {tftCommands.map(cmd => (
+                      <code key={cmd.type} style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', padding: 'var(--space-half) var(--space-1-5)', backgroundColor: 'var(--surface-1)', border: '1px solid var(--border)' }}>
+                        /{cmd.name}
                       </code>
                     ))}
                   </div>
@@ -327,17 +339,38 @@ export default function RiotServicesPage() {
         </div>
 
         {/* Panel 3: LoL Quiz Leaderboard Settings */}
-        <div className="col-span-12" style={{ marginTop: 'var(--space-6)' }}>
-          <Panel title={t("LOL QUIZ LEADERBOARD SCORING MATRIX")} accent>
-            <span style={{ fontSize: '11px', color: 'var(--text-3)', fontFamily: 'var(--font-mono)', display: 'block', marginBottom: 'var(--space-4)' }}>
-              &gt;&gt;&gt; {t("Configure point rewards based on the number of guesses taken to solve the Daily Quiz.")}
-            </span>
-            <div className="grid-12" style={{ gap: 'var(--space-4)' }}>
-              {[1, 2, 3, 4, 5, 6, 7, 8].map(num => (
-                <div key={num} className="col-span-3">
+        {isLolEnabled && (
+          <div className="col-span-12" style={{ marginTop: 'var(--space-6)' }}>
+            <Panel title={t("LOL QUIZ LEADERBOARD SCORING MATRIX")} accent>
+              <span style={{ fontSize: '11px', color: 'var(--text-3)', fontFamily: 'var(--font-mono)', display: 'block', marginBottom: 'var(--space-4)' }}>
+                &gt;&gt;&gt; {t("Configure point rewards based on the number of guesses taken to solve the Daily Quiz.")}
+              </span>
+              <div className="grid-12" style={{ gap: 'var(--space-4)' }}>
+                {[1, 2, 3, 4, 5, 6, 7, 8].map(num => (
+                  <div key={num} className="col-span-3">
+                    <div className="form-group" style={{ margin: 0 }}>
+                      <label className="form-label" style={{ fontFamily: 'var(--font-mono)', fontSize: '11px' }}>
+                        {t("Guess")} {num} {t("Points")}
+                      </label>
+                      <input
+                        type="number"
+                        className="form-input"
+                        style={{ fontFamily: 'var(--font-mono)' }}
+                        min="0"
+                        max="10000"
+                        value={config.quizScoring?.[`guess${num}`] ?? 0}
+                        onChange={e => {
+                          const newScoring = { ...config.quizScoring, [`guess${num}`]: parseInt(e.target.value, 10) || 0 };
+                          updateConfig({ quizScoring: newScoring });
+                        }}
+                      />
+                    </div>
+                  </div>
+                ))}
+                <div className="col-span-3">
                   <div className="form-group" style={{ margin: 0 }}>
                     <label className="form-label" style={{ fontFamily: 'var(--font-mono)', fontSize: '11px' }}>
-                      {t("Guess")} {num} {t("Points")}
+                      {t("Failure (Bỏ cuộc)")}
                     </label>
                     <input
                       type="number"
@@ -345,59 +378,42 @@ export default function RiotServicesPage() {
                       style={{ fontFamily: 'var(--font-mono)' }}
                       min="0"
                       max="10000"
-                      value={config.quizScoring?.[`guess${num}`] ?? 0}
+                      value={config.quizScoring?.fail ?? 0}
                       onChange={e => {
-                        const newScoring = { ...config.quizScoring, [`guess${num}`]: parseInt(e.target.value, 10) || 0 };
+                        const newScoring = { ...config.quizScoring, fail: parseInt(e.target.value, 10) || 0 };
                         updateConfig({ quizScoring: newScoring });
                       }}
                     />
                   </div>
                 </div>
-              ))}
-              <div className="col-span-3">
-                <div className="form-group" style={{ margin: 0 }}>
-                  <label className="form-label" style={{ fontFamily: 'var(--font-mono)', fontSize: '11px' }}>
-                    {t("Failure (Bỏ cuộc)")}
-                  </label>
-                  <input
-                    type="number"
-                    className="form-input"
-                    style={{ fontFamily: 'var(--font-mono)' }}
-                    min="0"
-                    max="10000"
-                    value={config.quizScoring?.fail ?? 0}
-                    onChange={e => {
-                      const newScoring = { ...config.quizScoring, fail: parseInt(e.target.value, 10) || 0 };
-                      updateConfig({ quizScoring: newScoring });
-                    }}
-                  />
-                </div>
               </div>
-            </div>
-          </Panel>
-        </div>
+            </Panel>
+          </div>
+        )}
 
         {/* Riot / TFT Commands Panel */}
-        <div className="col-span-12" style={{ marginTop: 'var(--space-6)' }}>
-          <Panel title={t("RIOT TELEMETRY COMMANDS ROUTING")} accent>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
-              {(config.riot?.commands ?? []).map(c => {
-                return (
-                  <CommandConfigRow
-                    key={c.type}
-                    cmd={c}
-                    roles={roles}
-                    onUpdate={updatedCmd => {
-                      const currentList = config.riot?.commands ?? [];
-                      const updatedList = currentList.map(x => x.type === c.type ? updatedCmd : x);
-                      updateConfig({ riot: { ...config.riot, commands: updatedList } });
-                    }}
-                  />
-                );
-              })}
-            </div>
-          </Panel>
-        </div>
+        {visibleCommands.length > 0 && (
+          <div className="col-span-12" style={{ marginTop: 'var(--space-6)' }}>
+            <Panel title={t("RIOT TELEMETRY COMMANDS ROUTING")} accent>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
+                {visibleCommands.map(c => {
+                  return (
+                    <CommandConfigRow
+                      key={c.type}
+                      cmd={c}
+                      roles={roles}
+                      onUpdate={updatedCmd => {
+                        const currentList = config.riot?.commands ?? [];
+                        const updatedList = currentList.map(x => x.type === c.type ? updatedCmd : x);
+                        updateConfig({ riot: { ...config.riot, commands: updatedList } });
+                      }}
+                    />
+                  );
+                })}
+              </div>
+            </Panel>
+          </div>
+        )}
 
       </div>
     </Workspace>
