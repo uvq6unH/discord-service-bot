@@ -51,6 +51,10 @@ export const defaultConfig = {
   levelsEnabled: false,
   xpPerMessage: 5,
   levelUpMessage: '{user} reached level {level}.',
+  levelUpAnnouncementEnabled: true,
+  levelUpAnnouncementChannelId: '',
+  xpBase: 100,
+  xpExponent: 2.0,
   levels: {
     commands: [
       { enabled: true, type: 'rank', name: 'rank', description: 'Show your XP rank', response: 'Rank' },
@@ -108,7 +112,8 @@ export const defaultConfig = {
       { enabled: true, type: 'musicloop', name: 'loop', description: 'Lặp lại bài hát hiện tại hoặc hàng chờ' },
       { enabled: true, type: 'musicqueue', name: 'queue', description: 'Xem danh sách bài hát trong hàng chờ' },
       { enabled: true, type: 'musicnp', name: 'np', description: 'Xem thông tin chi tiết bài hát đang phát' },
-      { enabled: true, type: 'musicvolume', name: 'volume', description: 'Thay đổi âm lượng phát nhạc (0-200)' }
+      { enabled: true, type: 'musicvolume', name: 'volume', description: 'Thay đổi âm lượng phát nhạc (0-200)' },
+      { enabled: true, type: 'musicremove', name: 'remove', description: 'Xóa bài hát khỏi hàng chờ bằng số thứ tự (ví dụ: remove 3)' }
     ]
   },
   economy: {
@@ -235,7 +240,8 @@ export const COMMAND_TYPES = new Set([
   'musicloop',
   'musicqueue',
   'musicnp',
-  'musicvolume'
+  'musicvolume',
+  'musicremove'
 ]);
 const allDefaultCommands = [
   ...(defaultConfig.core?.commands || []),

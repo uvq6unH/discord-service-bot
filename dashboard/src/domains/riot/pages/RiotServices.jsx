@@ -213,45 +213,50 @@ export default function RiotServicesPage() {
         {/* Panel 1: Riot API keys */}
         <div className="col-span-6">
           <Panel title={t("API CREDENTIALS DATABASE")} accent>
-            <div className="form-group">
-              <label className="form-label" style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
-                {t("Riot API Token (LoL)")}
-                {isRiotConfigured && (
-                  <span style={{ fontSize: '9px', fontFamily: 'var(--font-mono)', padding: 'var(--space-half) var(--space-1-5)', backgroundColor: 'var(--green-dim)', color: 'var(--green)', border: '1px solid var(--green)' }}>
-                    {t("CONFIGURED")}
-                  </span>
-                )}
-              </label>
-              <input
-                type="password"
-                className="form-input"
-                style={{ fontFamily: 'var(--font-mono)' }}
-                placeholder={isRiotConfigured ? '•••••••••••••••••••••••••••••••• ' + t('(Leave blank to keep current)') : 'RGAPI-xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx'}
-                onChange={e => handleApiKeyChange('riotApiKey', e.target.value)}
-              />
-            </div>
+            <form onSubmit={e => e.preventDefault()}>
+              {/* Hidden field to satisfy browser password manager accessibility guidelines */}
+              <input type="text" name="username" autocomplete="username" style={{ display: 'none' }} readOnly />
+              <div className="form-group">
+                <label className="form-label" style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
+                  {t("Riot API Token (LoL)")}
+                  {isRiotConfigured && (
+                    <span style={{ fontSize: '9px', fontFamily: 'var(--font-mono)', padding: 'var(--space-half) var(--space-1-5)', backgroundColor: 'var(--green-dim)', color: 'var(--green)', border: '1px solid var(--green)' }}>
+                      {t("CONFIGURED")}
+                    </span>
+                  )}
+                </label>
+                <input
+                  type="password"
+                  className="form-input"
+                  style={{ fontFamily: 'var(--font-mono)' }}
+                  placeholder={isRiotConfigured ? '•••••••••••••••••••••••••••••••• ' + t('(Leave blank to keep current)') : 'RGAPI-xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx'}
+                  autocomplete="new-password"
+                  onChange={e => handleApiKeyChange('riotApiKey', e.target.value)}
+                />
+              </div>
 
-            <div className="form-group">
-              <label className="form-label" style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
-                {t("TFT API Token (Optional)")}
-                {isTftConfigured && (
-                  <span style={{ fontSize: '9px', fontFamily: 'var(--font-mono)', padding: 'var(--space-half) var(--space-1-5)', backgroundColor: 'var(--green-dim)', color: 'var(--green)', border: '1px solid var(--green)' }}>
-                    {t("CONFIGURED")}
-                  </span>
-                )}
-              </label>
-              <input
-                type="password"
-                className="form-input"
-                style={{ fontFamily: 'var(--font-mono)' }}
-                placeholder={isTftConfigured ? '•••••••••••••••••••••••••••••••• ' + t('(Leave blank to keep current)') : t('Leave blank to use primary Riot key')}
-                onChange={e => handleApiKeyChange('tftApiKey', e.target.value)}
-              />
-            </div>
-            
-            <span style={{ fontSize: '11px', color: 'var(--text-3)', fontFamily: 'var(--font-mono)' }}>
+              <div className="form-group" style={{ marginBottom: 0 }}>
+                <label className="form-label" style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
+                  {t("TFT API Token (Optional)")}
+                  {isTftConfigured && (
+                    <span style={{ fontSize: '9px', fontFamily: 'var(--font-mono)', padding: 'var(--space-half) var(--space-1-5)', backgroundColor: 'var(--green-dim)', color: 'var(--green)', border: '1px solid var(--green)' }}>
+                      {t("CONFIGURED")}
+                    </span>
+                  )}
+                </label>
+                <input
+                  type="password"
+                  className="form-input"
+                  style={{ fontFamily: 'var(--font-mono)' }}
+                  placeholder={isTftConfigured ? '•••••••••••••••••••••••••••••••• ' + t('(Leave blank to keep current)') : t('Leave blank to use primary Riot key')}
+                  autocomplete="new-password"
+                  onChange={e => handleApiKeyChange('tftApiKey', e.target.value)}
+                />
+              </div>
+            </form>
+            <div style={{ marginTop: 'var(--space-4)', fontSize: '11px', color: 'var(--text-3)', fontFamily: 'var(--font-mono)' }}>
               &gt;&gt;&gt; {t("Tokens are encrypted in Redis memory. Acquire developmental/production keys from developer.riotgames.com.")}
-            </span>
+            </div>
           </Panel>
         </div>
 
@@ -345,7 +350,7 @@ export default function RiotServicesPage() {
               <span style={{ fontSize: '11px', color: 'var(--text-3)', fontFamily: 'var(--font-mono)', display: 'block', marginBottom: 'var(--space-4)' }}>
                 &gt;&gt;&gt; {t("Configure point rewards based on the number of guesses taken to solve the Daily Quiz.")}
               </span>
-              <div className="grid-12" style={{ gap: 'var(--space-4)' }}>
+              <div className="quiz-scoring-grid">
                 {[1, 2, 3, 4, 5, 6, 7, 8].map(num => (
                   <div key={num} className="col-span-3">
                     <div className="form-group" style={{ margin: 0 }}>

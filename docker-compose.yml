@@ -9,6 +9,7 @@ services:
       PORT: 10000
     volumes:
       - ./src:/app/src
+      - ./assets:/app/assets
       - bot-logs:/app/logs
       - app-data:/app/data
     restart: unless-stopped
@@ -28,6 +29,7 @@ services:
     volumes:
       - ./src:/app/src
       - ./dashboard:/app/dashboard
+      - ./assets:/app/assets
       - bot-logs:/app/logs
       - app-data:/app/data
     restart: unless-stopped

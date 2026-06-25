@@ -527,3 +527,317 @@ a {
 .flash-target {
   animation: flash-white 1.8s cubic-bezier(0.25, 1, 0.5, 1) forwards;
 }
+
+/* ── Semantic responsive classes (Desktop defaults) ──────────────────────── */
+.save-telemetry-bar {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  background-color: var(--surface-0);
+  border: 1px solid var(--border-strong);
+  border-left: 4px solid var(--accent);
+  padding: var(--space-4) var(--space-6);
+  display: flex;
+  align-items: center;
+  gap: var(--space-6);
+  z-index: 1000;
+}
+
+.currency-row {
+  display: grid;
+  grid-template-columns: 40px 1.5fr 1fr;
+  gap: var(--space-4);
+}
+
+.casino-row {
+  display: grid;
+  grid-template-columns: 1.5fr 1fr 1fr auto;
+  gap: var(--space-4);
+}
+
+.levels-config-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-3);
+}
+
+.milestones-grid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: var(--space-2);
+  text-align: center;
+}
+
+.daily-rewards-amounts-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: var(--space-3);
+  margin-top: var(--space-3);
+}
+
+.daily-rewards-meta-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-3);
+  margin-top: var(--space-3);
+}
+
+.member-list-header, .member-list-row {
+  display: grid;
+  grid-template-columns: 48px 2fr 1fr;
+  gap: var(--space-4);
+}
+
+.self-role-editor-row {
+  display: grid;
+  grid-template-columns: 140px 1fr auto;
+  gap: var(--space-2);
+}
+
+.custom-command-header-row {
+  display: flex;
+  gap: var(--space-3);
+  align-items: center;
+}
+
+.auto-reply-header-row {
+  display: flex;
+  gap: var(--space-3);
+  align-items: center;
+}
+
+.quiz-scoring-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: var(--space-4);
+}
+
+.reminder-target-grid, .reminder-meta-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-4);
+}
+
+/* ── Mobile Responsiveness Rules ─────────────────────────────────────────── */
+@media (max-width: 992px) {
+  /* Dimensions overrides */
+  :root {
+    --rail-domain-w: 260px;
+  }
+
+  .mobile-menu-toggle {
+    display: flex !important;
+  }
+
+  /* Slide OUT the Guild Rail on Mobile */
+  .guild-rail {
+    position: fixed;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    z-index: 100;
+    transform: translateX(-100%);
+    transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+    background-color: var(--bg);
+    border-right: 1px solid var(--border);
+  }
+
+  .menu-open .guild-rail {
+    transform: translateX(0);
+  }
+
+  /* Slide OUT the Domain Rail next to the Guild Rail */
+  .domain-rail {
+    position: fixed;
+    left: var(--rail-guild-w);
+    top: 0;
+    bottom: 0;
+    z-index: 99;
+    transform: translateX(-150%);
+    transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+    box-shadow: 10px 0 30px rgba(0, 0, 0, 0.6);
+  }
+
+  .menu-open .domain-rail {
+    transform: translateX(0);
+  }
+
+  /* Header adjustments */
+  .main-header {
+    padding: 0 16px;
+    height: 64px;
+  }
+
+  /* Workspace adjustments */
+  .workspace-content {
+    padding: 16px;
+    gap: 16px;
+  }
+  
+  .quiz-scoring-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+@media (max-width: 768px) {
+  /* 12-Column Grid collapse to stacked flex */
+  .grid-12 {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  .col-span-12, .col-span-8, .col-span-6, .col-span-4, .col-span-3 {
+    grid-column: span 12;
+  }
+
+  /* Header zone layout stacking */
+  .header-zone {
+    flex-direction: column;
+    gap: var(--space-3);
+    align-items: flex-start;
+  }
+
+  /* Status KPI tiles wrapping */
+  .status-zone {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
+  /* Hide Sys Rev and Username in Header on tablet/mobile */
+  .header-sys-rev, .header-user-tag {
+    display: none !important;
+  }
+
+  /* Collapse daily config elements */
+  .daily-rewards-amounts-grid {
+    grid-template-columns: 1fr !important;
+    gap: var(--space-2) !important;
+  }
+  
+  .daily-rewards-meta-grid {
+    grid-template-columns: 1fr !important;
+    gap: var(--space-2) !important;
+  }
+
+  .levels-config-grid {
+    grid-template-columns: 1fr !important;
+    gap: var(--space-2) !important;
+  }
+
+  /* CasinoGameRow columns layout on mobile */
+  .casino-row {
+    grid-template-columns: 1fr 1fr !important;
+    gap: var(--space-2) !important;
+  }
+
+  .casino-row > span {
+    grid-column: span 2;
+  }
+
+  .casino-row > label.toggle-switch {
+    grid-column: span 2;
+    justify-content: flex-end;
+    margin-top: 0 !important;
+  }
+}
+
+@media (max-width: 576px) {
+  /* Save bar stacks on mobile */
+  .save-telemetry-bar {
+    left: 12px;
+    right: 12px;
+    bottom: 12px;
+    padding: var(--space-3) var(--space-4);
+    gap: var(--space-3);
+    flex-direction: column;
+    align-items: stretch;
+    text-align: center;
+  }
+  
+  .save-telemetry-bar button {
+    width: 100%;
+  }
+
+  /* Hide Node ID on small screens */
+  .header-node-id {
+    display: none !important;
+  }
+
+  /* Currency row wrap */
+  .currency-row {
+    grid-template-columns: 40px 1fr !important;
+    gap: var(--space-2);
+  }
+  .currency-row > div:nth-child(2) {
+    grid-column: span 1;
+  }
+  .currency-row > div:nth-child(3) {
+    grid-column: span 2;
+    margin-left: 48px;
+  }
+
+  /* Self assign roles editor */
+  .self-role-editor-row {
+    grid-template-columns: 1fr auto !important;
+    gap: var(--space-2) !important;
+  }
+  .self-role-editor-row > input {
+    grid-column: span 2;
+  }
+
+  /* Custom command */
+  .custom-command-header-row {
+    flex-wrap: wrap;
+    gap: var(--space-2) !important;
+  }
+  .custom-command-header-row > input:nth-of-type(1) {
+    width: 100% !important;
+  }
+  .custom-command-header-row > input:nth-of-type(2) {
+    flex: 1 1 auto !important;
+    width: auto !important;
+  }
+
+  /* Auto reply */
+  .auto-reply-header-row {
+    justify-content: space-between;
+  }
+  .auto-reply-header-row > input {
+    width: 60% !important;
+  }
+
+  /* Quiz scoring */
+  .quiz-scoring-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: var(--space-3) !important;
+  }
+
+  /* Reminders */
+  .reminder-target-grid, .reminder-meta-grid {
+    grid-template-columns: 1fr !important;
+    gap: var(--space-3) !important;
+  }
+
+  /* Milestones milestone blocks layout */
+  .milestones-grid {
+    grid-template-columns: repeat(3, 1fr) !important;
+    gap: var(--space-1-5) !important;
+  }
+
+  /* Member rows on phone */
+  .member-list-header {
+    display: none !important;
+  }
+  .member-list-row {
+    grid-template-columns: 40px 1fr !important;
+    gap: var(--space-2) !important;
+    padding: var(--space-2-5) var(--space-3) !important;
+  }
+  .member-list-row > span:last-child {
+    grid-column: span 2;
+    text-align: left !important;
+    margin-left: 48px;
+    margin-top: -2px;
+  }
+}

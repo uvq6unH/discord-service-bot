@@ -221,7 +221,7 @@ function SelfRoleEditor({ roles, allRoles, onChange }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
       {roles.map((r, i) => (
-        <div key={i} style={{ display: 'grid', gridTemplateColumns: '140px 1fr auto', gap: 'var(--space-2)', alignItems: 'center' }}>
+        <div key={i} className="self-role-editor-row" style={{ gap: 'var(--space-2)', alignItems: 'center' }}>
           <input 
             className="form-input" 
             style={{ fontSize: '12px' }} 

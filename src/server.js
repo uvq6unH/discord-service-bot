@@ -404,6 +404,20 @@ export function createServer({ configStore, stateStore, botClient, redis = null 
       const v = Number(body.dailyCooldownHours);
       if (!Number.isInteger(v) || v < 1 || v > 168) errors.push('dailyCooldownHours phải là số nguyên 1–168.');
     }
+    if (body.xpBase !== undefined) {
+      const v = Number(body.xpBase);
+      if (!Number.isInteger(v) || v < 1 || v > 100000) errors.push('xpBase phải là số nguyên 1–100.000.');
+    }
+    if (body.xpExponent !== undefined) {
+      const v = Number(body.xpExponent);
+      if (Number.isNaN(v) || v < 0.5 || v > 10.0) errors.push('xpExponent phải là số từ 0.5 đến 10.0.');
+    }
+    if (body.levelUpAnnouncementEnabled !== undefined && typeof body.levelUpAnnouncementEnabled !== 'boolean') {
+      errors.push('levelUpAnnouncementEnabled phải là boolean.');
+    }
+    if (body.levelUpAnnouncementChannelId !== undefined && typeof body.levelUpAnnouncementChannelId !== 'string') {
+      errors.push('levelUpAnnouncementChannelId phải là string.');
+    }
 
     if (errors.length) {
       return res.status(400).json({ error: errors.join(' ') });

@@ -185,10 +185,7 @@ function CurrencyRow({ prefix, defaultName, defaultIcon, config, updateConfig })
   const { t } = useLanguage();
 
   return (
-    <div style={{
-      display: 'grid',
-      gridTemplateColumns: '40px 1.5fr 1fr',
-      gap: 'var(--space-4)',
+    <div className="currency-row" style={{
       alignItems: 'center',
       padding: 'var(--space-3) 0',
       borderBottom: '1px solid var(--border)'
@@ -231,18 +228,16 @@ function CurrencyRow({ prefix, defaultName, defaultIcon, config, updateConfig })
   );
 }
 
-function CasinoGameRow({ title, prefix, config, handleBetChange, updateConfig }) {
+function CasinoGameRow({ title, prefix, config, handleBetChange, updateConfig, economyEnabled }) {
   const enabledKey = `${prefix}Enabled`;
   const minKey = `${prefix}MinBet`;
   const maxKey = `${prefix}MaxBet`;
-  const enabled = config[enabledKey] ?? false;
+  const enabled = (config[enabledKey] ?? false) && economyEnabled;
+  const isToggled = config[enabledKey] ?? false;
   const { t } = useLanguage();
 
   return (
-    <div style={{
-      display: 'grid',
-      gridTemplateColumns: '1.5fr 1fr 1fr auto',
-      gap: 'var(--space-4)',
+    <div className="casino-row" style={{
       alignItems: 'center',
       padding: 'var(--space-3) 0',
       borderBottom: '1px solid var(--border)',
@@ -280,7 +275,8 @@ function CasinoGameRow({ title, prefix, config, handleBetChange, updateConfig })
         <input
           type="checkbox"
           className="toggle-switch__input"
-          checked={enabled}
+          disabled={!economyEnabled}
+          checked={isToggled}
           onChange={e => updateConfig({ [enabledKey]: e.target.checked })}
         />
         <div className="toggle-switch__track">
@@ -382,14 +378,101 @@ export default function EconomyPage() {
             </div>
 
             {isLeveling && (
-              <div className="form-group" style={{ animation: 'fade-in 0.15s ease-out' }}>
-                <label className="form-label">{t("Accrual coefficient (XP/msg)")}</label>
-                <input
-                  type="number"
-                  className="form-input"
-                  value={config.xpPerMessage ?? 15}
-                  onChange={e => updateConfig({ xpPerMessage: Number(e.target.value) })}
-                />
+              <div style={{ animation: 'fade-in 0.15s ease-out', display: 'flex', flexDirection: 'column', gap: 'var(--space-3)', marginTop: 'var(--space-3)', borderTop: '1px dashed var(--border)', paddingTop: 'var(--space-3)' }}>
+                <div className="form-group" style={{ margin: 0 }}>
+                  <label className="form-label">{t("Accrual coefficient (XP/msg)")}</label>
+                  <input
+                    type="number"
+                    className="form-input"
+                    value={config.xpPerMessage ?? 5}
+                    onChange={e => updateConfig({ xpPerMessage: Math.max(1, Number(e.target.value)) })}
+                  />
+                </div>
+
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 'var(--space-1)' }}>
+                  <span style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--text-2)' }}>
+                    {t("CONGRATULATE ON LEVEL UP")}
+                  </span>
+                  <label className="toggle-switch">
+                    <input
+                      type="checkbox"
+                      className="toggle-switch__input"
+                      checked={config.levelUpAnnouncementEnabled ?? true}
+                      onChange={e => updateConfig({ levelUpAnnouncementEnabled: e.target.checked })}
+                    />
+                    <div className="toggle-switch__track">
+                      <div className="toggle-switch__thumb" />
+                    </div>
+                  </label>
+                </div>
+
+                {(config.levelUpAnnouncementEnabled ?? true) && (
+                  <div className="form-group" style={{ margin: 0 }}>
+                    <label className="form-label">{t("Level-up announcement channel")}</label>
+                    <select
+                      className="form-select"
+                      value={config.levelUpAnnouncementChannelId ?? ''}
+                      onChange={e => updateConfig({ levelUpAnnouncementChannelId: e.target.value })}
+                    >
+                      <option value="">{t("Default (Current Channel)")}</option>
+                      {(guildData?.channels ?? [])
+                        .filter(c => c.type === 0 || c.type === 5)
+                        .map(c => (
+                          <option key={c.id} value={c.id}>
+                            #{c.name}
+                          </option>
+                        ))}
+                    </select>
+                  </div>
+                )}
+
+                <div className="levels-config-grid">
+                  <div className="form-group" style={{ margin: 0 }}>
+                    <label className="form-label">{t("Base XP")}</label>
+                    <input
+                      type="number"
+                      className="form-input"
+                      value={config.xpBase ?? 100}
+                      onChange={e => updateConfig({ xpBase: Math.max(1, Number(e.target.value)) })}
+                    />
+                  </div>
+                  <div className="form-group" style={{ margin: 0 }}>
+                    <label className="form-label">{t("XP Exponent")}</label>
+                    <input
+                      type="number"
+                      step="0.1"
+                      className="form-input"
+                      value={config.xpExponent ?? 2.0}
+                      onChange={e => updateConfig({ xpExponent: Math.max(0.5, Number(e.target.value)) })}
+                    />
+                  </div>
+                </div>
+
+                <div style={{
+                  backgroundColor: 'var(--surface-1)',
+                  border: '1px solid var(--border)',
+                  padding: 'var(--space-3)',
+                  fontSize: '11px',
+                  fontFamily: 'var(--font-mono)',
+                  color: 'var(--text-3)'
+                }}>
+                  <div style={{ fontWeight: 'bold', marginBottom: 'var(--space-1.5)', color: 'var(--text-2)' }}>
+                    {t("Level Milestones Preview")}
+                  </div>
+                  <div className="milestones-grid">
+                    {[1, 2, 3, 4, 5].map(lvl => {
+                      const base = config.xpBase ?? 100;
+                      const exp = config.xpExponent ?? 2.0;
+                      const requiredXp = Math.round(base * Math.pow(lvl, exp));
+                      return (
+                        <div key={lvl} style={{ backgroundColor: 'var(--surface-2)', padding: 'var(--space-1.5) 0', border: '1px solid var(--border-strong)' }}>
+                          <span style={{ color: 'var(--accent)', fontWeight: 'bold' }}>Lvl {lvl}</span>
+                          <div style={{ fontSize: '10px', marginTop: '4px' }}>{requiredXp} XP</div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
               </div>
             )}
           </Panel>
@@ -423,7 +506,7 @@ export default function EconomyPage() {
 
         {/* Panel 2: Rewards Claims & Betting Limits */}
         <div className="col-span-6">
-          <Panel title={t("DAILY REWARDS DISTRIBUTOR")} accent className={highlight === 'daily' ? 'flash-target' : ''}>
+          <Panel title={t("DAILY REWARDS DISTRIBUTOR")} accent className={highlight === 'daily' ? 'flash-target' : ''} style={{ opacity: isEnabled ? 1 : 0.4 }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <span style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--text-2)' }}>
                 {t("REWARDS DISPENSATION")}
@@ -432,6 +515,7 @@ export default function EconomyPage() {
                 <input
                   type="checkbox"
                   className="toggle-switch__input"
+                  disabled={!isEnabled}
                   checked={config.dailyEnabled ?? false}
                   onChange={e => updateConfig({ dailyEnabled: e.target.checked })}
                 />
@@ -441,12 +525,13 @@ export default function EconomyPage() {
               </label>
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 'var(--space-3)', marginTop: 'var(--space-3)' }}>
+            <div className="daily-rewards-amounts-grid">
               <div className="form-group">
                 <label className="form-label">{t("Silver amt")}</label>
                 <input
                   type="number"
                   className="form-input"
+                  disabled={!isEnabled}
                   style={{ fontFamily: 'var(--font-mono)' }}
                   value={config.dailySilverAmount ?? 100}
                   onChange={e => updateConfig({ dailySilverAmount: Number(e.target.value) })}
@@ -457,6 +542,7 @@ export default function EconomyPage() {
                 <input
                   type="number"
                   className="form-input"
+                  disabled={!isEnabled}
                   style={{ fontFamily: 'var(--font-mono)' }}
                   value={config.dailyGoldAmount ?? 10}
                   onChange={e => updateConfig({ dailyGoldAmount: Number(e.target.value) })}
@@ -467,6 +553,7 @@ export default function EconomyPage() {
                 <input
                   type="number"
                   className="form-input"
+                  disabled={!isEnabled}
                   style={{ fontFamily: 'var(--font-mono)' }}
                   value={config.dailyDiamondAmount ?? 1}
                   onChange={e => updateConfig({ dailyDiamondAmount: Number(e.target.value) })}
@@ -474,12 +561,13 @@ export default function EconomyPage() {
               </div>
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-3)', marginTop: 'var(--space-3)' }}>
+            <div className="daily-rewards-meta-grid">
               <div className="form-group">
                 <label className="form-label">{t("Cooldown (Hours)")}</label>
                 <input
                   type="number"
                   className="form-input"
+                  disabled={!isEnabled}
                   style={{ fontFamily: 'var(--font-mono)' }}
                   value={config.dailyCooldownHours ?? 24}
                   onChange={e => updateConfig({ dailyCooldownHours: Number(e.target.value) })}
@@ -489,6 +577,7 @@ export default function EconomyPage() {
                 <label className="form-label">{t("Reset UTC offset")}</label>
                 <select
                   className="form-select"
+                  disabled={!isEnabled}
                   value={config.dailyResetUtcOffset ?? 0}
                   onChange={e => updateConfig({ dailyResetUtcOffset: Number(e.target.value) })}
                 >
@@ -498,7 +587,7 @@ export default function EconomyPage() {
             </div>
           </Panel>
 
-          <Panel title={t("BETTING REGULATION SYSTEM")} style={{ marginTop: 'var(--space-5)' }}>
+          <Panel title={t("BETTING REGULATION SYSTEM")} style={{ marginTop: 'var(--space-5)', opacity: isEnabled ? 1 : 0.4 }}>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
               <CasinoGameRow 
                 title="Blackjack Module" 
@@ -506,6 +595,7 @@ export default function EconomyPage() {
                 config={config} 
                 handleBetChange={handleBetChange} 
                 updateConfig={updateConfig} 
+                economyEnabled={isEnabled}
               />
               <CasinoGameRow 
                 title="Poker Module" 
@@ -513,6 +603,7 @@ export default function EconomyPage() {
                 config={config} 
                 handleBetChange={handleBetChange} 
                 updateConfig={updateConfig} 
+                economyEnabled={isEnabled}
               />
               <CasinoGameRow 
                 title="Coinflip Module" 
@@ -520,6 +611,7 @@ export default function EconomyPage() {
                 config={config} 
                 handleBetChange={handleBetChange} 
                 updateConfig={updateConfig} 
+                economyEnabled={isEnabled}
               />
               <CasinoGameRow 
                 title="Dice Module" 
@@ -527,6 +619,7 @@ export default function EconomyPage() {
                 config={config} 
                 handleBetChange={handleBetChange} 
                 updateConfig={updateConfig} 
+                economyEnabled={isEnabled}
               />
               <CasinoGameRow 
                 title="Slots Module" 
@@ -534,6 +627,7 @@ export default function EconomyPage() {
                 config={config} 
                 handleBetChange={handleBetChange} 
                 updateConfig={updateConfig} 
+                economyEnabled={isEnabled}
               />
             </div>
           </Panel>

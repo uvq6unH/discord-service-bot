@@ -102,6 +102,7 @@ const TTL = {
   profile: 2 * 60 * 1000,      // 2 min   – summoner / rank
   match: 5 * 60 * 1000,      // 5 min   – match history
   mastery: 10 * 60 * 1000,     // 10 min  – champion mastery
+  recommendations: 60 * 60 * 1000, // 1 hour – recommendations
 };
 
 // ── Rate-limit-aware batch fetch ─────────────────────────────────────────────
@@ -521,6 +522,155 @@ export function getQueueName(queueId) {
 
 export function getRegionChoices() {
   return Object.entries(REGIONS.display).map(([value, name]) => ({ name, value }));
+}
+
+export async function getChampionRuneRecommendations(championId) {
+  const cacheKey = 'cdragon:runeRecs';
+  let data = cache.get(cacheKey);
+  if (!data) {
+    data = await httpGet(`${CDRAGON_BASE}/plugins/rcp-be-lol-game-data/global/default/v1/champion-rune-recommendations.json`);
+    cache.set(cacheKey, data, TTL.recommendations);
+  }
+  
+  const numericId = Number(championId);
+  const champRec = data.find(x => Number(x.championId) === numericId);
+  if (!champRec) return [];
+  
+  return champRec.runeRecommendations.filter(r => r.mapId === 11);
+}
+
+export async function getChampionItemBuild(championAlias, position) {
+  const normChamp = championAlias.toUpperCase();
+  const cacheKey = `opgg:build:${normChamp}:${position}`;
+  let cached = cache.get(cacheKey);
+  if (cached) return cached;
+
+  const url = 'https://mcp-api.op.gg/mcp';
+  const payload = {
+    jsonrpc: '2.0',
+    method: 'tools/call',
+    params: {
+      name: 'lol_get_champion_analysis',
+      arguments: {
+        champion: normChamp,
+        game_mode: 'ranked',
+        position: position,
+        desired_output_fields: [
+          'data.starter_items',
+          'data.boots',
+          'data.core_items',
+          'data.fourth_items[]',
+          'data.fifth_items[]',
+          'data.last_items[]'
+        ]
+      }
+    },
+    id: 1
+  };
+
+  const bodyData = JSON.stringify(payload);
+  const responseText = await new Promise((resolve, reject) => {
+    const parsed = new URL(url);
+    const options = {
+      hostname: parsed.hostname,
+      path: parsed.pathname + parsed.search,
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Content-Length': Buffer.byteLength(bodyData),
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'
+      }
+    };
+
+    const req = https.request(options, (res) => {
+      const chunks = [];
+      res.on('data', (c) => chunks.push(c));
+      res.on('end', () => {
+        const body = Buffer.concat(chunks).toString('utf8');
+        if (res.statusCode >= 400) {
+          reject(new Error(`OP.GG API HTTP ${res.statusCode}: ${body}`));
+        } else {
+          resolve(body);
+        }
+      });
+    });
+
+    req.on('error', reject);
+    req.write(bodyData);
+    req.end();
+  });
+
+  const resJson = JSON.parse(responseText);
+  if (resJson.error) {
+    throw new Error(`OP.GG MCP error: ${JSON.stringify(resJson.error.message)}`);
+  }
+
+  const text = resJson.result?.content?.[0]?.text;
+  if (!text) throw new Error('Empty response from OP.GG MCP');
+
+  const lines = text.split('\n');
+  const mainLine = lines.find(l => l.includes('LolGetChampionAnalysis') && !l.startsWith('class '));
+  if (!mainLine) throw new Error('Failed to find LolGetChampionAnalysis line in response');
+
+  const jsonStr = mainLine.replace(/[A-Za-z0-9_]+\(/g, '[').replace(/\)/g, ']');
+  const parsed = JSON.parse(jsonStr);
+  const dataArray = parsed[0];
+
+  if (!dataArray || dataArray.length < 6) {
+    throw new Error('Incomplete data array from OP.GG');
+  }
+
+  const build = {
+    starter_items: {
+      ids: dataArray[0][0] ?? [],
+      names: dataArray[0][1] ?? []
+    },
+    boots: {
+      ids: dataArray[1][0] ?? [],
+      names: dataArray[1][1] ?? []
+    },
+    core_items: {
+      ids: dataArray[2][0] ?? [],
+      names: dataArray[2][1] ?? []
+    },
+    fourth_items: (dataArray[3] || []).map(item => ({
+      ids: item[0],
+      name: Array.isArray(item[1]) ? item[1].join(', ') : item[1],
+      pick_rate: item[4]
+    })),
+    fifth_items: (dataArray[4] || []).map(item => ({
+      ids: item[0],
+      name: Array.isArray(item[1]) ? item[1].join(', ') : item[1],
+      pick_rate: item[4]
+    })),
+    last_items: (dataArray[5] || []).map(item => ({
+      ids: item[0],
+      name: Array.isArray(item[1]) ? item[1].join(', ') : item[1],
+      pick_rate: item[4]
+    }))
+  };
+
+  cache.set(cacheKey, build, TTL.recommendations);
+  return build;
+}
+
+export async function getPerkIconsMap() {
+  const cacheKey = 'cdragon:perkIconsMap';
+  let cached = cache.get(cacheKey);
+  if (cached) return cached;
+
+  const url = `${CDRAGON_BASE}/plugins/rcp-be-lol-game-data/global/default/v1/perks.json`;
+  const data = await httpGet(url);
+  const map = new Map();
+  for (const perk of data) {
+    if (perk.iconPath) {
+      const cleanPath = perk.iconPath.toLowerCase().replace('/lol-game-data/assets', '');
+      const fullUrl = `${CDRAGON_BASE}/plugins/rcp-be-lol-game-data/global/default${cleanPath}`;
+      map.set(Number(perk.id), fullUrl);
+    }
+  }
+  cache.set(cacheKey, map, TTL.recommendations);
+  return map;
 }
 
 export { RANK_EMOJIS };

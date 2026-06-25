@@ -56,6 +56,7 @@ export async function handleMusicCommand({ message, subcommand, args, config }) 
     if (c.type === 'musicqueue' && (subcommand === 'queue' || subcommand === 'q')) return true;
     if (c.type === 'musicnp' && (subcommand === 'np' || subcommand === 'nowplaying')) return true;
     if (c.type === 'musicvolume' && (subcommand === 'volume' || subcommand === 'vol')) return true;
+    if (c.type === 'musicremove' && (subcommand === 'remove' || subcommand === 'rm' || subcommand === 'delete')) return true;
     return false;
   });
 
@@ -332,6 +333,28 @@ export async function handleMusicCommand({ message, subcommand, args, config }) 
     return message.reply(`🔊 Volume: **${vol}%**`);
   }
 
+  // ── remove ────────────────────────────────────────────────────────────────
+  if (cmd?.type === 'musicremove') {
+    if (!player) return message.reply('❌ Không có hàng nhạc nào!');
+    const upcoming = player.queue.tracks ?? [];
+    if (!upcoming.length) return message.reply('📭 Hàng chờ hiện tại đang trống!');
+
+    const indexStr = args.trim();
+    if (!indexStr) {
+      return message.reply(`❌ Vui lòng cung cấp số thứ tự bài hát cần xóa.\n📌 Ví dụ: \`${musicPrefix} remove 3\``);
+    }
+
+    const index = parseInt(indexStr, 10);
+    if (isNaN(index) || index < 1 || index > upcoming.length) {
+      return message.reply(`❌ Số thứ tự không hợp lệ. Vui lòng nhập từ **1** đến **${upcoming.length}**.`);
+    }
+
+    const removedTrack = upcoming[index - 1];
+    await player.queue.remove(index - 1);
+
+    return message.reply(`🗑️ Đã xóa bài **${removedTrack.info.title}** khỏi hàng chờ.`);
+  }
+
   // ── help (fallback) ───────────────────────────────────────────────────────
   const playCmd   = musicCommands.find(c => c.type === 'musicplay');
   const skipCmd   = musicCommands.find(c => c.type === 'musicskip');
@@ -342,6 +365,7 @@ export async function handleMusicCommand({ message, subcommand, args, config }) 
   const queueCmd  = musicCommands.find(c => c.type === 'musicqueue');
   const npCmd     = musicCommands.find(c => c.type === 'musicnp');
   const volumeCmd = musicCommands.find(c => c.type === 'musicvolume');
+  const removeCmd = musicCommands.find(c => c.type === 'musicremove');
 
   const p = musicPrefix;
   const embed = new EmbedBuilder()
@@ -360,7 +384,8 @@ export async function handleMusicCommand({ message, subcommand, args, config }) 
       { name: `\`${p} ${queueCmd?.name || 'queue'}\` / \`${p} q\``,   value: queueCmd?.description || 'Xem danh sách hàng nhạc' },
       { name: `\`${p} ${npCmd?.name || 'np'}\``,                    value: npCmd?.description || 'Xem bài đang phát (+ progress bar)' },
       { name: `\`${p} ${loopCmd?.name || 'loop'}\``,                  value: loopCmd?.description || 'Cycle: TẮT → Lặp bài → Lặp hàng' },
-      { name: `\`${p} ${volumeCmd?.name || 'volume'} <0–200>\``,        value: volumeCmd?.description || 'Điều chỉnh âm lượng (mặc định 80%)' }
+      { name: `\`${p} ${volumeCmd?.name || 'volume'} <0–200>\``,        value: volumeCmd?.description || 'Điều chỉnh âm lượng (mặc định 80%)' },
+      { name: `\`${p} ${removeCmd?.name || 'remove'} <số thứ tự>\``,   value: removeCmd?.description || 'Xóa bài hát khỏi hàng chờ bằng số thứ tự' }
     );
 
   return message.reply({ embeds: [embed] });

@@ -211,10 +211,10 @@ export async function handleEconomy(ctx) {
     });
     if (!balance) return;
 
-    const target = isInteraction ? source.options.getInteger('number') : parts[1];
+    const target = isInteraction ? source.options.getString('prediction') : parts[1];
     const game = playDice(target);
-    // tryDebitBalance already deducted bet; on win return 6x stake, on loss do nothing
-    const delta = game.outcome === 'win' ? bet * 6 : 0;
+    // tryDebitBalance already deducted bet; on win return multiplier * stake, on loss do nothing
+    const delta = game.outcome === 'win' ? bet * game.multiplier : 0;
     const nextBalance = await client.stateStore.adjustBalance(guild.id, user.id, currency, delta);
     return reply({
       embeds: [

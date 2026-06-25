@@ -36,14 +36,28 @@ export async function handleXp(message, config, stateStore) {
 
   xpCache.set(xpKey, Date.now());
 
-  const rank = await stateStore.addXp(message.guild.id, message.author.id, config.xpPerMessage);
-  if (rank.leveledUp) {
+  const rank = await stateStore.addXp(
+    message.guild.id,
+    message.author.id,
+    config.xpPerMessage,
+    config.xpBase,
+    config.xpExponent
+  );
+  if (rank.leveledUp && config.levelUpAnnouncementEnabled !== false) {
     const levelMessage = config.levelUpMessage
       .replaceAll('{user}',     `<@${message.author.id}>`)
       .replaceAll('{username}', message.author.username)
       .replaceAll('{level}',    String(rank.level))
       .replaceAll('{xp}',       String(rank.xp));
-    await message.channel.send(levelMessage).catch(() => null);
+
+    let targetChannel = message.channel;
+    if (config.levelUpAnnouncementChannelId) {
+      const channel = message.guild.channels.cache.get(config.levelUpAnnouncementChannelId);
+      if (channel && channel.isTextBased()) {
+        targetChannel = channel;
+      }
+    }
+    await targetChannel.send(levelMessage).catch(() => null);
   }
 
   return true;

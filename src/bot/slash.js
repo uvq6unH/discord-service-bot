@@ -115,12 +115,22 @@ function buildSlashOptions(command) {
         required: true
       },
       {
-        name: 'number',
-        description: 'Pick a number from 1 to 6',
-        type: ApplicationCommandOptionType.Integer,
-        minValue: 1,
-        maxValue: 6,
-        required: true
+        name: 'prediction',
+        description: 'Chọn số (1-6), hoặc Tài/Xỉu/Chẵn/Lẻ',
+        type: ApplicationCommandOptionType.String,
+        required: true,
+        choices: [
+          { name: '1', value: '1' },
+          { name: '2', value: '2' },
+          { name: '3', value: '3' },
+          { name: '4', value: '4' },
+          { name: '5', value: '5' },
+          { name: '6', value: '6' },
+          { name: 'Tài (High: 4-6)', value: 'high' },
+          { name: 'Xỉu (Low: 1-3)', value: 'low' },
+          { name: 'Chẵn (Even)', value: 'even' },
+          { name: 'Lẻ (Odd)', value: 'odd' }
+        ]
       }
     ];
   }

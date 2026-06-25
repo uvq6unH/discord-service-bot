@@ -14,7 +14,7 @@
  */
 
 import { EmbedBuilder, ApplicationCommandOptionType, AttachmentBuilder, ActionRowBuilder, StringSelectMenuBuilder } from 'discord.js';
-import { Jimp } from 'jimp';
+import { Jimp, loadFont } from 'jimp';
 import path from 'node:path';
 import fs from 'node:fs';
 import {
@@ -28,7 +28,8 @@ import {
   getMatchHistory, getMatchDetail, getTopMastery, findChampion,
   getChampionDetail, getChampionData, getItemData, getRuneData,
   getLatestPatch, formatRank, formatDuration, getQueueName,
-  getRegionChoices, RANK_EMOJIS, REGIONS, batchFetch
+  getRegionChoices, RANK_EMOJIS, REGIONS, batchFetch,
+  getChampionRuneRecommendations, getChampionItemBuild, getPerkIconsMap
 } from './lolApi.js';
 
 // ── Colours ───────────────────────────────────────────────────────────────────
@@ -322,23 +323,160 @@ export async function handleLolChamp({ source, args, isInteraction, config, repl
 
     const tips = detail.allytips?.slice(0, 2).join('\n') || 'Chưa có mẹo.';
 
+    // ── Runes and Items integration ──────────────────────────────────────────
+    let runeRecs = [];
+    try {
+      runeRecs = await getChampionRuneRecommendations(detail.id);
+    } catch (e) {
+      console.error('[lolchamp] failed to fetch rune recommendations:', e.message);
+    }
+
+    const posMap = {
+      'MIDDLE': 'mid',
+      'TOP': 'top',
+      'JUNGLE': 'jungle',
+      'BOTTOM': 'adc',
+      'UTILITY': 'support'
+    };
+
+    let defaultPosition = 'mid';
+    if (runeRecs.length > 0) {
+      const defaultRec = runeRecs.find(r => r.isDefaultPosition) || runeRecs[0];
+      if (defaultRec) {
+        defaultPosition = posMap[defaultRec.position] || 'mid';
+      }
+    } else {
+      const tag = detail.tags?.[0]?.toLowerCase();
+      if (tag === 'marksman') defaultPosition = 'adc';
+      else if (tag === 'support') defaultPosition = 'support';
+      else if (tag === 'tank') defaultPosition = 'top';
+      else if (tag === 'fighter') defaultPosition = 'jungle';
+    }
+
+    let itemBuild = null;
+    try {
+      itemBuild = await getChampionItemBuild(found.alias, defaultPosition);
+    } catch (e) {
+      console.error('[lolchamp] failed to fetch item build:', e.message);
+    }
+
+    const runeTrees = await getRuneData('vi_VN');
+    const runeMap = new Map();
+    const styleMap = new Map();
+    for (const tree of runeTrees) {
+      styleMap.set(tree.id, tree.name);
+      for (const slot of tree.slots) {
+        for (const r of slot.runes) {
+          runeMap.set(r.id, r.name);
+        }
+      }
+    }
+    const shardNames = {
+      5001: 'Máu theo cấp',
+      5002: 'Giáp',
+      5003: 'Kháng phép',
+      5005: 'Tốc độ đánh',
+      5007: 'Điểm hồi kỹ năng',
+      5008: 'Sức mạnh thích ứng',
+      5010: 'Tốc độ di chuyển',
+      5011: 'Máu phẳng',
+      5013: 'Kháng hiệu ứng & Kháng làm chậm'
+    };
+    for (const [id, name] of Object.entries(shardNames)) {
+      runeMap.set(Number(id), name);
+    }
+
+    const positionNames = {
+      'mid': 'Đường Giữa',
+      'top': 'Đường Trên',
+      'jungle': 'Rừng',
+      'adc': 'Đường Dưới (ADC)',
+      'support': 'Hỗ Trợ'
+    };
+
+    const extraFields = [];
+    for (let i = 0; i < Math.min(runeRecs.length, 3); i++) {
+      const rec = runeRecs[i];
+      const primaryStyle = styleMap.get(rec.primaryPerkStyleId) || rec.primaryPerkStyleId;
+      const secondaryStyle = styleMap.get(rec.secondaryPerkStyleId) || rec.secondaryPerkStyleId;
+      
+      const perks = rec.perkIds.map(id => runeMap.get(id) || `ID:${id}`);
+      const keystone = perks[0];
+      const primaryPerks = perks.slice(1, 4).join(', ');
+      const secondaryPerks = perks.slice(4, 6).join(', ');
+      const shards = perks.slice(6, 9).join(', ');
+      
+      const posText = positionNames[posMap[rec.position]] || rec.position;
+      
+      extraFields.push({
+        name: `🔮 Bảng Ngọc Khuyên Dùng ${i + 1} (${posText})`,
+        value: `• **Chính: ${primaryStyle}** (Siêu cấp: __${keystone}__)\n  └ ${primaryPerks}\n• **Phụ: ${secondaryStyle}**\n  └ ${secondaryPerks}\n• **Mảnh chỉ số:**\n  └ ${shards}`,
+        inline: true
+      });
+    }
+
+    if (itemBuild) {
+      const starter = itemBuild.starter_items.names.join(' + ') || 'Không rõ';
+      const boots = itemBuild.boots.names.join(' / ') || 'Không rõ';
+      const core = itemBuild.core_items.names.join(' ➔ ') || 'Không rõ';
+
+      const formatSlot = (items) => {
+        if (!items || items.length === 0) return 'Không rõ';
+        return items.slice(0, 3).map(item => {
+          const pct = item.pick_rate ? ` (${(item.pick_rate * 100).toFixed(0)}%)` : '';
+          return `__${item.name}__${pct}`;
+        }).join(', ');
+      };
+
+      const slot4 = formatSlot(itemBuild.fourth_items);
+      const slot5 = formatSlot(itemBuild.fifth_items);
+      const slot6 = formatSlot(itemBuild.last_items);
+
+      extraFields.push({
+        name: `🛒 Lối Lên Đồ Khuyên Dùng (${positionNames[defaultPosition] || defaultPosition})`,
+        value: [
+          `• **Khởi đầu:** ${starter}`,
+          `• **Giày:** ${boots}`,
+          `• **Cốt lõi (3 món):** ${core}`,
+          `• **Món thứ 4:** ${slot4}`,
+          `• **Món thứ 5:** ${slot5}`,
+          `• **Món thứ 6:** ${slot6}`
+        ].join('\n'),
+        inline: false
+      });
+    }
+
+    // Generate build card image
+    const attachmentName = `build_card_${detail.id}.png`;
+    let attachment = null;
+    try {
+      const buildCardPath = await getOrCreateChampBuildCardImage(detail, defaultPosition, runeRecs, itemBuild, patch);
+      if (buildCardPath) {
+        attachment = new AttachmentBuilder(buildCardPath, { name: attachmentName });
+      }
+    } catch (e) {
+      console.error('[lolchamp] failed to generate build card image:', e.message);
+    }
+
     const embed = new EmbedBuilder()
       .setTitle(`${detail.name} — "${detail.title}"`)
-      .setDescription(detail.lore?.slice(0, 300) + '...' || detail.blurb)
+      .setDescription(detail.lore?.slice(0, 400) + '...' || detail.blurb)
       .setThumbnail(iconUrl)
-      .setImage(splashUrl)
+      .setImage(attachment ? `attachment://${attachmentName}` : splashUrl)
       .setColor(C.champ)
       .addFields(
         { name: '📌 Loại / Tags', value: detail.tags.join(', '), inline: true },
         { name: '📊 Độ Khó', value: '⭐'.repeat(detail.info?.difficulty ?? 1), inline: true },
-        { name: '🔖 Patch', value: patch, inline: true },
-        { name: '📈 Chỉ Số Cơ Bản', value: stats, inline: false },
-        { name: '🔮 Kỹ Năng', value: passiveLine + '\n\n' + spells, inline: false },
-        { name: '💡 Mẹo Đồng Đội', value: tips, inline: false }
+        { name: '🔖 Patch', value: patch, inline: true }
       )
       .setFooter({ text: `Dùng /lsd để tra lịch sử người chơi • Data Dragon ${patch}` });
 
-    return editOrReply(source, isInteraction, { embeds: [embed] });
+    const replyOptions = { embeds: [embed] };
+    if (attachment) {
+      replyOptions.files = [attachment];
+    }
+
+    return editOrReply(source, isInteraction, replyOptions);
   } catch (err) {
     return editOrReply(source, isInteraction, { content: formatRiotError(err), ephemeral: true });
   }
@@ -487,6 +625,448 @@ export async function handleLolRunes({ source, args, isInteraction, config, repl
     return editOrReply(source, isInteraction, payload);
   } catch (err) {
     return editOrReply(source, isInteraction, { content: formatRiotError(err), ephemeral: true });
+  }
+}
+
+function drawStyledPanel(image, x, y, w, h, titleText, font) {
+  const bgColor = 0x10121aff;
+  const borderColor = 0x242838ff;
+  const headerBgColor = 0x171a26ff;
+  
+  for (let py = 0; py < h; py++) {
+    for (let px = 0; px < w; px++) {
+      const isBorder = (px === 0 || px === w - 1 || py === 0 || py === h - 1);
+      let color;
+      if (isBorder) {
+        color = borderColor;
+      } else if (py < 40) {
+        color = headerBgColor;
+      } else {
+        color = bgColor;
+      }
+      image.setPixelColor(color, x + px, y + py);
+    }
+  }
+  
+  if (titleText) {
+    image.print({
+      font: font,
+      x: x + 15,
+      y: y + 10,
+      text: titleText
+    });
+  }
+}
+
+function drawGoldBorder(image, x, y, w, h) {
+  const goldColor = 0xc79a3cff;
+  for (let py = 0; py < h; py++) {
+    for (let px = 0; px < w; px++) {
+      if (px < 2 || px >= w - 2 || py < 2 || py >= h - 2) {
+        image.setPixelColor(goldColor, x + px, y + py);
+      }
+    }
+  }
+}
+
+function drawBox(image, x, y, w, h, bgColor, borderColor) {
+  for (let py = 0; py < h; py++) {
+    for (let px = 0; px < w; px++) {
+      const isBorder = (px === 0 || px === w - 1 || py === 0 || py === h - 1);
+      const color = isBorder ? borderColor : bgColor;
+      image.setPixelColor(color, x + px, y + py);
+    }
+  }
+}
+
+function stripAccentsForCard(str) {
+  if (!str) return '';
+  return str
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/đ/g, 'd')
+    .replace(/Đ/g, 'D')
+    .replace(/[^ -~]/g, '');
+}
+
+/**
+ * Generates and caches a detailed build card image for the champion (1200x650px)
+ */
+async function getOrCreateChampBuildCardImage(detail, defaultPosition, runeRecs, itemBuild, patch) {
+  const tempDir = path.join(process.cwd(), 'data', 'temp');
+  if (!fs.existsSync(tempDir)) {
+    fs.mkdirSync(tempDir, { recursive: true });
+  }
+
+  const runeHash = runeRecs.map(r => r.perkIds[0]).join('-');
+  const itemHash = itemBuild ? [...(itemBuild.starter_items.ids || []), ...(itemBuild.boots.ids || []), ...(itemBuild.core_items.ids || [])].join('-') : 'noitems';
+  const outPath = path.join(tempDir, `build_card_h_${detail.id}_${defaultPosition}_${patch}_${runeHash}_${itemHash}.png`);
+  
+  if (fs.existsSync(outPath)) {
+    return outPath;
+  }
+
+  try {
+    const baseImage = new Jimp({ width: 1200, height: 650 });
+
+    // Diagonal gradient background from top-left (dark indigo) to bottom-right (slate)
+    const colorStart = { r: 9, g: 10, b: 15 };
+    const colorEnd = { r: 22, g: 25, b: 38 };
+    for (let y = 0; y < 650; y++) {
+      for (let x = 0; x < 1200; x++) {
+        const factor = (x / 1200 + y / 650) / 2;
+        const r = Math.round(colorStart.r + (colorEnd.r - colorStart.r) * factor);
+        const g = Math.round(colorStart.g + (colorEnd.g - colorStart.g) * factor);
+        const b = Math.round(colorStart.b + (colorEnd.b - colorStart.b) * factor);
+        const color = (r << 24) | (g << 16) | (b << 8) | 0xff;
+        baseImage.setPixelColor(color, x, y);
+      }
+    }
+
+    // Load fonts
+    const font32 = await loadFont(path.resolve(process.cwd(), 'assets/fonts/open-sans-32-white/open-sans-32-white.fnt'));
+    const font16 = await loadFont(path.resolve(process.cwd(), 'assets/fonts/open-sans-16-white/open-sans-16-white.fnt'));
+    const font8 = await loadFont(path.resolve(process.cwd(), 'assets/fonts/open-sans-8-white/open-sans-8-white.fnt'));
+
+    // Draw panels
+    drawStyledPanel(baseImage, 25, 25, 360, 600, 'THONG TIN & KY NANG', font16);
+    drawStyledPanel(baseImage, 410, 25, 380, 600, 'BANG NGOC DE XUAT', font16);
+    drawStyledPanel(baseImage, 815, 25, 360, 600, 'LOI LEN DO KHUYEN DUNG', font16);
+
+    const runeTrees = await getRuneData('vi_VN');
+    const runeMap = new Map();
+    const styleMap = new Map();
+    for (const tree of runeTrees) {
+      styleMap.set(tree.id, tree.name);
+      for (const slot of tree.slots) {
+        for (const r of slot.runes) {
+          runeMap.set(r.id, r.name);
+        }
+      }
+    }
+    const shardNames = {
+      5001: 'Mau theo cap', 5002: 'Giap', 5003: 'Khang phep', 5005: 'Toc do danh',
+      5007: 'Hoi ky nang', 5008: 'Suc manh thich ung', 5010: 'Toc do di chuyen',
+      5011: 'Mau phang', 5013: 'Khang hieu ung'
+    };
+    for (const [id, name] of Object.entries(shardNames)) {
+      runeMap.set(Number(id), name);
+    }
+
+    const perkMap = await getPerkIconsMap();
+    const promises = [];
+
+    // ── COLUMN 1: Champion Details & Spells ─────────────────────────────────────
+    drawGoldBorder(baseImage, 43, 83, 84, 84);
+    const portraitUrl = `https://raw.communitydragon.org/latest/plugins/rcp-be-lol-game-data/global/default/v1/champion-icons/${detail.id}.png`;
+    promises.push(
+      Jimp.read(portraitUrl).then(img => {
+        img.resize({ w: 80, h: 80 });
+        baseImage.composite(img, 45, 85);
+      }).catch(e => console.error('Failed to load champion portrait:', e.message))
+    );
+
+    baseImage.print({ font: font32, x: 140, y: 80, text: stripAccentsForCard(detail.name).toUpperCase() });
+    baseImage.print({ font: font16, x: 140, y: 120, text: `"${stripAccentsForCard(detail.title).toUpperCase()}"` });
+    baseImage.print({ font: font8, x: 140, y: 148, text: `TAGS: ${detail.tags.map(t => stripAccentsForCard(t).toUpperCase()).join(', ')} | DO KHO: ${'⭐'.repeat(detail.info?.difficulty ?? 1)}` });
+
+    const statsY = 180;
+    baseImage.print({ font: font16, x: 45, y: statsY, text: `HP: ${detail.stats.hp} (+${detail.stats.hpperlevel}/LV) | AD: ${detail.stats.attackdamage} (+${detail.stats.attackdamageperlevel}/LV)` });
+    baseImage.print({ font: font16, x: 45, y: statsY + 22, text: `GIAP: ${detail.stats.armor} (+${detail.stats.armorperlevel}/LV) | K.PHEP: ${detail.stats.spellblock} (+${detail.stats.spellblockperlevel}/LV)` });
+
+    const spellsList = [
+      { key: 'P', name: detail.passive.name, description: detail.passive.description, isPassive: true, imgName: detail.passive.image },
+      ...detail.spells.map((sp, idx) => ({
+        key: ['Q', 'W', 'E', 'R'][idx] || '?',
+        name: sp.name,
+        description: sp.description,
+        isPassive: false,
+        imgName: sp.image
+      }))
+    ];
+
+    spellsList.forEach((sp, idx) => {
+      const y = 245 + idx * 70;
+      const url = sp.isPassive
+        ? `https://ddragon.leagueoflegends.com/cdn/${patch}/img/passive/${sp.imgName}`
+        : `https://ddragon.leagueoflegends.com/cdn/${patch}/img/spell/${sp.imgName}`;
+
+      drawBox(baseImage, 43, y - 2, 52, 52, 0x171a26ff, 0x242838ff);
+
+      promises.push(
+        Jimp.read(url).then(img => {
+          img.resize({ w: 48, h: 48 });
+          baseImage.composite(img, 45, y);
+        }).catch(e => console.error(`Failed to load spell icon ${sp.key}:`, e.message))
+      );
+
+      baseImage.print({ font: font16, x: 105, y: y - 2, text: `[${sp.key}] ${stripAccentsForCard(sp.name).toUpperCase()}` });
+      
+      let descClean = stripAccentsForCard(sp.description).replace(/\s+/g, ' ').trim();
+      if (descClean.length > 42) {
+        descClean = descClean.slice(0, 39) + '...';
+      }
+      baseImage.print({ font: font8, x: 105, y: y + 20, text: descClean });
+    });
+
+    // ── COLUMN 2: Recommended Runes ─────────────────────────────────────────────
+    const styleIcons = {
+      8000: 'https://ddragon.leagueoflegends.com/cdn/img/perk-images/Styles/7201_Precision.png',
+      8100: 'https://ddragon.leagueoflegends.com/cdn/img/perk-images/Styles/7200_Domination.png',
+      8200: 'https://ddragon.leagueoflegends.com/cdn/img/perk-images/Styles/7202_Sorcery.png',
+      8300: 'https://ddragon.leagueoflegends.com/cdn/img/perk-images/Styles/7203_Whimsy.png',
+      8400: 'https://ddragon.leagueoflegends.com/cdn/img/perk-images/Styles/7204_Resolve.png'
+    };
+
+    for (let i = 0; i < Math.min(runeRecs.length, 2); i++) {
+      const rec = runeRecs[i];
+      const pageY = 85 + i * 255;
+      const laneText = rec.position ? ` (${stripAccentsForCard(rec.position).toUpperCase()})` : '';
+
+      baseImage.print({ font: font16, x: 430, y: pageY, text: `${i + 1}. BANG NGOC DE XUAT${laneText}` });
+      drawBox(baseImage, 430, pageY + 25, 340, 205, 0x161822ff, 0x242838ff);
+
+      const relativeY = pageY + 25;
+
+      const priUrl = styleIcons[rec.primaryPerkStyleId];
+      if (priUrl) {
+        promises.push(
+          Jimp.read(priUrl).then(img => {
+            img.resize({ w: 40, h: 40 });
+            baseImage.composite(img, 445, relativeY + 15);
+          }).catch(e => console.error('Failed to load primary style:', e.message))
+        );
+      }
+
+      const keystoneId = rec.perkIds[0];
+      const keystoneUrl = perkMap.get(keystoneId);
+      if (keystoneUrl) {
+        promises.push(
+          Jimp.read(keystoneUrl).then(img => {
+            img.resize({ w: 56, h: 56 });
+            baseImage.composite(img, 495, relativeY + 7);
+          }).catch(e => console.error('Failed to load keystone:', e.message))
+        );
+      }
+
+      for (let j = 0; j < 3; j++) {
+        const perkId = rec.perkIds[j + 1];
+        const perkUrl = perkMap.get(perkId);
+        if (perkUrl) {
+          promises.push(
+            Jimp.read(perkUrl).then(img => {
+              img.resize({ w: 32, h: 32 });
+              baseImage.composite(img, 565 + j * 38, relativeY + 19);
+            }).catch(e => console.error('Failed to load sub-perk:', e.message))
+          );
+        }
+      }
+
+      const secUrl = styleIcons[rec.secondaryPerkStyleId];
+      if (secUrl) {
+        promises.push(
+          Jimp.read(secUrl).then(img => {
+            img.resize({ w: 40, h: 40 });
+            baseImage.composite(img, 445, relativeY + 85);
+          }).catch(e => console.error('Failed to load secondary style:', e.message))
+        );
+      }
+
+      for (let j = 0; j < 2; j++) {
+        const perkId = rec.perkIds[j + 4];
+        const perkUrl = perkMap.get(perkId);
+        if (perkUrl) {
+          promises.push(
+            Jimp.read(perkUrl).then(img => {
+              img.resize({ w: 32, h: 32 });
+              baseImage.composite(img, 495 + j * 38, relativeY + 89);
+            }).catch(e => console.error('Failed to load sub-perk:', e.message))
+          );
+        }
+      }
+
+      for (let j = 0; j < 3; j++) {
+        const shardId = rec.perkIds[j + 6];
+        const shardUrl = perkMap.get(shardId);
+        if (shardUrl) {
+          promises.push(
+            Jimp.read(shardUrl).then(img => {
+              img.resize({ w: 20, h: 20 });
+              baseImage.composite(img, 585 + j * 28, relativeY + 95);
+            }).catch(e => console.error('Failed to load shard:', e.message))
+          );
+        }
+      }
+
+      const primaryName = stripAccentsForCard(styleMap.get(rec.primaryPerkStyleId) || '').toUpperCase();
+      const secondaryName = stripAccentsForCard(styleMap.get(rec.secondaryPerkStyleId) || '').toUpperCase();
+      const perks = rec.perkIds.map(id => stripAccentsForCard(runeMap.get(id) || `ID:${id}`).toUpperCase());
+      const keystoneName = perks[0];
+      const secSubnames = perks.slice(4, 6).join(', ');
+
+      baseImage.print({
+        font: font8,
+        x: 445,
+        y: relativeY + 145,
+        text: `CHINH: ${primaryName} (${keystoneName})`,
+        maxWidth: 310
+      });
+      baseImage.print({
+        font: font8,
+        x: 445,
+        y: relativeY + 165,
+        text: `PHU: ${secondaryName} - ${secSubnames}`,
+        maxWidth: 310
+      });
+    }
+
+    // ── COLUMN 3: Recommended Items ─────────────────────────────────────────────
+    if (itemBuild) {
+      // 1. Starter Items
+      let itemY = 85;
+      baseImage.print({ font: font16, x: 830, y: itemY, text: 'KHOI DAU' });
+      const starterIds = itemBuild.starter_items.ids || [];
+      const starterNames = itemBuild.starter_items.names || [];
+      
+      starterIds.forEach((id, idx) => {
+        const url = `https://ddragon.leagueoflegends.com/cdn/${patch}/img/item/${id}.png`;
+        const drawX = 830 + idx * 75;
+        const drawY = itemY + 25;
+        
+        drawBox(baseImage, drawX - 1, itemY + 24, 50, 50, 0x171a26ff, 0x242838ff);
+        
+        promises.push(
+          Jimp.read(url).then(img => {
+            img.resize({ w: 48, h: 48 });
+            baseImage.composite(img, drawX, drawY);
+          }).catch(e => console.error('Failed to load item:', e.message))
+        );
+
+        const name = starterNames[idx] || `Item:${id}`;
+        baseImage.print({
+          font: font8,
+          x: drawX - 5,
+          y: itemY + 77,
+          text: stripAccentsForCard(name).toUpperCase(),
+          maxWidth: 70
+        });
+      });
+
+      // 2. Boots
+      itemY = 205;
+      baseImage.print({ font: font16, x: 830, y: itemY, text: 'GIAY' });
+      const bootIds = itemBuild.boots.ids || [];
+      const bootNames = itemBuild.boots.names || [];
+      
+      bootIds.forEach((id, idx) => {
+        const url = `https://ddragon.leagueoflegends.com/cdn/${patch}/img/item/${id}.png`;
+        const drawX = 830 + idx * 75;
+        const drawY = itemY + 25;
+        
+        drawBox(baseImage, drawX - 1, itemY + 24, 50, 50, 0x171a26ff, 0x242838ff);
+        
+        promises.push(
+          Jimp.read(url).then(img => {
+            img.resize({ w: 48, h: 48 });
+            baseImage.composite(img, drawX, drawY);
+          }).catch(e => console.error('Failed to load boot:', e.message))
+        );
+
+        const name = bootNames[idx] || `Item:${id}`;
+        baseImage.print({
+          font: font8,
+          x: drawX - 5,
+          y: itemY + 77,
+          text: stripAccentsForCard(name).toUpperCase(),
+          maxWidth: 70
+        });
+      });
+
+      // 3. Core Items (3 Items with Arrows)
+      itemY = 325;
+      baseImage.print({ font: font16, x: 830, y: itemY, text: 'COT LOI (3 MON)' });
+      const coreIds = itemBuild.core_items.ids || [];
+      const coreNames = itemBuild.core_items.names || [];
+      
+      coreIds.forEach((id, idx) => {
+        const url = `https://ddragon.leagueoflegends.com/cdn/${patch}/img/item/${id}.png`;
+        const drawX = 830 + idx * 95;
+        const drawY = itemY + 25;
+        
+        drawBox(baseImage, drawX - 1, itemY + 24, 50, 50, 0x171a26ff, 0x242838ff);
+        
+        promises.push(
+          Jimp.read(url).then(img => {
+            img.resize({ w: 48, h: 48 });
+            baseImage.composite(img, drawX, drawY);
+          }).catch(e => console.error('Failed to load core item:', e.message))
+        );
+
+        if (idx < 2) {
+          baseImage.print({ font: font16, x: drawX + 63, y: itemY + 38, text: '->' });
+        }
+
+        const name = coreNames[idx] || `Item:${id}`;
+        baseImage.print({
+          font: font8,
+          x: drawX - 8,
+          y: itemY + 77,
+          text: stripAccentsForCard(name).toUpperCase(),
+          maxWidth: 80
+        });
+      });
+
+      // 4. Situational Items (5 Items with Pick Rates)
+      itemY = 445;
+      baseImage.print({ font: font16, x: 830, y: itemY, text: 'TINH HUONG (MON 4, 5, 6)' });
+
+      const situationalList = [];
+      const addUniques = (items) => {
+        (items || []).forEach(item => {
+          const id = item.ids?.[0];
+          if (id && !situationalList.some(x => x.id === id)) {
+            situationalList.push({ id, name: item.name, pickRate: item.pick_rate });
+          }
+        });
+      };
+      addUniques(itemBuild.fourth_items);
+      addUniques(itemBuild.fifth_items);
+      addUniques(itemBuild.last_items);
+
+      situationalList.slice(0, 5).forEach((item, idx) => {
+        const url = `https://ddragon.leagueoflegends.com/cdn/${patch}/img/item/${item.id}.png`;
+        const drawX = 830 + idx * 64;
+        const drawY = itemY + 25;
+        
+        drawBox(baseImage, drawX - 1, itemY + 24, 50, 50, 0x171a26ff, 0x242838ff);
+        
+        promises.push(
+          Jimp.read(url).then(img => {
+            img.resize({ w: 48, h: 48 });
+            baseImage.composite(img, drawX, drawY);
+          }).catch(e => console.error('Failed to load situational item:', e.message))
+        );
+
+        const rateText = item.pickRate ? `${(item.pickRate * 100).toFixed(0)}%` : '';
+        const name = item.name || `Item:${item.id}`;
+        const cleanName = stripAccentsForCard(name).toUpperCase();
+        
+        baseImage.print({
+          font: font8,
+          x: drawX - 6,
+          y: itemY + 77,
+          text: `${cleanName.slice(0, 7)}..\n(${rateText})`,
+          maxWidth: 60
+        });
+      });
+    }
+
+    await Promise.all(promises);
+    await baseImage.write(outPath);
+    return outPath;
+  } catch (err) {
+    console.error(`[lolchamp] Failed to generate build card image:`, err);
+    return null;
   }
 }
 

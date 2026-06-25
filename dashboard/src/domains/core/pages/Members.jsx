@@ -74,9 +74,7 @@ export default function MembersPage() {
             ) : (
               <div style={{ border: '1px solid var(--border)', display: 'flex', flexDirection: 'column' }}>
                 {/* Table Header */}
-                <div style={{
-                  display: 'grid',
-                  gridTemplateColumns: '48px 1fr 1fr 1fr',
+                <div className="member-list-header" style={{
                   padding: 'var(--space-3) var(--space-4)',
                   backgroundColor: 'var(--surface-1)',
                   borderBottom: '1px solid var(--border)',
@@ -86,8 +84,7 @@ export default function MembersPage() {
                   color: 'var(--text-3)'
                 }}>
                   <span>{t("AVATAR")}</span>
-                  <span>{t("DISPLAY NAME")}</span>
-                  <span>{t("USER HANDLE")}</span>
+                  <span>{t("MEMBER")}</span>
                   <span style={{ textAlign: 'right' }}>{t("TIMESTAMP JOINED")}</span>
                 </div>
 
@@ -95,9 +92,8 @@ export default function MembersPage() {
                 {members.map(member => (
                   <div
                     key={member.id}
+                    className="member-list-row"
                     style={{
-                      display: 'grid',
-                      gridTemplateColumns: '48px 1fr 1fr 1fr',
                       alignItems: 'center',
                       padding: 'var(--space-3) var(--space-4)',
                       borderBottom: '1px solid var(--border)',
@@ -112,13 +108,15 @@ export default function MembersPage() {
                       alt=""
                       style={{ width: '24px', height: '24px', border: '1px solid var(--border)' }}
                     />
-                    <span style={{ fontWeight: 'bold', color: 'var(--text-1)' }}>
-                      {member.displayName ?? member.username}
-                    </span>
-                    <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--text-2)', fontSize: '12px' }}>
-                      @{member.username}
-                    </span>
-                    <span style={{ textAlign: 'right', fontFamily: 'var(--font-mono)', color: 'var(--text-3)', fontSize: '12px' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                      <span style={{ fontWeight: 'bold', color: 'var(--text-1)' }}>
+                        {member.displayName ?? member.username}
+                      </span>
+                      <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--text-2)', fontSize: '11px' }}>
+                        @{member.username}
+                      </span>
+                    </div>
+                    <span style={{ textAlign: 'right', fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--text-3)' }}>
                       {member.joinedAt ? new Date(member.joinedAt).toLocaleDateString('vi-VN') : '—'}
                     </span>
                   </div>

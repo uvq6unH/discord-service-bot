@@ -59,7 +59,7 @@ function ReminderItemRow({ reminder, channels, members, roles, onUpdate, onRemov
           </div>
 
           {/* Targets */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-4)', borderTop: '1px solid var(--border)', paddingTop: 'var(--space-3)' }}>
+          <div className="reminder-target-grid" style={{ borderTop: '1px solid var(--border)', paddingTop: 'var(--space-3)' }}>
             {/* Users */}
             <div className="form-group">
               <label className="form-label" style={{ fontSize: '10px' }}>{t("Mention Users")}</label>
@@ -155,7 +155,7 @@ function ReminderItemRow({ reminder, channels, members, roles, onUpdate, onRemov
             </div>
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-3)', borderTop: '1px solid var(--border)', paddingTop: 'var(--space-3)' }}>
+          <div className="reminder-meta-grid" style={{ borderTop: '1px solid var(--border)', paddingTop: 'var(--space-3)' }}>
             {/* Target Timestamp */}
             <div className="form-group">
               <label className="form-label" style={{ fontSize: '10px' }}>{t("Target Timestamp")}</label>

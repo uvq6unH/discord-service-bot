@@ -695,6 +695,12 @@ export class ConfigStore {
         levelsEnabled: pickBoolean(patch, 'levelsEnabled', current),
         xpPerMessage: Math.max(1, Math.min(100, Number.parseInt(patch.xpPerMessage, 10) || defaultConfig.xpPerMessage)),
         levelUpMessage: String(patch.levelUpMessage ?? '').trim().slice(0, 500) || defaultConfig.levelUpMessage,
+        levelUpAnnouncementEnabled: pickFlag(patch, 'levelUpAnnouncementEnabled', current, { defaultTrue: true }),
+        levelUpAnnouncementChannelId: normalizeSnowflakeId(patch.levelUpAnnouncementChannelId),
+        xpBase: Math.max(1, Math.min(100000, Number.parseInt(patch.xpBase, 10) || current.xpBase || defaultConfig.xpBase)),
+        xpExponent: Number.isFinite(Number(patch.xpExponent))
+          ? Math.max(0.5, Math.min(10.0, Number(patch.xpExponent)))
+          : (current.xpExponent ?? defaultConfig.xpExponent),
         economyEnabled: pickBoolean(patch, 'economyEnabled', current),
         currencySilverName: String(patch.currencySilverName ?? '').trim().slice(0, 40) || defaultConfig.currencySilverName,
         currencySilverIcon: String(patch.currencySilverIcon ?? '').trim().slice(0, 8) || defaultConfig.currencySilverIcon,

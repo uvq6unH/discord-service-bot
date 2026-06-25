@@ -17,7 +17,7 @@ export async function handleLevels(ctx) {
     const target = targetUser
       ? { user: targetUser, member: await guild.members.fetch(targetUser.id).catch(() => null) }
       : await resolveMentionedUser(client, guild, args, user);
-    const rank = await client.stateStore.getRank(guild.id, target.user.id);
+    const rank = await client.stateStore.getRank(guild.id, target.user.id, config.xpBase, config.xpExponent);
     return reply({
       embeds: [
         new EmbedBuilder()
@@ -32,7 +32,7 @@ export async function handleLevels(ctx) {
     if (!config.levelsEnabled) {
       return reply(isInteraction ? { content: 'Levels are disabled.', ephemeral: true } : 'Levels are disabled.');
     }
-    const top = await client.stateStore.getLeaderboard(guild.id, 10);
+    const top = await client.stateStore.getLeaderboard(guild.id, 10, config.xpBase, config.xpExponent);
     const description = top.length
       ? top.map((entry, index) => `${index + 1}. <@${entry.userId}> - level ${entry.level}, ${entry.xp} XP`).join('\n')
       : 'No XP yet.';

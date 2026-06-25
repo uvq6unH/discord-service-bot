@@ -186,7 +186,7 @@ function CustomCommandEditor({ commands, onChange }) {
           flexDirection: 'column',
           gap: 'var(--space-3)'
         }}>
-          <div style={{ display: 'flex', gap: 'var(--space-3)', alignItems: 'center' }}>
+          <div className="custom-command-header-row">
             <span style={{ fontFamily: 'var(--font-mono)', fontSize: '12px', color: 'var(--text-3)' }}>/</span>
             <input
               className="form-input"
@@ -260,7 +260,7 @@ function AutoReplyEditor({ replies, onChange }) {
           flexDirection: 'column',
           gap: 'var(--space-3)'
         }}>
-          <div style={{ display: 'flex', gap: 'var(--space-3)', alignItems: 'center' }}>
+          <div className="auto-reply-header-row">
             <span style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--text-3)' }}>{t("KEYWORD")}</span>
             <input
               className="form-input"

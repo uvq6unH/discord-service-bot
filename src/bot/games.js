@@ -91,9 +91,43 @@ export function playCoinflip(choice) {
 }
 
 export function playDice(target) {
-  const normalizedTarget = Math.max(1, Math.min(6, Number.parseInt(target, 10) || 1));
   const roll = Math.floor(Math.random() * 6) + 1;
-  return { target: normalizedTarget, roll, outcome: normalizedTarget === roll ? 'win' : 'lose' };
+  const input = String(target ?? '').trim().toLowerCase();
+  
+  let isWin = false;
+  let multiplier = 0;
+  let displayChoice = input;
+
+  if (['odd', 'le', 'lẻ'].includes(input)) {
+    isWin = roll % 2 !== 0;
+    multiplier = 2;
+    displayChoice = 'Lẻ';
+  } else if (['even', 'chan', 'chẵn'].includes(input)) {
+    isWin = roll % 2 === 0;
+    multiplier = 2;
+    displayChoice = 'Chẵn';
+  } else if (['high', 'tai', 'tài'].includes(input)) {
+    isWin = roll >= 4;
+    multiplier = 2;
+    displayChoice = 'Tài';
+  } else if (['low', 'xiu', 'xỉu'].includes(input)) {
+    isWin = roll <= 3;
+    multiplier = 2;
+    displayChoice = 'Xỉu';
+  } else {
+    const num = Number.parseInt(input, 10);
+    const validNum = Number.isInteger(num) && num >= 1 && num <= 6 ? num : 1;
+    isWin = roll === validNum;
+    multiplier = 6;
+    displayChoice = `Số ${validNum}`;
+  }
+
+  return {
+    target: displayChoice,
+    roll,
+    outcome: isWin ? 'win' : 'lose',
+    multiplier
+  };
 }
 
 export function playSlots() {
@@ -101,8 +135,11 @@ export function playSlots() {
   const reels = Array.from({ length: 3 }, () => symbols[Math.floor(Math.random() * symbols.length)]);
   const unique = new Set(reels);
   let multiplier = 0;
-  if (unique.size === 1) multiplier = reels[0] === '7' ? 10 : 5;
-  else if (unique.size === 2) multiplier = 2;
+  if (unique.size === 1) {
+    multiplier = reels[0] === '7' ? 20 : 8;
+  } else if (unique.size === 2) {
+    multiplier = 1.5;
+  }
   return { reels, multiplier, outcome: multiplier > 0 ? 'win' : 'lose' };
 }
 
@@ -343,33 +380,10 @@ function chance(percent) {
   return Math.random() * 100 < percent;
 }
 
-// Intentional house-edge heuristics (not uniform random) for blackjack dealer AI.
+// Standard casino dealer rules (Stand on all 17s).
 function shouldDealerHit(session) {
   const dealerValue = handValue(session.dealer);
-  if (dealerValue <= 11) return true;
-  if (dealerValue >= 21) return false;
-
-  const livePlayerValues = blackjackHands(session)
-    .map(({ handState }) => handValue(handState.cards))
-    .filter((value) => value <= 21);
-  if (livePlayerValues.length === 0) return false;
-
-  const bestPlayerValue = Math.max(...livePlayerValues);
-  const soft = hasSoftAce(session.dealer);
-
-  if (dealerValue < bestPlayerValue) {
-    if (dealerValue <= 15) return true;
-    if (dealerValue === 16) return chance(75);
-    if (dealerValue === 17 && soft) return chance(55);
-    if (dealerValue === 17) return chance(25);
-    if (dealerValue === 18) return chance(10);
-  }
-
-  if (dealerValue <= 14) return chance(70);
-  if (dealerValue === 15) return chance(45);
-  if (dealerValue === 16) return chance(30);
-  if (dealerValue === 17 && soft) return chance(20);
-  return false;
+  return dealerValue < 17;
 }
 
 export function buildBlackjackPayload(config, session) {

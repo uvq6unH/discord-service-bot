@@ -4,6 +4,7 @@ import DomainRail from '../navigation/DomainRail.jsx';
 import { useLocation } from 'react-router-dom';
 import { NAVIGATION_SCHEMA } from '../navigation/navigation.config.ts';
 import { useLanguage } from '../context/LanguageContext.jsx';
+import { Menu, X } from 'lucide-react';
 
 export default function AppShell({
   guilds,
@@ -19,10 +20,16 @@ export default function AppShell({
   const location = useLocation();
   const { language, setLanguage, t } = useLanguage();
   const [theme, setTheme] = useState(localStorage.getItem('theme') || 'dark');
+  const [menuOpen, setMenuOpen] = useState(false);
 
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme);
   }, [theme]);
+
+  // Close sidebar drawer automatically when switching pages on mobile
+  useEffect(() => {
+    setMenuOpen(false);
+  }, [location.pathname]);
 
   const toggleTheme = () => {
     const nextTheme = theme === 'dark' ? 'light' : 'dark';
@@ -38,8 +45,27 @@ export default function AppShell({
   const domainClass = `domain-${activeDomain.id}`;
 
   return (
-    <div className={`app-container ${domainClass}`}>
+    <div className={`app-container ${domainClass} ${menuOpen ? 'menu-open' : ''}`}>
       <a href="#main-content" className="skip-link">{t("Bỏ qua điều hướng")}</a>
+      
+      {/* Backdrop overlay for mobile drawer */}
+      {menuOpen && (
+        <div
+          className="mobile-backdrop"
+          onClick={() => setMenuOpen(false)}
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(0, 0, 0, 0.4)',
+            backdropFilter: 'blur(3px)',
+            zIndex: 90
+          }}
+        />
+      )}
+
       {/* 1. Left Guild Rail */}
       <GuildRail
         guilds={guilds}
@@ -57,10 +83,28 @@ export default function AppShell({
         {/* Header Zone */}
         <header className="main-header" aria-label="System Telemetry">
           <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-4)' }}>
-            <span style={{ fontSize: '11px', fontFamily: 'var(--font-mono)', border: '1px solid var(--border)', padding: 'var(--space-1) var(--space-2)', color: 'var(--accent)' }}>
+            <button
+              onClick={() => setMenuOpen(!menuOpen)}
+              className="mobile-menu-toggle"
+              style={{
+                display: 'none',
+                background: 'none',
+                border: '1px solid var(--border)',
+                padding: 'var(--space-1) var(--space-2)',
+                alignItems: 'center',
+                justifyContent: 'center',
+                cursor: 'pointer',
+                color: 'var(--text-2)',
+                outline: 'none',
+              }}
+              title={menuOpen ? t("Close Menu") : t("Open Menu")}
+            >
+              {menuOpen ? <X size={16} /> : <Menu size={16} />}
+            </button>
+            <span className="header-node-id" style={{ fontSize: '11px', fontFamily: 'var(--font-mono)', border: '1px solid var(--border)', padding: 'var(--space-1) var(--space-2)', color: 'var(--accent)' }}>
               NODE_ID // {selectedGuild?.id ? selectedGuild.id.slice(0, 8) : 'DISCONNECTED'}
             </span>
-            <span style={{ fontSize: '11px', fontFamily: 'var(--font-mono)', color: 'var(--text-3)' }}>
+            <span className="header-sys-rev" style={{ fontSize: '11px', fontFamily: 'var(--font-mono)', color: 'var(--text-3)' }}>
               SYS_REV_4.0.0
             </span>
           </div>
@@ -108,7 +152,7 @@ export default function AppShell({
               🌐 {language === 'en' ? 'EN' : 'VI'}
             </button>
 
-            <span style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--text-2)' }}>
+            <span className="header-user-tag" style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--text-2)' }}>
               USER // {user?.username?.toUpperCase()}
             </span>
             <div style={{
@@ -126,20 +170,9 @@ export default function AppShell({
         </main>
 
         {/* Global Save Telemetry Bar */}
-        <div style={{
-          position: 'fixed',
-          bottom: '24px',
-          right: '24px',
-          backgroundColor: 'var(--surface-0)',
-          border: '1px solid var(--border-strong)',
-          borderLeft: '4px solid var(--accent)',
-          padding: 'var(--space-4) var(--space-6)',
-          display: 'flex',
-          alignItems: 'center',
-          gap: 'var(--space-6)',
+        <div className="save-telemetry-bar" style={{
           transform: dirty || saveStatus === 'saved' || saveStatus === 'error' ? 'translateY(0)' : 'translateY(150%)',
-          transition: 'transform 0.25s cubic-bezier(0.16, 1, 0.3, 1)',
-          zIndex: 1000
+          transition: 'transform 0.25s cubic-bezier(0.16, 1, 0.3, 1)'
         }}>
           <span style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--text-2)' }}>
             {saveStatus === 'saving' && t('>>> COMMITTING TELEMETRY CHANGES...')}

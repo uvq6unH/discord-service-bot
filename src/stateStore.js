@@ -635,9 +635,11 @@ export class StateStore {
   // Levels / XP
   // ════════════════════════════════════════════════════════════════════════════
 
-  async addXp(guildId, userId, amount) {
+  async addXp(guildId, userId, amount, xpBase = 100, xpExponent = 2.0) {
     return this._withEconomyLock(guildId, userId, async () => {
       const now = Date.now();
+      const base = xpBase > 0 ? xpBase : 100;
+      const exponent = xpExponent > 0 ? xpExponent : 2.0;
 
       if (this._useRedis) {
         const memberIndexKey = `guild:${guildId}:levels:_members`;
@@ -648,7 +650,7 @@ export class StateStore {
         }
         current.lastMessageAt = now;
         current.xp += amount;
-        const nextLevel = Math.floor(Math.sqrt(current.xp / 100));
+        const nextLevel = Math.floor(Math.pow(current.xp / base, 1 / exponent));
         const leveledUp = nextLevel > current.level;
         current.level = Math.max(current.level, nextLevel);
         await this._redis.pipeline([
@@ -667,7 +669,7 @@ export class StateStore {
       }
       current.lastMessageAt = now;
       current.xp += amount;
-      const nextLevel = Math.floor(Math.sqrt(current.xp / 100));
+      const nextLevel = Math.floor(Math.pow(current.xp / base, 1 / exponent));
       const leveledUp = nextLevel > current.level;
       current.level = Math.max(current.level, nextLevel);
       await this._save();
@@ -675,33 +677,44 @@ export class StateStore {
     });
   }
 
-  async getRank(guildId, userId) {
+  async getRank(guildId, userId, xpBase = 100, xpExponent = 2.0) {
+    let current;
     if (this._useRedis) {
-      return (await this._rGet(this._k.levels(guildId, userId))) ?? DEFAULT_LEVELS_USER();
+      current = (await this._rGet(this._k.levels(guildId, userId))) ?? DEFAULT_LEVELS_USER();
+    } else {
+      const guild = await this._fileGetGuild(guildId);
+      current = guild.levels[userId] ?? DEFAULT_LEVELS_USER();
     }
-    const guild = await this._fileGetGuild(guildId);
-    return guild.levels[userId] ?? DEFAULT_LEVELS_USER();
+    const base = xpBase > 0 ? xpBase : 100;
+    const exponent = xpExponent > 0 ? xpExponent : 2.0;
+    current.level = Math.floor(Math.pow(current.xp / base, 1 / exponent));
+    return current;
   }
 
-  async getLeaderboard(guildId, limit = 10) {
+  async getLeaderboard(guildId, limit = 10, xpBase = 100, xpExponent = 2.0) {
+    let entries = [];
     if (!this._useRedis) {
       const guild = await this._fileGetGuild(guildId);
-      return Object.entries(guild.levels)
-        .map(([userId, data]) => ({ userId, ...data }))
-        .sort((a, b) => b.xp - a.xp)
-        .slice(0, limit);
+      entries = Object.entries(guild.levels)
+        .map(([userId, data]) => ({ userId, ...data }));
+    } else {
+      // Tương tự economy — dùng member index
+      const memberIndexKey = `guild:${guildId}:levels:_members`;
+      const memberIds = (await this._redis.smembers(memberIndexKey)) ?? [];
+
+      entries = await Promise.all(
+        memberIds.map(async (userId) => {
+          const data = (await this._rGet(this._k.levels(guildId, userId))) ?? DEFAULT_LEVELS_USER();
+          return { userId, ...data };
+        })
+      );
     }
 
-    // Tương tự economy — dùng member index
-    const memberIndexKey = `guild:${guildId}:levels:_members`;
-    const memberIds = (await this._redis.smembers(memberIndexKey)) ?? [];
-
-    const entries = await Promise.all(
-      memberIds.map(async (userId) => {
-        const data = (await this._rGet(this._k.levels(guildId, userId))) ?? DEFAULT_LEVELS_USER();
-        return { userId, ...data };
-      })
-    );
+    const base = xpBase > 0 ? xpBase : 100;
+    const exponent = xpExponent > 0 ? xpExponent : 2.0;
+    for (const entry of entries) {
+      entry.level = Math.floor(Math.pow(entry.xp / base, 1 / exponent));
+    }
 
     return entries.sort((a, b) => b.xp - a.xp).slice(0, limit);
   }
