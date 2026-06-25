@@ -19,7 +19,9 @@ export function renderCommandResponse(template, { client, context, config, args 
   const tftKey = config.tftApiKey;
   const riotKeyStatus = riotKey ? '✅ Đã cấu hình' : '❌ Chưa cấu hình';
   const tftKeyStatus = tftKey ? '✅ Riêng' : (riotKey ? '♻️ Dùng chung LoL key' : '❌ Chưa cấu hình');
-  return template
+  const tpl = String(template ?? '').trim();
+  if (!tpl) return '';
+  return tpl
     .replaceAll('{args}', args)
     .replaceAll('{autoReplyStatus}', config.autoReplyEnabled ? 'on' : 'off')
     .replaceAll('{channel}', `<#${getContextValue(context, 'channelId')}>`)

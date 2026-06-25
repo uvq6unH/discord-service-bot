@@ -1,8 +1,151 @@
-import React from 'react';
+import React, { useState } from 'react';
+import { useLocation } from 'react-router-dom';
 import Workspace, { HeaderZone, StatusZone, KpiTile } from '../../../shared/layouts/Workspace.jsx';
 import Panel from '../../../shared/primitives/Panel.jsx';
+import DataSlab from '../../../shared/primitives/DataSlab.jsx';
 import { useEconomy } from '../hooks/useEconomy.js';
+import { useGuild } from '../../../shared/hooks/useGuild.js';
 import { Coins, Award, CalendarCheck, Joystick } from 'lucide-react';
+import { useLanguage } from '../../../shared/context/LanguageContext.jsx';
+
+function CommandConfigRow({ cmd, roles, onUpdate, displayPrefix = '/' }) {
+  const [expanded, setExpanded] = useState(false);
+  const { t } = useLanguage();
+  
+  const isEnabled = cmd.enabled !== false;
+  const name = cmd.name;
+  const description = cmd.description;
+  const allowedRoles = cmd.allowedRoles ?? [];
+  
+  const handleToggle = (checked) => {
+    onUpdate({ ...cmd, enabled: checked });
+  };
+  
+  const handleFieldChange = (field, val) => {
+    onUpdate({
+      ...cmd,
+      [field]: val
+    });
+  };
+
+  const handleRoleToggle = (roleId) => {
+    const nextRoles = allowedRoles.includes(roleId)
+      ? allowedRoles.filter(r => r !== roleId)
+      : [...allowedRoles, roleId];
+    handleFieldChange('allowedRoles', nextRoles);
+  };
+  
+  return (
+    <div style={{
+      border: '1px solid var(--border)',
+      background: isEnabled ? 'var(--surface-0)' : 'var(--surface-1)',
+      marginBottom: 'var(--space-2)'
+    }}>
+      <div style={{
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        padding: 'var(--space-3) var(--space-4)',
+        cursor: 'pointer'
+      }} onClick={() => setExpanded(!expanded)}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
+          <span style={{
+            fontFamily: 'var(--font-mono)',
+            fontWeight: 'bold',
+            fontSize: '13px',
+            color: isEnabled ? 'var(--text-1)' : 'var(--text-3)'
+          }}>
+            {displayPrefix}{name}
+          </span>
+          <span style={{ fontSize: '11px', color: 'var(--text-3)' }}>
+            ({cmd.type})
+          </span>
+        </div>
+        
+        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-4)' }} onClick={e => e.stopPropagation()}>
+          <label className="toggle-switch">
+            <input
+              type="checkbox"
+              className="toggle-switch__input"
+              checked={isEnabled}
+              onChange={e => handleToggle(e.target.checked)}
+            />
+            <div className="toggle-switch__track">
+              <div className="toggle-switch__thumb" />
+            </div>
+          </label>
+          <button 
+            className="btn btn--secondary" 
+            style={{ padding: 'var(--space-1) var(--space-2)', fontSize: '10px', fontFamily: 'var(--font-mono)' }}
+            onClick={() => setExpanded(!expanded)}
+          >
+            {expanded ? 'HIDE' : 'EDIT'}
+          </button>
+        </div>
+      </div>
+
+      {expanded && (
+        <div style={{
+          borderTop: '1px solid var(--border)',
+          background: 'var(--surface-1)',
+          padding: 'var(--space-4)',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 'var(--space-3)'
+        }}>
+          <div className="form-group" style={{ margin: 0 }}>
+            <label className="form-label" style={{ fontSize: '10px' }}>{t("Custom Name")}</label>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
+              <span style={{ fontFamily: 'var(--font-mono)', fontSize: '12px', color: 'var(--text-3)' }}>{displayPrefix}</span>
+              <input
+                className="form-input"
+                style={{ fontSize: '12px', fontFamily: 'var(--font-mono)', flex: 1 }}
+                value={name}
+                onChange={e => handleFieldChange('name', e.target.value.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9_-]/g, ''))}
+              />
+            </div>
+          </div>
+
+          <div className="form-group" style={{ margin: 0 }}>
+            <label className="form-label" style={{ fontSize: '10px' }}>{t("Custom Description")}</label>
+            <input
+              className="form-input"
+              style={{ fontSize: '12px' }}
+              value={description}
+              onChange={e => handleFieldChange('description', e.target.value)}
+            />
+          </div>
+
+          <div className="form-group" style={{ margin: 0 }}>
+            <label className="form-label" style={{ fontSize: '10px' }}>{t("Restricted Roles (Empty for Everyone)")}</label>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--space-1.5)', marginTop: 'var(--space-1)' }}>
+              {roles.filter(r => r.name !== '@everyone').map(role => {
+                const active = allowedRoles.includes(role.id) || allowedRoles.includes(role.name);
+                return (
+                  <button
+                    key={role.id}
+                    className="btn"
+                    onClick={() => handleRoleToggle(role.id)}
+                    style={{
+                      fontSize: '10px',
+                      padding: 'var(--space-1) var(--space-2)',
+                      fontFamily: 'var(--font-mono)',
+                      backgroundColor: active ? 'var(--accent-dim)' : 'var(--surface-2)',
+                      borderColor: active ? 'var(--accent)' : 'var(--border)',
+                      color: active ? 'var(--text-1)' : 'var(--text-3)'
+                    }}
+                  >
+                    {role.name}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
 
 const UTC_OFFSETS = [
   { label: 'UTC-12', value: -720 },
@@ -39,6 +182,7 @@ const UTC_OFFSETS = [
 function CurrencyRow({ prefix, defaultName, defaultIcon, config, updateConfig }) {
   const nameKey = `${prefix}Name`;
   const iconKey = `${prefix}Icon`;
+  const { t } = useLanguage();
 
   return (
     <div style={{
@@ -63,7 +207,7 @@ function CurrencyRow({ prefix, defaultName, defaultIcon, config, updateConfig })
       </div>
       
       <div className="form-group">
-        <label className="form-label" style={{ fontSize: '10px' }}>Name Token</label>
+        <label className="form-label" style={{ fontSize: '10px' }}>{t("Name Token")}</label>
         <input
           className="form-input"
           style={{ fontSize: '12px' }}
@@ -74,7 +218,7 @@ function CurrencyRow({ prefix, defaultName, defaultIcon, config, updateConfig })
       </div>
 
       <div className="form-group">
-        <label className="form-label" style={{ fontSize: '10px' }}>Emoji Code</label>
+        <label className="form-label" style={{ fontSize: '10px' }}>{t("Emoji Code")}</label>
         <input
           className="form-input"
           style={{ fontSize: '12px' }}
@@ -92,6 +236,7 @@ function CasinoGameRow({ title, prefix, config, handleBetChange, updateConfig })
   const minKey = `${prefix}MinBet`;
   const maxKey = `${prefix}MaxBet`;
   const enabled = config[enabledKey] ?? false;
+  const { t } = useLanguage();
 
   return (
     <div style={{
@@ -104,11 +249,11 @@ function CasinoGameRow({ title, prefix, config, handleBetChange, updateConfig })
       opacity: enabled ? 1 : 0.4
     }}>
       <span style={{ fontSize: '13px', fontWeight: 'bold', fontFamily: 'var(--font-mono)' }}>
-        {title.toUpperCase()}
+        {t(title).toUpperCase()}
       </span>
 
       <div className="form-group">
-        <label className="form-label" style={{ fontSize: '10px' }}>Min Bet</label>
+        <label className="form-label" style={{ fontSize: '10px' }}>{t("Min Bet")}</label>
         <input
           type="number"
           className="form-input"
@@ -120,7 +265,7 @@ function CasinoGameRow({ title, prefix, config, handleBetChange, updateConfig })
       </div>
 
       <div className="form-group">
-        <label className="form-label" style={{ fontSize: '10px' }}>Max Bet</label>
+        <label className="form-label" style={{ fontSize: '10px' }}>{t("Max Bet")}</label>
         <input
           type="number"
           className="form-input"
@@ -147,12 +292,16 @@ function CasinoGameRow({ title, prefix, config, handleBetChange, updateConfig })
 }
 
 export default function EconomyPage() {
+  const location = useLocation();
+  const highlight = location.state?.highlight;
   const { config, loading, updateConfig, handleBetChange } = useEconomy();
+  const { guildData } = useGuild();
+  const { t } = useLanguage();
 
   if (loading || !config) {
     return (
       <div style={{ padding: 'var(--space-10)', textAlign: 'center', fontFamily: 'var(--font-mono)' }}>
-        LOADING FINANCIAL MODULES...
+        {t("LOADING FINANCIAL MODULES...")}
       </div>
     );
   }
@@ -164,30 +313,30 @@ export default function EconomyPage() {
     <Workspace>
       {/* 1. Header Zone */}
       <HeaderZone
-        title="FINANCIAL LEDGER OPERATIONS"
-        subtitle="Manage virtual currency balances, reward distributions pipelines, and casino module configurations."
+        title={t("FINANCIAL LEDGER OPERATIONS")}
+        subtitle={t("Manage virtual currency balances, reward distributions pipelines, and casino module configurations.")}
       />
 
       {/* 2. Status Zone */}
       <StatusZone>
         <KpiTile 
-          label="Ledger Module Status" 
-          value={isEnabled ? 'NOMINAL' : 'OFFLINE'} 
+          label={t("Ledger Module Status")} 
+          value={isEnabled ? t('NOMINAL') : t('OFFLINE')} 
           sub="ECONOMY_SYSTEM_STATE"
         />
         <KpiTile 
-          label="Silver Reserves Unit" 
+          label={t("Silver Reserves Unit")} 
           value={config.currencySilverIcon || '🥈'} 
           sub={config.currencySilverName ? config.currencySilverName.toUpperCase() : 'SILVER'}
         />
         <KpiTile 
-          label="Gold Reserves Unit" 
+          label={t("Gold Reserves Unit")} 
           value={config.currencyGoldIcon || '🥇'} 
           sub={config.currencyGoldName ? config.currencyGoldName.toUpperCase() : 'GOLD'}
         />
         <KpiTile 
-          label="XP Leveling pipeline" 
-          value={isLeveling ? 'ACTIVE' : 'INACTIVE'} 
+          label={t("XP Leveling pipeline")} 
+          value={isLeveling ? t('ACTIVE') : t('INACTIVE')} 
           sub="XP_PER_MESSAGE_CALC"
         />
       </StatusZone>
@@ -196,10 +345,10 @@ export default function EconomyPage() {
       <div className="grid-12">
         {/* Panel 1: Core Toggles & Currencies */}
         <div className="col-span-6">
-          <Panel title="LEDGER STATE CONTROL" accent>
+          <Panel title={t("LEDGER STATE CONTROL")} accent className={highlight === 'ledger' ? 'flash-target' : ''}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <span style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--text-2)' }}>
-                GLOBAL FINANCIAL SYSTEM
+                {t("GLOBAL FINANCIAL SYSTEM")}
               </span>
               <label className="toggle-switch">
                 <input
@@ -216,7 +365,7 @@ export default function EconomyPage() {
 
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', opacity: isEnabled ? 1 : 0.4 }}>
               <span style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--text-2)' }}>
-                XP PIPELINE ACCRUAL
+                {t("XP PIPELINE ACCRUAL")}
               </span>
               <label className="toggle-switch">
                 <input
@@ -234,7 +383,7 @@ export default function EconomyPage() {
 
             {isLeveling && (
               <div className="form-group" style={{ animation: 'fade-in 0.15s ease-out' }}>
-                <label className="form-label">Accrual coefficient (XP/msg)</label>
+                <label className="form-label">{t("Accrual coefficient (XP/msg)")}</label>
                 <input
                   type="number"
                   className="form-input"
@@ -245,7 +394,7 @@ export default function EconomyPage() {
             )}
           </Panel>
 
-          <Panel title="CURRENCY REGISTRY DATABASE" style={{ marginTop: 'var(--space-5)' }}>
+          <Panel title={t("CURRENCY REGISTRY DATABASE")} style={{ marginTop: 'var(--space-5)' }} className={highlight === 'currency' ? 'flash-target' : ''}>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
               <CurrencyRow 
                 prefix="currencySilver" 
@@ -274,10 +423,10 @@ export default function EconomyPage() {
 
         {/* Panel 2: Rewards Claims & Betting Limits */}
         <div className="col-span-6">
-          <Panel title="DAILY REWARDS DISTRIBUTOR" accent>
+          <Panel title={t("DAILY REWARDS DISTRIBUTOR")} accent className={highlight === 'daily' ? 'flash-target' : ''}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <span style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--text-2)' }}>
-                REWARDS DISPENSATION
+                {t("REWARDS DISPENSATION")}
               </span>
               <label className="toggle-switch">
                 <input
@@ -294,7 +443,7 @@ export default function EconomyPage() {
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 'var(--space-3)', marginTop: 'var(--space-3)' }}>
               <div className="form-group">
-                <label className="form-label">Silver amt</label>
+                <label className="form-label">{t("Silver amt")}</label>
                 <input
                   type="number"
                   className="form-input"
@@ -304,7 +453,7 @@ export default function EconomyPage() {
                 />
               </div>
               <div className="form-group">
-                <label className="form-label">Gold amt</label>
+                <label className="form-label">{t("Gold amt")}</label>
                 <input
                   type="number"
                   className="form-input"
@@ -314,7 +463,7 @@ export default function EconomyPage() {
                 />
               </div>
               <div className="form-group">
-                <label className="form-label">Diamond amt</label>
+                <label className="form-label">{t("Diamond amt")}</label>
                 <input
                   type="number"
                   className="form-input"
@@ -327,7 +476,7 @@ export default function EconomyPage() {
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-3)', marginTop: 'var(--space-3)' }}>
               <div className="form-group">
-                <label className="form-label">Cooldown (Hours)</label>
+                <label className="form-label">{t("Cooldown (Hours)")}</label>
                 <input
                   type="number"
                   className="form-input"
@@ -337,7 +486,7 @@ export default function EconomyPage() {
                 />
               </div>
               <div className="form-group">
-                <label className="form-label">Reset UTC offset</label>
+                <label className="form-label">{t("Reset UTC offset")}</label>
                 <select
                   className="form-select"
                   value={config.dailyResetUtcOffset ?? 0}
@@ -349,7 +498,7 @@ export default function EconomyPage() {
             </div>
           </Panel>
 
-          <Panel title="BETTING REGULATION SYSTEM" style={{ marginTop: 'var(--space-5)' }}>
+          <Panel title={t("BETTING REGULATION SYSTEM")} style={{ marginTop: 'var(--space-5)' }}>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
               <CasinoGameRow 
                 title="Blackjack Module" 
@@ -386,6 +535,34 @@ export default function EconomyPage() {
                 handleBetChange={handleBetChange} 
                 updateConfig={updateConfig} 
               />
+            </div>
+          </Panel>
+        </div>
+
+        {/* Economy Commands Panel */}
+        <div className="col-span-12" style={{ marginTop: 'var(--space-5)' }}>
+          <Panel title={t("FINANCIAL & LEVELING COMMANDS ROUTING")} accent>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
+              {[
+                ...(config.economy?.commands ?? []),
+                ...(config.levels?.commands ?? [])
+              ].map(c => {
+                const isLevelCmd = c.type === 'rank' || c.type === 'leaderboard';
+                const moduleKey = isLevelCmd ? 'levels' : 'economy';
+                const roles = guildData?.roles ?? [];
+                return (
+                  <CommandConfigRow
+                    key={c.type}
+                    cmd={c}
+                    roles={roles}
+                    onUpdate={updatedCmd => {
+                      const currentList = config[moduleKey]?.commands ?? [];
+                      const updatedList = currentList.map(x => x.type === c.type ? updatedCmd : x);
+                      updateConfig({ [moduleKey]: { ...config[moduleKey], commands: updatedList } });
+                    }}
+                  />
+                );
+              })}
             </div>
           </Panel>
         </div>

@@ -1,9 +1,9 @@
 import React from 'react';
 
-export default function Panel({ title, actions, accent = false, children, style }) {
+export default function Panel({ title, actions, accent = false, children, style, className = '' }) {
   return (
     <section 
-      className={`panel ${accent ? 'panel--accent' : ''}`}
+      className={`panel ${accent ? 'panel--accent' : ''} ${className}`}
       style={style}
     >
       {(title || actions) && (

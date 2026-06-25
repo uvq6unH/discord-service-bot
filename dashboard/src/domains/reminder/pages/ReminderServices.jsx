@@ -3,8 +3,10 @@ import Workspace, { HeaderZone, StatusZone, KpiTile } from '../../../shared/layo
 import Panel from '../../../shared/primitives/Panel.jsx';
 import { useReminders } from '../hooks/useReminders.js';
 import { Trash2, Plus } from 'lucide-react';
+import { useLanguage } from '../../../shared/context/LanguageContext.jsx';
 
 function ReminderItemRow({ reminder, channels, members, roles, onUpdate, onRemove }) {
+  const { t } = useLanguage();
   const textChannels = channels.filter(c => c.type === 0 || c.type === 5);
 
   const uIds = Array.isArray(reminder.userIds) ? reminder.userIds : [];
@@ -46,12 +48,12 @@ function ReminderItemRow({ reminder, channels, members, roles, onUpdate, onRemov
           
           {/* Message Input */}
           <div className="form-group">
-            <label className="form-label" style={{ fontSize: '10px' }}>Alert Message Payload</label>
+            <label className="form-label" style={{ fontSize: '10px' }}>{t("Alert Message Payload")}</label>
             <input
               className="form-input"
               style={{ fontSize: '12px' }}
               value={reminder.message}
-              placeholder="System notification content..."
+              placeholder={t("System notification content...")}
               onChange={e => onUpdate(reminder.id, { message: e.target.value })}
             />
           </div>
@@ -60,7 +62,7 @@ function ReminderItemRow({ reminder, channels, members, roles, onUpdate, onRemov
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-4)', borderTop: '1px solid var(--border)', paddingTop: 'var(--space-3)' }}>
             {/* Users */}
             <div className="form-group">
-              <label className="form-label" style={{ fontSize: '10px' }}>Mention Users</label>
+              <label className="form-label" style={{ fontSize: '10px' }}>{t("Mention Users")}</label>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--space-1-5)', marginBottom: 'var(--space-2)' }}>
                 {selectedUsers.map(u => (
                   <span key={u.id} style={{
@@ -84,7 +86,7 @@ function ReminderItemRow({ reminder, channels, members, roles, onUpdate, onRemov
                   </span>
                 ))}
                 {selectedUsers.length === 0 && (
-                  <span style={{ fontSize: '11px', color: 'var(--text-3)' }}>No users selected</span>
+                  <span style={{ fontSize: '11px', color: 'var(--text-3)' }}>{t("No users selected")}</span>
                 )}
               </div>
               <select
@@ -98,7 +100,7 @@ function ReminderItemRow({ reminder, channels, members, roles, onUpdate, onRemov
                   }
                 }}
               >
-                <option value="">+ Add User...</option>
+                <option value="">{t("+ Add User...")}</option>
                 {availableUsers.map(u => (
                   <option key={u.id} value={u.id}>{u.displayName || u.username}</option>
                 ))}
@@ -107,7 +109,7 @@ function ReminderItemRow({ reminder, channels, members, roles, onUpdate, onRemov
 
             {/* Roles */}
             <div className="form-group">
-              <label className="form-label" style={{ fontSize: '10px' }}>Mention Roles</label>
+              <label className="form-label" style={{ fontSize: '10px' }}>{t("Mention Roles")}</label>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--space-1-5)', marginBottom: 'var(--space-2)' }}>
                 {selectedRoles.map(r => (
                   <span key={r.id} style={{
@@ -131,7 +133,7 @@ function ReminderItemRow({ reminder, channels, members, roles, onUpdate, onRemov
                   </span>
                 ))}
                 {selectedRoles.length === 0 && (
-                  <span style={{ fontSize: '11px', color: 'var(--text-3)' }}>No roles selected</span>
+                  <span style={{ fontSize: '11px', color: 'var(--text-3)' }}>{t("No roles selected")}</span>
                 )}
               </div>
               <select
@@ -145,7 +147,7 @@ function ReminderItemRow({ reminder, channels, members, roles, onUpdate, onRemov
                   }
                 }}
               >
-                <option value="">+ Add Role...</option>
+                <option value="">{t("+ Add Role...")}</option>
                 {availableRoles.map(r => (
                   <option key={r.id} value={r.id}>{r.name}</option>
                 ))}
@@ -156,7 +158,7 @@ function ReminderItemRow({ reminder, channels, members, roles, onUpdate, onRemov
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-3)', borderTop: '1px solid var(--border)', paddingTop: 'var(--space-3)' }}>
             {/* Target Timestamp */}
             <div className="form-group">
-              <label className="form-label" style={{ fontSize: '10px' }}>Target Timestamp</label>
+              <label className="form-label" style={{ fontSize: '10px' }}>{t("Target Timestamp")}</label>
               <input
                 type="datetime-local"
                 className="form-input"
@@ -178,7 +180,7 @@ function ReminderItemRow({ reminder, channels, members, roles, onUpdate, onRemov
 
             {/* Repeat Frequency */}
             <div className="form-group">
-              <label className="form-label" style={{ fontSize: '10px' }}>Recurrence Interval</label>
+              <label className="form-label" style={{ fontSize: '10px' }}>{t("Recurrence Interval")}</label>
               <select
                 className="form-select"
                 style={{ fontSize: '12px', fontFamily: 'var(--font-mono)' }}
@@ -195,14 +197,14 @@ function ReminderItemRow({ reminder, channels, members, roles, onUpdate, onRemov
 
           {/* Target Channel */}
           <div className="form-group" style={{ borderTop: '1px solid var(--border)', paddingTop: 'var(--space-3)' }}>
-            <label className="form-label" style={{ fontSize: '10px' }}>Target Channel Broadcast</label>
+            <label className="form-label" style={{ fontSize: '10px' }}>{t("Target Channel Broadcast")}</label>
             <select
               className="form-select"
               style={{ fontSize: '12px', fontFamily: 'var(--font-mono)' }}
               value={reminder.channelId ?? ''}
               onChange={e => onUpdate(reminder.id, { channelId: e.target.value })}
             >
-              <option value="">-- Select Channel --</option>
+              <option value="">{t("-- Select Channel --")}</option>
               {textChannels.map(c => <option key={c.id} value={c.id}>#{c.name}</option>)}
             </select>
           </div>
@@ -214,7 +216,7 @@ function ReminderItemRow({ reminder, channels, members, roles, onUpdate, onRemov
           className="btn btn--danger"
           style={{ marginTop: 'var(--space-5)', padding: 'var(--space-2-5)' }}
           onClick={() => onRemove(reminder.id)}
-          title="Delete Reminder Job"
+          title={t("Delete Reminder Job")}
         >
           <Trash2 size={14} />
         </button>
@@ -235,11 +237,12 @@ export default function ReminderServicesPage() {
     removeReminder,
     updateReminder
   } = useReminders();
+  const { t } = useLanguage();
 
   if (loading || !config) {
     return (
       <div style={{ padding: 'var(--space-10)', textAlign: 'center', fontFamily: 'var(--font-mono)' }}>
-        LAUNCHING CRON CONTROLLERS...
+        {t("LAUNCHING CRON CONTROLLERS...")}
       </div>
     );
   }
@@ -256,24 +259,24 @@ export default function ReminderServicesPage() {
     <Workspace>
       {/* 1. Header Zone */}
       <HeaderZone
-        title="REMINDER JOBS PIPELINE"
-        subtitle="Manage scheduled alert notifications, recurring cron tasks, and target channels broadcasts."
+        title={t("REMINDER JOBS PIPELINE")}
+        subtitle={t("Manage scheduled alert notifications, recurring cron tasks, and target channels broadcasts.")}
       />
 
       {/* 2. Status Zone */}
       <StatusZone>
         <KpiTile 
-          label="Reminder System Status" 
-          value={isEnabled ? 'NOMINAL' : 'OFFLINE'} 
+          label={t("Reminder System Status")} 
+          value={isEnabled ? t('NOMINAL') : t('OFFLINE')} 
           sub="REMINDER_CRON_STATE"
         />
         <KpiTile 
-          label="Active Jobs Count" 
+          label={t("Active Jobs Count")} 
           value={reminders.length} 
           sub="SCHEDULED_EVENTS"
         />
         <KpiTile 
-          label="Target Broadcast Rooms" 
+          label={t("Target Broadcast Rooms")} 
           value={activeChannelsCount} 
           sub="UNIQUE_CHANNELS"
         />
@@ -282,14 +285,14 @@ export default function ReminderServicesPage() {
       {/* 3. Workspace Zone */}
       <div className="grid-12">
         <div className="col-span-12">
-          <Panel title="CRON SCHEDULER SYSTEM" accent>
+          <Panel title={t("CRON SCHEDULER SYSTEM")} accent>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid var(--border)', paddingBottom: 'var(--space-4)' }}>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-half)' }}>
                 <span style={{ fontFamily: 'var(--font-mono)', fontSize: '12px', fontWeight: 'bold', color: 'var(--text-1)' }}>
-                  SCHEDULER ENGINE POWER
+                  {t("SCHEDULER ENGINE POWER")}
                 </span>
                 <span style={{ fontSize: '11px', color: 'var(--text-3)' }}>
-                  Enables alert threads and job execution.
+                  {t("Enables alert threads and job execution.")}
                 </span>
               </div>
               <label className="toggle-switch">
@@ -321,7 +324,7 @@ export default function ReminderServicesPage() {
 
               {reminders.length === 0 && (
                 <p style={{ color: 'var(--text-3)', fontSize: '13px', fontFamily: 'var(--font-mono)', padding: 'var(--space-4) 0' }}>
-                  [ NO REGISTERED RUNTIME CRON JOBS ]
+                  {t("[ NO REGISTERED RUNTIME CRON JOBS ]")}
                 </p>
               )}
 
@@ -330,7 +333,7 @@ export default function ReminderServicesPage() {
                 style={{ alignSelf: 'flex-start', display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}
                 onClick={addReminder}
               >
-                <Plus size={14} /> ADD NEW RUNTIME JOB
+                <Plus size={14} /> {t("ADD NEW RUNTIME JOB")}
               </button>
             </div>
           </Panel>

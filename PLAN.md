@@ -89,49 +89,70 @@ Region routing uses two separate maps: `accountRouting` for Account-v1 (VN2 → 
 
 ---
 
-## Phase 4 — Event System ⬜
+## Phase 4 — Real-time Event Queue & Queue Optimization (BLPOP) ⬜
 
-**Trigger:** When `slash_sync_queue` pattern needs to expand to other cross-process event types.
-
-Standardise all inter-service communication through a single `event_queue` Redis list:
-```json
-{ "type": "sync_commands", "guildId": "..." }
-{ "type": "refresh_guild",  "guildId": "..." }
-{ "type": "purge_sessions" }
-```
-
-Bot consumes events and reacts. No direct RPC. Replaces the current dedicated `slash_sync_queue` key.
+**Mục tiêu:** Tối ưu hóa độ trễ đồng bộ và giảm tải CPU thăm dò (polling wakeups).
+- Thay thế `setInterval` + `lpop` (thăm dò 5 giây) bằng cơ chế blocking pop `BLPOP` hoặc Redis Streams/PubSub để bot phản hồi tức thì khi có lệnh từ dashboard.
+- Chuẩn hóa toàn bộ giao tiếp liên tiến trình (IPC) qua một danh sách `event_queue` Redis duy nhất:
+  ```json
+  { "type": "sync_commands", "guildId": "..." }
+  { "type": "refresh_guild",  "guildId": "..." }
+  { "type": "purge_sessions" }
+  ```
 
 ---
 
-## Phase 5 — Internal Bot API ⬜
+## Phase 5 — Phân trang & Truy vấn Thành viên Quy mô lớn ⬜
 
-**Trigger:** Guild size exceeds ~50,000 members where Redis cache is no longer practical.
-
-```
-Dashboard → GET /internal/members  → Bot → Discord (live fetch)
-Dashboard → GET /internal/presence → Bot → Discord (live fetch)
-```
-
-Redis remains the primary cache. Internal API handles on-demand realtime data.
+**Mục tiêu:** Giải quyết rủi ro phình bộ nhớ và băng thông của "quả bom" `guild_cache:{id}:members`.
+- Triển khai phân trang cho cache thành viên trên Redis (ví dụ: `guild_cache:{id}:members:page:{num}`).
+- Thiết lập cơ chế truy vấn động (on-demand live fetch) trực tiếp từ Discord API thông qua bot khi dashboard yêu cầu trang cụ thể đối với các guild có quy mô lớn (>10.000 thành viên).
 
 ---
 
-## Phase 6 — Redis Streams ⬜
+## Phase 6 — Phân tách Domain Repository ⬜
 
-**Trigger:** Slash sync queue backlog, or multiple bot instances needed.
-
-Replace `setInterval` + `lpop` polling (currently 5 s interval) with Redis Streams or Pub/Sub for lower latency and better multi-consumer support.
-
-Current polling is fine at current scale. Revisit when throughput warrants it.
+**Mục tiêu:** Thu gọn cấu trúc phình to của `StateStore`.
+- Tách file monolithic `StateStore.js` thành các lớp lưu trữ chuyên biệt (Repository Pattern) theo từng domain:
+  - `EconomyRepository`
+  - `LevelRepository`
+  - `WarningRepository`
+  - `TicketRepository`
+  - `QuizRepository`
+  - `RiotAccountRepository`
+- Giữ `StateStore` như một Facade mỏng ở cổng vào nếu cần thiết.
 
 ---
 
-## Phase 7 — Sharding ⬜
+## Phase 7 — Distributed Riot Static Cache (Redis) ⬜
 
-**Trigger:** 500–1,000+ guilds.
+**Mục tiêu:** Đồng bộ bộ nhớ đệm khi scale-up nhiều bot worker.
+- Di chuyển cache tĩnh Riot DDragon (champions, items, runes) từ bộ nhớ trong (in-process memory) sang Redis (`riot:ddragon:champions`, `riot:ddragon:items`).
+- Cho phép nhiều instance bot/dashboard chạy song song cùng truy cập một nguồn cache tĩnh chung, tối ưu hóa lượt gọi Riot/DDragon API.
 
-Redis-first architecture is already shard-ready — no shared in-process state. Add Discord.js `ShardingManager` and partition guild cache writes by shard.
+---
+
+## Phase 8 — Advanced System Observability & Tracing ⬜
+
+**Mục tiêu:** Đo lường hiệu năng thực tế cấp production và truy vết lỗi liên tiến trình.
+- Bổ sung chỉ số đo lường độ trễ nâng cao:
+  - Request latency (p50/p95/p99)
+  - Discord Gateway & API latency
+  - Redis query execution duration
+  - Command execution duration & error rate per command
+  - Lavalink reconnect count & memory trends
+  - Node.js event loop lag
+- **Structured Logging & Request Tracing**:
+  - Chuẩn hóa ghi log cấu trúc JSON (sử dụng Winston/Pino) để dễ dàng gom log tập trung (ELK / Grafana Loki / Sentry).
+  - Tích hợp **Correlation-ID** (Request Tracing) để theo vết luồng yêu cầu đi từ Dashboard API -> đẩy vào Redis sync queue -> Bot worker xử lý, giúp dễ dàng cô lập và gỡ lỗi (debug) bất đồng bộ.
+
+---
+
+## Phase 9 — Background Workers & Sharding ⬜
+
+**Mục tiêu:** Phân rã tiến trình nặng và phân mảnh (Sharding) khi có >500 guilds.
+- Tách các tác vụ nền tốn tài nguyên (reminder polling worker, quiz updates, stats calculation) sang một background worker service riêng biệt.
+- Sử dụng Discord.js `ShardingManager` để phân luồng xử lý các phân vùng guild độc lập.
 
 ---
 
@@ -142,12 +163,14 @@ Redis-first architecture is already shard-ready — no shared in-process state. 
 ✅ P2  Slash sync queue
 ✅ P3  Heartbeat + observability counters + System page
 ✅ P4  Riot API puuid migration (League-v4, Mastery-v4, Match-v5)
-⬜ P5  Event system normalisation
-⬜ P6  Internal bot API
-⬜ P7  Redis Streams / Pub/Sub
-⬜ P8  Sharding
+⬜ P5  Real-time Event Queue (BLPOP/Streams)
+⬜ P6  Member Cache Pagination / On-demand Fetch
+⬜ P7  Domain Repository Separation
+⬜ P8  Distributed Riot Static Cache (Redis)
+⬜ P9  Advanced Observability (p99 latency)
+⬜ P10 Background Workers & Sharding
 ```
 
 ---
 
-*Last updated: Phases 1–3 complete + Riot puuid migration. Split architecture stable in production.*
+*Last updated: June 2026. Roadmap updated based on Solution Architect Review.*

@@ -1,8 +1,9 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import GuildRail from '../navigation/GuildRail.jsx';
 import DomainRail from '../navigation/DomainRail.jsx';
 import { useLocation } from 'react-router-dom';
 import { NAVIGATION_SCHEMA } from '../navigation/navigation.config.ts';
+import { useLanguage } from '../context/LanguageContext.jsx';
 
 export default function AppShell({
   guilds,
@@ -16,6 +17,18 @@ export default function AppShell({
   children
 }) {
   const location = useLocation();
+  const { language, setLanguage, t } = useLanguage();
+  const [theme, setTheme] = useState(localStorage.getItem('theme') || 'dark');
+
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', theme);
+  }, [theme]);
+
+  const toggleTheme = () => {
+    const nextTheme = theme === 'dark' ? 'light' : 'dark';
+    setTheme(nextTheme);
+    localStorage.setItem('theme', nextTheme);
+  };
 
   // Find active domain to apply dynamic class styling accent
   const activeDomain = NAVIGATION_SCHEMA.find(domain =>
@@ -26,7 +39,7 @@ export default function AppShell({
 
   return (
     <div className={`app-container ${domainClass}`}>
-      <a href="#main-content" className="skip-link">Bỏ qua điều hướng</a>
+      <a href="#main-content" className="skip-link">{t("Bỏ qua điều hướng")}</a>
       {/* 1. Left Guild Rail */}
       <GuildRail
         guilds={guilds}
@@ -52,7 +65,49 @@ export default function AppShell({
             </span>
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-4)' }}>
+            {/* Theme Toggle */}
+            <button 
+              onClick={toggleTheme}
+              style={{
+                background: 'none',
+                border: '1px solid var(--border)',
+                padding: 'var(--space-1) var(--space-2)',
+                cursor: 'pointer',
+                fontFamily: 'var(--font-mono)',
+                fontSize: '11px',
+                color: 'var(--text-2)',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 'var(--space-1)',
+                outline: 'none'
+              }}
+              title={t("Toggle Theme")}
+            >
+              {theme === 'dark' ? '🌙 DARK' : '☀️ LIGHT'}
+            </button>
+
+            {/* Language Switcher */}
+            <button 
+              onClick={() => setLanguage(language === 'en' ? 'vi' : 'en')}
+              style={{
+                background: 'none',
+                border: '1px solid var(--border)',
+                padding: 'var(--space-1) var(--space-2)',
+                cursor: 'pointer',
+                fontFamily: 'var(--font-mono)',
+                fontSize: '11px',
+                color: 'var(--text-2)',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 'var(--space-1)',
+                outline: 'none'
+              }}
+              title={t("Toggle Language")}
+            >
+              🌐 {language === 'en' ? 'EN' : 'VI'}
+            </button>
+
             <span style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--text-2)' }}>
               USER // {user?.username?.toUpperCase()}
             </span>
@@ -87,10 +142,10 @@ export default function AppShell({
           zIndex: 1000
         }}>
           <span style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--text-2)' }}>
-            {saveStatus === 'saving' && '>>> COMMITTING TELEMETRY CHANGES...'}
-            {saveStatus === 'saved'  && '>>> TELEMETRY COMMITTED SUCCESSFULLY.'}
-            {saveStatus === 'error'  && '>>> ERROR COMMITTING CONFIG.'}
-            {saveStatus === 'idle'   && '>>> UNCOMMITTED TELEMETRY DETECTED.'}
+            {saveStatus === 'saving' && t('>>> COMMITTING TELEMETRY CHANGES...')}
+            {saveStatus === 'saved'  && t('>>> TELEMETRY COMMITTED SUCCESSFULLY.')}
+            {saveStatus === 'error'  && t('>>> ERROR COMMITTING CONFIG.')}
+            {saveStatus === 'idle'   && t('>>> UNCOMMITTED TELEMETRY DETECTED.')}
           </span>
           <button
             className="btn btn--primary"
@@ -98,7 +153,7 @@ export default function AppShell({
             disabled={saveStatus === 'saving'}
             style={{ padding: 'var(--space-1-5) var(--space-3)' }}
           >
-            {saveStatus === 'saving' ? 'Committing...' : 'Commit Changes'}
+            {saveStatus === 'saving' ? t('Committing...') : t('Commit Changes')}
           </button>
         </div>
       </div>

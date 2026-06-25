@@ -1,7 +1,10 @@
 import React from 'react';
 import { Bot } from 'lucide-react';
+import { useLanguage } from '../../../shared/context/LanguageContext.jsx';
 
 export default function LoginPage() {
+  const { t } = useLanguage();
+
   const handleLogin = () => {
     window.location.href = '/auth/login';
   };
@@ -49,7 +52,7 @@ export default function LoginPage() {
             letterSpacing: '0.05em',
             color: 'var(--text-1)'
           }}>
-            SYSTEM ACCESS REQUIRED
+            {t("SYSTEM ACCESS REQUIRED")}
           </h1>
           <p style={{
             fontSize: '11px',
@@ -57,7 +60,7 @@ export default function LoginPage() {
             fontFamily: 'var(--font-mono)',
             marginTop: 'var(--space-1-5)'
           }}>
-            COMMUNITY OPERATIONS PLATFORM // V4.0.0
+            {t("COMMUNITY OPERATIONS PLATFORM // V4.0.0")}
           </p>
         </div>
 
@@ -69,7 +72,7 @@ export default function LoginPage() {
           style={{ width: '100%', padding: 'var(--space-3)' }}
           onClick={handleLogin}
         >
-          AUTHENTICATE DISCORD SESSION
+          {t("AUTHENTICATE DISCORD SESSION")}
         </button>
 
         {/* Footer */}
@@ -79,7 +82,7 @@ export default function LoginPage() {
           color: 'var(--text-3)',
           textAlign: 'center'
         }}>
-          SECURE CONNECTION REQUIRED. UNAUTHORIZED ACCESS IS LOGGED.
+          {t("SECURE CONNECTION REQUIRED. UNAUTHORIZED ACCESS IS LOGGED.")}
         </span>
       </div>
     </main>

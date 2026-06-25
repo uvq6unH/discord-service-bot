@@ -31,11 +31,13 @@ const Icons = {
 };
 
 import { NAVIGATION_SCHEMA } from './navigation.config.ts';
+import { useLanguage } from '../context/LanguageContext.jsx';
 
 export default function DomainRail({ selectedGuild }) {
   const location = useLocation();
   const navigate = useNavigate();
   const [dropdownOpen, setDropdownOpen] = useState(false);
+  const { t } = useLanguage();
 
   // Find active domain by checking if location path matches any item's path
   const activeDomain = NAVIGATION_SCHEMA.find(domain =>
@@ -87,7 +89,7 @@ export default function DomainRail({ selectedGuild }) {
             {selectedGuild?.name}
           </span>
           <span style={{ fontSize: '11px', color: 'var(--text-3)', fontFamily: 'var(--font-mono)' }}>
-            SECURE TERMINAL
+            {t("SECURE TERMINAL")}
           </span>
         </div>
       </div>
@@ -120,7 +122,7 @@ export default function DomainRail({ selectedGuild }) {
                              activeDomain.id === 'riot' ? 'var(--accent-riot)' :
                              activeDomain.id === 'music' ? 'var(--accent-music)' : 'var(--accent-reminder)'
             }} />
-            {activeDomain.label}
+            {t(activeDomain.label)}
           </span>
           <Icons.ChevronDown size={14} style={{ color: 'var(--text-3)' }} />
         </button>
@@ -156,8 +158,8 @@ export default function DomainRail({ selectedGuild }) {
                   gap: 'var(--space-half)'
                 }}
               >
-                <span style={{ fontWeight: 'bold' }}>{domain.label}</span>
-                <span style={{ fontSize: '9px', color: 'var(--text-3)' }}>{domain.description}</span>
+                <span style={{ fontWeight: 'bold' }}>{t(domain.label)}</span>
+                <span style={{ fontSize: '9px', color: 'var(--text-3)' }}>{t(domain.description)}</span>
               </button>
             ))}
           </div>
@@ -167,7 +169,7 @@ export default function DomainRail({ selectedGuild }) {
       {/* Navigation Links for Active Domain */}
       <div className="domain-rail__content">
         <div>
-          <div className="domain-rail__section-title">ACTIVE WORKSPACE</div>
+          <div className="domain-rail__section-title">{t("ACTIVE WORKSPACE")}</div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-1)' }}>
             {activeDomain.items.map(item => (
               <NavLink
@@ -194,7 +196,7 @@ export default function DomainRail({ selectedGuild }) {
                 })}
               >
                 {renderIcon(item.icon, 14)}
-                <span>{item.label}</span>
+                <span>{t(item.label)}</span>
               </NavLink>
             ))}
           </div>

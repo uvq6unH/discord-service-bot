@@ -1,13 +1,17 @@
 import React from 'react';
+import { useNavigate } from 'react-router-dom';
 import Workspace, { HeaderZone, StatusZone, KpiTile } from '../../../shared/layouts/Workspace.jsx';
 import Panel from '../../../shared/primitives/Panel.jsx';
 import DataSlab from '../../../shared/primitives/DataSlab.jsx';
 import { useGuild } from '../hooks/useGuild.js';
 import { useSystem } from '../hooks/useSystem.js';
+import { useLanguage } from '../../../shared/context/LanguageContext.jsx';
 
 export default function OverviewPage() {
+  const navigate = useNavigate();
   const { config, selectedGuild } = useGuild();
   const { status } = useSystem();
+  const { t } = useLanguage();
 
   const bot = status?.bot;
   const stats = status?.stats;
@@ -22,8 +26,8 @@ export default function OverviewPage() {
   };
 
   const getWelcomeChannelHint = () => {
-    if (!config?.welcomeEnabled) return 'DISABLED';
-    return config?.welcomeChannelId ? `#${config.welcomeChannelId}` : 'CHƯA CẤU HÌNH';
+    if (!config?.welcomeEnabled) return t('DISABLED');
+    return config?.welcomeChannelId ? `#${config.welcomeChannelId}` : t('CHƯA CẤU HÌNH');
   };
 
   return (
@@ -31,30 +35,30 @@ export default function OverviewPage() {
       {/* 1. Header Zone */}
       <HeaderZone
         title={selectedGuild?.name ? `${selectedGuild.name.toUpperCase()} // OVERVIEW` : 'OVERVIEW'}
-        subtitle="Operations center telemetry and community parameters snapshot."
+        subtitle={t("Operations center telemetry and community parameters snapshot.")}
       />
 
       {/* 2. Status Zone (KPIs) */}
       <StatusZone>
         <KpiTile 
-          label="Server Health" 
-          value={online ? 'ONLINE' : 'OFFLINE'} 
-          sub={online ? 'TELEMETRY STATUS NOMINAL' : 'TELEMETRY OFFLINE'}
+          label={t("Server Health")} 
+          value={online ? t('ONLINE') : t('OFFLINE')} 
+          sub={online ? t('TELEMETRY STATUS NOMINAL') : t('TELEMETRY OFFLINE')}
         />
         <KpiTile 
-          label="Uptime" 
+          label={t("Uptime")} 
           value={bot?.uptime ? fmtUptime(bot.uptime) : '—'} 
-          sub="SYS_UPTIME_COUNTER"
+          sub={t("SYS_UPTIME_COUNTER")}
         />
         <KpiTile 
-          label="Commands Run" 
+          label={t("Commands Run")} 
           value={stats?.commandsToday ?? '—'} 
-          sub="RUN_TODAY"
+          sub={t("RUN_TODAY")}
         />
         <KpiTile 
-          label="Ping Latency" 
+          label={t("Ping Latency")} 
           value={bot?.ping ? `${bot.ping}ms` : '—'} 
-          sub="GATEWAY_LATENCY"
+          sub={t("GATEWAY_LATENCY")}
         />
       </StatusZone>
 
@@ -62,94 +66,107 @@ export default function OverviewPage() {
       <div className="grid-12">
         {/* Panel 1: Member growth */}
         <div className="col-span-6">
-          <Panel title="MEMBER GROWTH CONFIG" accent>
+          <Panel title={t("MEMBER GROWTH CONFIG")} accent>
             <DataSlab 
-              label="Welcome System" 
-              value={config?.welcomeEnabled ? 'ACTIVE' : 'INACTIVE'} 
-              sub="New member greeting broadcast"
+              label={t("Welcome System")} 
+              value={config?.welcomeEnabled ? t('ACTIVE') : t('INACTIVE')} 
+              sub={t("New member greeting broadcast")}
               highlight={config?.welcomeEnabled}
+              onClick={() => navigate('/moderation', { state: { highlight: 'selfroles' } })}
             />
             <DataSlab 
-              label="Welcome Target Channel" 
+              label={t("Welcome Target Channel")} 
               value={getWelcomeChannelHint()} 
-              sub="Broadcast target room"
+              sub={t("Broadcast target room")}
+              onClick={() => navigate('/moderation', { state: { highlight: 'selfroles' } })}
             />
             <DataSlab 
-              label="Logging Integration" 
-              value={config?.logChannelId ? 'ACTIVE' : 'INACTIVE'} 
-              sub="Member activity logs target"
+              label={t("Logging Integration")} 
+              value={config?.logChannelId ? t('ACTIVE') : t('INACTIVE')} 
+              sub={t("Member activity logs target")}
               highlight={!!config?.logChannelId}
+              onClick={() => navigate('/moderation', { state: { highlight: 'selfroles' } })}
             />
             <DataSlab 
-              label="Broadcast Announcements" 
-              value={config?.announcementsEnabled ? 'ACTIVE' : 'INACTIVE'} 
-              sub="System notifications module"
+              label={t("Broadcast Announcements")} 
+              value={config?.announcementsEnabled ? t('ACTIVE') : t('INACTIVE')} 
+              sub={t("System notifications module")}
+              onClick={() => navigate('/moderation', { state: { highlight: 'selfroles' } })}
             />
           </Panel>
         </div>
 
         {/* Panel 2: Command activity */}
         <div className="col-span-6">
-          <Panel title="COMMAND ENGINE STATUS" accent>
+          <Panel title={t("COMMAND ENGINE STATUS")} accent>
             <DataSlab 
-              label="Prefix Parameter" 
+              label={t("Prefix Parameter")} 
               value={config?.prefix ? `"${config.prefix}"` : '"!"'} 
-              sub="Legacy text command invocation prefix"
+              sub={t("Legacy text command invocation prefix")}
+              onClick={() => navigate('/commands', { state: { highlight: 'commands' } })}
             />
             <DataSlab 
-              label="Command Module Status" 
-              value={(config?.enabled ?? true) ? 'ACTIVE' : 'INACTIVE'} 
-              sub="Guild commands routing status"
+              label={t("Command Module Status")} 
+              value={(config?.enabled ?? true) ? t('ACTIVE') : t('INACTIVE')} 
+              sub={t("Guild commands routing status")}
               highlight={config?.enabled ?? true}
+              onClick={() => navigate('/commands', { state: { highlight: 'commands' } })}
             />
           </Panel>
         </div>
 
         {/* Panel 3: Moderation config */}
         <div className="col-span-6">
-          <Panel title="MODERATION CONTROLS" accent>
+          <Panel title={t("MODERATION CONTROLS")} accent>
             <DataSlab 
-              label="Auto Moderation" 
-              value={config?.moderation?.enabled ? 'ACTIVE' : 'INACTIVE'} 
-              sub="Automated chat filter state"
+              label={t("Auto Moderation")} 
+              value={config?.moderation?.enabled ? t('ACTIVE') : t('INACTIVE')} 
+              sub={t("Automated chat filter state")}
               highlight={config?.moderation?.enabled}
+              onClick={() => navigate('/moderation', { state: { highlight: 'automod' } })}
             />
             <DataSlab 
-              label="Anti Spam Protocol" 
-              value={config?.moderation?.antiSpam ? 'ACTIVE' : 'INACTIVE'} 
-              sub="Rate limiting message spikes"
+              label={t("Anti Spam Protocol")} 
+              value={config?.moderation?.antiSpam ? t('ACTIVE') : t('INACTIVE')} 
+              sub={t("Rate limiting message spikes")}
+              onClick={() => navigate('/moderation', { state: { highlight: 'automod' } })}
             />
             <DataSlab 
-              label="Anti Link Broadcast" 
-              value={config?.moderation?.antiLink ? 'ACTIVE' : 'INACTIVE'} 
-              sub="Filtering unapproved hyper-links"
+              label={t("Anti Link Broadcast")} 
+              value={config?.moderation?.antiLink ? t('ACTIVE') : t('INACTIVE')} 
+              sub={t("Filtering unapproved hyper-links")}
+              onClick={() => navigate('/moderation', { state: { highlight: 'automod' } })}
             />
             <DataSlab 
-              label="Anti Raid Shield" 
-              value={config?.moderation?.antiRaid ? 'ACTIVE' : 'INACTIVE'} 
-              sub="Guild lockdown operations toggle"
+              label={t("Anti Raid Shield")} 
+              value={config?.moderation?.antiRaid ? t('ACTIVE') : t('INACTIVE')} 
+              sub={t("Guild lockdown operations toggle")}
+              onClick={() => navigate('/moderation', { state: { highlight: 'automod' } })}
             />
           </Panel>
         </div>
 
         {/* Panel 4: Economy config */}
         <div className="col-span-6">
-          <Panel title="ECONOMY TELEMETRY" accent>
+          <Panel title={t("ECONOMY TELEMETRY")} accent>
             <DataSlab 
-              label="Economy Ledger Status" 
-              value={config?.economy?.enabled ? 'ACTIVE' : 'INACTIVE'} 
-              sub="Global virtual transaction module"
-              highlight={config?.economy?.enabled}
+              label={t("Economy Ledger Status")} 
+              value={config?.economyEnabled ? t('ACTIVE') : t('INACTIVE')} 
+              sub={t("Global virtual transaction module")}
+              highlight={config?.economyEnabled}
+              onClick={() => navigate('/economy', { state: { highlight: 'ledger' } })}
             />
             <DataSlab 
-              label="XP Leveling Pipeline" 
-              value={config?.economy?.levelingEnabled ? 'ACTIVE' : 'INACTIVE'} 
-              sub="Chat participation score module"
+              label={t("XP Leveling Pipeline")} 
+              value={config?.levelsEnabled ? t('ACTIVE') : t('INACTIVE')} 
+              sub={t("Chat participation score module")}
+              onClick={() => navigate('/economy', { state: { highlight: 'ledger' } })}
             />
             <DataSlab 
-              label="Primary Ledger Currency" 
-              value={config?.economy?.currencyName ? config.economy.currencyName.toUpperCase() : 'COINS'} 
-              sub="Current ledger name token"
+              label={t("Primary Ledger Currency")} 
+              value={config?.currencyGoldName ? config.currencyGoldName.toUpperCase() : 'GOLD'} 
+              sub={t("Current ledger name token")}
+              onClick={() => navigate('/economy', { state: { highlight: 'currency' } })}
             />
           </Panel>
         </div>

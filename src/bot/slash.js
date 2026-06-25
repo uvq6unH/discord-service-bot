@@ -4,7 +4,7 @@ import { buildTftSlashOptions } from '../tftCommands.js';
 
 export function buildSlashCommands(config) {
   return config.commands
-    .filter((command) => command.enabled)
+    .filter((command) => command.enabled && !command.type.startsWith('music'))
     .map((command) => ({
       name: command.name,
       description: command.description || `Run ${command.name}`,
@@ -240,6 +240,10 @@ function buildSlashOptions(command) {
         required: true
       }
     ];
+  }
+
+  if (command.type === 'lolquiz') {
+    return [];
   }
 
   // ── League of Legends ───────────────────────────────────────────────────

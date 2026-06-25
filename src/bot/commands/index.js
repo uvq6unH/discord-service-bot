@@ -27,10 +27,12 @@ export async function runBuiltInCommand(params) {
     if (result !== undefined) return result;
   }
 
-  return ctx.reply(renderCommandResponse(ctx.command.response, {
+  const responseText = renderCommandResponse(ctx.command.response, {
     client: ctx.client,
     context: ctx.context,
     config: ctx.config,
     args: ctx.args
-  }));
+  });
+
+  return ctx.reply(responseText || '❌ Lệnh custom chưa cấu hình nội dung phản hồi.');
 }

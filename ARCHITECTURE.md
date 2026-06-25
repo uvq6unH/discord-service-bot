@@ -38,7 +38,7 @@ Communication: Upstash Redis (shared state, config, sessions, event queues)
 ```
 
 ```
-┌──────────────────────┐      Redis (Upstash)      ┌─────────────────────────┐
+┌──────────────────────┐      Redis (Upstash)        ┌─────────────────────────┐
 │   discord-bot        │ ◄───── shared state ──────► │   discord-dashboard     │
 │   (index.bot.js)     │       configs               │   (index.server.js)     │
 │                      │       sessions              │                         │
@@ -68,17 +68,17 @@ Discord API ◄─────────────────────�
      │ REST (API calls)
      ▼
 ┌─────────────────────────────────────────────────────────────────────┐
-│ src/index.js  ← MONOLITH ENTRY (Mode A)                            │
+│ src/index.js  ← MONOLITH ENTRY (Mode A)                             │
 │  • validateEnvironment()          (bot + server vars)               │
 │  • createUpstashFromEnv()  → redis                                  │
 │  • new ConfigStore() + new StateStore()                             │
 │  • createBot(configStore, stateStore, redis)                        │
 │  • createServer({ botClient, configStore, stateStore, redis })      │
-│  • loginWithRetry() → app.listen() → startKeepalive()              │
+│  • loginWithRetry() → app.listen() → startKeepalive()               │
 └─────────────────────────────────────────────────────────────────────┘
 
 ┌─────────────────────────────────────────────────────────────────────┐
-│ src/index.bot.js  ← BOT ENTRY (Mode B)                             │
+│ src/index.bot.js  ← BOT ENTRY (Mode B)                              │
 │  • validateBotEnvironment()                                         │
 │  • createUpstashFromEnv() → sharedRedis                             │
 │  • new ConfigStore() + new StateStore()                             │
@@ -88,7 +88,7 @@ Discord API ◄─────────────────────�
 └─────────────────────────────────────────────────────────────────────┘
 
 ┌─────────────────────────────────────────────────────────────────────┐
-│ src/index.server.js  ← DASHBOARD ENTRY (Mode B)                    │
+│ src/index.server.js  ← DASHBOARD ENTRY (Mode B)                     │
 │  • validateServerEnvironment()                                      │
 │  • createUpstashFromEnv() → sharedRedis                             │
 │  • new ConfigStore() + new StateStore()                             │
@@ -118,7 +118,7 @@ Discord API ◄─────────────────────�
 All three previously-problematic routes are fully resolved via Redis:
 
 | Route | Mode B behaviour |
-|-------|-----------------|
+|-------|------------------|
 | `GET /api/guild-data` | ✅ reads `guild_cache:{guildId}`; **503** only on cold cache miss |
 | `GET /api/members` | ✅ reads `guild_cache:{guildId}:members`; **503** only on cold cache miss |
 | `POST /api/slash-sync` | ✅ pushes job to `slash_sync_queue` Redis list; bot picks up within 5 s |
@@ -237,7 +237,7 @@ helmet (CSP + security headers)
 **Route summary:**
 
 | Method | Path | Bot required? |
-|--------|------|--------------|
+|--------|------|---------------|
 | GET | `/health` | ❌ |
 | GET | `/auth/login`, `/callback`, `/logout`, `/me` | ❌ |
 | GET | `/api/csrf-token` | ❌ |
@@ -249,6 +249,7 @@ helmet (CSP + security headers)
 | GET | `/api/state` | ❌ (StateStore / Redis) |
 | GET | `/api/guild-data` | ⚡ Redis `guild_cache` fallback; 503 on cold miss only |
 | GET | `/api/members` | ⚡ Redis `guild_cache:members` fallback; 503 on cold miss only |
+| GET | `/api/analytics` | ❌ (returns mock telemetry generated dynamically using a stable seed based on guildId) |
 | GET | `/api/invite-url` | ❌ |
 | GET | `/api/keepalive-status` | ❌ |
 
@@ -329,14 +330,14 @@ Permission check (`memberCanUseCommand`) runs before any handler. Auto-defer fir
 #### Handler files (`src/bot/commands/handlers/`)
 
 | File | Commands handled |
-|------|-----------------|
+|------|------------------|
 | `help.js` | `/help` |
 | `general.js` | `/ping`, `/config`, `/server`, `/user`, `/avatar`, `/say`, `/remindme` |
 | `moderation.js` | `/warn`, `/warnings`, `/clearwarnings`, `/kick`, `/ban`, `/purge`, `/ticket` |
 | `levels.js` | `/level`, `/leaderboard` |
 | `economy.js` | `/balance`, `/daily`, `/transfer`, `/blackjack`, `/coinflip`, `/slots` |
 | `panels.js` | `/panel` |
-| `riot.js` | `/lol-link`, `/lol-profile`, `/lol-match`, `/tft-link`, `/tft-profile` |
+| `riot.js` | `/lol-link`, `/lol-profile`, `/lol-match`, `/tft-link`, `/tft-profile`, `/lolquiz` |
 
 ---
 
@@ -360,20 +361,28 @@ Same structure as `lolApi.js` but for TFT endpoints (TFT-Summoner-v1, TFT-League
 
 Format helpers shared by both `lolCommands.js` and `tftCommands.js`.
 
-#### Riot account storage (Redis)
+#### Riot accounts are linked per user per guild. The `puuid` (not the deprecated summoner ID) is the persistent identifier.
 
-```
-guild:{guildId}:lolAccount:{userId}  → { riotId, puuid, region, linkedAt }
-guild:{guildId}:tftAccount:{userId}  → { riotId, puuid, region, linkedAt }
-```
+#### `src/bot/lolQuiz.js` — League of Legends Quiz Game
 
-Accounts are linked per user per guild. The `puuid` (not the deprecated summoner ID) is the persistent identifier.
+Interactive minigame with multiple play modes:
+- **Classic**: Attribute comparison guesser (gender, race, position, resource, range, region, release year).
+- **Ability**: Guess the champion name based on an ability icon (processed using `jimp` to build composite templates).
+- **Emoji**: Guess the champion based on three emojis.
+- **Connections**: Group 4 related champions from a grid of 16 (renders custom image grids of champion icons dynamically).
+- **Build Guesser**: Guess the champion based on keystone rune, skill max order, and build item names.
+- **Daily Challenge**: Guess champion based on hidden-name ability description (rewards points).
+
+Daily limits are reset using the Vietnam offset. Scoring points are saved via `stateStore` in Redis and a server-wide leaderboard can be requested.
 
 ---
 
 ### 5.6 Music
 
-`src/bot/music/lavalink.js` — Lavalink client wrapper. Manages player lifecycle (join, play, skip, stop, queue). Lavalink server runs as a separate Java process (see `lavalink/` directory and `lavalink/fly.toml` for Fly.io deploy).
+`src/bot/music/lavalink.js` — Lavalink client wrapper. Manages player lifecycle (join, play, skip, stop, queue). Lavalink server runs as a separate Java process.
+- **Dynamic Subcommand Mapping**: The music handler (`handleMusicCommand`) maps subcommand names dynamically based on `config.music.commands` settings, allowing custom triggers for commands like play, skip, stop, pause, resume, loop, queue, np, and volume.
+- **Slash Filtering**: Music commands are text-only (using prefix like `hb`) and are filtered out from slash command registrations in `slash.js`.
+- **NodeManager Event Listeners**: Hooked directly to `nodeManager.on('connect' | 'disconnect' | 'error' | 'reconnecting' | 'destroy')` to prevent unhandled rejection crashes.
 
 ---
 
@@ -383,18 +392,21 @@ Accounts are linked per user per guild. The `puuid` (not the deprecated summoner
 |------|---------|
 | `src/cooldowns.js` | Per-command cooldown tracking (in-memory Map) |
 | `src/commandAccess.js` | `memberCanUseCommand` — role/channel/permission checks |
-| `src/bot/interactions.js` | Button/select-menu interaction router |
+| `src/bot/interactions.js` | Button/select-menu/modal interaction router (supports `quiz:` interactions) |
 | `src/bot/games.js` | Blackjack, coinflip, slots game logic |
+| `src/bot/lolQuiz.js` | Core game loops, banner creation, image composite and buttons/selects/modals for LoL Quiz |
+| `src/bot/lolQuizData.js` | Static database of 160+ champions, attributes, abilities, emojis, connection categories |
+| `src/bot/lolQuizCustomData.js` | Fallback custom questions/challenges for Daily Quiz |
 | `src/bot/emojiMap.js` | `EMOJI_MAP` + `resolveEmojiNames()` |
-| `src/bot/reminderWorker.js` | `startReminderWorker()` — 60 s polling worker |
+| `src/bot/reminderWorker.js` | `startReminderWorker()` — 60 s polling worker; skips stale reminders older than 2 minutes |
 | `src/bot/xpHandler.js` | `handleXp()` — XP grant với in-memory cooldown |
 | `src/bot/autoMod.js` | `runAutoMod()` + `runMentionReact()` |
-| `src/bot/help.js` | Dynamic help text generation |
-| `src/bot/slash.js` | Slash command registration builder |
+| `src/bot/help.js` | Dynamic help text generation (reads custom music command settings) |
+| `src/bot/slash.js` | Slash command registration builder (excludes music commands, configures quiz options) |
 | `src/bot/embeds.js` | Shared Discord embed helpers |
-| `src/bot/responses.js` | Template renderer (`{ping}`, `{userId}`, etc.) |
+| `src/bot/responses.js` | Template renderer (`{ping}`, `{userId}`, etc.); safely returns empty string on empty templates |
 | `src/bot/logging.js` | `sendLog()` — sends formatted log to guild log channel |
-| `src/bot/constants.js` | `AUTO_DEFER_COMMAND_TYPES` and other constants |
+| `src/bot/constants.js` | `AUTO_DEFER_COMMAND_TYPES` and other constants (added `lolquiz`) |
 | `src/safeJson.js` | JSON parse that returns null on error |
 | `src/csrf.js` | CSRF token generation and validation |
 | `src/rateLimit.js` | Express rate limiter middleware |
@@ -497,6 +509,11 @@ guild:{guildId}:game:{type}:{messageId}  → JSON session (TTL 30 s)
 # Riot accounts
 guild:{guildId}:lolAccount:{userId}      → JSON { riotId, puuid, region, linkedAt }
 guild:{guildId}:tftAccount:{userId}      → JSON { riotId, puuid, region, linkedAt }
+
+# Quiz / Minigame
+quiz:daily:{userId}:{mode}:{dayKey}      → 'true' (indicates user completed today's daily, TTL 36h)
+quiz:points:{guildId}:{userId}           → integer (Quiz points)
+guild:{guildId}:quiz:_members            → Set<userId> (members with quiz score)
 
 # Guild index
 guild:index                              → Set<guildId>

@@ -313,10 +313,12 @@ export async function getChampionDetail(champKey, lang = 'vi_VN') {
     passive: {
       name: raw.passive?.name ?? ddChamp?.passive?.name ?? '',
       description: (raw.passive?.description ?? ddChamp?.passive?.description ?? '').replace(/<[^>]+>/g, ''),
+      image: ddChamp?.passive?.image?.full ?? '',
     },
-    spells: (raw.spells?.length ? raw.spells : ddChamp?.spells ?? []).map(sp => ({
+    spells: (raw.spells?.length ? raw.spells : ddChamp?.spells ?? []).map((sp, idx) => ({
       name: sp.name ?? '',
       description: (sp.description ?? '').replace(/<[^>]+>/g, ''),
+      image: ddChamp?.spells?.[idx]?.image?.full ?? '',
     })),
   };
 

@@ -23,6 +23,42 @@ function normalizeAutoReplies(autoReplies) {
     .slice(0, 50);
 }
 
+function normalizeQuizScoring(val) {
+  const d = defaultConfig.quizScoring;
+  if (!val || typeof val !== 'object' || Array.isArray(val)) return d;
+  return {
+    guess1: Math.max(0, Math.min(10000, Number.parseInt(val.guess1, 10) ?? d.guess1)),
+    guess2: Math.max(0, Math.min(10000, Number.parseInt(val.guess2, 10) ?? d.guess2)),
+    guess3: Math.max(0, Math.min(10000, Number.parseInt(val.guess3, 10) ?? d.guess3)),
+    guess4: Math.max(0, Math.min(10000, Number.parseInt(val.guess4, 10) ?? d.guess4)),
+    guess5: Math.max(0, Math.min(10000, Number.parseInt(val.guess5, 10) ?? d.guess5)),
+    guess6: Math.max(0, Math.min(10000, Number.parseInt(val.guess6, 10) ?? d.guess6)),
+    guess7: Math.max(0, Math.min(10000, Number.parseInt(val.guess7, 10) ?? d.guess7)),
+    guess8: Math.max(0, Math.min(10000, Number.parseInt(val.guess8, 10) ?? d.guess8)),
+    fail: Math.max(0, Math.min(10000, Number.parseInt(val.fail, 10) ?? d.fail))
+  };
+}
+
+function normalizeMusic(val) {
+  const d = defaultConfig.music;
+  if (!val || typeof val !== 'object' || Array.isArray(val)) return d;
+  return {
+    defaultVolume: Math.max(0, Math.min(100, Number.parseInt(val.defaultVolume, 10) ?? d.defaultVolume))
+  };
+}
+
+function normalizeModeration(val) {
+  const d = defaultConfig.moderation;
+  if (!val || typeof val !== 'object' || Array.isArray(val)) return d;
+  return {
+    enabled: pickBoolean(val, 'enabled', d),
+    antiSpam: pickBoolean(val, 'antiSpam', d),
+    antiLink: pickBoolean(val, 'antiLink', d),
+    antiRaid: pickBoolean(val, 'antiRaid', d),
+    warnThreshold: Math.max(1, Math.min(100, Number.parseInt(val.warnThreshold, 10) ?? d.warnThreshold))
+  };
+}
+
 function normalizeReminders(reminders) {
   if (!Array.isArray(reminders)) {
     return [];
@@ -102,8 +138,8 @@ function normalizeCommandName(name) {
     .slice(0, 32);
 }
 
-function normalizeCommands(commands) {
-  const source = Array.isArray(commands) ? commands : defaultConfig.commands;
+function normalizeCommands(commands, defaultFallback = []) {
+  const source = Array.isArray(commands) ? commands : defaultFallback;
   const seen = new Set();
   const seenBuiltInTypes = new Set();
 
@@ -123,8 +159,8 @@ function normalizeCommands(commands) {
       };
     })
     .filter((item) => {
-      // custom commands require a response; built-in types (including LoL) do not
-      if (!item.name || (item.type === 'custom' && !item.response) || seen.has(item.name)) {
+      // custom commands require a name, but can be saved with an empty response while being drafted
+      if (!item.name || seen.has(item.name)) {
         return false;
       }
       if (item.type !== 'custom') {
@@ -135,6 +171,115 @@ function normalizeCommands(commands) {
       return true;
     })
     .slice(0, 100);
+}
+
+const COMMAND_TO_MODULE = {
+  // core
+  ping: 'core',
+  help: 'core',
+  config: 'core',
+  server: 'core',
+  user: 'core',
+  avatar: 'core',
+  say: 'core',
+  announce: 'core',
+  
+  // moderation
+  purge: 'moderation',
+  warn: 'moderation',
+  kick: 'moderation',
+  ban: 'moderation',
+  timeout: 'moderation',
+  warnings: 'moderation',
+  clearwarns: 'moderation',
+  ticketpanel: 'moderation',
+  rolepanel: 'moderation',
+  
+  // levels
+  rank: 'levels',
+  leaderboard: 'levels',
+  
+  // economy
+  balance: 'economy',
+  daily: 'economy',
+  economyleaderboard: 'economy',
+  blackjack: 'economy',
+  poker: 'economy',
+  coinflip: 'economy',
+  dice: 'economy',
+  slots: 'economy',
+  ecoadd: 'economy',
+  ecoset: 'economy',
+  ecoremove: 'economy',
+  
+  // riot
+  lsd: 'riot',
+  lolprofile: 'riot',
+  lolmatch: 'riot',
+  lolchamp: 'riot',
+  lolitem: 'riot',
+  lolrunes: 'riot',
+  lolpatch: 'riot',
+  lollink: 'riot',
+  lolunlink: 'riot',
+  tftlsd: 'riot',
+  tftprofile: 'riot',
+  tftmatch: 'riot',
+  tftlink: 'riot',
+  tftunlink: 'riot',
+  lolquiz: 'riot',
+  
+  // music
+  musicplay: 'music',
+  musicskip: 'music',
+  musicstop: 'music',
+  musicpause: 'music',
+  musicresume: 'music',
+  musicloop: 'music',
+  musicqueue: 'music',
+  musicnp: 'music',
+  musicvolume: 'music'
+};
+
+function getModuleCommands(stored, moduleName, defaultModuleCommands) {
+  if (stored?.[moduleName] && Array.isArray(stored[moduleName].commands)) {
+    return stored[moduleName].commands;
+  }
+  
+  if (Array.isArray(stored?.commands) && stored.commands.length > 0) {
+    const moduleCommands = stored.commands.filter((cmd) => {
+      const type = String(cmd?.type ?? '').trim().toLowerCase();
+      const mappedModule = COMMAND_TO_MODULE[type] || (type === 'custom' ? 'core' : 'core');
+      return mappedModule === moduleName;
+    });
+    if (moduleCommands.length > 0) {
+      return moduleCommands;
+    }
+  }
+  
+  return defaultModuleCommands;
+}
+
+function mergeModuleCommands(storedCommands, defaultModuleCommands, moduleName) {
+  const merged = [...(Array.isArray(storedCommands) ? storedCommands : (defaultModuleCommands || []))];
+  const existingTypes = new Set(merged.map((command) => String(command?.type ?? '').toLowerCase()).filter(Boolean));
+  const existingNames = new Set(merged.map((command) => normalizeCommandName(command?.name)).filter(Boolean));
+
+  for (const command of (defaultModuleCommands || [])) {
+    if (!existingTypes.has(command.type) && !existingNames.has(command.name)) {
+      merged.push(command);
+    }
+  }
+
+  if (moduleName === 'core') {
+    for (const command of merged) {
+      if (command.type === 'config' && command.response && !command.response.includes('{riotKeyStatus}')) {
+        command.response = command.response + '\nRiot API: {riotKeyStatus}\nTFT API: {tftKeyStatus}';
+      }
+    }
+  }
+
+  return merged;
 }
 
 function resolveSecretPatch(patchValue, currentValue) {
@@ -345,15 +490,80 @@ export class ConfigStore {
       stored = this.cache[guildId] ?? {};
     }
 
+    const coreCmds = normalizeCommands(
+      mergeModuleCommands(getModuleCommands(stored, 'core', defaultConfig.core?.commands), defaultConfig.core?.commands, 'core'),
+      defaultConfig.core?.commands
+    );
+    const modCmds = normalizeCommands(
+      mergeModuleCommands(getModuleCommands(stored, 'moderation', defaultConfig.moderation?.commands), defaultConfig.moderation?.commands, 'moderation'),
+      defaultConfig.moderation?.commands
+    );
+    const levelsCmds = normalizeCommands(
+      mergeModuleCommands(getModuleCommands(stored, 'levels', defaultConfig.levels?.commands), defaultConfig.levels?.commands, 'levels'),
+      defaultConfig.levels?.commands
+    );
+    const ecoCmds = normalizeCommands(
+      mergeModuleCommands(getModuleCommands(stored, 'economy', defaultConfig.economy?.commands), defaultConfig.economy?.commands, 'economy'),
+      defaultConfig.economy?.commands
+    );
+    const riotCmds = normalizeCommands(
+      mergeModuleCommands(getModuleCommands(stored, 'riot', defaultConfig.riot?.commands), defaultConfig.riot?.commands, 'riot'),
+      defaultConfig.riot?.commands
+    );
+    const musicCmds = normalizeCommands(
+      mergeModuleCommands(getModuleCommands(stored, 'music', defaultConfig.music?.commands), defaultConfig.music?.commands, 'music'),
+      defaultConfig.music?.commands
+    );
+
     const base = {
       guildId,
       ...clone(defaultConfig),
       ...clone(stored),
-      commands: normalizeCommands(mergeWithDefaultCommands(stored.commands)),
+      core: {
+        ...(defaultConfig.core ?? {}),
+        ...(stored.core ?? {}),
+        commands: coreCmds
+      },
+      moderation: {
+        ...normalizeModeration(stored.moderation ?? defaultConfig.moderation),
+        commands: modCmds
+      },
+      levels: {
+        ...(defaultConfig.levels ?? {}),
+        ...(stored.levels ?? {}),
+        commands: levelsCmds
+      },
+      economy: {
+        ...(defaultConfig.economy ?? {}),
+        ...(stored.economy ?? {}),
+        commands: ecoCmds
+      },
+      riot: {
+        ...(defaultConfig.riot ?? {}),
+        ...(stored.riot ?? {}),
+        commands: riotCmds
+      },
+      music: {
+        ...normalizeMusic(stored.music ?? defaultConfig.music),
+        commands: musicCmds
+      },
+      commands: [
+        ...coreCmds,
+        ...modCmds,
+        ...levelsCmds,
+        ...ecoCmds,
+        ...riotCmds,
+        ...musicCmds
+      ],
       badWords: normalizeStringList(stored.badWords ?? defaultConfig.badWords),
       selfRoles: normalizeSelfRoles(stored.selfRoles ?? defaultConfig.selfRoles),
       autoReplies: normalizeAutoReplies(stored.autoReplies ?? defaultConfig.autoReplies),
       reminders: normalizeReminders(stored.reminders ?? defaultConfig.reminders),
+      quizScoring: normalizeQuizScoring(stored.quizScoring ?? defaultConfig.quizScoring),
+      lolEnabled: pickBoolean(stored, 'lolEnabled', defaultConfig),
+      tftEnabled: pickBoolean(stored, 'tftEnabled', defaultConfig),
+      autoModEnabled: (stored.moderation ?? defaultConfig.moderation)?.enabled ?? defaultConfig.autoModEnabled,
+      antiLinkEnabled: (stored.moderation ?? defaultConfig.moderation)?.antiLink ?? defaultConfig.antiLinkEnabled,
       riotApiKey: '',
       tftApiKey: '',
       // musicEnabled defaulted false in older versions — force true unless admin
@@ -392,11 +602,80 @@ export class ConfigStore {
         this._runtimeSecrets.delete(guildId);
       }
 
+      const patchCommands = patch.commands;
+      let nextCoreCmds = patch.core?.commands;
+      let nextModCmds = patch.moderation?.commands;
+      let nextLevelsCmds = patch.levels?.commands;
+      let nextEcoCmds = patch.economy?.commands;
+      let nextRiotCmds = patch.riot?.commands;
+      let nextMusicCmds = patch.music?.commands;
+
+      if (Array.isArray(patchCommands)) {
+        const partitioned = {
+          core: [], moderation: [], levels: [], economy: [], riot: [], music: []
+        };
+        for (const cmd of patchCommands) {
+          const type = String(cmd?.type ?? '').trim().toLowerCase();
+          const moduleName = COMMAND_TO_MODULE[type] || (type === 'custom' ? 'core' : 'core');
+          if (partitioned[moduleName]) {
+            partitioned[moduleName].push(cmd);
+          }
+        }
+        
+        if (nextCoreCmds === undefined) nextCoreCmds = partitioned.core;
+        if (nextModCmds === undefined) nextModCmds = partitioned.moderation;
+        if (nextLevelsCmds === undefined) nextLevelsCmds = partitioned.levels;
+        if (nextEcoCmds === undefined) nextEcoCmds = partitioned.economy;
+        if (nextRiotCmds === undefined) nextRiotCmds = partitioned.riot;
+        if (nextMusicCmds === undefined) nextMusicCmds = partitioned.music;
+      }
+
+      if (nextCoreCmds === undefined) nextCoreCmds = current.core?.commands;
+      if (nextModCmds === undefined) nextModCmds = current.moderation?.commands;
+      if (nextLevelsCmds === undefined) nextLevelsCmds = current.levels?.commands;
+      if (nextEcoCmds === undefined) nextEcoCmds = current.economy?.commands;
+      if (nextRiotCmds === undefined) nextRiotCmds = current.riot?.commands;
+      if (nextMusicCmds === undefined) nextMusicCmds = current.music?.commands;
+
+      const coreCmds = normalizeCommands(nextCoreCmds, defaultConfig.core?.commands);
+      const modCmds = normalizeCommands(nextModCmds, defaultConfig.moderation?.commands);
+      const levelsCmds = normalizeCommands(nextLevelsCmds, defaultConfig.levels?.commands);
+      const ecoCmds = normalizeCommands(nextEcoCmds, defaultConfig.economy?.commands);
+      const riotCmds = normalizeCommands(nextRiotCmds, defaultConfig.riot?.commands);
+      const musicCmds = normalizeCommands(nextMusicCmds, defaultConfig.music?.commands);
+
       const next = {
         ...current,
         enabled: pickBoolean(patch, 'enabled', current),
         prefix: String(patch.prefix ?? current.prefix).trim().slice(0, 5) || '!',
-        commands: normalizeCommands(patch.commands ?? current.commands),
+        core: {
+          ...(defaultConfig.core ?? {}),
+          ...(patch.core ?? current.core ?? {}),
+          commands: coreCmds
+        },
+        moderation: {
+          ...normalizeModeration(patch.moderation ?? current.moderation),
+          commands: modCmds
+        },
+        levels: {
+          ...(defaultConfig.levels ?? {}),
+          ...(patch.levels ?? current.levels ?? {}),
+          commands: levelsCmds
+        },
+        economy: {
+          ...(defaultConfig.economy ?? {}),
+          ...(patch.economy ?? current.economy ?? {}),
+          commands: ecoCmds
+        },
+        riot: {
+          ...(defaultConfig.riot ?? {}),
+          ...(patch.riot ?? current.riot ?? {}),
+          commands: riotCmds
+        },
+        music: {
+          ...normalizeMusic(patch.music ?? current.music),
+          commands: musicCmds
+        },
         moderationEnabled: pickBoolean(patch, 'moderationEnabled', current),
         autoModEnabled: pickBoolean(patch, 'autoModEnabled', current),
         deleteBlockedMessages: pickFlag(patch, 'deleteBlockedMessages', current),
@@ -460,9 +739,23 @@ export class ConfigStore {
         remindersEnabled: pickBoolean(patch, 'remindersEnabled', current),
         reminders: normalizeReminders(patch.reminders ?? current.reminders),
         musicEnabled: pickBoolean(patch, 'musicEnabled', current),
-        musicPrefix: String(patch.musicPrefix ?? current.musicPrefix ?? 'hb').trim().slice(0, 10) || 'hb'
+        musicPrefix: String(patch.musicPrefix ?? current.musicPrefix ?? 'hb').trim().slice(0, 10) || 'hb',
+        quizScoring: normalizeQuizScoring(patch.quizScoring ?? current.quizScoring),
+        lolEnabled: pickBoolean(patch, 'lolEnabled', current),
+        tftEnabled: pickBoolean(patch, 'tftEnabled', current),
+        music: {
+          ...normalizeMusic(patch.music ?? current.music),
+          commands: musicCmds
+        },
+        moderation: {
+          ...normalizeModeration(patch.moderation ?? current.moderation),
+          commands: modCmds
+        },
+        autoModEnabled: normalizeModeration(patch.moderation ?? current.moderation).enabled,
+        antiLinkEnabled: normalizeModeration(patch.moderation ?? current.moderation).antiLink
       };
 
+      delete next.commands;
       delete next.guildId;
       delete next.riotApiKey;
       delete next.tftApiKey;

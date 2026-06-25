@@ -5,6 +5,7 @@ import DataSlab from '../../../shared/primitives/DataSlab.jsx';
 import { useGuild } from '../hooks/useGuild.js';
 import { useAnalytics } from '../hooks/useAnalytics.js';
 import { RefreshCw, TrendingUp, TrendingDown, Minus } from 'lucide-react';
+import { useLanguage } from '../../../shared/context/LanguageContext.jsx';
 
 function BarChart({ data, color = 'var(--accent)', height = 100, labelKey = 'date', valueKey = 'count' }) {
   const max = Math.max(...data.map(d => d[valueKey]), 1);
@@ -69,11 +70,12 @@ export default function AnalyticsPage() {
     loading,
     refetch
   } = useAnalytics(selectedGuild?.id);
+  const { t } = useLanguage();
 
   if (loading || !data) {
     return (
       <div style={{ padding: 'var(--space-10)', textAlign: 'center', fontFamily: 'var(--font-mono)' }}>
-        QUERYING SERVICE TELEMETRY DATABASE...
+        {t("QUERYING SERVICE TELEMETRY DATABASE...")}
       </div>
     );
   }
@@ -105,15 +107,15 @@ export default function AnalyticsPage() {
     <Workspace>
       {/* 1. Header Zone */}
       <HeaderZone
-        title="OPERATIONAL TELEMETRY LOGS"
-        subtitle="Historical execution statistics, user interaction profiles, and network query traffic load."
+        title={t("OPERATIONAL TELEMETRY LOGS")}
+        subtitle={t("Historical execution statistics, user interaction profiles, and network query traffic load.")}
         actions={
           <button 
             className="btn btn--secondary" 
             onClick={() => refetch()} 
             style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}
           >
-            <RefreshCw size={12} /> REQUERY
+            <RefreshCw size={12} /> {t("REQUERY")}
           </button>
         }
       />
@@ -132,7 +134,7 @@ export default function AnalyticsPage() {
               padding: 'var(--space-1-5) var(--space-3)'
             }}
           >
-            {r.toUpperCase()} INTERVAL
+            {t(r.toUpperCase() + " INTERVAL")}
           </button>
         ))}
       </div>
@@ -140,22 +142,22 @@ export default function AnalyticsPage() {
       {/* 2. Status Zone */}
       <StatusZone>
         <KpiTile 
-          label="Commands Executed" 
+          label={t("Commands Executed")} 
           value={summary.commandsExecuted.value.toLocaleString('vi-VN')} 
           sub={renderKpiDelta(summary.commandsExecuted.delta)}
         />
         <KpiTile 
-          label="Active Users Metric" 
+          label={t("Active Users Metric")} 
           value={summary.activeUsers.value.toLocaleString('vi-VN')} 
           sub={renderKpiDelta(summary.activeUsers.delta)}
         />
         <KpiTile 
-          label="Ledger Transactions" 
+          label={t("Ledger Transactions")} 
           value={summary.economyTransactions.value.toLocaleString('vi-VN')} 
           sub={renderKpiDelta(summary.economyTransactions.delta)}
         />
         <KpiTile 
-          label="Moderation Actions" 
+          label={t("Moderation Actions")} 
           value={summary.moderationActions.value.toLocaleString('vi-VN')} 
           sub={renderKpiDelta(summary.moderationActions.delta)}
         />
@@ -165,7 +167,7 @@ export default function AnalyticsPage() {
       <div className="grid-12">
         {/* Core Command Load Chart */}
         <div className="col-span-8">
-          <Panel title="HISTORICAL COMMAND LOAD DISTRIBUTION" accent>
+          <Panel title={t("HISTORICAL COMMAND LOAD DISTRIBUTION")} accent>
             <div style={{ padding: 'var(--space-4) 0' }}>
               <BarChart data={commandsChart} />
             </div>
@@ -174,7 +176,7 @@ export default function AnalyticsPage() {
 
         {/* Top Commands list */}
         <div className="col-span-4">
-          <Panel title="TOP COMMAND SIGNALS" accent>
+          <Panel title={t("TOP COMMAND SIGNALS")} accent>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
               {topCommands.map((cmd, i) => (
                 <DataSlab
@@ -191,7 +193,7 @@ export default function AnalyticsPage() {
 
         {/* Heatmap active hours */}
         <div className="col-span-12">
-          <Panel title="DAILY ENGAGEMENT PROFILE LOGS" accent>
+          <Panel title={t("DAILY ENGAGEMENT PROFILE LOGS")} accent>
             <HeatmapRow data={activeHours} />
             {/* Heatmap hours label */}
             <div style={{ display: 'flex', justifyContent: 'space-between', fontFamily: 'var(--font-mono)', fontSize: '9px', color: 'var(--text-3)' }}>

@@ -30,6 +30,7 @@ import { initLavalink, forwardVoiceEvent }     from './bot/music/lavalink.js';
 import { startReminderWorker }                 from './bot/reminderWorker.js';
 import { handleXp }                            from './bot/xpHandler.js';
 import { runAutoMod, runMentionReact }         from './bot/autoMod.js';
+import { activeQuizSessions, buildQuizEmbed }  from './bot/lolQuiz.js';
 
 // ── Guild Cache ───────────────────────────────────────────────────────────────
 // Hai key tách biệt để tránh Upstash 1 MB REST limit trên guild lớn:
@@ -117,6 +118,7 @@ export function createBot(configStore, stateStore, redis = null) {
     partials: [Partials.Channel],
   });
   client.stateStore = stateStore;
+  client.configStore = configStore;
 
   // ── ClientReady ─────────────────────────────────────────────────────────────
   client.once(Events.ClientReady, (readyClient) => {
@@ -240,6 +242,34 @@ export function createBot(configStore, stateStore, redis = null) {
   // ── Interaction handler ─────────────────────────────────────────────────────
   client.on(Events.InteractionCreate, async (interaction) => {
     try {
+      // Autocomplete handling for champion names
+      if (interaction.isAutocomplete()) {
+        const focusedValue = interaction.options.getFocused().toLowerCase();
+        const { getChampionData } = await import('./lolApi.js');
+        const champData = await getChampionData('vi_VN');
+        const cleanFocused = focusedValue.normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
+        const filtered = Object.values(champData.data)
+          .filter(champ => {
+            const nameClean = champ.name.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+            return nameClean.includes(cleanFocused) || champ.name.toLowerCase().includes(focusedValue);
+          })
+          .slice(0, 25);
+
+        await interaction.respond(
+          filtered.map(champ => ({ name: champ.name, value: champ.name }))
+        );
+        return;
+      }
+
+      // Modal submit handling
+      if (interaction.isModalSubmit()) {
+        if (interaction.customId.startsWith('quiz:guess_modal')) {
+          const { handleQuizModalSubmit } = await import('./bot/lolQuiz.js');
+          await handleQuizModalSubmit(interaction);
+          return;
+        }
+      }
+
       // Component interactions (buttons, select menus)
       if ((interaction.isStringSelectMenu() || interaction.isButton()) && interaction.guild) {
         const config = await configStore.getGuildConfig(interaction.guild.id);
@@ -378,6 +408,43 @@ export function createBot(configStore, stateStore, redis = null) {
           content: sanitizeAnnouncementText(match.response),
           allowedMentions: { parse: [] },
         });
+      }
+
+      // 7. Auto reposition active quiz embeds to the bottom of the channel
+      //    Session keys are now `channelId:userId`, so iterate to find all sessions in this channel
+      if (message.author.id !== client.user.id) {
+        for (const [key, session] of activeQuizSessions) {
+          if (!key.startsWith(message.channel.id + ':') || session.status !== 'active') continue;
+
+          if (session.moveTimeout) {
+            clearTimeout(session.moveTimeout);
+          }
+          session.moveTimeout = setTimeout(async () => {
+            try {
+              const currentSession = activeQuizSessions.get(key);
+              if (!currentSession || currentSession.status !== 'active') return;
+
+              // Delete old message
+              if (currentSession.messageId) {
+                const oldMsg = await message.channel.messages.fetch(currentSession.messageId).catch(() => null);
+                if (oldMsg) {
+                  await oldMsg.delete().catch(() => null);
+                }
+              }
+
+              // Send new message
+              const replyPayload = buildQuizEmbed(currentSession);
+              const newMsg = await message.channel.send(replyPayload);
+              currentSession.messageId = newMsg.id;
+            } catch (err) {
+              console.error('[lolQuiz] Error repositioning quiz message:', err);
+            } finally {
+              if (session) {
+                session.moveTimeout = null;
+              }
+            }
+          }, 1500); // 1.5s debounce
+        }
       }
     } catch (error) {
       console.error('[bot] Message handler error:', error);

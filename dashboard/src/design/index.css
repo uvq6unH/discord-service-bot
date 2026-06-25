@@ -61,6 +61,23 @@
   --space-12: 48px;
 }
 
+html[data-theme='light'] {
+  --bg: #F0F2F5;
+  --surface-0: #FFFFFF;
+  --surface-1: #F8F9FA;
+  --surface-2: #E9ECEF;
+  --surface-3: #DEE2E6;
+
+  --border: rgba(0, 0, 0, 0.1);
+  --border-strong: rgba(0, 0, 0, 0.2);
+
+  --text-1: #111111;
+  --text-2: #4A4A4A;
+  --text-3: #777777;
+
+  --accent-core: #111111;
+}
+
 /* ── Reset & Base Styles ─────────────────────────────────────────────────── */
 * {
   box-sizing: border-box;
@@ -274,6 +291,16 @@ a {
   font-weight: bold;
 }
 
+.data-slab--clickable {
+  cursor: pointer;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+
+.data-slab--clickable:hover {
+  background-color: var(--surface-2);
+  border-color: var(--accent);
+}
+
 /* ── Page Blueprints ─────────────────────────────────────────────────────── */
 .header-zone {
   display: flex;
@@ -480,4 +507,23 @@ a {
 }
 ::-webkit-scrollbar-thumb:hover {
   background: var(--accent);
+}
+
+@keyframes flash-white {
+  0% {
+    box-shadow: 0 0 0 6px rgba(255, 255, 255, 0.8), 0 0 20px 10px rgba(255, 255, 255, 0.4);
+    border-color: rgba(255, 255, 255, 1);
+  }
+  50% {
+    box-shadow: 0 0 0 4px rgba(255, 255, 255, 0.4), 0 0 10px 5px rgba(255, 255, 255, 0.2);
+    border-color: rgba(255, 255, 255, 0.6);
+  }
+  100% {
+    box-shadow: 0 0 0 0px rgba(255, 255, 255, 0), 0 0 0px 0px rgba(255, 255, 255, 0);
+    border-color: var(--border);
+  }
+}
+
+.flash-target {
+  animation: flash-white 1.8s cubic-bezier(0.25, 1, 0.5, 1) forwards;
 }

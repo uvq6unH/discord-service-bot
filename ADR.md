@@ -190,3 +190,79 @@
 - Bot restart không còn mất bet: sessions auto-expire sau 3 giờ nếu bot crash giữa chừng
 - `purgeStaleGameSessions()` thực sự refund tất cả active sessions cũ khi bot startup
 - Redis memory: game sessions chiếm ~1 KB/session × max vài chục sessions = negligible
+
+---
+
+## ADR-010 — Phân loại Command theo Module và Tùy biến Music Command
+
+**Quyết định:** Cấu trúc danh sách commands trong config được chia nhỏ theo từng module chuyên biệt (`core`, `moderation`, `levels`, `economy`, `riot`, `music`) thay vì lưu chung một danh mục phẳng. Riêng Music commands được cấu hình động tên và mô tả, chạy qua prefix text (`hb`) và bị loại trừ khỏi danh sách slash commands. Cho phép lưu custom command với response rỗng để nháp.
+
+**Lý do chọn:**
+- Gộp chung commands vào một chỗ làm phình to payload cấu hình và gây khó khăn khi quản trị giao diện theo từng cụm tính năng.
+- Người dùng thường nhầm lẫn gọi các lệnh nhạc dạng slash (như `/play`), trong khi bot chỉ hỗ trợ chơi nhạc dạng text prefix (như `hb play`) do giới hạn kiến trúc kết nối voice. Lọc bỏ lệnh nhạc khỏi slash commands giải quyết triệt để vấn đề này.
+- Khi người dùng muốn lưu nháp custom command mà chưa nghĩ ra câu trả lời, hệ thống cũ sẽ chặn hoặc xóa mất command. Cho phép lưu rỗng giúp cải thiện UX, đi kèm fallback hiển thị thông báo lỗi thân thiện khi gọi lệnh.
+
+**Hệ quả:**
+- `ConfigStore` và API layer được tái cấu trúc để normalize/sanitize config commands theo từng phân vùng module tương ứng.
+- Phía bot xử lý commands động theo cấu hình tên mới được kéo về từ Redis.
+- File `slash.js` loại trừ toàn bộ các lệnh nhạc khi đồng bộ slash commands với Discord API.
+- Nếu template custom command trống, helper `responses.js` trả về chuỗi rỗng và bot trả lời tin nhắn cảnh báo thay vì crash hoặc gửi tin nhắn lỗi.
+
+---
+
+## ADR-011 — Distributed Locking (withRedisLock) via Redis and Lua
+
+**Quyết định:** Sử dụng distributed locks dựa trên Redis (`EVAL` + Lua script) với TTL ngắn (15–30s) và cơ chế exponential backoff retry cho các thao tác ghi đồng thời nhạy cảm như Economy (cộng trừ số dư), Tickets (tăng counter number), và Game Sessions ( Blackjack/Poker/Slots). Bản monolith chạy local dev dùng `asyncMutex` làm in-process mutex fallback.
+
+**Lý do chọn:**
+- Khi chạy split mode hoặc scale ngang nhiều bot instances, các thao tác thay đổi số dư tài chính hoặc thao tác tạo ticket có thể bị race condition nếu người dùng spam click interaction buttons hoặc gọi API đồng thời.
+- Cơ chế locking phân tán bằng Redis Lua script đảm bảo tính nguyên tử (atomicity) khi thay đổi dữ liệu của cùng một user/guild qua các tiến trình khác nhau.
+
+**Hệ quả:**
+- Mọi thao tác ghi đè trạng thái tài chính hoặc phiên trò chơi phải chạy qua hàm bảo vệ `withRedisLock()`.
+- Thời gian chờ lock (retry backoff) được tính toán thông minh để tránh spam băng thông Upstash Redis.
+
+---
+
+## ADR-012 — Redis Schema Versioning & Data Migration Strategy
+
+**Quyết định:** Quản lý phiên bản dữ liệu Redis bằng một key global `schema_version`. Sử dụng cơ chế startup checks (bot/server boot check) hoặc logic chuyển đổi tự động khi đọc/ghi dữ liệu (transparent migration) trong các lớp cổng của Data Layer (ví dụ: `getGuildConfig` tự động chuyển đổi cấu hình cũ sang định dạng phân rã module mới).
+
+**Lý do chọn:**
+- Redis là schemaless database, không có các công cụ migration schema chính quy như SQL.
+- Chuyển đổi dữ liệu trực tiếp trong mã nguồn khi đọc dữ liệu giúp hệ thống nâng cấp mượt mà, không gián đoạn dịch vụ và giảm thiểu rủi ro lỗi dữ liệu cũ bị stale.
+
+**Hệ quả:**
+- Lập trình viên phải viết mã tương thích ngược và logic tự động chuyển đổi dữ liệu khi thay đổi cấu trúc key Redis.
+- Tránh chạy các tác vụ migration nặng, tốn quét toàn bộ Redis (`SCAN`/`KEYS`) trên production.
+
+---
+
+## ADR-013 — Disaster Recovery & Backup Strategy for Upstash Redis
+
+**Quyết định:** Sử dụng tính năng replication và daily auto-backup (giữ 7 ngày) của Upstash Pro ở production làm rào chắn an toàn chính. Cung cấp API xuất/nhập cấu hình (`GET /api/config?guildId={id}`) ra file JSON thủ công làm phương án dự phòng.
+
+**Lý do chọn:**
+- Redis là single source of truth cho toàn bộ config và state. Mất Redis tương đương mất trắng dữ liệu server.
+- Sử dụng replication và snapshot tự động của cloud provider giúp giảm thiểu công sức vận hành mà vẫn đạt được RTO dưới 1 giờ và RPO dưới 24 giờ.
+
+**Hệ quả:**
+- Chi phí vận hành tăng nhẹ (Upstash Pro).
+- Các key tạm thời như `guild_cache`, `heartbeat`, `slash_sync_queue` không cần backup để tối ưu hóa tài nguyên.
+
+---
+
+## ADR-014 — Rate Limiting & Retry Policies for Discord and Riot APIs
+
+**Quyết định:**
+- **Riot API**: Định luồng toàn bộ yêu cầu qua một hàng đợi throttle tập trung (20 req/s, 100 req/2 min - free tier) kết hợp cache in-memory 2 phút cho thông tin trận đấu/profile để giảm số lượng request.
+- **Discord API**: Sử dụng cơ chế retry tự động tích hợp sẵn của Discord.js và exponential backoff trong `loginWithRetry` (tối đa 10 lần, trì hoãn tăng dần từ 5s đến 30s) đối với các lỗi mạng tạm thời hoặc Discord Gateway ngắt kết nối.
+
+**Lý do chọn:**
+- Riot API kiểm soát rate limit rất nghiêm ngặt ở free tier; việc spam request sẽ dẫn đến lỗi 429 và block API key.
+- Discord API thường gặp sự cố kết nối gián đoạn tạm thời; cơ chế reconnect thông minh giúp bot tự phục hồi mà không cần can thiệp thủ công.
+
+**Hệ quả:**
+- Các lệnh gọi Riot API có độ trễ hàng đợi nhỏ khi có nhiều người dùng gọi lệnh đồng thời; bot tự động phục hồi kết nối mà không bị crash.
+
+

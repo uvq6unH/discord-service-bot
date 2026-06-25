@@ -1,4 +1,5 @@
 node_modules/
+public-react/
 .env
 data/configs.json
 data/state.json

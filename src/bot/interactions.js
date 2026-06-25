@@ -4,7 +4,10 @@ import {
   ButtonStyle,
   ChannelType,
   EmbedBuilder,
-  PermissionFlagsBits
+  PermissionFlagsBits,
+  ModalBuilder,
+  TextInputBuilder,
+  TextInputStyle
 } from 'discord.js';
 import { buildHelpPayload } from './help.js';
 import { handleBlackjackButton, handlePokerButton } from './games.js';
@@ -12,6 +15,10 @@ import { sendTicketLog } from './logging.js';
 
 export async function handleComponentInteraction(interaction, { client, config, stateStore }) {
   if (interaction.isStringSelectMenu()) {
+    if (interaction.customId.startsWith('quiz:')) {
+      const { handleQuizButton } = await import('./lolQuiz.js');
+      return handleQuizButton(interaction);
+    }
     if (!interaction.customId.startsWith('help_select:')) return;
     const targetUserId = interaction.customId.slice('help_select:'.length);
     if (interaction.user.id !== targetUserId) {
@@ -36,6 +43,11 @@ export async function handleComponentInteraction(interaction, { client, config, 
 
   if (interaction.customId.startsWith('vp:')) {
     return handlePokerButton(interaction, { client, config });
+  }
+
+  if (interaction.customId.startsWith('quiz:')) {
+    const { handleQuizButton } = await import('./lolQuiz.js');
+    return handleQuizButton(interaction);
   }
 
   if (interaction.customId === 'ticket:create') {

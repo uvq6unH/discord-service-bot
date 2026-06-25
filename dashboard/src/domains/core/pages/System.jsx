@@ -5,15 +5,17 @@ import DataSlab from '../../../shared/primitives/DataSlab.jsx';
 import { useSystem } from '../hooks/useSystem.js';
 import { useGuild } from '../../../shared/hooks/useGuild.js';
 import { RefreshCw } from 'lucide-react';
+import { useLanguage } from '../../../shared/context/LanguageContext.jsx';
 
 export default function SystemPage() {
   const { config } = useGuild();
   const { status, loading, refetch } = useSystem(10000); // Poll every 10s
+  const { t } = useLanguage();
 
   if (loading || !status) {
     return (
       <div style={{ padding: 'var(--space-10)', textAlign: 'center', fontFamily: 'var(--font-mono)' }}>
-        ESTABLISHING ENGINE CONNECTION TELEMETRY...
+        {t("ESTABLISHING ENGINE CONNECTION TELEMETRY...")}
       </div>
     );
   }
@@ -43,15 +45,15 @@ export default function SystemPage() {
     <Workspace>
       {/* 1. Header Zone */}
       <HeaderZone
-        title="SYSTEM RUNTIME MONITOR"
-        subtitle="Real-time PM2 process load, microservices heartbeats, socket latencies, and transaction queues."
+        title={t("SYSTEM RUNTIME MONITOR")}
+        subtitle={t("Real-time PM2 process load, microservices heartbeats, socket latencies, and transaction queues.")}
         actions={
           <button 
             className="btn btn--secondary" 
             onClick={() => refetch()} 
             style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}
           >
-            <RefreshCw size={12} /> SYNC
+            <RefreshCw size={12} /> {t("SYNC")}
           </button>
         }
       />
@@ -59,23 +61,23 @@ export default function SystemPage() {
       {/* 2. Status Zone */}
       <StatusZone>
         <KpiTile 
-          label="Process Load (CPU)" 
+          label={t("Process Load (CPU)")} 
           value={bot?.cpu != null ? `${bot.cpu.toFixed(1)}%` : '0.0%'} 
           sub="PM2_ENGINE_LOAD"
         />
         <KpiTile 
-          label="Resident Memory" 
+          label={t("Resident Memory")} 
           value={bot?.memory ? getMemString(bot.memory) : '—'} 
           sub="RSS_MEM_USAGE"
         />
         <KpiTile 
-          label="Gateway latency" 
+          label={t("Gateway latency")} 
           value={bot?.ping ? `${bot.ping}ms` : '—'} 
           sub="SHARD_WS_LATENCY"
         />
         <KpiTile 
-          label="Redis DB Status" 
-          value={status.redisConnected ? 'CONNECTED' : 'OFFLINE'} 
+          label={t("Redis DB Status")} 
+          value={status.redisConnected ? t('CONNECTED') : t('OFFLINE')} 
           sub="CACHE_PERSIST_LINK"
         />
       </StatusZone>
@@ -84,25 +86,25 @@ export default function SystemPage() {
       <div className="grid-12">
         {/* Discord Bot Engine telemetry */}
         <div className="col-span-6">
-          <Panel title="DISCORD PROCESS BLUEPRINT [PM2_BOT]" accent={botOnline}>
+          <Panel title={t("DISCORD PROCESS BLUEPRINT [PM2_BOT]")} accent={botOnline}>
             <DataSlab 
-              label="Bot Session Status" 
-              value={botOnline ? 'ACTIVE // RUNNING' : 'OFFLINE // TERMINATED'} 
+              label={t("Bot Session Status")} 
+              value={botOnline ? t('ACTIVE // RUNNING') : t('OFFLINE // TERMINATED')} 
               sub="STATUS_CODE"
               highlight={botOnline}
             />
             <DataSlab 
-              label="Process Uptime" 
+              label={t("Process Uptime")} 
               value={bot?.uptime ? fmtUptime(bot.uptime) : '—'} 
               sub="ACTIVE_PROCESS_UPTIME"
             />
             <DataSlab 
-              label="Command Load (Today)" 
+              label={t("Command Load (Today)")} 
               value={`${stats?.commandsToday ?? 0} EXEC`} 
               sub="DISPATCHED_SIGNALS"
             />
             <DataSlab 
-              label="Task Scheduler Queue" 
+              label={t("Task Scheduler Queue")} 
               value={`${stats?.slashQueueLength ?? 0} JOBS`} 
               sub="REMAINING_BUFFER_JOBS"
             />
@@ -111,26 +113,26 @@ export default function SystemPage() {
 
         {/* Dashboard node server details */}
         <div className="col-span-6">
-          <Panel title="WEB INTERFACE PROCESS [PM2_DASH]" accent>
+          <Panel title={t("WEB INTERFACE PROCESS [PM2_DASH]")} accent>
             <DataSlab 
-              label="Node Server Uptime" 
+              label={t("Node Server Uptime")} 
               value={dash?.uptime ? fmtUptime(dash.uptime) : '—'} 
               sub="SERVER_UPTIME_COUNTER"
               highlight
             />
             <DataSlab 
-              label="Node Memory (RSS)" 
+              label={t("Node Memory (RSS)")} 
               value={dash?.memory ? getMemString(dash.memory) : '—'} 
               sub="MEM_RAM_ALLOCATION"
             />
             <DataSlab 
-              label="Node CPU load" 
+              label={t("Node CPU load")} 
               value={dash?.cpu != null ? `${dash.cpu.toFixed(1)}%` : '0.0%'} 
               sub="CPU_PROCESS_LOAD"
             />
             <DataSlab 
-              label="Redis Cache Link" 
-              value={status.redisConnected ? 'NOMINAL' : 'LINK_FAILURE'} 
+              label={t("Redis Cache Link")} 
+              value={status.redisConnected ? t('NOMINAL') : t('LINK_FAILURE')} 
               sub="REDIS_UPSTASH_STATUS"
             />
           </Panel>
@@ -138,24 +140,24 @@ export default function SystemPage() {
 
         {/* External integrations telemetry */}
         <div className="col-span-12">
-          <Panel title="INTEGRATIONS & ADAPTERS HEALTH">
+          <Panel title={t("INTEGRATIONS & ADAPTERS HEALTH")}>
             <div className="grid-12" style={{ gap: 'var(--space-3)' }}>
               <div className="col-span-4" style={{ border: '1px solid var(--border)', padding: 'var(--space-4)' }}>
-                <span style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--text-3)' }}>RIOT API CONNECTIVITY</span>
+                <span style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--text-3)' }}>{t("RIOT API CONNECTIVITY")}</span>
                 <div style={{ fontSize: '14px', fontWeight: 'bold', marginTop: 'var(--space-2)', color: config?.riotApiKeyConfigured ? 'var(--green)' : 'var(--text-3)' }}>
-                  {config?.riotApiKeyConfigured ? '>>> KEY_NOMINAL' : '>>> NO_KEY_PROVIDED'}
+                  &gt;&gt;&gt; {t(config?.riotApiKeyConfigured ? 'KEY_NOMINAL' : 'NO_KEY_PROVIDED')}
                 </div>
               </div>
               <div className="col-span-4" style={{ border: '1px solid var(--border)', padding: 'var(--space-4)' }}>
-                <span style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--text-3)' }}>TFT CONFIG STATUS</span>
+                <span style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--text-3)' }}>{t("TFT CONFIG STATUS")}</span>
                 <div style={{ fontSize: '14px', fontWeight: 'bold', marginTop: 'var(--space-2)', color: config?.tftApiKeyConfigured ? 'var(--green)' : 'var(--text-3)' }}>
-                  {config?.tftApiKeyConfigured ? '>>> KEY_NOMINAL' : '>>> NO_KEY_PROVIDED'}
+                  &gt;&gt;&gt; {t(config?.tftApiKeyConfigured ? 'KEY_NOMINAL' : 'NO_KEY_PROVIDED')}
                 </div>
               </div>
               <div className="col-span-4" style={{ border: '1px solid var(--border)', padding: 'var(--space-4)' }}>
-                <span style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--text-3)' }}>LAVALINK NODES ONLINE</span>
+                <span style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--text-3)' }}>{t("LAVALINK NODES ONLINE")}</span>
                 <div style={{ fontSize: '14px', fontWeight: 'bold', marginTop: 'var(--space-2)', color: config?.musicEnabled ? 'var(--yellow)' : 'var(--text-3)' }}>
-                  {config?.musicEnabled ? '>>> MODULE_STANDBY' : '>>> MODULE_DISABLED'}
+                  &gt;&gt;&gt; {t(config?.musicEnabled ? 'MODULE_STANDBY' : 'MODULE_DISABLED')}
                 </div>
               </div>
             </div>

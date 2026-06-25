@@ -4,6 +4,7 @@ import Panel from '../../../shared/primitives/Panel.jsx';
 import { useGuild } from '../hooks/useGuild.js';
 import { useMembers } from '../hooks/useMembers.js';
 import { Search } from 'lucide-react';
+import { useLanguage } from '../../../shared/context/LanguageContext.jsx';
 
 function getDefaultAvatarIndex(id) {
   try {
@@ -25,40 +26,41 @@ export default function MembersPage() {
     search,
     handleSearch
   } = useMembers(selectedGuild?.id);
+  const { t } = useLanguage();
 
   return (
     <Workspace>
       {/* 1. Header Zone */}
       <HeaderZone
-        title="MEMBERS REGISTRY"
-        subtitle="Operational directory of all registered server member accounts."
+        title={t("MEMBERS REGISTRY")}
+        subtitle={t("Operational directory of all registered server member accounts.")}
       />
 
       {/* 2. Status Zone */}
       <StatusZone>
         <KpiTile 
-          label="Total Guild Accounts" 
+          label={t("Total Guild Accounts")} 
           value={total} 
-          sub="DB_MEMBER_COUNT"
+          sub={t("DB_MEMBER_COUNT")}
         />
         <KpiTile 
-          label="Active Session Page" 
+          label={t("Active Session Page")} 
           value={`${page} / ${Math.max(pageCount, 1)}`} 
-          sub="REGISTRY_PAGINATION"
+          sub={t("REGISTRY_PAGINATION")}
         />
       </StatusZone>
 
       {/* 3. Workspace Zone */}
       <div className="grid-12">
         <div className="col-span-12">
-          <Panel title="REGISTRY DATABASE SEARCH" accent>
+          <Panel title={t("REGISTRY DATABASE SEARCH")} accent>
             {/* Search Input Box */}
             <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', border: '1px solid var(--border)', padding: 'var(--space-2-5) var(--space-3-5)', backgroundColor: 'var(--surface-1)' }}>
               <Search size={16} style={{ color: 'var(--text-3)' }} />
               <input
                 className="form-input"
                 style={{ border: 'none', background: 'transparent', padding: 0 }}
-                placeholder="Query member handle or ID..."
+                placeholder={t("Query member handle or ID...")}
                 value={search}
                 onChange={e => handleSearch(e.target.value)}
               />
@@ -67,7 +69,7 @@ export default function MembersPage() {
             {/* Members List Table */}
             {loading ? (
               <div style={{ padding: 'var(--space-10)', textAlign: 'center', fontFamily: 'var(--font-mono)', fontSize: '12px', color: 'var(--text-3)' }}>
-                QUERYING DATABASE RECORD SETS...
+                {t("QUERYING DATABASE RECORD SETS...")}
               </div>
             ) : (
               <div style={{ border: '1px solid var(--border)', display: 'flex', flexDirection: 'column' }}>
@@ -83,10 +85,10 @@ export default function MembersPage() {
                   fontWeight: 'bold',
                   color: 'var(--text-3)'
                 }}>
-                  <span>AVATAR</span>
-                  <span>DISPLAY NAME</span>
-                  <span>USER HANDLE</span>
-                  <span style={{ textAlign: 'right' }}>TIMESTAMP JOINED</span>
+                  <span>{t("AVATAR")}</span>
+                  <span>{t("DISPLAY NAME")}</span>
+                  <span>{t("USER HANDLE")}</span>
+                  <span style={{ textAlign: 'right' }}>{t("TIMESTAMP JOINED")}</span>
                 </div>
 
                 {/* Table Rows */}
@@ -124,7 +126,7 @@ export default function MembersPage() {
 
                 {members.length === 0 && (
                   <div style={{ padding: 'var(--space-6)', textAlign: 'center', fontFamily: 'var(--font-mono)', fontSize: '12px', color: 'var(--text-3)' }}>
-                    NO DATA MATCHED THE RECORD QUERY.
+                    {t("NO DATA MATCHED THE RECORD QUERY.")}
                   </div>
                 )}
               </div>
@@ -141,7 +143,7 @@ export default function MembersPage() {
                   &lt; prev
                 </button>
                 <span style={{ fontFamily: 'var(--font-mono)', fontSize: '12px' }}>
-                  PAGE {page} OF {pageCount}
+                  {t("PAGE {page} OF {pageCount}").replace("{page}", page).replace("{pageCount}", pageCount)}
                 </span>
                 <button
                   className="btn btn--secondary"

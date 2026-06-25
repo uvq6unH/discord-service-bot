@@ -7,6 +7,7 @@ import App from './App.jsx';
 import Login from './domains/core/pages/Login.jsx';
 import { AuthProvider } from './app/providers/AuthProvider.jsx';
 import { GuildProvider } from './app/providers/GuildProvider.jsx';
+import { LanguageProvider } from './shared/context/LanguageContext.jsx';
 import './design/index.css';
 
 import { getQueryClient } from './app/services/queryClient.js';
@@ -16,7 +17,8 @@ const queryClient = getQueryClient();
 createRoot(document.getElementById('root')).render(
   <React.StrictMode>
     <QueryClientProvider client={queryClient}>
-      <BrowserRouter>
+      <LanguageProvider>
+        <BrowserRouter>
         <Routes>
           <Route path="/login" element={<Login />} />
           <Route path="/*" element={
@@ -39,6 +41,7 @@ createRoot(document.getElementById('root')).render(
           },
         }}
       />
+      </LanguageProvider>
     </QueryClientProvider>
   </React.StrictMode>
 );

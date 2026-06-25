@@ -811,6 +811,86 @@ export class StateStore {
     return guild.tftAccounts?.[userId] ?? null;
   }
 
+  // ── Quiz Daily tracking ──────────────────────────────────────────────────────
+  async hasPlayedDailyQuiz(userId, mode, dayKey) {
+    const key = `quiz:daily:${userId}:${mode}:${dayKey}`;
+    if (this._useRedis) {
+      return (await this._redis.get(key)) === 'true';
+    }
+    const state = await readJsonFile(this._filePath) || {};
+    return state[`quiz_daily_${userId}_${mode}_${dayKey}`] === true;
+  }
+
+  async setPlayedDailyQuiz(userId, mode, dayKey) {
+    const key = `quiz:daily:${userId}:${mode}:${dayKey}`;
+    if (this._useRedis) {
+      await this._redis.set(key, 'true', 'EX', 36 * 60 * 60); // 36 hours TTL
+      return;
+    }
+    const state = await readJsonFile(this._filePath) || {};
+    state[`quiz_daily_${userId}_${mode}_${dayKey}`] = true;
+    fs.writeFileSync(this._filePath, JSON.stringify(state, null, 2), 'utf8');
+  }
+
+  // ── Quiz Leaderboard & Scoring ───────────────────────────────────────────────
+  async getQuizPoints(guildId, userId) {
+    const key = `quiz:points:${guildId}:${userId}`;
+    if (this._useRedis) {
+      const val = await this._redis.get(key);
+      return val ? parseInt(val, 10) : 0;
+    }
+    const state = await readJsonFile(this._filePath) || {};
+    return state[`quiz_points_${guildId}_${userId}`] || 0;
+  }
+
+  async adjustQuizPoints(guildId, userId, amount) {
+    const key = `quiz:points:${guildId}:${userId}`;
+    const memberIndexKey = `guild:${guildId}:quiz:_members`;
+    if (this._useRedis) {
+      const current = await this.getQuizPoints(guildId, userId);
+      const newVal = Math.max(0, current + amount);
+      await this._redis.pipeline([
+        ['SADD', 'guild:index', guildId],
+        ['SADD', memberIndexKey, userId],
+        ['SET', key, String(newVal)]
+      ]);
+      return newVal;
+    }
+    const state = await readJsonFile(this._filePath) || {};
+    const current = state[`quiz_points_${guildId}_${userId}`] || 0;
+    const newVal = Math.max(0, current + amount);
+    state[`quiz_points_${guildId}_${userId}`] = newVal;
+    state[`guild_quiz_members_${guildId}`] ??= [];
+    if (!state[`guild_quiz_members_${guildId}`].includes(userId)) {
+      state[`guild_quiz_members_${guildId}`].push(userId);
+    }
+    fs.writeFileSync(this._filePath, JSON.stringify(state, null, 2), 'utf8');
+    return newVal;
+  }
+
+  async getQuizLeaderboard(guildId, limit = 10) {
+    if (!this._useRedis) {
+      const state = await readJsonFile(this._filePath) || {};
+      const memberIds = state[`guild_quiz_members_${guildId}`] || [];
+      const entries = [];
+      for (const userId of memberIds) {
+        const points = state[`quiz_points_${guildId}_${userId}`] || 0;
+        entries.push({ userId, points });
+      }
+      return entries.sort((a, b) => b.points - a.points).slice(0, limit);
+    }
+
+    const memberIndexKey = `guild:${guildId}:quiz:_members`;
+    const memberIds = (await this._redis.smembers(memberIndexKey)) ?? [];
+    const entries = await Promise.all(
+      memberIds.map(async (userId) => {
+        const points = await this.getQuizPoints(guildId, userId);
+        return { userId, points };
+      })
+    );
+    return entries.sort((a, b) => b.points - a.points).slice(0, limit);
+  }
+
 }
 // getGuild() đã bị xoá (deprecated từ v1.3, không còn caller nào).
 // Dùng các method cụ thể: getEconomyUser, getLevels, getWarnings, ...

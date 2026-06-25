@@ -4,6 +4,7 @@
 // Requires lavalink.js to have been initialised (initLavalink called in bot.js).
 
 import { EmbedBuilder } from 'discord.js';
+import { memberCanUseCommand } from '../../../commandAccess.js';
 import {
   getLavalinkManager,
   buildLavalinkQuery,
@@ -41,8 +42,38 @@ export async function handleMusicCommand({ message, subcommand, args, config }) 
     return message.reply('⚠️ Hệ thống nhạc chưa sẵn sàng — Lavalink đang kết nối, thử lại sau vài giây.');
   }
 
+  const musicCommands = config.music?.commands ?? [];
+  const cmd = musicCommands.find(c => {
+    // Check custom name
+    if (c.name === subcommand) return true;
+    // Check default aliases/names
+    if (c.type === 'musicplay' && (subcommand === 'play' || subcommand === 'p')) return true;
+    if (c.type === 'musicskip' && (subcommand === 'skip' || subcommand === 's')) return true;
+    if (c.type === 'musicstop' && subcommand === 'stop') return true;
+    if (c.type === 'musicpause' && subcommand === 'pause') return true;
+    if (c.type === 'musicresume' && (subcommand === 'resume' || subcommand === 'r')) return true;
+    if (c.type === 'musicloop' && (subcommand === 'loop' || subcommand === 'l')) return true;
+    if (c.type === 'musicqueue' && (subcommand === 'queue' || subcommand === 'q')) return true;
+    if (c.type === 'musicnp' && (subcommand === 'np' || subcommand === 'nowplaying')) return true;
+    if (c.type === 'musicvolume' && (subcommand === 'volume' || subcommand === 'vol')) return true;
+    return false;
+  });
+
+  if (cmd) {
+    if (!cmd.enabled) {
+      return message.reply('❌ Lệnh này đã bị vô hiệu hóa.');
+    }
+    if (!memberCanUseCommand(message.member, cmd)) {
+      return message.reply('❌ Bạn không có quyền sử dụng lệnh này.');
+    }
+  } else {
+    if (subcommand && subcommand !== 'help') {
+      return message.reply(`❌ Lệnh không hợp lệ. Gõ \`${musicPrefix}\` hoặc \`${musicPrefix} help\` để xem hướng dẫn.`);
+    }
+  }
+
   // ── play / p ──────────────────────────────────────────────────────────────
-  if (subcommand === 'play' || subcommand === 'p') {
+  if (cmd?.type === 'musicplay') {
     const input = args.trim();
     if (!input) {
       return message.reply(
@@ -92,19 +123,38 @@ export async function handleMusicCommand({ message, subcommand, args, config }) 
       // Resolve query — URL first, then ytsearch, fallback scsearch
       const { query, isUrl, searchTerm } = buildLavalinkQuery(input);
 
-      let res = await player.search({ query }, message.author);
+      let res;
+      let ytFallbackNeeded = false;
 
-      // YouTube search returned no results or is blocked → fallback SoundCloud
-      if (
-        !isUrl &&
-        (res.loadType === 'empty' || res.loadType === 'error' || !res.tracks?.length)
-      ) {
-        console.warn(`[music] ytsearch failed for "${searchTerm}" — trying scsearch`);
-        res = await player.search({ query: `scsearch:${searchTerm}` }, message.author);
+      try {
+        res = await player.search({ query }, message.author);
+        if (
+          !isUrl &&
+          (res.loadType === 'empty' || res.loadType === 'error' || !res.tracks?.length)
+        ) {
+          ytFallbackNeeded = true;
+        }
+      } catch (err) {
+        if (!isUrl) {
+          console.warn(`[music] ytsearch failed or timed out for "${searchTerm}":`, err.message || err);
+          ytFallbackNeeded = true;
+        } else {
+          throw err;
+        }
       }
 
-      if (res.loadType === 'error') {
-        throw new Error(res.exception?.message ?? 'Lavalink search error');
+      if (ytFallbackNeeded) {
+        console.log(`[music] Trying SoundCloud search fallback for "${searchTerm}"...`);
+        try {
+          res = await player.search({ query: `scsearch:${searchTerm}` }, message.author);
+        } catch (scErr) {
+          console.error(`[music] scsearch also failed for "${searchTerm}":`, scErr.message || scErr);
+          throw new Error('Hết thời gian tìm kiếm trên cả YouTube và SoundCloud. Vui lòng thử lại sau.');
+        }
+      }
+
+      if (!res || res.loadType === 'error') {
+        throw new Error(res?.exception?.message ?? 'Lavalink search error');
       }
       if (res.loadType === 'empty' || !res.tracks?.length) {
         throw new Error('Không tìm thấy bài nhạc nào.');
@@ -173,21 +223,21 @@ export async function handleMusicCommand({ message, subcommand, args, config }) 
   const player = manager.getPlayer(guildId);
 
   // ── skip / s ──────────────────────────────────────────────────────────────
-  if (subcommand === 'skip' || subcommand === 's') {
+  if (cmd?.type === 'musicskip') {
     if (!player?.playing) return message.reply('❌ Không có bài nhạc nào đang phát!');
     await player.skip();
     return message.reply('⏭️ Đã bỏ qua bài hiện tại.');
   }
 
   // ── stop ──────────────────────────────────────────────────────────────────
-  if (subcommand === 'stop') {
+  if (cmd?.type === 'musicstop') {
     if (!player) return message.reply('❌ Bot đang không phát nhạc!');
     await player.destroy();
     return message.reply('⏹️ Đã dừng phát nhạc và rời Voice Channel.');
   }
 
   // ── pause ─────────────────────────────────────────────────────────────────
-  if (subcommand === 'pause') {
+  if (cmd?.type === 'musicpause') {
     if (!player?.playing) return message.reply('❌ Không có bài nhạc nào đang phát!');
     if (player.paused)    return message.reply('⏸️ Đã tạm dừng rồi.');
     await player.pause(true);
@@ -195,7 +245,7 @@ export async function handleMusicCommand({ message, subcommand, args, config }) 
   }
 
   // ── resume / r ────────────────────────────────────────────────────────────
-  if (subcommand === 'resume' || subcommand === 'r') {
+  if (cmd?.type === 'musicresume') {
     if (!player)          return message.reply('❌ Không có hàng nhạc nào!');
     if (!player.paused)   return message.reply('▶️ Đang phát rồi!');
     await player.pause(false);
@@ -203,7 +253,7 @@ export async function handleMusicCommand({ message, subcommand, args, config }) 
   }
 
   // ── loop / l ──────────────────────────────────────────────────────────────
-  if (subcommand === 'loop' || subcommand === 'l') {
+  if (cmd?.type === 'musicloop') {
     if (!player) return message.reply('❌ Không có hàng nhạc nào!');
     // Cycle: off → track → queue → off
     const modes = ['off', 'track', 'queue'];
@@ -215,7 +265,7 @@ export async function handleMusicCommand({ message, subcommand, args, config }) 
   }
 
   // ── queue / q ─────────────────────────────────────────────────────────────
-  if (subcommand === 'queue' || subcommand === 'q') {
+  if (cmd?.type === 'musicqueue') {
     const current  = player?.queue?.current;
     const upcoming = player?.queue?.tracks ?? [];
 
@@ -247,7 +297,7 @@ export async function handleMusicCommand({ message, subcommand, args, config }) 
   }
 
   // ── np / nowplaying ───────────────────────────────────────────────────────
-  if (subcommand === 'np' || subcommand === 'nowplaying') {
+  if (cmd?.type === 'musicnp') {
     const current = player?.queue?.current;
     if (!current) return message.reply('❌ Không có bài nhạc nào đang phát!');
 
@@ -274,7 +324,7 @@ export async function handleMusicCommand({ message, subcommand, args, config }) 
   }
 
   // ── volume / vol ──────────────────────────────────────────────────────────
-  if (subcommand === 'volume' || subcommand === 'vol') {
+  if (cmd?.type === 'musicvolume') {
     const vol = parseInt(args, 10);
     if (isNaN(vol) || vol < 0 || vol > 200) return message.reply('❌ Volume phải từ **0–200**');
     if (!player) return message.reply('❌ Không có hàng nhạc nào!');
@@ -283,6 +333,16 @@ export async function handleMusicCommand({ message, subcommand, args, config }) 
   }
 
   // ── help (fallback) ───────────────────────────────────────────────────────
+  const playCmd   = musicCommands.find(c => c.type === 'musicplay');
+  const skipCmd   = musicCommands.find(c => c.type === 'musicskip');
+  const stopCmd   = musicCommands.find(c => c.type === 'musicstop');
+  const pauseCmd  = musicCommands.find(c => c.type === 'musicpause');
+  const resumeCmd = musicCommands.find(c => c.type === 'musicresume');
+  const loopCmd   = musicCommands.find(c => c.type === 'musicloop');
+  const queueCmd  = musicCommands.find(c => c.type === 'musicqueue');
+  const npCmd     = musicCommands.find(c => c.type === 'musicnp');
+  const volumeCmd = musicCommands.find(c => c.type === 'musicvolume');
+
   const p = musicPrefix;
   const embed = new EmbedBuilder()
     .setColor(0x5865F2)
@@ -293,14 +353,14 @@ export async function handleMusicCommand({ message, subcommand, args, config }) 
       `\\* *Lấy metadata Spotify/Apple → phát audio YouTube*`
     )
     .addFields(
-      { name: `\`${p} play <link hoặc tên>\``, value: 'Phát nhạc — YT / SC / Spotify / URL' },
-      { name: `\`${p} skip\` / \`${p} s\``,    value: 'Bỏ qua bài hiện tại' },
-      { name: `\`${p} stop\``,                  value: 'Dừng phát và rời Voice Channel' },
-      { name: `\`${p} pause\` / \`${p} resume\``, value: 'Tạm dừng / tiếp tục phát' },
-      { name: `\`${p} queue\` / \`${p} q\``,   value: 'Xem danh sách hàng nhạc' },
-      { name: `\`${p} np\``,                    value: 'Xem bài đang phát (+ progress bar)' },
-      { name: `\`${p} loop\``,                  value: 'Cycle: TẮT → Lặp bài → Lặp hàng' },
-      { name: `\`${p} volume <0–200>\``,        value: 'Điều chỉnh âm lượng (mặc định 80%)' }
+      { name: `\`${p} ${playCmd?.name || 'play'} <link hoặc tên>\``, value: playCmd?.description || 'Phát nhạc — YT / SC / Spotify / URL' },
+      { name: `\`${p} ${skipCmd?.name || 'skip'}\` / \`${p} s\``,    value: skipCmd?.description || 'Bỏ qua bài hiện tại' },
+      { name: `\`${p} ${stopCmd?.name || 'stop'}\``,                  value: stopCmd?.description || 'Dừng phát và rời Voice Channel' },
+      { name: `\`${p} ${pauseCmd?.name || 'pause'}\` / \`${p} ${resumeCmd?.name || 'resume'}\``, value: 'Tạm dừng / tiếp tục phát' },
+      { name: `\`${p} ${queueCmd?.name || 'queue'}\` / \`${p} q\``,   value: queueCmd?.description || 'Xem danh sách hàng nhạc' },
+      { name: `\`${p} ${npCmd?.name || 'np'}\``,                    value: npCmd?.description || 'Xem bài đang phát (+ progress bar)' },
+      { name: `\`${p} ${loopCmd?.name || 'loop'}\``,                  value: loopCmd?.description || 'Cycle: TẮT → Lặp bài → Lặp hàng' },
+      { name: `\`${p} ${volumeCmd?.name || 'volume'} <0–200>\``,        value: volumeCmd?.description || 'Điều chỉnh âm lượng (mặc định 80%)' }
     );
 
   return message.reply({ embeds: [embed] });

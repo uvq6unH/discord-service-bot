@@ -69,26 +69,28 @@ export async function initLavalink(client) {
     },
   });
 
-  // ── Node events ────────────────────────────────────────────────────────────
+  // ── Node events on NodeManager ─────────────────────────────────────────────
 
-  _manager.on('nodeConnect', (node) => {
+  _manager.nodeManager.on('connect', (node) => {
     console.log(`[lavalink] ✅ Node "${node.id}" connected → ${node.options.host}:${node.options.port}`);
   });
 
-  _manager.on('nodeDisconnect', (node, reason) => {
+  _manager.nodeManager.on('disconnect', (node, reason) => {
     console.warn(`[lavalink] ⚠️ Node "${node.id}" disconnected — code ${reason?.code ?? '?'} | will retry every 10 s`);
   });
 
-  _manager.on('nodeError', (node, error) => {
+  _manager.nodeManager.on('error', (node, error) => {
+    // lavalink-client v2 sometimes emits weird function objects as errors — ignore or handle safely
+    if (error == null || typeof error === 'function' || typeof error?.message === 'function') return;
     // Log but DO NOT rethrow — prevents unhandled rejection from killing the process
     console.error(`[lavalink] ❌ Node "${node.id}" error: ${error?.message ?? error}`);
   });
 
-  _manager.on('nodeReconnecting', (node) => {
+  _manager.nodeManager.on('reconnecting', (node) => {
     console.log(`[lavalink] 🔄 Node "${node.id}" reconnecting…`);
   });
 
-  _manager.on('nodeDestroy', (node, destroyReason) => {
+  _manager.nodeManager.on('destroy', (node, destroyReason) => {
     console.warn(`[lavalink] 💀 Node "${node.id}" destroyed — reason: ${destroyReason ?? 'unknown'}`);
   });
 
@@ -147,21 +149,6 @@ export async function initLavalink(client) {
     console.error('[lavalink] Initial node connection failed (will retry):', err?.message ?? err);
   }
 
-  // ── Patch NodeManager emitter — nguồn gốc crash ERR_UNHANDLED_ERROR ────────
-  // lavalink-client v2 emit 'error' lên nodeManager (EventEmitter nội bộ).
-  // Nếu nodeManager không có listener 'error', Node.js throw và kill process.
-  // Phải patch SAU khi _manager.init() vì nodeManager chỉ tồn tại sau đó.
-  try {
-    const nm = _manager.nodeManager;
-    if (nm && typeof nm.on === 'function' && nm.listenerCount('error') === 0) {
-      nm.on('error', (err) => {
-        // lavalink-client v2 đôi khi emit object có .message là AsyncFunction khi reconnect — bỏ qua
-        if (err == null || typeof err === 'function' || typeof err?.message === 'function') return;
-        console.error('[lavalink] nodeManager error (caught):', err?.message ?? err);
-      });
-    }
-  } catch (_) { }
-
   return _manager;
 }
 
@@ -181,7 +168,7 @@ export function getLavalinkManager() {
  */
 export function forwardVoiceEvent(packet, shardId) {
   if (_manager && (packet.t === 'VOICE_STATE_UPDATE' || packet.t === 'VOICE_SERVER_UPDATE')) {
-    _manager.sendRawData(packet.d, shardId).catch(() => null);
+    _manager.sendRawData(packet).catch(() => null);
   }
 }
 

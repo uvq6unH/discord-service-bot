@@ -80,6 +80,28 @@ async function reminderTick(discordClient, configStore) {
         const time = new Date(reminder.time);
         if (!isNaN(time) && time <= now) {
           modified = true;
+
+          // Skip reminders that are too stale (e.g. bot was restarted after the reminder time)
+          const staleMs = now.getTime() - time.getTime();
+          const STALE_THRESHOLD_MS = 2 * 60 * 1000; // 2 minutes
+
+          if (staleMs > STALE_THRESHOLD_MS) {
+            // Stale reminder — don't fire the message
+            const repeat = reminder.repeat ?? 'none';
+            const ms = REPEAT_INTERVALS_MS[repeat];
+            if (ms) {
+              // Recurring: reschedule to next future slot without firing
+              let nextTime = time.getTime() + ms;
+              while (nextTime <= now.getTime()) nextTime += ms;
+              nextReminders.push({ ...reminder, time: new Date(nextTime).toISOString() });
+              console.log(`[reminder] Skipped stale recurring reminder ${reminder.id} (was ${Math.round(staleMs / 60000)}m late), rescheduled to ${new Date(nextTime).toISOString()}`);
+            } else {
+              // One-shot: silently discard
+              console.log(`[reminder] Discarded stale one-shot reminder ${reminder.id} (was ${Math.round(staleMs / 60000)}m late)`);
+            }
+            continue;
+          }
+
           const guild = await discordClient.guilds.fetch(guildId).catch(() => null);
           const updated = guild ? await processOneReminder(reminder, guild) : null;
           if (updated) nextReminders.push(updated);
