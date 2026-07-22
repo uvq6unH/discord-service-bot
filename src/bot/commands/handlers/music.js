@@ -241,9 +241,13 @@ export async function handleMusicCommand({ message, subcommand, args, config }) 
 
   // ── pause ─────────────────────────────────────────────────────────────────
   if (cmd?.type === 'musicpause') {
-    if (!player?.playing) return message.reply('❌ Không có bài nhạc nào đang phát!');
+    if (!player)          return message.reply('❌ Không có bài nhạc nào đang phát!');
     if (player.paused)    return message.reply('⏸️ Đã tạm dừng rồi.');
-    await player.pause(true);
+    if (typeof player.pause === 'function') {
+      await player.pause();
+    } else {
+      await player.pause(true);
+    }
     return message.reply('⏸️ Đã tạm dừng.');
   }
 
@@ -251,7 +255,11 @@ export async function handleMusicCommand({ message, subcommand, args, config }) 
   if (cmd?.type === 'musicresume') {
     if (!player)          return message.reply('❌ Không có hàng nhạc nào!');
     if (!player.paused)   return message.reply('▶️ Đang phát rồi!');
-    await player.pause(false);
+    if (typeof player.resume === 'function') {
+      await player.resume();
+    } else {
+      await player.pause(false);
+    }
     return message.reply('▶️ Đã tiếp tục phát.');
   }
 

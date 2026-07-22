@@ -83,9 +83,21 @@ export async function handleComponentInteraction(interaction, { client, config, 
     const action = interaction.customId.replace('music:control:', '');
     try {
       if (action === 'pause_resume') {
-        const nextState = !player.paused;
-        await player.pause(nextState);
-        await interaction.reply({ content: nextState ? '⏸️ Đã tạm dừng phát nhạc.' : '▶️ Đã tiếp tục phát nhạc.', ephemeral: true });
+        if (player.paused) {
+          if (typeof player.resume === 'function') {
+            await player.resume();
+          } else {
+            await player.pause(false);
+          }
+          await interaction.reply({ content: '▶️ Đã tiếp tục phát nhạc.', ephemeral: true });
+        } else {
+          if (typeof player.pause === 'function') {
+            await player.pause();
+          } else {
+            await player.pause(true);
+          }
+          await interaction.reply({ content: '⏸️ Đã tạm dừng phát nhạc.', ephemeral: true });
+        }
         if (interaction.message?.editable) {
           await interaction.message.edit({ components: [buildMusicControlRow(player)] }).catch(() => null);
         }
