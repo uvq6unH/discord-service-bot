@@ -53,19 +53,19 @@ function buildNodeConfigs() {
   nodes.push({
     id: 'public-darren',
     host: 'lavalink.darrennathanael.com',
-    port: 80,
+    port: 443,
     authorization: 'LL.darrennathanael.com',
-    secure: false,
+    secure: true,
     retryAmount: 5,
     retryDelay: 10_000,
   });
 
   nodes.push({
-    id: 'public-ajie',
-    host: 'lava-v4.ajieconz.com',
-    port: 443,
-    authorization: 'https://discord.gg/ajieconz',
-    secure: true,
+    id: 'public-jirayu',
+    host: 'lavalink.jirayu.net',
+    port: 13592,
+    authorization: 'youshallnotpass',
+    secure: false,
     retryAmount: 5,
     retryDelay: 10_000,
   });
