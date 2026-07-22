@@ -17,12 +17,13 @@ import {
 
 function trackEmbed(track, title, color, extra = {}) {
   const info = track.info;
+  const durationMs = info.duration ?? info.length ?? track.duration;
   const embed = new EmbedBuilder()
     .setColor(color)
     .setTitle(title)
     .setDescription(`**[${info.title}](${info.uri})**`)
     .addFields(
-      { name: 'Duration',      value: info.isStream ? '🔴 Live' : fmt(info.length), inline: true },
+      { name: 'Duration',      value: info.isStream ? '🔴 Live' : fmt(durationMs), inline: true },
       { name: 'Source',        value: sourceLabel(track), inline: true },
       { name: 'Requested by',  value: `<@${track.requester?.id ?? info.requester ?? '?'}>`, inline: true }
     );
@@ -314,7 +315,7 @@ export async function handleMusicCommand({ message, subcommand, args, config }) 
 
     const info     = current.info;
     const pos      = player.position ?? 0;
-    const len      = info.length ?? 0;
+    const len      = info.duration ?? info.length ?? current.duration ?? 0;
     const barLen   = 20;
     const filled   = len > 0 ? Math.round((pos / len) * barLen) : 0;
     const bar      = '█'.repeat(filled) + '░'.repeat(barLen - filled);
@@ -325,7 +326,7 @@ export async function handleMusicCommand({ message, subcommand, args, config }) 
       .setTitle('🎵 Now Playing')
       .setDescription(`**[${info.title}](${info.uri})**\n${progress}`)
       .addFields(
-        { name: 'Duration',     value: info.isStream ? '🔴 Live' : fmt(info.length), inline: true },
+        { name: 'Duration',     value: info.isStream ? '🔴 Live' : fmt(len), inline: true },
         { name: 'Source',       value: sourceLabel(current), inline: true },
         { name: 'Requested by', value: `<@${current.requester?.id ?? '?'}>`, inline: true }
       );

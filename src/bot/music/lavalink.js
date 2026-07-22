@@ -238,11 +238,22 @@ export function sourceLabel(track) {
   return '🎵';
 }
 
-export function fmt(ms) {
-  if (!ms || isNaN(ms)) return '?:??';
-  const total = Math.floor(ms / 1000);
-  const m = Math.floor(total / 60);
+export function fmt(msOrTrack) {
+  let ms = msOrTrack;
+  if (typeof msOrTrack === 'object' && msOrTrack !== null) {
+    const info = msOrTrack.info ?? msOrTrack;
+    ms = info.duration ?? info.length ?? msOrTrack.duration ?? 0;
+  }
+  const num = Number(ms);
+  if (!num || isNaN(num) || num <= 0) return '?:??';
+  const total = Math.floor(num / 1000);
+  const h = Math.floor(total / 3600);
+  const m = Math.floor((total % 3600) / 60);
   const s = total % 60;
+
+  if (h > 0) {
+    return `${h}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+  }
   return `${m}:${s.toString().padStart(2, '0')}`;
 }
 
