@@ -62,3 +62,9 @@ for (const lang of Object.values(SUPPORTED_LANGUAGES)) {
     ALIAS_MAP[alias.toLowerCase()] = lang.code;
   }
 }
+
+export function normalizeLanguageCode(input) {
+  if (!input) return null;
+  const key = String(input).trim().toLowerCase();
+  return ALIAS_MAP[key] ?? null;
+}

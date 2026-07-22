@@ -67,6 +67,53 @@ export async function handleComponentInteraction(interaction, { client, config, 
     return handleDuolingoButton(interaction);
   }
 
+  if (interaction.customId.startsWith('music:control:')) {
+    const { getLavalinkManager, buildMusicControlRow } = await import('./music/lavalink.js');
+    const manager = getLavalinkManager();
+    const player = manager?.getPlayer(interaction.guildId);
+
+    if (!player) {
+      return interaction.reply({ content: '❌ Không có trình phát nhạc nào đang chạy.', ephemeral: true });
+    }
+    const voiceChannel = interaction.member?.voice?.channel;
+    if (!voiceChannel || voiceChannel.id !== player.voiceChannelId) {
+      return interaction.reply({ content: '❌ Bạn cần ở trong cùng **Voice Channel** với Bot để điều khiển nhạc!', ephemeral: true });
+    }
+
+    const action = interaction.customId.replace('music:control:', '');
+    try {
+      if (action === 'pause_resume') {
+        const nextState = !player.paused;
+        await player.pause(nextState);
+        await interaction.reply({ content: nextState ? '⏸️ Đã tạm dừng phát nhạc.' : '▶️ Đã tiếp tục phát nhạc.', ephemeral: true });
+        if (interaction.message?.editable) {
+          await interaction.message.edit({ components: [buildMusicControlRow(player)] }).catch(() => null);
+        }
+        return;
+      }
+      if (action === 'skip') {
+        await player.skip();
+        return interaction.reply({ content: '⏭️ Đã bỏ qua bài hát.', ephemeral: true });
+      }
+      if (action === 'stop') {
+        await player.destroy();
+        return interaction.reply({ content: '⏹️ Đã dừng trình phát nhạc.', ephemeral: true });
+      }
+      if (action === 'shuffle') {
+        await player.queue.shuffle();
+        return interaction.reply({ content: '🔀 Đã xáo trộn danh sách phát.', ephemeral: true });
+      }
+      if (action === 'volup') {
+        const currentVol = player.volume ?? 100;
+        const newVol = currentVol >= 200 ? 100 : Math.min(currentVol + 10, 200);
+        await player.setVolume(newVol);
+        return interaction.reply({ content: `🔊 Đã chỉnh âm lượng: **${newVol}%**`, ephemeral: true });
+      }
+    } catch (err) {
+      return interaction.reply({ content: `❌ Lỗi điều khiển: ${err.message}`, ephemeral: true });
+    }
+  }
+
   if (interaction.customId === 'ticket:create') {
     if (!config.ticketsEnabled) {
       await interaction.reply({ content: 'Tickets are disabled.', ephemeral: true });

@@ -15,6 +15,7 @@
 // Public nodes for testing (no self-host needed):
 //   Host: lavalink.darrennathanael.com  Port: 80  Password: LL.darrennathanael.com  Secure: false
 
+import { ActionRowBuilder, ButtonBuilder, ButtonStyle } from 'discord.js';
 import { LavalinkManager } from 'lavalink-client';
 
 /** @type {LavalinkManager | null} */
@@ -205,4 +206,34 @@ export function fmt(ms) {
   const m = Math.floor(total / 60);
   const s = total % 60;
   return `${m}:${s.toString().padStart(2, '0')}`;
+}
+
+/**
+  * Tạo ActionRow chứa các nút bấm tương tác phát nhạc (Pause, Skip, Stop, Shuffle, Vol+, Vol-)
+  * @param {import('lavalink-client').Player} [player]
+  */
+export function buildMusicControlRow(player) {
+  const isPaused = player?.paused ?? false;
+  return new ActionRowBuilder().addComponents(
+    new ButtonBuilder()
+      .setCustomId('music:control:pause_resume')
+      .setLabel(isPaused ? '▶️ Tiếp tục' : '⏸️ Tạm dừng')
+      .setStyle(isPaused ? ButtonStyle.Success : ButtonStyle.Secondary),
+    new ButtonBuilder()
+      .setCustomId('music:control:skip')
+      .setLabel('⏭️ Bỏ qua')
+      .setStyle(ButtonStyle.Secondary),
+    new ButtonBuilder()
+      .setCustomId('music:control:stop')
+      .setLabel('⏹️ Dừng')
+      .setStyle(ButtonStyle.Danger),
+    new ButtonBuilder()
+      .setCustomId('music:control:shuffle')
+      .setLabel('🔀 Trộn bài')
+      .setStyle(ButtonStyle.Secondary),
+    new ButtonBuilder()
+      .setCustomId('music:control:volup')
+      .setLabel('🔊 +10%')
+      .setStyle(ButtonStyle.Secondary)
+  );
 }

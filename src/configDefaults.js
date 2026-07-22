@@ -1,6 +1,7 @@
 export const defaultConfig = {
   enabled: true,
   prefix: '!',
+  disabledCommands: [],
   commands: [],
   core: {
     commands: [

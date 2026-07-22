@@ -15,6 +15,7 @@
     "dev:ui": "cd dashboard && pnpm dev",
     "build:ui": "cd dashboard && pnpm build",
     "build": "pnpm build:ui",
+    "test": "vitest run",
     "check": "node --check src/env.js && node --check src/cooldowns.js && node --check src/bot.js && node --check src/bot/constants.js && node --check src/bot/logging.js && node --check src/bot/embeds.js && node --check src/bot/commands.js && node --check src/bot/commands/index.js && node --check src/bot/commands/runtime.js && node --check src/bot/commands/handlers/help.js && node --check src/bot/commands/handlers/general.js && node --check src/bot/commands/handlers/moderation.js && node --check src/bot/commands/handlers/levels.js && node --check src/bot/commands/handlers/economy.js && node --check src/bot/commands/handlers/panels.js && node --check src/bot/commands/handlers/riot.js && node --check src/bot/interactions.js && node --check src/bot/help.js && node --check src/bot/games.js && node --check src/bot/slash.js && node --check src/bot/responses.js && node --check src/server.js && node --check src/configDefaults.js && node --check src/configStore.js && node --check src/stateStore.js && node --check src/auth.js && node --check src/lolApi.js && node --check src/lolCommands.js && node --check src/tftApi.js && node --check src/tftCommands.js && node --check src/upstash.js && node --check src/safeJson.js && node --check src/csrf.js && node --check src/rateLimit.js && node --check src/commandAccess.js && node --check src/asyncMutex.js && node --check src/distributedLock.js && node --check src/configPatch.js && node --check src/riot/helpers.js && node --check src/bot/commands/handlers/translate.js && node --check src/bot/commands/handlers/duolingo.js"
   },
   "dependencies": {
@@ -27,5 +28,8 @@
     "jimp": "^1.6.1",
     "lavalink-client": "^2.4.0",
     "libsodium-wrappers": "^0.8.4"
+  },
+  "devDependencies": {
+    "vitest": "^1.6.0"
   }
 }

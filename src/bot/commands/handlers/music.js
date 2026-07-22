@@ -10,6 +10,7 @@ import {
   buildLavalinkQuery,
   sourceLabel,
   fmt,
+  buildMusicControlRow,
 } from '../../music/lavalink.js';
 
 // ── Embed builder ─────────────────────────────────────────────────────────────
@@ -207,9 +208,10 @@ export async function handleMusicCommand({ message, subcommand, args, config }) 
         embed.addFields({ name: 'Playlist', value: res.playlist?.name ?? res.playlistInfo?.name ?? 'Unknown', inline: false });
       }
 
+      const components = [buildMusicControlRow(player)];
       return loadingMsg
-        ? loadingMsg.edit({ content: '', embeds: [embed] })
-        : message.reply({ embeds: [embed] });
+        ? loadingMsg.edit({ content: '', embeds: [embed], components })
+        : message.reply({ embeds: [embed], components });
 
     } catch (err) {
       console.error('[music] play error:', err.message);
@@ -321,7 +323,7 @@ export async function handleMusicCommand({ message, subcommand, args, config }) 
       );
     if (info.artworkUrl) embed.setThumbnail(info.artworkUrl);
 
-    return message.reply({ embeds: [embed] });
+    return message.reply({ embeds: [embed], components: [buildMusicControlRow(player)] });
   }
 
   // ── volume / vol ──────────────────────────────────────────────────────────

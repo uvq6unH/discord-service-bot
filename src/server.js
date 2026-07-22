@@ -25,6 +25,24 @@ function sanitizeConfigForClient(config) {
   };
 }
 
+async function addAuditLog(redis, guildId, entry) {
+  if (!redis || !guildId) return;
+  try {
+    const key = `guild:${guildId}:audit_logs`;
+    const payload = JSON.stringify({
+      id: Date.now().toString(36) + Math.random().toString(36).substring(2, 5),
+      timestamp: new Date().toISOString(),
+      user: entry.user ?? 'Admin',
+      action: entry.action ?? 'UPDATE_CONFIG',
+      details: entry.details ?? {},
+    });
+    await redis.lpush(key, payload);
+    await redis.ltrim(key, 0, 99);
+  } catch (err) {
+    console.error('[audit-log] Error writing log:', err.message);
+  }
+}
+
 async function mapWithConcurrency(items, limit, mapper) {
   const results = new Array(items.length);
   let nextIndex = 0;
@@ -424,6 +442,14 @@ export function createServer({ configStore, stateStore, botClient, redis = null 
     }
 
     const config = await configStore.updateGuildConfig(req.guildId, body);
+
+    if (redis) {
+      addAuditLog(redis, req.guildId, {
+        user: req.session?.user?.username ?? 'Admin',
+        action: 'UPDATE_GUILD_CONFIG',
+        details: { fields: Object.keys(body) }
+      });
+    }
 
     let slashSync;
     if (botClient?.user) {
@@ -856,6 +882,50 @@ export function createServer({ configStore, stateStore, botClient, redis = null 
       channelName,
       intervalMinutes: 14,
     });
+  });
+
+  app.get('/api/guilds/:guildId/audit-logs', auth.requireAuth, readRateLimit, auth.requireGuildAccess, async (req, res) => {
+    const guildId = req.params.guildId || req.guildId;
+    if (!redis) {
+      return res.json({ logs: [] });
+    }
+    try {
+      const rawLogs = await redis.lrange(`guild:${guildId}:audit_logs`, 0, 99);
+      const logs = (rawLogs || []).map(item => typeof item === 'string' ? JSON.parse(item) : item);
+      res.json({ logs });
+    } catch (err) {
+      res.status(500).json({ error: 'Không thể đọc Audit Logs.' });
+    }
+  });
+
+  app.post('/api/guilds/:guildId/command-toggle', auth.requireAuth, writeRateLimit, auth.requireGuildAccess, async (req, res) => {
+    const guildId = req.params.guildId || req.guildId;
+    const { commandName, enabled } = req.body ?? {};
+    if (!commandName || typeof enabled !== 'boolean') {
+      return res.status(400).json({ error: 'Cần truyền commandName và enabled (boolean).' });
+    }
+
+    const currentConfig = await configStore.getGuildConfig(guildId);
+    const disabledSet = new Set(currentConfig.disabledCommands ?? []);
+    if (enabled) {
+      disabledSet.delete(commandName);
+    } else {
+      disabledSet.add(commandName);
+    }
+
+    const updatedConfig = await configStore.updateGuildConfig(guildId, {
+      disabledCommands: Array.from(disabledSet)
+    });
+
+    if (redis) {
+      addAuditLog(redis, guildId, {
+        user: req.session?.user?.username ?? 'Admin',
+        action: enabled ? 'ENABLE_COMMAND' : 'DISABLE_COMMAND',
+        details: { commandName }
+      });
+    }
+
+    res.json({ success: true, disabledCommands: updatedConfig.disabledCommands });
   });
 
   // Central error handler — catches unhandled async errors in Express 5 routes
