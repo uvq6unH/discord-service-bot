@@ -123,6 +123,15 @@ export function GuildProvider({ children }) {
           next[k] = v;
         }
       }
+      // Sync flat next.commands array with sub-module command arrays
+      const coreCmds = next.core?.commands ?? [];
+      const modCmds = next.moderation?.commands ?? [];
+      const levelsCmds = next.levels?.commands ?? [];
+      const ecoCmds = next.economy?.commands ?? [];
+      const riotCmds = next.riot?.commands ?? [];
+      const musicCmds = next.music?.commands ?? [];
+      next.commands = [...coreCmds, ...modCmds, ...levelsCmds, ...ecoCmds, ...riotCmds, ...musicCmds];
+
       // Compare against server snapshot to determine real dirty state
       const isDirty = !configsEqual(next, serverSnapshotRef.current);
       setDirty(isDirty);

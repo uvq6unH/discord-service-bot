@@ -353,7 +353,10 @@ export default function CommandsPage() {
                     roles={roles}
                     onUpdate={updatedCmd => {
                       const currentList = config.core?.commands ?? [];
-                      const updatedList = currentList.map(x => x.type === c.type ? updatedCmd : x);
+                      const updatedList = currentList.map(x => {
+                        const isMatch = (x.type && c.type && x.type === c.type) || (x.name && c.name && x.name === c.name);
+                        return isMatch ? updatedCmd : x;
+                      });
                       updateConfig({ core: { commands: updatedList } });
                     }}
                   />
