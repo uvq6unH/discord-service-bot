@@ -15,18 +15,59 @@ import {
 
 // ── Embed builder ─────────────────────────────────────────────────────────────
 
-function trackEmbed(track, title, color, extra = {}) {
-  const info = track.info;
-  const durationMs = info.duration ?? info.length ?? track.duration;
+export function buildMusicStatusEmbed(player, targetTrack, title, color, extra = {}) {
+  const currentTrack = player?.queue?.current ?? targetTrack;
+  const info = currentTrack?.info ?? targetTrack?.info ?? {};
+  const durationMs = info.duration ?? info.length ?? currentTrack?.duration ?? targetTrack?.duration;
+  
   const embed = new EmbedBuilder()
     .setColor(color)
-    .setTitle(title)
-    .setDescription(`**[${info.title}](${info.uri})**`)
-    .addFields(
-      { name: 'Duration',      value: info.isStream ? '🔴 Live' : fmt(durationMs), inline: true },
-      { name: 'Source',        value: sourceLabel(track), inline: true },
-      { name: 'Requested by',  value: `<@${track.requester?.id ?? info.requester ?? '?'}>`, inline: true }
-    );
+    .setTitle(title);
+
+  const pos = player?.position ?? 0;
+  const len = durationMs ?? 0;
+
+  if (extra.showProgress && len > 0) {
+    const barLen = 20;
+    const filled = Math.round((pos / len) * barLen);
+    const bar = '█'.repeat(Math.max(0, Math.min(barLen, filled))) + '░'.repeat(Math.max(0, barLen - Math.min(barLen, filled)));
+    const progress = `\`${fmt(pos)} ${bar} ${fmt(len)}\``;
+    embed.setDescription(`**[${info.title ?? 'Unknown Track'}](${info.uri ?? ''})**\n${progress}`);
+  } else {
+    embed.setDescription(`**[${info.title ?? 'Unknown Track'}](${info.uri ?? ''})**`);
+  }
+
+  embed.addFields(
+    { name: '⏱️ Duration',    value: info.isStream ? '🔴 Live' : fmt(durationMs), inline: true },
+    { name: '🌐 Source',      value: sourceLabel(currentTrack ?? targetTrack), inline: true },
+    { name: '👤 Requested by', value: `<@${currentTrack?.requester?.id ?? targetTrack?.requester?.id ?? info.requester ?? '?'}>`, inline: true }
+  );
+
+  if (extra.playlistName) {
+    embed.addFields({ name: '📜 Playlist', value: `"${extra.playlistName}"`, inline: false });
+  }
+
+  // Render upcoming queue items if available
+  const upcoming = player?.queue?.tracks ?? [];
+  if (upcoming.length > 0) {
+    const queueList = upcoming.slice(0, 4).map((t, idx) => {
+      const tInfo = t.info ?? {};
+      const dur = fmt(tInfo.duration ?? tInfo.length ?? t.duration);
+      const reqId = t.requester?.id ?? tInfo.requester;
+      const reqStr = reqId ? `<@${reqId}>` : '';
+      return `\`${idx + 1}.\` **[${tInfo.title ?? 'Unknown'}](${tInfo.uri ?? ''})** \`${dur}\` ${reqStr}`;
+    }).join('\n');
+
+    const remaining = upcoming.length - 4;
+    const moreText = remaining > 0 ? `\n*... và **${remaining}** bài nữa trong hàng chờ*` : '';
+
+    embed.addFields({
+      name: `📋 Hàng chờ tiếp theo (${upcoming.length} bài)`,
+      value: queueList + moreText,
+      inline: false
+    });
+  }
+
   if (info.artworkUrl) embed.setThumbnail(info.artworkUrl);
   if (extra.footer)    embed.setFooter({ text: extra.footer });
   return embed;
@@ -201,13 +242,15 @@ export async function handleMusicCommand({ message, subcommand, args, config }) 
         res.tracks[0]?.info?.sourceName === 'soundcloud' &&
         query.startsWith('ytsearch:') === false;
 
-      const embed = trackEmbed(firstTrack, embedTitle, embedColor,
-        ytFallback ? { footer: '⚠️ YouTube không có kết quả — đã tìm qua SoundCloud' } : {}
-      );
-
+      const extraOptions = {};
       if (res.loadType === 'playlist') {
-        embed.addFields({ name: 'Playlist', value: res.playlist?.name ?? res.playlistInfo?.name ?? 'Unknown', inline: false });
+        extraOptions.playlistName = res.playlist?.name ?? res.playlistInfo?.name ?? 'Unknown';
       }
+      if (ytFallback) {
+        extraOptions.footer = '⚠️ YouTube không có kết quả — đã tìm qua SoundCloud';
+      }
+
+      const embed = buildMusicStatusEmbed(player, firstTrack, embedTitle, embedColor, extraOptions);
 
       const components = [buildMusicControlRow(player)];
       return loadingMsg
@@ -313,25 +356,7 @@ export async function handleMusicCommand({ message, subcommand, args, config }) 
     const current = player?.queue?.current;
     if (!current) return message.reply('❌ Không có bài nhạc nào đang phát!');
 
-    const info     = current.info;
-    const pos      = player.position ?? 0;
-    const len      = info.duration ?? info.length ?? current.duration ?? 0;
-    const barLen   = 20;
-    const filled   = len > 0 ? Math.round((pos / len) * barLen) : 0;
-    const bar      = '█'.repeat(filled) + '░'.repeat(barLen - filled);
-    const progress = `\`${fmt(pos)} ${bar} ${fmt(len)}\``;
-
-    const embed = new EmbedBuilder()
-      .setColor(0x5865F2)
-      .setTitle('🎵 Now Playing')
-      .setDescription(`**[${info.title}](${info.uri})**\n${progress}`)
-      .addFields(
-        { name: 'Duration',     value: info.isStream ? '🔴 Live' : fmt(len), inline: true },
-        { name: 'Source',       value: sourceLabel(current), inline: true },
-        { name: 'Requested by', value: `<@${current.requester?.id ?? '?'}>`, inline: true }
-      );
-    if (info.artworkUrl) embed.setThumbnail(info.artworkUrl);
-
+    const embed = buildMusicStatusEmbed(player, current, '🎵 Now Playing', 0x5865F2, { showProgress: true });
     return message.reply({ embeds: [embed], components: [buildMusicControlRow(player)] });
   }
 

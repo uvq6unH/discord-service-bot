@@ -99,13 +99,21 @@ export async function handleComponentInteraction(interaction, { client, config, 
           await interaction.reply({ content: '⏸️ Đã tạm dừng phát nhạc.', ephemeral: true });
         }
         if (interaction.message?.editable) {
-          await interaction.message.edit({ components: [buildMusicControlRow(player)] }).catch(() => null);
+          const { buildMusicStatusEmbed } = await import('./commands/handlers/music.js');
+          const updatedEmbed = buildMusicStatusEmbed(player, null, player.paused ? '⏸️ Tạm dừng phát nhạc' : '🎵 Now Playing', player.paused ? 0xFEE75C : 0x5865F2, { showProgress: true });
+          await interaction.message.edit({ embeds: [updatedEmbed], components: [buildMusicControlRow(player)] }).catch(() => null);
         }
         return;
       }
       if (action === 'skip') {
         await player.skip();
-        return interaction.reply({ content: '⏭️ Đã bỏ qua bài hát.', ephemeral: true });
+        await interaction.reply({ content: '⏭️ Đã bỏ qua bài hát.', ephemeral: true });
+        if (interaction.message?.editable) {
+          const { buildMusicStatusEmbed } = await import('./commands/handlers/music.js');
+          const updatedEmbed = buildMusicStatusEmbed(player, null, '🎵 Now Playing', 0x5865F2, { showProgress: true });
+          await interaction.message.edit({ embeds: [updatedEmbed], components: [buildMusicControlRow(player)] }).catch(() => null);
+        }
+        return;
       }
       if (action === 'stop') {
         await player.destroy();
@@ -113,7 +121,13 @@ export async function handleComponentInteraction(interaction, { client, config, 
       }
       if (action === 'shuffle') {
         await player.queue.shuffle();
-        return interaction.reply({ content: '🔀 Đã xáo trộn danh sách phát.', ephemeral: true });
+        await interaction.reply({ content: '🔀 Đã xáo trộn danh sách phát.', ephemeral: true });
+        if (interaction.message?.editable) {
+          const { buildMusicStatusEmbed } = await import('./commands/handlers/music.js');
+          const updatedEmbed = buildMusicStatusEmbed(player, null, '🎵 Now Playing', 0x5865F2, { showProgress: true });
+          await interaction.message.edit({ embeds: [updatedEmbed], components: [buildMusicControlRow(player)] }).catch(() => null);
+        }
+        return;
       }
       if (action === 'volup') {
         const currentVol = player.volume ?? 100;
