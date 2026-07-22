@@ -23,16 +23,54 @@ let _manager = null;
 
 // ── Node config ───────────────────────────────────────────────────────────────
 
-function buildNodeConfig() {
-  return {
-    host: process.env.LAVALINK_HOST ?? 'localhost',
-    port: Number(process.env.LAVALINK_PORT ?? 2333),
-    authorization: process.env.LAVALINK_PASSWORD ?? 'youshallnotpass',
-    secure: process.env.LAVALINK_SECURE === 'true',
-    id: 'main',
-    retryAmount: 20,      // keep retrying indefinitely while bot is alive
-    retryDelay: 10_000,  // 10 s between retries
-  };
+function buildNodeConfigs() {
+  const nodes = [];
+
+  const envHost = process.env.LAVALINK_HOST;
+  if (envHost && envHost !== 'localhost') {
+    nodes.push({
+      id: 'main',
+      host: envHost,
+      port: Number(process.env.LAVALINK_PORT ?? (process.env.LAVALINK_SECURE === 'true' ? 443 : 2333)),
+      authorization: process.env.LAVALINK_PASSWORD ?? 'youshallnotpass',
+      secure: process.env.LAVALINK_SECURE === 'true',
+      retryAmount: 5,
+      retryDelay: 10_000,
+    });
+  } else {
+    nodes.push({
+      id: 'local',
+      host: 'localhost',
+      port: Number(process.env.LAVALINK_PORT ?? 2333),
+      authorization: process.env.LAVALINK_PASSWORD ?? 'youshallnotpass',
+      secure: false,
+      retryAmount: 3,
+      retryDelay: 5_000,
+    });
+  }
+
+  // Fallback public Lavalink v4 nodes (ensures music stays active if primary returns 403 or drops)
+  nodes.push({
+    id: 'public-darren',
+    host: 'lavalink.darrennathanael.com',
+    port: 80,
+    authorization: 'LL.darrennathanael.com',
+    secure: false,
+    retryAmount: 5,
+    retryDelay: 10_000,
+  });
+
+  nodes.push({
+    id: 'public-ajie',
+    host: 'lava-v4.ajieconz.com',
+    port: 443,
+    authorization: 'https://discord.gg/ajieconz',
+    secure: true,
+    retryAmount: 5,
+    retryDelay: 10_000,
+  });
+
+  return nodes;
 }
 
 // ── Init ──────────────────────────────────────────────────────────────────────
@@ -47,7 +85,7 @@ export async function initLavalink(client) {
   if (_manager) return _manager;
 
   _manager = new LavalinkManager({
-    nodes: [buildNodeConfig()],
+    nodes: buildNodeConfigs(),
 
     // Forward raw voice state/server events to Lavalink
     sendToShard: (guildId, payload) => {
