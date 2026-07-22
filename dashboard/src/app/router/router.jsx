@@ -11,7 +11,6 @@ const EconomyPage = lazy(() => import('../../domains/core/pages/Economy.jsx'));
 const AnalyticsPage = lazy(() => import('../../domains/core/pages/Analytics.jsx'));
 const SystemPage = lazy(() => import('../../domains/core/pages/System.jsx'));
 const AuditLogsPage = lazy(() => import('../../domains/core/pages/AuditLogs.jsx'));
-const CommandManagerPage = lazy(() => import('../../domains/core/pages/CommandManager.jsx'));
 
 // Riot
 const RiotServicesPage = lazy(() => import('../../domains/riot/pages/RiotServices.jsx'));
@@ -39,7 +38,6 @@ export default function AppRoutes() {
         <Route path="/overview"        element={<OverviewPage />} />
         <Route path="/members"         element={<MembersPage />} />
         <Route path="/commands"        element={<CommandsPage />} />
-        <Route path="/command-manager" element={<CommandManagerPage />} />
         <Route path="/audit-logs"      element={<AuditLogsPage />} />
         <Route path="/economy"         element={<EconomyPage />} />
         <Route path="/moderation"      element={<ModerationPage />} />

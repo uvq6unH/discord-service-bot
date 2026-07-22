@@ -23,7 +23,6 @@ export const NAVIGATION_SCHEMA: DomainConfig[] = [
       { to: "/members", label: "MEMBERS", icon: "Users" },
       { to: "/moderation", label: "MODERATION", icon: "Shield" },
       { to: "/commands", label: "COMMANDS", icon: "Terminal" },
-      { to: "/command-manager", label: "CMD MANAGER", icon: "Sliders" },
       { to: "/audit-logs", label: "AUDIT LOGS", icon: "FileText" },
       { to: "/economy", label: "ECONOMY", icon: "Coins" },
       { to: "/analytics", label: "ANALYTICS", icon: "BarChart2" },
