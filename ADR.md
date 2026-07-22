@@ -265,4 +265,47 @@
 **Hệ quả:**
 - Các lệnh gọi Riot API có độ trễ hàng đợi nhỏ khi có nhiều người dùng gọi lệnh đồng thời; bot tự động phục hồi kết nối mà không bị crash.
 
+---
+
+## ADR-015 — Lavalink Multi-Node Pool & Automatic Failover
+
+**Quyết định:** Sử dụng mảng danh sách nhiều Node Lavalink v4 (`main`, `public-darren`, `public-jirayu`) trong `buildNodeConfigs()` thay vì chỉ dùng một Node đơn lẻ.
+
+**Lý do chọn:**
+- Các Lavalink Node công cộng hoặc tự host trên cloud có thể bị sập, thay đổi IP, hoặc ngắt kết nối với mã lỗi HTTP `403 Forbidden` / `301 Redirect`.
+- Việc cấu hình Multi-Node cho phép `lavalink-client` v2 tự động chuyển mạch (Failover) sang Node dự phòng đang hoạt động mà không làm sập tiến trình Bot hoặc ngắt tính năng nghe nhạc.
+
+**Hệ quả:**
+- Tính năng phát nhạc (`/play`, `/skip`, `/stop`...) đạt độ sẵn sàng cao.
+- Khi Node chính bị ngắt, Bot tự động dùng Node tiếp theo trong danh sách mà không ảnh hưởng tới người dùng Discord.
+
+---
+
+## ADR-016 — Hợp nhất Quản lý Lệnh (Unified Commands Hub) & Nhật ký Audit Logs
+
+**Quyết định:** Hợp nhất giao diện quản lý lệnh về một trang duy nhất [Commands.jsx](file:///d:/CODE/Code/discord-bot/dashboard/src/domains/core/pages/Commands.jsx) (`/commands`), loại bỏ file `CommandManager.jsx` dư thừa. Bổ sung trang [AuditLogs.jsx](file:///d:/CODE/Code/discord-bot/dashboard/src/domains/core/pages/AuditLogs.jsx) (`/audit-logs`) sử dụng Telemetry Design System để xem vết lịch sử thay đổi cấu hình.
+
+**Lý do chọn:**
+- Việc duy trì 2 trang quản lý lệnh trùng lặp gây lệch Design System và xung đột state khi bật/tắt lệnh.
+- Admin cần một nơi lưu vết (`Audit Logs`) để theo dõi ai đã thay đổi cấu hình hoặc bật/tắt tính năng nào trên Dashboard.
+
+**Hệ quả:**
+- Giao diện Dashboard gọn gàng, đồng bộ 100% về mặt thẩm mỹ và kiến trúc định tuyến (React Router).
+- Mọi thao tác lưu cấu hình hoặc toggle lệnh đều được ghi log bất đồng bộ vào Redis buffer `guild:{id}:audit_logs`.
+
+---
+
+## ADR-017 — Loại bỏ PM2 & Self-Ping Script (Duy trì 24/7 qua UptimeRobot)
+
+**Quyết định:** Xóa bỏ hoàn toàn PM2 (`pm2.config.cjs`), script self-ping (`keep-alive.sh`, `src/utils/keepalive.js`), và file blueprint Render YAML. Chạy trực tiếp `node src/index.bot.js` và `node src/index.server.js` trên Render Split-Account deployment. Duy trì keep-alive bằng UptimeRobot HTTP Monitors từ bên ngoài.
+
+**Lý do chọn:**
+- Script self-ping nội bộ gây tốn CPU/băng thông và không hiệu quả khi instance bị Render tạm dừng.
+- Render Blueprint YAML tạo 2 service trên 1 account làm cạn kiệt 750 giờ free tier trong 15 ngày.
+- Triển khai thủ công `discord-bot` trên Acc Render A và `discord-dashboard` trên Acc Render B giúp cả 2 services hoạt động 100% miễn phí trọn đời.
+
+**Hệ quả:**
+- Mã nguồn sạch sẽ, không còn file rác PM2 hoặc script tự ping.
+- UptimeRobot đảm bảo gửi HTTP request mỗi 5 phút giữ cho Web Services luôn active.
+
 

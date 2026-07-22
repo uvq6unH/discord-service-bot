@@ -163,6 +163,9 @@ Region routing uses two separate maps: `accountRouting` for Account-v1 (VN2 → 
 ✅ P2  Slash sync queue
 ✅ P3  Heartbeat + observability counters + System page
 ✅ P4  Riot API puuid migration (League-v4, Mastery-v4, Match-v5)
+✅ P4.5 Lavalink Multi-Node Failover & Custom Music UI
+✅ P4.6 Audit Logs & Unified Commands Hub (CommandManager removal)
+✅ P4.7 Vitest Automated Testing & GitHub Actions CI/CD
 ⬜ P5  Real-time Event Queue (BLPOP/Streams)
 ⬜ P6  Member Cache Pagination / On-demand Fetch
 ⬜ P7  Domain Repository Separation
@@ -173,4 +176,4 @@ Region routing uses two separate maps: `accountRouting` for Account-v1 (VN2 → 
 
 ---
 
-*Last updated: June 2026. Roadmap updated based on Solution Architect Review.*
+*Last updated: July 2026. Roadmap updated based on Solution Architect Review.*

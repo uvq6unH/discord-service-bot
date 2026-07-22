@@ -75,12 +75,22 @@ This report maps the data flow, endpoints, mutations, states, and dependencies o
 
 ### System Page
 - **Inputs**: Manual refresh trigger.
-- **Outputs**: PM2 telemetry block details, system resources heartbeats (CPU/RAM).
+- **Outputs**: Engine telemetry block details, system resources heartbeats (CPU/RAM RSS, Gateway pings, Redis latency).
 - **API Endpoints**: `/api/status` (api.status)
 - **State Management**:
   - Local: `status` (system state), `loading` (boolean), `refreshing` (boolean) updated via 15s refresh intervals.
 - **Mutations**: None.
 - **Dependencies**: `lucide-react`, `api`.
+
+### Audit Logs Page
+- **Inputs**: None (uses selected guild session).
+- **Outputs**: Administrative activity history, config change records, timestamped event logs.
+- **API Endpoints**: `/api/guilds/:guildId/audit-logs`
+- **State Management**:
+  - Global: `selectedGuild` via `GuildContext`.
+  - Local: `logs` (Array of audit log objects), `loading` (boolean).
+- **Mutations**: None (read-only audit trail dashboard).
+- **Dependencies**: `lucide-react`, `useGuild`.
 
 ---
 

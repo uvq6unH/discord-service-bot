@@ -4,6 +4,31 @@ Format: `[vX.Y] — Mô tả ngắn` → chi tiết thay đổi.
 
 ---
 
+## [v2.0.0] — Unified Architecture, Lavalink Multi-Node Pool & Dashboard Refactor (2026-07-22)
+
+**1. Lavalink Multi-Node Audio Engine (`src/bot/music/lavalink.js`)**
+- Chuyển sang cơ chế Multi-Node Failover pool (`main`, `public-darren`, `public-jirayu`).
+- Tự động chuyển mạch sang Node dự phòng khi Node chính gặp lỗi HTTP 403 Forbidden / 301 Redirect / ENOTFOUND.
+- Tự động bóc tách `info.duration` (Lavalink v4) để hiển thị thời lượng bài hát chuẩn xác thay vì `?:??`.
+- Thiết kế lại Giao diện Embed nhạc tùy biến: hiển thị bài đang phát, thanh tiến trình, và danh sách hàng chờ queue phía dưới.
+- Tự động refresh Embed và nút bấm tương tác thời gian thực khi bấm các nút điều khiển (`Pause/Resume`, `Skip`, `Shuffle`).
+
+**2. Quản lý Lệnh & Dashboard Telemetry (`dashboard/src/domains/core/pages/`)**
+- Hợp nhất trang quản lý lệnh về duy nhất `/commands` (`Commands.jsx`), gỡ bỏ `CommandManager.jsx` dư thừa.
+- Thêm trang Audit Logs (`AuditLogs.jsx`) hiển thị vết lịch sử Admin thao tác cấu hình (`GET /api/guilds/:id/audit-logs`).
+- Sửa lỗi gán lầm lệnh hệ thống thành custom (`type: 'custom'`) và lỗi so sánh `undefined === undefined` trong `CustomCommandEditor`.
+- Đồng bộ mảng phẳng `next.commands` thời gian thực khi cập nhật sub-module command arrays trong `GuildProvider.jsx`.
+- Hỗ trợ PWA Manifest và meta tags trên mobile (`dashboard/index.html`).
+
+**3. Làm sạch Hạ tầng & Keep-Alive (`package.json`, `.env`)**
+- Xóa bỏ hoàn toàn PM2 (`pm2.config.cjs`), blueprint YAML, script `keep-alive.sh` và `src/utils/keepalive.js`.
+- Chuyển sang mô hình chạy trực tiếp `node src/index.bot.js` và `node src/index.server.js` trên Render Split-Account deployment.
+- Duy trì trạng thái 24/7 thông qua UptimeRobot HTTP Monitors từ bên ngoài.
+
+**4. Testing & CI/CD Pipeline (`tests/`, `.github/workflows/ci.yml`)**
+- Tích hợp Vitest runner và viết unit tests cho ConfigStore (`tests/configStore.test.js`) & Translation (`tests/translation.test.js`).
+- Cấu hình tự động kiểm thử `pnpm check` và `npx vitest run` trên GitHub Actions.
+
 ## [v1.7.0] — Dashboard refactor: bug fixes + light theme
 
 **`dashboard/src/contexts/GuildContext.jsx`** — fix race condition khi switch guild nhanh
