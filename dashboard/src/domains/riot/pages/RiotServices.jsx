@@ -352,7 +352,7 @@ export default function RiotServicesPage() {
               </span>
               <div className="quiz-scoring-grid">
                 {[1, 2, 3, 4, 5, 6, 7, 8].map(num => (
-                  <div key={num} className="col-span-3">
+                  <div key={num}>
                     <div className="form-group" style={{ margin: 0 }}>
                       <label className="form-label" style={{ fontFamily: 'var(--font-mono)', fontSize: '11px' }}>
                         {t("Guess")} {num} {t("Points")}
@@ -372,7 +372,7 @@ export default function RiotServicesPage() {
                     </div>
                   </div>
                 ))}
-                <div className="col-span-3">
+                <div>
                   <div className="form-group" style={{ margin: 0 }}>
                     <label className="form-label" style={{ fontFamily: 'var(--font-mono)', fontSize: '11px' }}>
                       {t("Failure (Bỏ cuộc)")}

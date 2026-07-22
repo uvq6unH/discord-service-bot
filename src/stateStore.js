@@ -43,6 +43,20 @@ function nextDayStartForOffset(dayKey, utcOffsetMinutes) {
   return (dayKey + 1) * dayMs - utcOffsetMinutes * 60 * 1000;
 }
 
+function getDayKey(utcOffsetMinutes = 0) {
+  const now = new Date();
+  const utc = now.getTime() + now.getTimezoneOffset() * 60000;
+  const local = new Date(utc + utcOffsetMinutes * 60000);
+  return local.toISOString().split('T')[0];
+}
+
+function getPreviousDayKey(utcOffsetMinutes = 0) {
+  const now = new Date();
+  const utc = now.getTime() + now.getTimezoneOffset() * 60000;
+  const local = new Date(utc + utcOffsetMinutes * 60000 - 24 * 60 * 60 * 1000);
+  return local.toISOString().split('T')[0];
+}
+
 // ── Default values ─────────────────────────────────────────────────────────────
 
 const DEFAULT_ECONOMY_USER = () => ({
@@ -902,6 +916,131 @@ export class StateStore {
       })
     );
     return entries.sort((a, b) => b.points - a.points).slice(0, limit);
+  }
+
+  // ── Duolingo Language Learning stats ─────────────────────────────────────────
+  async getDuolingoStats(guildId, userId, utcOffsetMinutes = 0) {
+    const key = `duolingo:stats:${guildId}:${userId}`;
+    let stats;
+    if (this._useRedis) {
+      const val = await this._redis.get(key);
+      stats = val ? JSON.parse(val) : { xp: 0, streak: 0, lastActiveDate: null };
+    } else {
+      const state = await readJsonFile(this._filePath) || {};
+      stats = state[`duolingo_stats_${guildId}_${userId}`] || { xp: 0, streak: 0, lastActiveDate: null };
+    }
+
+    // Normalize streak: if the user missed yesterday and today, streak resets to 0
+    if (stats.lastActiveDate) {
+      const today = getDayKey(utcOffsetMinutes);
+      const yesterday = getPreviousDayKey(utcOffsetMinutes);
+      if (stats.lastActiveDate !== today && stats.lastActiveDate !== yesterday) {
+        stats.streak = 0;
+        // Save the reset streak back to the DB to avoid repeatedly evaluating it
+        await this.saveDuolingoStats(guildId, userId, stats);
+      }
+    } else {
+      stats.streak = 0;
+    }
+
+    return stats;
+  }
+
+  async saveDuolingoStats(guildId, userId, stats) {
+    const key = `duolingo:stats:${guildId}:${userId}`;
+    const memberIndexKey = `guild:${guildId}:duolingo:_members`;
+    if (this._useRedis) {
+      await this._redis.pipeline([
+        ['SADD', 'guild:index', guildId],
+        ['SADD', memberIndexKey, userId],
+        ['SET', key, JSON.stringify(stats)]
+      ]);
+      return stats;
+    }
+    const state = await readJsonFile(this._filePath) || {};
+    state[`duolingo_stats_${guildId}_${userId}`] = stats;
+    state[`guild_duolingo_members_${guildId}`] ??= [];
+    if (!state[`guild_duolingo_members_${guildId}`].includes(userId)) {
+      state[`guild_duolingo_members_${guildId}`].push(userId);
+    }
+    fs.writeFileSync(this._filePath, JSON.stringify(state, null, 2), 'utf8');
+    return stats;
+  }
+
+  async getDuolingoLeaderboard(guildId, limit = 10, utcOffsetMinutes = 0) {
+    if (!this._useRedis) {
+      const state = await readJsonFile(this._filePath) || {};
+      const memberIds = state[`guild_duolingo_members_${guildId}`] || [];
+      const entries = [];
+      for (const userId of memberIds) {
+        const stats = await this.getDuolingoStats(guildId, userId, utcOffsetMinutes);
+        entries.push({ userId, xp: stats.xp, streak: stats.streak });
+      }
+      return entries.sort((a, b) => b.xp - a.xp).slice(0, limit);
+    }
+
+    const memberIndexKey = `guild:${guildId}:duolingo:_members`;
+    const memberIds = (await this._redis.smembers(memberIndexKey)) ?? [];
+    const entries = await Promise.all(
+      memberIds.map(async (userId) => {
+        const stats = await this.getDuolingoStats(guildId, userId, utcOffsetMinutes);
+        return { userId, xp: stats.xp, streak: stats.streak };
+      })
+    );
+    return entries.sort((a, b) => b.xp - a.xp).slice(0, limit);
+  }
+
+  // ── Duolingo history ──────────────────────────────────────────────────────────
+  async getDuolingoHistory(guildId, userId) {
+    const key = `duolingo:history:${guildId}:${userId}`;
+    if (this._useRedis) {
+      const val = await this._redis.get(key);
+      return val ? JSON.parse(val) : [];
+    }
+    const state = await readJsonFile(this._filePath) || {};
+    return state[`duolingo_history_${guildId}_${userId}`] || [];
+  }
+
+  async pushDuolingoHistory(guildId, userId, entry) {
+    const key = `duolingo:history:${guildId}:${userId}`;
+    const history = await this.getDuolingoHistory(guildId, userId);
+    history.unshift(entry);
+    const limited = history.slice(0, 10); // cap at last 10 lessons
+
+    if (this._useRedis) {
+      await this._redis.set(key, JSON.stringify(limited));
+      return limited;
+    }
+    const state = await readJsonFile(this._filePath) || {};
+    state[`duolingo_history_${guildId}_${userId}`] = limited;
+    fs.writeFileSync(this._filePath, JSON.stringify(state, null, 2), 'utf8');
+    return limited;
+  }
+
+  // ── Duolingo questions database ────────────────────────────────────────────────
+  async getDuolingoQuestions(lang, level) {
+    const key = `duolingo:questions:${lang}:${level}`;
+    if (this._useRedis) {
+      const val = await this._redis.get(key).catch(() => null);
+      if (val) {
+        try {
+          const parsed = JSON.parse(val);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            return parsed;
+          }
+        } catch (err) {
+          console.error(`[StateStore] Failed to parse duolingo questions for ${lang}:${level}:`, err);
+        }
+      }
+    }
+    return [];
+  }
+
+  async setDuolingoQuestions(lang, level, questions) {
+    const key = `duolingo:questions:${lang}:${level}`;
+    if (this._useRedis) {
+      await this._redis.set(key, JSON.stringify(questions));
+    }
   }
 
 }

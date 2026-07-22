@@ -7,6 +7,8 @@ import { handleLevels } from './handlers/levels.js';
 import { handleEconomy } from './handlers/economy.js';
 import { handlePanels } from './handlers/panels.js';
 import { handleRiot } from './handlers/riot.js';
+import { handleTranslate } from './handlers/translate.js';
+import { handleDuolingo } from './handlers/duolingo.js';
 
 const HANDLERS = [
   handleHelp,
@@ -15,7 +17,9 @@ const HANDLERS = [
   handleLevels,
   handleEconomy,
   handlePanels,
-  handleRiot
+  handleRiot,
+  handleTranslate,
+  handleDuolingo
 ];
 
 export async function runBuiltInCommand(params) {

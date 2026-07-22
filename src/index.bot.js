@@ -1,5 +1,5 @@
 /**
- * index.bot.js — Bot process entry point (Render Web Service / PM2)
+ * index.bot.js — Bot process entry point (Render Web Service)
  *
  * Render Free yêu cầu bind HTTP port NGAY LẬP TỨC sau khi process start.
  * → HTTP server phải listen TRƯỚC khi login Discord.
@@ -11,7 +11,6 @@
  *   Bot writes  → config:guild:* (qua configStore)
  *
  * Render: type = web, startCommand = node src/index.bot.js
- * PM2:    xem pm2.config.cjs (app "discord-bot")
  */
 
 import 'dotenv/config';
@@ -24,7 +23,6 @@ await sodium.ready;
 import { ConfigStore } from './configStore.js';
 import { StateStore } from './stateStore.js';
 import { createBot } from './bot.js';
-import { startKeepalive } from './utils/keepalive.js';
 import { loginWithRetry } from './utils/loginWithRetry.js';
 import { validateBotEnvironment } from './env.js';
 import { createUpstashFromEnv } from './upstash.js';
@@ -102,7 +100,6 @@ http.createServer((req, res) => {
   }));
 }).listen(botPort, () => {
   console.log(`[bot:health] HTTP health server listening on port ${botPort}`);
-  startKeepalive(botPort);
 });
 
 // ── Login Discord — SAU khi HTTP server đã bind ───────────────────────────────

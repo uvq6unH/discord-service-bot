@@ -256,6 +256,82 @@ function buildSlashOptions(command) {
     return [];
   }
 
+  if (command.type === 'translate') {
+    return [
+      {
+        name: 'text',
+        description: 'Văn bản cần dịch',
+        type: ApplicationCommandOptionType.String,
+        required: true
+      },
+      {
+        name: 'target',
+        description: 'Ngôn ngữ đích (mặc định: tự động Việt/Anh)',
+        type: ApplicationCommandOptionType.String,
+        required: false,
+        choices: [
+          { name: '🇻🇳 Tiếng Việt (vi)', value: 'vi' },
+          { name: '🇺🇸 English (en)', value: 'en' },
+          { name: '🇷🇺 Русский (ru)', value: 'ru' },
+          { name: '🇯🇵 日本語 (ja)', value: 'ja' },
+          { name: '🇨🇳 中文 (zh)', value: 'zh' }
+        ]
+      },
+      {
+        name: 'source',
+        description: 'Ngôn ngữ nguồn (mặc định: Tự động nhận diện)',
+        type: ApplicationCommandOptionType.String,
+        required: false,
+        choices: [
+          { name: '🔍 Tự động nhận diện (auto)', value: 'auto' },
+          { name: '🇻🇳 Tiếng Việt (vi)', value: 'vi' },
+          { name: '🇺🇸 English (en)', value: 'en' },
+          { name: '🇷🇺 Русский (ru)', value: 'ru' },
+          { name: '🇯🇵 日本語 (ja)', value: 'ja' },
+          { name: '🇨🇳 中文 (zh)', value: 'zh' }
+        ]
+      }
+    ];
+  }
+
+  if (command.type === 'duolingo') {
+    return [
+      {
+        name: 'action',
+        description: 'Chọn hành động: Bắt đầu học, Bảng xếp hạng, Xem thống kê, hoặc Lịch sử học tập',
+        type: ApplicationCommandOptionType.String,
+        required: true,
+        choices: [
+          { name: '🚀 Bắt đầu bài học (start)', value: 'start' },
+          { name: '📊 Bảng xếp hạng (leaderboard)', value: 'leaderboard' },
+          { name: '👤 Thống kê của tôi (stats)', value: 'stats' },
+          { name: '📜 Lịch sử học tập (history)', value: 'history' }
+        ]
+      },
+      {
+        name: 'language',
+        description: 'Ngôn ngữ muốn học (chỉ dùng cho Bắt đầu học)',
+        type: ApplicationCommandOptionType.String,
+        required: false,
+        choices: [
+          { name: '🇷🇺 Tiếng Nga (ru)', value: 'ru' },
+          { name: '🇨🇳 Tiếng Trung (zh)', value: 'zh' },
+          { name: '🇬🇧 Tiếng Anh (en)', value: 'en' }
+        ]
+      },
+      {
+        name: 'level',
+        description: 'Độ khó (chỉ dùng cho Bắt đầu học)',
+        type: ApplicationCommandOptionType.String,
+        required: false,
+        choices: [
+          { name: '🟢 Cơ bản (basic)', value: 'basic' },
+          { name: '🔥 Nâng cao (advanced)', value: 'advanced' }
+        ]
+      }
+    ];
+  }
+
   // ── League of Legends ───────────────────────────────────────────────────
   if (['lsd', 'lolprofile', 'lolmatch', 'lolchamp', 'lolitem', 'lolrunes', 'lolpatch', 'lollink', 'lolunlink'].includes(command.type)) {
     return buildLolSlashOptions(command.type);

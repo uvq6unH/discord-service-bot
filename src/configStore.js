@@ -183,6 +183,8 @@ const COMMAND_TO_MODULE = {
   avatar: 'core',
   say: 'core',
   announce: 'core',
+  translate: 'core',
+  duolingo: 'core',
   
   // moderation
   purge: 'moderation',

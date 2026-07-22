@@ -14,6 +14,27 @@ function sKey(channelId, userId) {
   return `${channelId}:${userId}`;
 }
 
+async function sendOrUpdateQuizMessage(interaction, session, payload) {
+  try {
+    await interaction.deferUpdate().catch(() => null);
+    if (interaction.message) {
+      await interaction.message.delete().catch(() => null);
+    } else if (session.messageId) {
+      const channel = interaction.channel || await interaction.client.channels.fetch(interaction.channelId).catch(() => null);
+      if (channel) {
+        const oldMsg = await channel.messages.fetch(session.messageId).catch(() => null);
+        if (oldMsg) {
+          await oldMsg.delete().catch(() => null);
+        }
+      }
+    }
+    const newMsg = await interaction.channel.send(payload);
+    session.messageId = newMsg.id;
+  } catch (err) {
+    console.error('[lolQuiz] Failed to resend quiz message:', err);
+  }
+}
+
 /**
  * Generates a grid image containing champion avatars for the Connections game.
  */
@@ -366,7 +387,11 @@ export async function handleQuizButton(interaction) {
         isInteraction: true,
         reply: async (payload) => {
           if (payload.embeds) {
-            await interaction.update({ embeds: payload.embeds, components: [] });
+            await interaction.deferUpdate().catch(() => null);
+            if (interaction.message) {
+              await interaction.message.delete().catch(() => null);
+            }
+            await interaction.channel.send({ embeds: payload.embeds, components: [] });
           } else {
             const content = typeof payload === 'string' ? payload : (payload.content || 'Error');
             await interaction.reply({ content, ephemeral: true });
@@ -391,8 +416,12 @@ export async function handleQuizButton(interaction) {
           if (payload.files) {
             updatePayload.files = payload.files;
           }
-          await interaction.update(updatePayload);
-          return { id: interaction.message.id };
+          await interaction.deferUpdate().catch(() => null);
+          if (interaction.message) {
+            await interaction.message.delete().catch(() => null);
+          }
+          const newMsg = await interaction.channel.send(updatePayload);
+          return newMsg;
         } else {
           const content = typeof payload === 'string' ? payload : (payload.content || 'Error');
           await interaction.reply({ content, ephemeral: payload.ephemeral ?? true });
@@ -454,7 +483,7 @@ export async function handleQuizButton(interaction) {
     resetExpiry(sessionKeyStr);
     
     const payload = buildQuizEmbed(session);
-    await interaction.update(payload);
+    await sendOrUpdateQuizMessage(interaction, session, payload);
     return;
   }
 
@@ -465,7 +494,7 @@ export async function handleQuizButton(interaction) {
     resetExpiry(sessionKeyStr);
     
     const payload = buildQuizEmbed(session);
-    await interaction.update(payload);
+    await sendOrUpdateQuizMessage(interaction, session, payload);
     return;
   }
 
@@ -515,7 +544,7 @@ export async function handleQuizButton(interaction) {
       resetExpiry(sessionKeyStr);
 
       const payload = buildQuizEmbed(session);
-      await interaction.update(payload);
+      await sendOrUpdateQuizMessage(interaction, session, payload);
       
       const cat = game.categories.find(c => c.idx === firstIdx);
       const diffIcon = cat.difficulty === 'easy' ? '🟩' : (cat.difficulty === 'medium' ? '🟦' : (cat.difficulty === 'hard' ? '🟪' : '🟨'));
@@ -541,7 +570,7 @@ export async function handleQuizButton(interaction) {
       resetExpiry(sessionKeyStr);
 
       const payload = buildQuizEmbed(session);
-      await interaction.update(payload);
+      await sendOrUpdateQuizMessage(interaction, session, payload);
       
       if (session.status !== 'lost') {
         await interaction.followUp({
@@ -582,7 +611,7 @@ export async function handleQuizButton(interaction) {
     resetExpiry(sessionKeyStr);
 
     const payload = buildQuizEmbed(session);
-    await interaction.update(payload);
+    await sendOrUpdateQuizMessage(interaction, session, payload);
 
     if (!isCorrect && session.status !== 'lost') {
       const nextHint = game.preset.hints[game.hintLevel - 1];
@@ -607,7 +636,7 @@ export async function handleQuizButton(interaction) {
     }
 
     const payload = buildQuizEmbed(session);
-    await interaction.update(payload);
+    await sendOrUpdateQuizMessage(interaction, session, payload);
 
     let answerMsg = '';
     if (session.mode === 'connections') {
@@ -634,7 +663,7 @@ export async function handleQuizButton(interaction) {
 
         // Update the embed in-place to reveal the new attribute
         const payload = buildQuizEmbed(session);
-        await interaction.update(payload);
+        await sendOrUpdateQuizMessage(interaction, session, payload);
 
         const nameMap = {
           resource: 'Tài nguyên',
@@ -788,7 +817,7 @@ export async function handleQuizModalSubmit(interaction) {
   const replyPayload = buildQuizEmbed(session);
 
   // Update original message
-  await interaction.update(replyPayload);
+  await sendOrUpdateQuizMessage(interaction, session, replyPayload);
 }
 
 /**

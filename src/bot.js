@@ -525,9 +525,3 @@ function _startHeartbeat(client, redis) {
   handle.unref();
   console.log('[heartbeat] Bot heartbeat started — writing every 30 s');
 }
-
-// ── Self-ping keepalive ────────────────────────────────────────────────────────
-// Re-export từ utils/keepalive.js để entry points không cần import 2 nơi.
-// Logic thực sự nằm ở src/utils/keepalive.js — tách khỏi bot.js để
-// index.server.js import mà không kéo theo Discord client dependency graph.
-export { startKeepalive } from './utils/keepalive.js';

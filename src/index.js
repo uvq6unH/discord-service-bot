@@ -16,7 +16,6 @@ await sodium.ready;
 import { ConfigStore } from './configStore.js';
 import { StateStore } from './stateStore.js';
 import { createBot } from './bot.js';
-import { startKeepalive } from './utils/keepalive.js';
 import { loginWithRetry } from './utils/loginWithRetry.js';
 import { createServer } from './server.js';
 import { validateEnvironment } from './env.js';
@@ -95,5 +94,4 @@ await loginWithRetry(botClient, token, { logPrefix: 'app' });
 httpServer = app.listen(port, () => {
   console.log(`[app] Dashboard running at http://localhost:${port}`);
   console.log(`[app] Bot: ${botClient.user?.tag}`);
-  startKeepalive(port);
 });

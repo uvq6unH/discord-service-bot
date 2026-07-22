@@ -11,7 +11,9 @@ export const defaultConfig = {
       { enabled: true, type: 'user', name: 'user', description: 'Show user info', response: 'User info' },
       { enabled: true, type: 'avatar', name: 'avatar', description: 'Show user avatar', response: 'Avatar' },
       { enabled: true, type: 'say', name: 'say', description: 'Make the bot send a message', response: '{args}' },
-      { enabled: true, type: 'announce', name: 'announce', description: 'Send an announcement', response: '{args}' }
+      { enabled: true, type: 'announce', name: 'announce', description: 'Send an announcement', response: '{args}' },
+      { enabled: true, type: 'translate', name: 'translate', description: 'Dịch văn bản tự động (Nga, Nhật, Trung, Việt, Anh)', response: '' },
+      { enabled: true, type: 'duolingo', name: 'duolingo', description: 'Học tiếng Nga và tiếng Trung giống Duolingo', response: '' }
     ]
   },
   moderationEnabled: true,
@@ -214,6 +216,8 @@ export const COMMAND_TYPES = new Set([
   'announce',
   'ticketpanel',
   'rolepanel',
+  'translate',
+  'duolingo',
   // ── League of Legends ──────────────────────────────────────────────────────
   'lsd',
   'lolprofile',

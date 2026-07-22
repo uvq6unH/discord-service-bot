@@ -29,6 +29,7 @@ services:
     volumes:
       - ./src:/app/src
       - ./dashboard:/app/dashboard
+      - ./public-react:/app/public-react
       - ./assets:/app/assets
       - bot-logs:/app/logs
       - app-data:/app/data

@@ -6,7 +6,6 @@
  * Giao tiếp read-only với Redis (ConfigStore + StateStore).
  *
  * Start:  node src/index.server.js
- * PM2:    xem pm2.config.cjs (app "discord-dashboard")
  */
 
 import 'dotenv/config';
@@ -16,9 +15,6 @@ import { StateStore }             from './stateStore.js';
 import { createServer }           from './server.js';
 import { validateServerEnvironment } from './env.js';
 import { createUpstashFromEnv }       from './upstash.js';
-// Import từ utils/keepalive.js — KHÔNG import từ bot.js để tránh kéo theo
-// toàn bộ Discord client dependency graph vào dashboard process.
-import { startKeepalive }             from './utils/keepalive.js';
 
 // ── Validate ──────────────────────────────────────────────────────────────────
 try {
@@ -64,5 +60,4 @@ const app = createServer({
 
 app.listen(port, () => {
   console.log(`[server] Dashboard running at http://localhost:${port}`);
-  startKeepalive(port);
 });

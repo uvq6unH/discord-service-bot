@@ -46,7 +46,7 @@ export default function SystemPage() {
       {/* 1. Header Zone */}
       <HeaderZone
         title={t("SYSTEM RUNTIME MONITOR")}
-        subtitle={t("Real-time PM2 process load, microservices heartbeats, socket latencies, and transaction queues.")}
+        subtitle={t("Real-time process load, microservices heartbeats, socket latencies, and transaction queues.")}
         actions={
           <button 
             className="btn btn--secondary" 
@@ -63,7 +63,7 @@ export default function SystemPage() {
         <KpiTile 
           label={t("Process Load (CPU)")} 
           value={bot?.cpu != null ? `${bot.cpu.toFixed(1)}%` : '0.0%'} 
-          sub="PM2_ENGINE_LOAD"
+          sub="ENGINE_LOAD"
         />
         <KpiTile 
           label={t("Resident Memory")} 
@@ -86,7 +86,7 @@ export default function SystemPage() {
       <div className="grid-12">
         {/* Discord Bot Engine telemetry */}
         <div className="col-span-6">
-          <Panel title={t("DISCORD PROCESS BLUEPRINT [PM2_BOT]")} accent={botOnline}>
+          <Panel title={t("DISCORD PROCESS BLUEPRINT [BOT_SERVICE]")} accent={botOnline}>
             <DataSlab 
               label={t("Bot Session Status")} 
               value={botOnline ? t('ACTIVE // RUNNING') : t('OFFLINE // TERMINATED')} 
@@ -113,7 +113,7 @@ export default function SystemPage() {
 
         {/* Dashboard node server details */}
         <div className="col-span-6">
-          <Panel title={t("WEB INTERFACE PROCESS [PM2_DASH]")} accent>
+          <Panel title={t("WEB INTERFACE PROCESS [DASH_SERVICE]")} accent>
             <DataSlab 
               label={t("Node Server Uptime")} 
               value={dash?.uptime ? fmtUptime(dash.uptime) : '—'} 

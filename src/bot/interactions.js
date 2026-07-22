@@ -62,6 +62,11 @@ export async function handleComponentInteraction(interaction, { client, config, 
     return handleQuizButton(interaction);
   }
 
+  if (interaction.customId.startsWith('duolingo:')) {
+    const { handleDuolingoButton } = await import('./commands/handlers/duolingo.js');
+    return handleDuolingoButton(interaction);
+  }
+
   if (interaction.customId === 'ticket:create') {
     if (!config.ticketsEnabled) {
       await interaction.reply({ content: 'Tickets are disabled.', ephemeral: true });
