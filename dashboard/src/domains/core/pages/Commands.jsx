@@ -146,8 +146,16 @@ function CommandConfigRow({ cmd, roles, onUpdate, displayPrefix = '/' }) {
   );
 }
 
+const BUILTIN_COMMAND_NAMES = new Set([
+  'ping', 'help', 'config', 'server', 'user', 'avatar', 'say', 'announce', 'translate', 'duolingo',
+  'purge', 'warn', 'kick', 'ban', 'timeout', 'warnings', 'clearwarns', 'ticketpanel', 'rolepanel',
+  'rank', 'leaderboard', 'balance', 'daily', 'lsd', 'lolprofile', 'lolmatch', 'lolchamp', 'lolitem',
+  'lolrunes', 'lolpatch', 'lollink', 'lolunlink', 'tftlsd', 'tftprofile', 'tftmatch', 'tftlink',
+  'tftunlink', 'lolquiz', 'play', 'skip', 'stop', 'pause', 'resume', 'loop', 'queue', 'np', 'volume', 'remove'
+]);
+
 function CustomCommandEditor({ commands, onChange }) {
-  const customs = commands.filter(c => c.type === 'custom');
+  const customs = commands.filter(c => c.type === 'custom' && !BUILTIN_COMMAND_NAMES.has(c.name));
   const { t } = useLanguage();
 
   const add = () => onChange([
@@ -163,11 +171,18 @@ function CustomCommandEditor({ commands, onChange }) {
     },
   ]);
 
-  const remove = (id) => onChange(commands.filter(c => !(c.type === 'custom' && c.id === id)));
+  const matchesCmd = (c, targetKey) => {
+    if (c.type !== 'custom') return false;
+    if (targetKey && c.id) return c.id === targetKey;
+    if (targetKey && c.name) return c.name === targetKey;
+    return false;
+  };
 
-  const update = (id, field, val) =>
+  const remove = (targetKey) => onChange(commands.filter(c => !matchesCmd(c, targetKey)));
+
+  const update = (targetKey, field, val) =>
     onChange(commands.map(c =>
-      c.type === 'custom' && c.id === id ? { ...c, [field]: val } : c
+      matchesCmd(c, targetKey) ? { ...c, [field]: val } : c
     ));
 
   return (
@@ -177,56 +192,59 @@ function CustomCommandEditor({ commands, onChange }) {
           {t("[ NO CUSTOM ROUTED COMMANDS ]")}
         </p>
       )}
-      {customs.map((c) => (
-        <div key={c.id} style={{
-          background: 'var(--surface-1)',
-          border: '1px solid var(--border)',
-          padding: 'var(--space-4)',
-          display: 'flex',
-          flexDirection: 'column',
-          gap: 'var(--space-3)'
-        }}>
-          <div className="custom-command-header-row">
-            <span style={{ fontFamily: 'var(--font-mono)', fontSize: '12px', color: 'var(--text-3)' }}>/</span>
-            <input
-              className="form-input"
-              style={{ width: '150px', fontSize: '12px', fontFamily: 'var(--font-mono)' }}
-              placeholder={t("command-handle")}
-              value={c.name}
-              onChange={e => update(c.id, 'name', e.target.value.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9_-]/g, ''))}
-            />
-            <input
-              className="form-input"
-              style={{ flex: 1, fontSize: '12px' }}
-              placeholder={t("Description metadata...")}
-              value={c.description}
-              onChange={e => update(c.id, 'description', e.target.value)}
-            />
-            <label className="toggle-switch">
+      {customs.map((c, idx) => {
+        const itemKey = c.id || c.name || `custom_${idx}`;
+        return (
+          <div key={itemKey} style={{
+            background: 'var(--surface-1)',
+            border: '1px solid var(--border)',
+            padding: 'var(--space-4)',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 'var(--space-3)'
+          }}>
+            <div className="custom-command-header-row">
+              <span style={{ fontFamily: 'var(--font-mono)', fontSize: '12px', color: 'var(--text-3)' }}>/</span>
               <input
-                type="checkbox"
-                className="toggle-switch__input"
-                checked={c.enabled ?? true}
-                onChange={e => update(c.id, 'enabled', e.target.checked)}
+                className="form-input"
+                style={{ width: '150px', fontSize: '12px', fontFamily: 'var(--font-mono)' }}
+                placeholder={t("command-handle")}
+                value={c.name}
+                onChange={e => update(itemKey, 'name', e.target.value.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9_-]/g, ''))}
               />
-              <div className="toggle-switch__track">
-                <div className="toggle-switch__thumb" />
-              </div>
-            </label>
-            <button className="btn btn--danger" onClick={() => remove(c.id)} style={{ padding: 'var(--space-2) var(--space-3)' }}>
-              ×
-            </button>
+              <input
+                className="form-input"
+                style={{ flex: 1, fontSize: '12px' }}
+                placeholder={t("Description metadata...")}
+                value={c.description}
+                onChange={e => update(itemKey, 'description', e.target.value)}
+              />
+              <label className="toggle-switch">
+                <input
+                  type="checkbox"
+                  className="toggle-switch__input"
+                  checked={c.enabled ?? true}
+                  onChange={e => update(itemKey, 'enabled', e.target.checked)}
+                />
+                <div className="toggle-switch__track">
+                  <div className="toggle-switch__thumb" />
+                </div>
+              </label>
+              <button className="btn btn--danger" onClick={() => remove(itemKey)} style={{ padding: 'var(--space-2) var(--space-3)' }}>
+                ×
+              </button>
+            </div>
+            <textarea
+              className="form-input"
+              rows={2}
+              style={{ fontSize: '12px', fontFamily: 'var(--font-mono)' }}
+              placeholder={t("Command Response template. Variables: {user} {args} {server} {prefix}")}
+              value={c.response}
+              onChange={e => update(itemKey, 'response', e.target.value)}
+            />
           </div>
-          <textarea
-            className="form-input"
-            rows={2}
-            style={{ fontSize: '12px', fontFamily: 'var(--font-mono)' }}
-            placeholder={t("Command Response template. Variables: {user} {args} {server} {prefix}")}
-            value={c.response}
-            onChange={e => update(c.id, 'response', e.target.value)}
-          />
-        </div>
-      ))}
+        );
+      })}
       <button className="btn btn--secondary" style={{ alignSelf: 'flex-start' }} onClick={add}>
         {t("+ ADD CUSTOM COMMAND")}
       </button>

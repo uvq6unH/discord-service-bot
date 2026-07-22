@@ -147,7 +147,8 @@ function normalizeCommands(commands, defaultFallback = []) {
     .map((item) => {
       const name = normalizeCommandName(item?.name);
       const requestedType = String(item?.type ?? '').trim().toLowerCase();
-      const type = COMMAND_TYPES.has(requestedType) ? requestedType : builtInTypesByName.get(name) ?? 'custom';
+      const builtInType = builtInTypesByName.get(name);
+      const type = builtInType ?? (COMMAND_TYPES.has(requestedType) ? requestedType : 'custom');
 
       return {
         enabled: item?.enabled !== false,
