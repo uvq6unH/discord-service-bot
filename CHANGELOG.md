@@ -7,8 +7,8 @@ Format: `[vX.Y] — Mô tả ngắn` → chi tiết thay đổi.
 ## [v2.2.0] — Music Auto-Play (Radio Mode) & Dashboard Live Console Terminal (2026-07-23)
 
 **1. Music Auto-Play / Radio Mode (`src/bot/music/lavalink.js`, `interactions.js`, `music.js`)**
-- Bổ sung chế độ **Auto-Play / Radio Mode**: Khi danh sách nhạc hết (`queueEnd`), Bot tự động tìm kiếm các bài hát liên quan dựa trên tác giả và tên bài vừa phát qua Lavalink và tự động nối tiếp phát nhạc.
-- Thêm nút bấm tương tác **`📻 Radio: ON/OFF`** trên ActionRow điều khiển nhạc Discord và lệnh `/autoplay` (`hb autoplay`).
+- Bổ sung chế độ **Auto-Play / Radio Mode mặc định TỰ ĐỘNG 100%**: Ngay khi trạm phát nhạc được tạo, khi danh sách nhạc hết (`queueEnd`), Bot tự động tìm kiếm và nối tiếp phát các bài hát liên quan dựa trên tác giả/tên bài vừa phát qua Lavalink.
+- Thêm nút bấm tương tác **`📻 Radio: ON/OFF`** trên ActionRow điều khiển nhạc Discord và lệnh `/autoplay` (`hb autoplay`) hỗ trợ bật/tắt thủ công khi cần.
 
 **2. Live Terminal Console Viewer (`src/bot/logging.js`, `src/server.js`, `LiveConsole.jsx`, `System.jsx`)**
 - Xây dựng bộ thu thập Live Logs (`pushLiveLog` & `getLiveLogs`) ghi vết thời gian thực vào Redis list `telemetry:live_logs` (cấu trúc 100 bản ghi mới nhất).

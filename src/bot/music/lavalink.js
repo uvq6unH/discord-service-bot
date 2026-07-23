@@ -160,7 +160,7 @@ export async function initLavalink(client) {
 
   _manager.on('queueEnd', async (player) => {
     console.log(`[lavalink] 📭 queueEnd | guild ${player.guildId}`);
-    const isAutoplay = player.get('autoplay') ?? false;
+    const isAutoplay = player.get('autoplay') ?? true;
     if (isAutoplay && player.queue.previous?.length > 0) {
       const lastTrack = player.queue.previous[player.queue.previous.length - 1];
       const author = lastTrack?.info?.author ?? '';
@@ -190,6 +190,7 @@ export async function initLavalink(client) {
 
   _manager.on('playerCreate', (player) => {
     console.log(`[lavalink] playerCreate | guild ${player.guildId}`);
+    player.set('autoplay', true); // Mặc định tự động phát nhạc liên quan
   });
 
   _manager.on('playerDestroy', (player) => {
@@ -287,7 +288,7 @@ export function fmt(msOrTrack) {
   */
 export function buildMusicControlRow(player) {
   const isPaused = player?.paused ?? false;
-  const isAutoplay = player?.get('autoplay') ?? false;
+  const isAutoplay = player?.get('autoplay') ?? true;
 
   return new ActionRowBuilder().addComponents(
     new ButtonBuilder()
