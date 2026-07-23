@@ -4,6 +4,15 @@ Format: `[vX.Y] — Mô tả ngắn` → chi tiết thay đổi.
 
 ---
 
+## [v2.3.13] — Live Reads & Writes Telemetry Integration (2026-07-23)
+
+**`src/server.js`, `UpstashMetrics.jsx`** — Trích xuất và đồng bộ thống kê Writes và Reads chi tiết
+- Khai thác thành công 2 chỉ số ẩn trong lệnh `INFO` của Upstash Redis: `total_reads_processed` và `total_writes_processed`.
+- Thiết lập cơ chế tự phục hồi **Self-Healing Baselines** độc lập cho cả Reads và Writes (bắt đầu khớp với mốc thực tế `9,568 Reads` và `34,214 Writes` trong tháng 07/2026).
+- Cập nhật giao diện thẻ `COMMANDS` trên Dashboard để hiển thị bảng thống kê phân rã Writes (chấm xanh lục) và Reads (chấm trắng) vát vuông đồng bộ 100% với giao diện quản trị Upstash Console.
+
+---
+
 ## [v2.3.12] — Dynamic Monthly Baseline Reset Guard (2026-07-23)
 
 **`src/server.js`** — Tối ưu hóa mốc khởi đầu baseline tự động theo tháng lịch

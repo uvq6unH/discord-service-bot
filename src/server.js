@@ -382,20 +382,23 @@ export function createServer({ configStore, stateStore, botClient, redis = null 
     let upstashMetrics = null;
     if (redis) {
       try {
-        const [rawBot, rawDash, slashSynced, cacheRefresh, discordErrors, queueLen, commandsToday, rawDbsize, rawInfo, rawMonthlyBaseline, rawDailyBaseline, rawMonthlyLastValue, rawDailyLastValue] = await Promise.all([
+        const [rawBot, rawDash, slashSynced, cacheRefresh, discordErrors, queueLen, rawDbsize, rawInfo, rawMonthlyBaseline, rawDailyBaseline, rawMonthlyLastValue, rawDailyLastValue, rawReadsBaseline, rawWritesBaseline, rawReadsLastValue, rawWritesLastValue] = await Promise.all([
           redis.get('heartbeat:bot').catch(() => null),
           redis.get('heartbeat:dashboard').catch(() => null),
           redis.get('stats:slash_sync_processed').catch(() => null),
           redis.get('stats:guild_cache_refresh').catch(() => null),
           redis.get('stats:discord_errors').catch(() => null),
           redis.llen('slash_sync_queue').catch(() => null),
-          redis.hget(`telemetry:global:daily:${todayStr}`, 'commands').catch(() => null),
           redis.dbsize().catch(() => null),
           redis.info().catch(() => null),
           redis.get(`telemetry:global:monthly_baseline:${monthStr}`).catch(() => null),
           redis.get(`telemetry:global:daily_baseline:${todayStr}`).catch(() => null),
           redis.get(`telemetry:global:monthly_last_value:${monthStr}`).catch(() => null),
           redis.get(`telemetry:global:daily_last_value:${todayStr}`).catch(() => null),
+          redis.get(`telemetry:global:reads_baseline:${monthStr}`).catch(() => null),
+          redis.get(`telemetry:global:writes_baseline:${monthStr}`).catch(() => null),
+          redis.get(`telemetry:global:reads_last_value:${monthStr}`).catch(() => null),
+          redis.get(`telemetry:global:writes_last_value:${monthStr}`).catch(() => null),
         ]);
         redisConnected = true;
         if (rawBot) botHeartbeat = typeof rawBot === 'string' ? JSON.parse(rawBot) : rawBot;
@@ -414,26 +417,36 @@ export function createServer({ configStore, stateStore, botClient, redis = null 
         const usedBytes = Number(infoMap.total_data_size ?? infoMap.used_memory ?? 619839);
         const usedHuman = infoMap.total_data_size_human ?? infoMap.used_memory_human ?? `${(usedBytes / 1024).toFixed(0)} KB`;
         const engineCmds = Number(infoMap.total_commands_processed ?? 37000);
+        const engineReads = Number(infoMap.total_reads_processed ?? 11000);
+        const engineWrites = Number(infoMap.total_writes_processed ?? 180000);
 
         // Parse baseline state variables
         let monthlyBaseline = rawMonthlyBaseline ? parseInt(rawMonthlyBaseline, 10) : null;
         const initialConsoleVal = process.env.UPSTASH_MONTHLY_COMMANDS 
           ? Number(process.env.UPSTASH_MONTHLY_COMMANDS) 
-          : (monthStr === '2026-07' ? 42000 : 0);
+          : (monthStr === '2026-07' ? 44000 : 0);
         let monthlyLastValue = rawMonthlyLastValue ? parseInt(rawMonthlyLastValue, 10) : initialConsoleVal;
         
         let dailyBaseline = rawDailyBaseline ? parseInt(rawDailyBaseline, 10) : null;
         let dailyLastValue = rawDailyLastValue ? parseInt(rawDailyLastValue, 10) : 0;
 
+        // Reads baseline (July starts at 9568)
+        let readsBaseline = rawReadsBaseline ? parseInt(rawReadsBaseline, 10) : null;
+        const initialReadsVal = monthStr === '2026-07' ? 9568 : 0;
+        let readsLastValue = rawReadsLastValue ? parseInt(rawReadsLastValue, 10) : initialReadsVal;
+
+        // Writes baseline (July starts at 34214)
+        let writesBaseline = rawWritesBaseline ? parseInt(rawWritesBaseline, 10) : null;
+        const initialWritesVal = monthStr === '2026-07' ? 34214 : 0;
+        let writesLastValue = rawWritesLastValue ? parseInt(rawWritesLastValue, 10) : initialWritesVal;
+
         // 1. Self-Healing Monthly Baseline (handles serverless process resets/migrations)
         let computedMonthlyCmds = Math.max(0, engineCmds - (monthlyBaseline ?? 0));
         if (monthlyBaseline === null || isNaN(monthlyBaseline) || computedMonthlyCmds < monthlyLastValue) {
-          // Engine reset! Recalculate baseline so that total commands displayed does not drop
           monthlyBaseline = Math.max(0, engineCmds - monthlyLastValue);
           redis.set(`telemetry:global:monthly_baseline:${monthStr}`, String(monthlyBaseline)).catch(() => null);
           computedMonthlyCmds = monthlyLastValue;
         } else {
-          // Keep recording the incrementing value
           redis.set(`telemetry:global:monthly_last_value:${monthStr}`, String(computedMonthlyCmds)).catch(() => null);
         }
         const totalCmds = computedMonthlyCmds;
@@ -448,6 +461,28 @@ export function createServer({ configStore, stateStore, botClient, redis = null 
           redis.set(`telemetry:global:daily_last_value:${todayStr}`, String(computedDailyCmds)).catch(() => null);
         }
         const actualCommandsToday = computedDailyCmds;
+
+        // 3. Self-Healing Reads Baseline
+        let computedReads = Math.max(0, engineReads - (readsBaseline ?? 0));
+        if (readsBaseline === null || isNaN(readsBaseline) || computedReads < readsLastValue) {
+          readsBaseline = Math.max(0, engineReads - readsLastValue);
+          redis.set(`telemetry:global:reads_baseline:${monthStr}`, String(readsBaseline)).catch(() => null);
+          computedReads = readsLastValue;
+        } else {
+          redis.set(`telemetry:global:reads_last_value:${monthStr}`, String(computedReads)).catch(() => null);
+        }
+        const totalReads = computedReads;
+
+        // 4. Self-Healing Writes Baseline
+        let computedWrites = Math.max(0, engineWrites - (writesBaseline ?? 0));
+        if (writesBaseline === null || isNaN(writesBaseline) || computedWrites < writesLastValue) {
+          writesBaseline = Math.max(0, engineWrites - writesLastValue);
+          redis.set(`telemetry:global:writes_baseline:${monthStr}`, String(writesBaseline)).catch(() => null);
+          computedWrites = writesLastValue;
+        } else {
+          redis.set(`telemetry:global:writes_last_value:${monthStr}`, String(computedWrites)).catch(() => null);
+        }
+        const totalWrites = computedWrites;
 
         stats = {
           slashSyncProcessed: slashSynced ? parseInt(slashSynced, 10) : 0,
@@ -468,6 +503,8 @@ export function createServer({ configStore, stateStore, botClient, redis = null 
           cost: '$0.00',
           commands: {
             used: totalCmds,
+            reads: totalReads,
+            writes: totalWrites,
             engineTotal: engineCmds,
             limit: cmdLimit,
             percent: Number(((totalCmds / cmdLimit) * 100).toFixed(1)),

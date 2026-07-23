@@ -45,6 +45,24 @@ export default function UpstashMetrics({ upstash, redisConnected, commandsToday 
           <div style={{ width: '100%', height: '4px', background: 'rgba(255,255,255,0.1)', borderRadius: '2px', marginTop: '12px', overflow: 'hidden' }}>
             <div style={{ width: `${Math.min(100, commands?.percent ?? 0)}%`, height: '100%', background: 'var(--accent)', transition: 'width 0.3s' }} />
           </div>
+          
+          {/* Reads and Writes Console Breakdown */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginTop: '12px', fontSize: '11px', fontFamily: 'var(--font-mono)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', color: 'var(--text-2)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <span style={{ width: '6px', height: '6px', backgroundColor: 'var(--green)' }} />
+                <span>Writes</span>
+              </div>
+              <span style={{ color: 'var(--text-1)', fontWeight: 'bold' }}>{(commands?.writes ?? 0).toLocaleString('en-US')}</span>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', color: 'var(--text-2)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <span style={{ width: '6px', height: '6px', backgroundColor: 'var(--accent)' }} />
+                <span>Reads</span>
+              </div>
+              <span style={{ color: 'var(--text-1)', fontWeight: 'bold' }}>{(commands?.reads ?? 0).toLocaleString('en-US')}</span>
+            </div>
+          </div>
         </div>
 
         {/* BANDWIDTH */}
