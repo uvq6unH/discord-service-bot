@@ -35,6 +35,16 @@ export async function runBuiltInCommand(params) {
     ).catch(() => null);
   }
 
+  if (params.redis) {
+    import('../logging.js').then(({ pushLiveLog }) => {
+      pushLiveLog(params.redis, {
+        type: 'CMD',
+        message: `Executed /${ctx.command?.name ?? 'command'} by ${ctx.author?.tag ?? 'user'} in ${ctx.guild?.name ?? ctx.guild?.id}`,
+        metadata: ctx.guild?.id ?? 'GLOBAL'
+      }).catch(() => null);
+    }).catch(() => null);
+  }
+
   for (const handler of HANDLERS) {
     const result = await handler(ctx);
     if (result !== undefined) return result;
