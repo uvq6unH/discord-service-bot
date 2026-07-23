@@ -4,6 +4,14 @@ Format: `[vX.Y] — Mô tả ngắn` → chi tiết thay đổi.
 
 ---
 
+## [v2.3.5] — Route Guard Unification & Analytics Chart Size Normalization (2026-07-23)
+
+**`router.jsx` & `Analytics.jsx`** — Đồng bộ giao diện Guard & cố định kích thước biểu đồ Analytics
+- Chuyển route `/system` vào bên trong khối `GuildGuard` trong `router.jsx` giúp trải nghiệm hiển thị màn hình chọn máy chủ (`MISSION CONTROL // SELECT SERVER`) đồng bộ 100% trên tất cả các trang domain khi chưa chọn server.
+- Tối ưu lại component `BarChart` trong `Analytics.jsx` với khung tọa độ SVG chuẩn `800x150` và container cố định `160px` height. Giữ kích thước thẻ `HISTORICAL COMMAND LOAD DISTRIBUTION` và cỡ chữ ngày tháng sắc nét, đồng nhất tuyệt đối trên cả 3 tab `7D`, `30D`, và `90D INTERVAL`.
+
+---
+
 ## [v2.3.4] — Monthly Commands Meter & Live Console Stream Fix (2026-07-23)
 
 **`src/server.js`, `src/stateStore.js`, `src/bot/logging.js`** — Fix monthly command counter & real-time live log stream

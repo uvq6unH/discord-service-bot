@@ -7,35 +7,62 @@ import { useAnalytics } from '../hooks/useAnalytics.js';
 import { RefreshCw, TrendingUp, TrendingDown, Minus } from 'lucide-react';
 import { useLanguage } from '../../../shared/context/LanguageContext.jsx';
 
-function BarChart({ data, color = 'var(--accent)', height = 100, labelKey = 'date', valueKey = 'count' }) {
+function BarChart({ data, color = 'var(--accent)', labelKey = 'date', valueKey = 'count' }) {
+  const chartWidth = 800;
+  const chartHeight = 125;
+  const bottomMargin = 25;
+  const svgHeight = chartHeight + bottomMargin;
+
   const max = Math.max(...data.map(d => d[valueKey]), 1);
-  const showEvery = Math.ceil(data.length / 7);
+  const count = data.length || 1;
+  const paddingX = 10;
+  const usableWidth = chartWidth - paddingX * 2;
+  const step = usableWidth / count;
+  const barWidth = Math.max(3, Math.min(24, step * 0.7));
+
+  const maxLabels = 8;
+  const showEvery = Math.max(1, Math.ceil(count / maxLabels));
 
   return (
-    <svg viewBox={`0 0 ${data.length * 14} ${height + 24}`} style={{ width: '100%', overflow: 'visible' }} role="img">
-      {data.map((d, i) => {
-        const barH = Math.max((d[valueKey] / max) * height, 2);
-        return (
-          <g key={i}>
-            <rect 
-              x={i * 14 + 1} 
-              y={height - barH} 
-              width={11} 
-              height={barH} 
-              fill={color} 
-              opacity={0.82}
-            >
-              <title>{d[labelKey]}: {d[valueKey].toLocaleString('vi-VN')}</title>
-            </rect>
-            {i % showEvery === 0 && (
-              <text x={i * 14 + 7} y={height + 16} textAnchor="middle" fontSize={8} fill="var(--text-3)" fontFamily="var(--font-mono)">
-                {d[labelKey]}
-              </text>
-            )}
-          </g>
-        );
-      })}
-    </svg>
+    <div style={{ height: '160px', width: '100%', display: 'flex', alignItems: 'center' }}>
+      <svg viewBox={`0 0 ${chartWidth} ${svgHeight}`} style={{ width: '100%', height: '100%', overflow: 'visible' }} role="img">
+        <line x1={paddingX} y1={chartHeight} x2={chartWidth - paddingX} y2={chartHeight} stroke="var(--border)" strokeWidth="1" />
+        {data.map((d, i) => {
+          const val = d[valueKey] || 0;
+          const barH = Math.max((val / max) * (chartHeight - 10), 3);
+          const x = paddingX + i * step + (step - barWidth) / 2;
+          const y = chartHeight - barH;
+
+          return (
+            <g key={i}>
+              <rect 
+                x={x} 
+                y={y} 
+                width={barWidth} 
+                height={barH} 
+                fill={val > 0 ? color : 'var(--surface-2)'} 
+                opacity={val > 0 ? 0.88 : 0.4}
+                rx={1}
+              >
+                <title>{d[labelKey]}: {val.toLocaleString('vi-VN')}</title>
+              </rect>
+              {i % showEvery === 0 && (
+                <text 
+                  x={x + barWidth / 2} 
+                  y={chartHeight + 16} 
+                  textAnchor="middle" 
+                  fontSize={11} 
+                  fill="var(--text-3)" 
+                  fontFamily="var(--font-mono)"
+                >
+                  {d[labelKey]}
+                </text>
+              )}
+            </g>
+          );
+        })}
+      </svg>
+    </div>
   );
 }
 

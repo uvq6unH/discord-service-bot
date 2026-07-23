@@ -30,9 +30,6 @@ export default function AppRoutes() {
       {/* Default redirect to overview */}
       <Route path="/"            element={<Navigate to="/overview" replace />} />
 
-      {/* Global System Telemetry (Guild-independent) */}
-      <Route path="/system"      element={<SystemPage />} />
-
       {/* Guild-Scoped Sub-routes Guarded by GuildGuard */}
       <Route element={<GuildGuard><Outlet /></GuildGuard>}>
         <Route path="/overview"        element={<OverviewPage />} />
@@ -42,6 +39,7 @@ export default function AppRoutes() {
         <Route path="/economy"         element={<EconomyPage />} />
         <Route path="/moderation"      element={<ModerationPage />} />
         <Route path="/analytics"       element={<AnalyticsPage />} />
+        <Route path="/system"          element={<SystemPage />} />
         <Route path="/riot"            element={<RiotServicesPage />} />
         <Route path="/music"           element={<MusicServicesPage />} />
         <Route path="/reminders"       element={<ReminderServicesPage />} />
