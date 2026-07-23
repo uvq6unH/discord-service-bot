@@ -308,4 +308,18 @@
 - Mã nguồn sạch sẽ, không còn file rác PM2 hoặc script tự ping.
 - UptimeRobot đảm bảo gửi HTTP request mỗi 5 phút giữ cho Web Services luôn active.
 
+---
+
+## ADR-018 — Real-time Telemetry Pipeline & Redis Aggregation
+
+**Quyết định:** Thay thế toàn bộ dữ liệu giả lập (pseudo-random) bằng hệ thống thu thập dữ liệu thời gian thực `recordTelemetryEvent` lưu trữ theo dạng Hash và Set nguyên tử trong Redis (`telemetry:guild:{id}:daily:{date}`, `telemetry:guild:{id}:users:{date}`, `telemetry:guild:{id}:active_hours`).
+
+**Lý do chọn:**
+- Dữ liệu ngẫu nhiên giả lập không phản ánh đúng lượt tương tác thực tế của server và gây hiểu nhầm cho Quản trị viên.
+- Kiến trúc lưu trữ nguyên tử theo ngày qua Redis Hash/Set cho phép tổng hợp cực nhanh các mốc 7d, 30d, 90d mà không cần quét cơ sở dữ liệu lớn hay tốn chi phí tính toán CPU.
+
+**Hệ quả:**
+- Trang Analytics và System hiển thị 100% chỉ số thực tế (lượt chạy lệnh, RAM, CPU load, Ping, active users).
+- Hoạt động bất đồng bộ, không tạo độ trễ cho quá trình xử lý lệnh Discord.
+
 

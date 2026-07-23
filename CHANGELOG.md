@@ -4,6 +4,19 @@ Format: `[vX.Y] — Mô tả ngắn` → chi tiết thay đổi.
 
 ---
 
+## [v2.1.0] — Real-time Telemetry Pipeline & Engine Load Monitoring (2026-07-23)
+
+**1. Telemetry Pipeline (`src/stateStore.js` & `src/bot/commands/index.js`)**
+- Tích hợp `recordTelemetryEvent` lưu trữ theo thời gian thực lượt gọi lệnh (`commands`), lượt giao dịch kinh tế (`economy`), hành động kiểm duyệt (`moderation`) và người dùng active (`users`) theo từng ngày vào Redis keys `telemetry:guild:{id}:daily:{YYYY-MM-DD}` và `telemetry:guild:{id}:users:{YYYY-MM-DD}`.
+- Ghi nhận phân bổ thời gian tương tác người dùng theo khung giờ (`active_hours`) và đếm số lượng lệnh toàn hệ thống trong ngày (`telemetry:global:daily:{YYYY-MM-DD}`).
+
+**2. Analytics & System Pages (`src/server.js`)**
+- Nâng cấp `fetchAnalytics` thay thế hoàn toàn dữ liệu giả lập `generateAnalytics`: đọc và tính toán chỉ số thực tế trực tiếp từ Redis/StateStore cho các biểu đồ 7d, 30d, 90d.
+- Bổ sung thông số tải hệ thống thực tế cho `/api/status`: CPU Load (`process.cpuUsage`), RAM RSS Memory (`process.memoryUsage().rss`), Gateway WebSocket Latency (`client.ws.ping`) và lệnh chạy trong ngày (`commandsToday`).
+- Bổ sung `heartbeat:dashboard` ghi nhận tình trạng Server định kỳ mỗi 30 giây.
+
+---
+
 ## [v2.0.0] — Unified Architecture, Lavalink Multi-Node Pool & Dashboard Refactor (2026-07-22)
 
 **1. Lavalink Multi-Node Audio Engine (`src/bot/music/lavalink.js`)**
