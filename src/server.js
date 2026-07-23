@@ -382,7 +382,7 @@ export function createServer({ configStore, stateStore, botClient, redis = null 
     let upstashMetrics = null;
     if (redis) {
       try {
-        const [rawBot, rawDash, slashSynced, cacheRefresh, discordErrors, queueLen, commandsToday, rawDbsize, rawInfo, rawMonthlyBaseline, rawDailyBaseline] = await Promise.all([
+        const [rawBot, rawDash, slashSynced, cacheRefresh, discordErrors, queueLen, commandsToday, rawDbsize, rawInfo, rawMonthlyBaseline, rawDailyBaseline, rawMonthlyLastValue, rawDailyLastValue] = await Promise.all([
           redis.get('heartbeat:bot').catch(() => null),
           redis.get('heartbeat:dashboard').catch(() => null),
           redis.get('stats:slash_sync_processed').catch(() => null),
@@ -394,6 +394,8 @@ export function createServer({ configStore, stateStore, botClient, redis = null 
           redis.info().catch(() => null),
           redis.get(`telemetry:global:monthly_baseline:${monthStr}`).catch(() => null),
           redis.get(`telemetry:global:daily_baseline:${todayStr}`).catch(() => null),
+          redis.get(`telemetry:global:monthly_last_value:${monthStr}`).catch(() => null),
+          redis.get(`telemetry:global:daily_last_value:${todayStr}`).catch(() => null),
         ]);
         redisConnected = true;
         if (rawBot) botHeartbeat = typeof rawBot === 'string' ? JSON.parse(rawBot) : rawBot;
@@ -413,33 +415,44 @@ export function createServer({ configStore, stateStore, botClient, redis = null 
         const usedHuman = infoMap.total_data_size_human ?? infoMap.used_memory_human ?? `${(usedBytes / 1024).toFixed(0)} KB`;
         const engineCmds = Number(infoMap.total_commands_processed ?? 37000);
 
-        // 1. Monthly Baseline Calculation
+        // Parse baseline state variables
         let monthlyBaseline = rawMonthlyBaseline ? parseInt(rawMonthlyBaseline, 10) : null;
-        if (monthlyBaseline === null || isNaN(monthlyBaseline)) {
-          // Initialize baseline so current monthly commands matches the Upstash console.
-          // Currently, the console is around 42k (42000).
-          const initialConsoleValue = process.env.UPSTASH_MONTHLY_COMMANDS
-            ? Number(process.env.UPSTASH_MONTHLY_COMMANDS)
-            : 42000;
-          monthlyBaseline = Math.max(0, engineCmds - initialConsoleValue);
-          redis.set(`telemetry:global:monthly_baseline:${monthStr}`, String(monthlyBaseline)).catch(() => null);
-        }
-        const totalCmds = Math.max(0, engineCmds - monthlyBaseline);
-
-        // 2. Daily Baseline Calculation
+        const initialConsoleVal = process.env.UPSTASH_MONTHLY_COMMANDS ? Number(process.env.UPSTASH_MONTHLY_COMMANDS) : 42000;
+        let monthlyLastValue = rawMonthlyLastValue ? parseInt(rawMonthlyLastValue, 10) : initialConsoleVal;
+        
         let dailyBaseline = rawDailyBaseline ? parseInt(rawDailyBaseline, 10) : null;
-        if (dailyBaseline === null || isNaN(dailyBaseline)) {
-          dailyBaseline = engineCmds;
-          redis.set(`telemetry:global:daily_baseline:${todayStr}`, String(dailyBaseline)).catch(() => null);
+        let dailyLastValue = rawDailyLastValue ? parseInt(rawDailyLastValue, 10) : 0;
+
+        // 1. Self-Healing Monthly Baseline (handles serverless process resets/migrations)
+        let computedMonthlyCmds = Math.max(0, engineCmds - (monthlyBaseline ?? 0));
+        if (monthlyBaseline === null || isNaN(monthlyBaseline) || computedMonthlyCmds < monthlyLastValue) {
+          // Engine reset! Recalculate baseline so that total commands displayed does not drop
+          monthlyBaseline = Math.max(0, engineCmds - monthlyLastValue);
+          redis.set(`telemetry:global:monthly_baseline:${monthStr}`, String(monthlyBaseline)).catch(() => null);
+          computedMonthlyCmds = monthlyLastValue;
+        } else {
+          // Keep recording the incrementing value
+          redis.set(`telemetry:global:monthly_last_value:${monthStr}`, String(computedMonthlyCmds)).catch(() => null);
         }
-        const actualCommandsToday = Math.max(0, engineCmds - dailyBaseline);
+        const totalCmds = computedMonthlyCmds;
+
+        // 2. Self-Healing Daily Baseline
+        let computedDailyCmds = Math.max(0, engineCmds - (dailyBaseline ?? 0));
+        if (dailyBaseline === null || isNaN(dailyBaseline) || computedDailyCmds < dailyLastValue) {
+          dailyBaseline = Math.max(0, engineCmds - dailyLastValue);
+          redis.set(`telemetry:global:daily_baseline:${todayStr}`, String(dailyBaseline)).catch(() => null);
+          computedDailyCmds = dailyLastValue;
+        } else {
+          redis.set(`telemetry:global:daily_last_value:${todayStr}`, String(computedDailyCmds)).catch(() => null);
+        }
+        const actualCommandsToday = computedDailyCmds;
 
         stats = {
           slashSyncProcessed: slashSynced ? parseInt(slashSynced, 10) : 0,
           guildCacheRefresh: cacheRefresh ? parseInt(cacheRefresh, 10) : 0,
           discordErrors: discordErrors ? parseInt(discordErrors, 10) : 0,
           slashQueueLength: queueLen ? parseInt(queueLen, 10) : 0,
-          commandsToday: actualCommandsToday, // Phản ánh đúng 100% số lượng lệnh chạy thực tế hôm nay
+          commandsToday: actualCommandsToday,
         };
 
         const storageLimit = 256 * 1024 * 1024;

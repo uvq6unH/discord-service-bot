@@ -4,6 +4,14 @@ Format: `[vX.Y] — Mô tả ngắn` → chi tiết thay đổi.
 
 ---
 
+## [v2.3.11] — Self-Healing Telemetry Baselines & Serverless Resiliency (2026-07-23)
+
+**`src/server.js`** — Tự phục hồi số liệu khi tiến trình Redis Engine bị reset trên Upstash Cloud
+- Giải quyết triệt để lỗi sụt giảm số liệu lệnh hiển thị (ví dụ từ 42k tụt về 32k và số lệnh ngày tụt về 0) xảy ra do Upstash Cloud tự động khởi động lại, chuyển đổi hoặc di chuyển node Redis (khiến chỉ số `total_commands_processed` trong bộ nhớ RAM Redis Engine bị reset về 0).
+- Thiết lập cơ chế **Self-Healing**: Ghi lại giá trị hợp lệ cuối cùng lên Redis (`monthly_last_value` và `daily_last_value`). Nếu phát hiện chỉ số engine bị sụt giảm, hệ thống tự động căn chỉnh lại mốc baseline để đảm bảo hiển thị dữ liệu tăng tiến liên tục, chính xác tuyệt đối mà không bị gián đoạn.
+
+---
+
 ## [v2.3.10] — Public Docs Redesign & System Navigation Integration (2026-07-23)
 
 **`TermsPage.jsx`, `PrivacyPage.jsx`, `DomainRail.jsx`, `GuildGuard.jsx`** — Thiết kế lại 2 trang pháp lý & Tích hợp liên kết truy cập
