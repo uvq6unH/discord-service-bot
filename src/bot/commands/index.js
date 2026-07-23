@@ -26,6 +26,15 @@ export async function runBuiltInCommand(params) {
   const ctx = await createCommandContext(params);
   if (ctx.denied) return ctx.deniedResult;
 
+  if (params.stateStore && ctx.guild?.id) {
+    params.stateStore.recordTelemetryEvent(
+      ctx.guild.id,
+      ctx.author?.id,
+      ctx.command?.name,
+      ctx.command?.type
+    ).catch(() => null);
+  }
+
   for (const handler of HANDLERS) {
     const result = await handler(ctx);
     if (result !== undefined) return result;

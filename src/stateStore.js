@@ -1043,6 +1043,66 @@ export class StateStore {
     }
   }
 
+  // ── Real-time Analytics & Telemetry Tracking ─────────────────────────────────
+  async recordTelemetryEvent(guildId, userId, commandName, category = 'general') {
+    if (!guildId) return;
+    const now = new Date();
+    const dateStr = now.toISOString().slice(0, 10); // YYYY-MM-DD
+    const hourStr = `${String(now.getHours()).padStart(2, '0')}:00`;
+
+    const cat = String(category || '').toLowerCase();
+    const cmd = String(commandName || '').toLowerCase();
+
+    const isEconomy = ['economy', 'games', 'daily', 'balance', 'pay', 'blackjack', 'slots', 'poker'].includes(cat) ||
+      ['balance', 'daily', 'pay', 'blackjack', 'slots', 'coinflip', 'poker'].includes(cmd);
+    const isMod = ['moderation', 'ticket'].includes(cat) ||
+      ['warn', 'kick', 'ban', 'mute', 'unmute', 'purge', 'ticket'].includes(cmd);
+
+    if (this._useRedis) {
+      try {
+        const pipeline = [
+          ['HINCRBY', `telemetry:guild:${guildId}:daily:${dateStr}`, 'commands', 1],
+          ['HINCRBY', `telemetry:global:daily:${dateStr}`, 'commands', 1],
+          ['HINCRBY', `telemetry:guild:${guildId}:active_hours`, hourStr, 1]
+        ];
+        if (cmd) {
+          pipeline.push(['HINCRBY', `telemetry:guild:${guildId}:daily:${dateStr}`, `cmd:${cmd}`, 1]);
+        }
+        if (isEconomy) {
+          pipeline.push(['HINCRBY', `telemetry:guild:${guildId}:daily:${dateStr}`, 'economy', 1]);
+        }
+        if (isMod) {
+          pipeline.push(['HINCRBY', `telemetry:guild:${guildId}:daily:${dateStr}`, 'moderation', 1]);
+        }
+        if (userId) {
+          pipeline.push(['SADD', `telemetry:guild:${guildId}:users:${dateStr}`, String(userId)]);
+        }
+        await this._redis.pipeline(pipeline);
+      } catch (err) {
+        /* non-fatal telemetry error */
+      }
+    } else {
+      try {
+        const state = (await readJsonFile(this._filePath)) || {};
+        state.telemetry ??= {};
+        state.telemetry[guildId] ??= {};
+        state.telemetry[guildId][dateStr] ??= { commands: 0, economy: 0, moderation: 0, commandsMap: {} };
+        const d = state.telemetry[guildId][dateStr];
+        d.commands = (d.commands || 0) + 1;
+        if (cmd) {
+          d.commandsMap[cmd] = (d.commandsMap[cmd] || 0) + 1;
+        }
+        if (isEconomy) d.economy = (d.economy || 0) + 1;
+        if (isMod) d.moderation = (d.moderation || 0) + 1;
+
+        state.telemetry_global ??= {};
+        state.telemetry_global[dateStr] = (state.telemetry_global[dateStr] || 0) + 1;
+
+        fs.writeFileSync(this._filePath, JSON.stringify(state, null, 2), 'utf8');
+      } catch { /* non-fatal */ }
+    }
+  }
+
 }
 // getGuild() đã bị xoá (deprecated từ v1.3, không còn caller nào).
 // Dùng các method cụ thể: getEconomyUser, getLevels, getWarnings, ...

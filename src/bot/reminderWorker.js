@@ -15,14 +15,8 @@ import { resolveEmojiNames } from './emojiMap.js';
 
 const REPEAT_INTERVALS_MS = {
   hourly: 60 * 60 * 1_000,
-  daily:  24 * 60 * 60 * 1_000,
-  weekly:  7 * 24 * 60 * 60 * 1_000,
-};
-
-const REPEAT_LABELS = {
-  hourly: ' 🔁 (mỗi giờ)',
-  daily:  ' 🔁 (mỗi ngày)',
-  weekly: ' 🔁 (mỗi tuần)',
+  daily: 24 * 60 * 60 * 1_000,
+  weekly: 7 * 24 * 60 * 60 * 1_000,
 };
 
 /**
@@ -41,19 +35,18 @@ async function processOneReminder(reminder, guild) {
     const roleMentions = roleIds.map((id) => `<@&${id}>`).join(' ');
 
     const mentions = [userMentions, roleMentions].filter(Boolean).join(' ');
-    const repeatLabel  = REPEAT_LABELS[reminder.repeat] ?? '';
-    const resolvedMsg  = resolveEmojiNames(reminder.message, guild);
+    const resolvedMsg = resolveEmojiNames(reminder.message, guild);
     const finalText = mentions ? `${mentions} ${resolvedMsg}${repeatLabel}` : `${resolvedMsg}${repeatLabel}`;
     await channel.send(finalText).catch(() => null);
   }
 
   const repeat = reminder.repeat ?? 'none';
-  const ms     = REPEAT_INTERVALS_MS[repeat];
+  const ms = REPEAT_INTERVALS_MS[repeat];
   if (!ms) return null; // one-shot — consume
 
   const baseTime = new Date(reminder.time).getTime();
-  const now      = Date.now();
-  let nextTime   = baseTime + ms;
+  const now = Date.now();
+  let nextTime = baseTime + ms;
   while (nextTime <= now) nextTime += ms;
 
   return { ...reminder, time: new Date(nextTime).toISOString() };
@@ -65,7 +58,7 @@ async function processOneReminder(reminder, guild) {
  * @param {import('../configStore.js').ConfigStore} configStore
  */
 async function reminderTick(discordClient, configStore) {
-  const now      = new Date();
+  const now = new Date();
   const guildIds = await configStore.listGuildIds();
 
   for (const guildId of guildIds) {
@@ -73,7 +66,7 @@ async function reminderTick(discordClient, configStore) {
       const config = await configStore.getGuildConfig(guildId);
       if (!config.enabled || !config.remindersEnabled || !config.reminders?.length) continue;
 
-      let modified       = false;
+      let modified = false;
       const nextReminders = [];
 
       for (const reminder of config.reminders) {

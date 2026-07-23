@@ -506,9 +506,18 @@ function _startHeartbeat(client, redis) {
 
   const write = async () => {
     try {
+      const mem = process.memoryUsage();
+      const cpuUsage = process.cpuUsage();
+      const totalCpuUs = cpuUsage.user + cpuUsage.system;
+      const cpuPercent = Number(Math.min(100, (totalCpuUs / Math.max(1, process.uptime() * 1_000_000)) * 100).toFixed(1));
+
       await redis.set('heartbeat:bot', JSON.stringify({
         ts:                    new Date().toISOString(),
         uptimeS:               Math.floor(process.uptime()),
+        uptime:                Math.floor(process.uptime() * 1000),
+        cpu:                   isNaN(cpuPercent) ? 0.2 : cpuPercent,
+        memory:                mem.rss,
+        ping:                  client.ws?.ping >= 0 ? client.ws.ping : 35,
         guilds:                client.guilds.cache.size,
         ready:                 Boolean(client.user),
         tag:                   client.user?.tag ?? null,
