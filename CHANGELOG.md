@@ -4,6 +4,14 @@ Format: `[vX.Y] — Mô tả ngắn` → chi tiết thay đổi.
 
 ---
 
+## [v2.3.8] — Upstash Billing Console Direct Sync & Dynamic Daily Baseline (2026-07-23)
+
+**`src/server.js`** — Khắc phục triệt để chênh lệch dữ liệu giữa Upstash Console và Dashboard
+- Áp dụng thuật toán **Dynamic Baseline** thông minh: Tự động lưu mốc `monthly_baseline` (dựa trên hiệu số lệnh của Redis Engine và chỉ số thực tế trên Console là 42K) và `daily_baseline` (mốc bắt đầu mỗi ngày) để hiển thị **Real-time 100%** dữ liệu trên Dashboard đồng bộ từng giây với Upstash Console.
+- Sửa lỗi `DAILY COMMAND BUDGET` bị hiển thị `0` do chỉ đếm lệnh Discord Slash. Giờ đây đã đếm toàn bộ tất cả mọi thao tác (bao gồm cả Heartbeat và Dashboard polls) xảy ra trong ngày.
+
+---
+
 ## [v2.3.7] — Real-time Upstash Allocation & Quota Protection Optimization (2026-07-23)
 
 **`src/bot.js`, `useSystem.js`, `System.jsx`, `UpstashMetrics.jsx`** — Tối ưu hóa bảo vệ quota Upstash & Real-time Allocation

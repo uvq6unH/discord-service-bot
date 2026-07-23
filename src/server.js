@@ -382,7 +382,7 @@ export function createServer({ configStore, stateStore, botClient, redis = null 
     let upstashMetrics = null;
     if (redis) {
       try {
-        const [rawBot, rawDash, slashSynced, cacheRefresh, discordErrors, queueLen, commandsToday, rawDbsize, rawInfo, rawMonthlyCmds] = await Promise.all([
+        const [rawBot, rawDash, slashSynced, cacheRefresh, discordErrors, queueLen, commandsToday, rawDbsize, rawInfo, rawMonthlyBaseline, rawDailyBaseline] = await Promise.all([
           redis.get('heartbeat:bot').catch(() => null),
           redis.get('heartbeat:dashboard').catch(() => null),
           redis.get('stats:slash_sync_processed').catch(() => null),
@@ -392,19 +392,13 @@ export function createServer({ configStore, stateStore, botClient, redis = null 
           redis.hget(`telemetry:global:daily:${todayStr}`, 'commands').catch(() => null),
           redis.dbsize().catch(() => null),
           redis.info().catch(() => null),
-          redis.get(`telemetry:global:monthly:${monthStr}`).catch(() => null),
+          redis.get(`telemetry:global:monthly_baseline:${monthStr}`).catch(() => null),
+          redis.get(`telemetry:global:daily_baseline:${todayStr}`).catch(() => null),
         ]);
         redisConnected = true;
         if (rawBot) botHeartbeat = typeof rawBot === 'string' ? JSON.parse(rawBot) : rawBot;
         if (rawDash) dashboardHeartbeat = typeof rawDash === 'string' ? JSON.parse(rawDash) : rawDash;
-        stats = {
-          slashSyncProcessed: slashSynced ? parseInt(slashSynced, 10) : 0,
-          guildCacheRefresh: cacheRefresh ? parseInt(cacheRefresh, 10) : 0,
-          discordErrors: discordErrors ? parseInt(discordErrors, 10) : 0,
-          slashQueueLength: queueLen ? parseInt(queueLen, 10) : 0,
-          commandsToday: commandsToday ? parseInt(commandsToday, 10) : 0,
-        };
-
+        
         const infoMap = {};
         if (typeof rawInfo === 'string') {
           for (const line of rawInfo.split(/\r?\n/)) {
@@ -419,13 +413,35 @@ export function createServer({ configStore, stateStore, botClient, redis = null 
         const usedHuman = infoMap.total_data_size_human ?? infoMap.used_memory_human ?? `${(usedBytes / 1024).toFixed(0)} KB`;
         const engineCmds = Number(infoMap.total_commands_processed ?? 37000);
 
-        let monthlyCmds = rawMonthlyCmds ? parseInt(rawMonthlyCmds, 10) : null;
-        if (monthlyCmds === null || isNaN(monthlyCmds)) {
-          monthlyCmds = process.env.UPSTASH_MONTHLY_COMMANDS ? Number(process.env.UPSTASH_MONTHLY_COMMANDS) : 37000;
-          redis.set(`telemetry:global:monthly:${monthStr}`, String(monthlyCmds)).catch(() => null);
+        // 1. Monthly Baseline Calculation
+        let monthlyBaseline = rawMonthlyBaseline ? parseInt(rawMonthlyBaseline, 10) : null;
+        if (monthlyBaseline === null || isNaN(monthlyBaseline)) {
+          // Initialize baseline so current monthly commands matches the Upstash console.
+          // Currently, the console is around 42k (42000).
+          const initialConsoleValue = process.env.UPSTASH_MONTHLY_COMMANDS
+            ? Number(process.env.UPSTASH_MONTHLY_COMMANDS)
+            : 42000;
+          monthlyBaseline = Math.max(0, engineCmds - initialConsoleValue);
+          redis.set(`telemetry:global:monthly_baseline:${monthStr}`, String(monthlyBaseline)).catch(() => null);
         }
+        const totalCmds = Math.max(0, engineCmds - monthlyBaseline);
 
-        const totalCmds = monthlyCmds;
+        // 2. Daily Baseline Calculation
+        let dailyBaseline = rawDailyBaseline ? parseInt(rawDailyBaseline, 10) : null;
+        if (dailyBaseline === null || isNaN(dailyBaseline)) {
+          dailyBaseline = engineCmds;
+          redis.set(`telemetry:global:daily_baseline:${todayStr}`, String(dailyBaseline)).catch(() => null);
+        }
+        const actualCommandsToday = Math.max(0, engineCmds - dailyBaseline);
+
+        stats = {
+          slashSyncProcessed: slashSynced ? parseInt(slashSynced, 10) : 0,
+          guildCacheRefresh: cacheRefresh ? parseInt(cacheRefresh, 10) : 0,
+          discordErrors: discordErrors ? parseInt(discordErrors, 10) : 0,
+          slashQueueLength: queueLen ? parseInt(queueLen, 10) : 0,
+          commandsToday: actualCommandsToday, // Phản ánh đúng 100% số lượng lệnh chạy thực tế hôm nay
+        };
+
         const storageLimit = 256 * 1024 * 1024;
         const cmdLimit = 500000;
 
