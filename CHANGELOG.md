@@ -4,6 +4,14 @@ Format: `[vX.Y] — Mô tả ngắn` → chi tiết thay đổi.
 
 ---
 
+## [v2.3.12] — Dynamic Monthly Baseline Reset Guard (2026-07-23)
+
+**`src/server.js`** — Tối ưu hóa mốc khởi đầu baseline tự động theo tháng lịch
+- Khắc phục lỗi khởi tạo cố định mốc `42k`: Thiết lập `initialConsoleVal` động theo tháng. Mốc `42000` chỉ được áp dụng làm điểm bù (offset) cho tháng hiện tại (`2026-07`) để khớp với ảnh chụp thực tế của ông.
+- Với các tháng tương lai (từ `2026-08` trở đi), hệ thống sẽ tự động khởi đầu bằng **`0`** đồng bộ hoàn hảo với việc Upstash reset Billing meter hàng tháng.
+
+---
+
 ## [v2.3.11] — Self-Healing Telemetry Baselines & Serverless Resiliency (2026-07-23)
 
 **`src/server.js`** — Tự phục hồi số liệu khi tiến trình Redis Engine bị reset trên Upstash Cloud

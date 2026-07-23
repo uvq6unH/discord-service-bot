@@ -417,7 +417,9 @@ export function createServer({ configStore, stateStore, botClient, redis = null 
 
         // Parse baseline state variables
         let monthlyBaseline = rawMonthlyBaseline ? parseInt(rawMonthlyBaseline, 10) : null;
-        const initialConsoleVal = process.env.UPSTASH_MONTHLY_COMMANDS ? Number(process.env.UPSTASH_MONTHLY_COMMANDS) : 42000;
+        const initialConsoleVal = process.env.UPSTASH_MONTHLY_COMMANDS 
+          ? Number(process.env.UPSTASH_MONTHLY_COMMANDS) 
+          : (monthStr === '2026-07' ? 42000 : 0);
         let monthlyLastValue = rawMonthlyLastValue ? parseInt(rawMonthlyLastValue, 10) : initialConsoleVal;
         
         let dailyBaseline = rawDailyBaseline ? parseInt(rawDailyBaseline, 10) : null;
