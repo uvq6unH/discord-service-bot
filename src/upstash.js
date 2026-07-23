@@ -94,6 +94,12 @@ export class UpstashClient {
   /** Trả về mảng key khớp với pattern (dùng scan khi có; Upstash REST hỗ trợ KEYS). */
   keys(pattern)                     { return this._request(['KEYS', pattern]); }
 
+  // ── Hash commands ──────────────────────────────────────────────────────────
+
+  hget(key, field)                  { return this._request(['HGET', key, field]); }
+  hgetall(key)                      { return this._request(['HGETALL', key]); }
+  hincrby(key, field, increment)    { return this._request(['HINCRBY', key, field, String(increment)]); }
+
   // ── Set commands ───────────────────────────────────────────────────────────
 
   smembers(key)                     { return this._request(['SMEMBERS', key]); }

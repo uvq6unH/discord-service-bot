@@ -4,6 +4,14 @@ Format: `[vX.Y] — Mô tả ngắn` → chi tiết thay đổi.
 
 ---
 
+## [v2.1.1] — Fix Upstash Hash Methods & Dashboard Redis Linking (2026-07-23)
+
+**`src/upstash.js` & `src/server.js`** — Fix Redis connection failure & Hash command errors
+- Bổ sung các phương thức Redis Hash (`hget`, `hgetall`, `hincrby`) bị thiếu vào `UpstashClient` trong `src/upstash.js`. Sửa lỗi `TypeError: redis.hget is not a function` khiến `/api/status` báo lỗi ngắt kết nối `LINK_FAILURE` / `OFFLINE`.
+- Cấu hình `ConfigStore` trong `src/index.server.js` truyền tham số `{ redis: sharedRedis }` giúp tiến trình Dashboard đọc ghi cấu hình đồng bộ trực tiếp qua Redis.
+
+---
+
 ## [v2.1.0] — Real-time Telemetry Pipeline & Engine Load Monitoring (2026-07-23)
 
 **1. Telemetry Pipeline (`src/stateStore.js` & `src/bot/commands/index.js`)**

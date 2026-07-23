@@ -48,7 +48,7 @@ process.on('SIGTERM', () => { console.log('[server] SIGTERM — exiting.'); proc
 // Dashboard không cần botClient — truyền null.
 // server.js đã handle botClient === null: các route cần bot sẽ trả lỗi 503.
 const sharedRedis = createUpstashFromEnv();
-const configStore = new ConfigStore(configPath);
+const configStore = new ConfigStore(configPath, { redis: sharedRedis });
 const stateStore  = new StateStore(statePath, { redis: sharedRedis });
 
 const app = createServer({
