@@ -368,6 +368,30 @@ export function createServer({ configStore, stateStore, botClient, redis = null 
 
   app.get('/api/csrf-token', auth.requireAuth, (req, res) => csrf.issueToken(req, res));
 
+  async function getUptimeRobotMonitors(apiKey) {
+    try {
+      const res = await fetch('https://api.uptimerobot.com/v2/getMonitors', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          api_key: apiKey,
+          format: 'json',
+        }),
+      });
+      if (!res.ok) return null;
+      const data = await res.json();
+      if (data.stat === 'ok') {
+        return data.monitors;
+      }
+      return null;
+    } catch (err) {
+      console.error('Failed to fetch UptimeRobot monitors:', err);
+      return null;
+    }
+  }
+
   app.get('/api/status', auth.requireAuth, readRateLimit, async (_req, res) => {
     const guildIds = await configStore.listGuildIds();
 
@@ -581,6 +605,8 @@ export function createServer({ configStore, stateStore, botClient, redis = null 
       stats,
       // Upstash Cloud Redis quota metrics
       upstash: upstashMetrics,
+      // UptimeRobot live monitors
+      uptimeRobot: process.env.UPTIMEROBOT_API_KEY ? await getUptimeRobotMonitors(process.env.UPTIMEROBOT_API_KEY) : null,
     });
   });
 

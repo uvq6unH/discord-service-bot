@@ -148,7 +148,7 @@ export default function SystemPage() {
 
         {/* UptimeRobot 24/7 Keep-Alive Monitors */}
         <div className="col-span-12">
-          <UptimeRobotStatus botOnline={status.bot?.online ?? status.botReady} />
+          <UptimeRobotStatus uptimeRobot={status.uptimeRobot} botOnline={status.bot?.online ?? status.botReady} />
         </div>
 
         {/* External integrations telemetry */}

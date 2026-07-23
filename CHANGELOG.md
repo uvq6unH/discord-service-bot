@@ -4,6 +4,15 @@ Format: `[vX.Y] — Mô tả ngắn` → chi tiết thay đổi.
 
 ---
 
+## [v2.3.15] — Live UptimeRobot Monitors API Integration (2026-07-23)
+
+**`src/server.js`, `System.jsx`, `UptimeRobotStatus.jsx`** — Tích hợp API UptimeRobot hiển thị trạng thái hệ thống động
+- Triển khai kết nối đến API UptimeRobot chính thức (`POST https://api.uptimerobot.com/v2/getMonitors`) thông qua biến môi trường cấu hình `UPTIMEROBOT_API_KEY`.
+- Cập nhật luồng dữ liệu truyền tải trạng thái máy giám sát động (Real-time monitor feed) từ API bao gồm: ID, tên máy giám sát (`friendly_name`), target URL (`url`), và mã trạng thái (`status`).
+- Thiết lập cơ chế hiển thị linh hoạt: Nếu có API key sẽ tự động hiển thị danh sách các Monitor động thời gian thực. Nếu không có key, giao diện tự động chuyển đổi thông minh sang chế độ Fallback tĩnh hiển thị nhịp tim cục bộ an toàn.
+
+---
+
 ## [v2.3.14] — Decoupling Hardcoded Baseline Telemetry (2026-07-23)
 
 **`src/server.js`** — Loại bỏ hoàn toàn mốc gán cứng (Hardcoded values) phục vụ phân phối dùng chung
