@@ -370,24 +370,36 @@ export function createServer({ configStore, stateStore, botClient, redis = null 
 
   async function getUptimeRobotMonitors(apiKey) {
     try {
-      const res = await fetch('https://api.uptimerobot.com/v2/getMonitors', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          api_key: apiKey,
-          format: 'json',
-        }),
+      const keys = apiKey.split(',');
+      const fetchPromises = keys.map(async (key) => {
+        try {
+          const trimmedKey = key.trim();
+          if (!trimmedKey) return [];
+          const res = await fetch('https://api.uptimerobot.com/v2/getMonitors', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              api_key: trimmedKey,
+              format: 'json',
+            }),
+          });
+          if (!res.ok) return [];
+          const data = await res.json();
+          if (data.stat === 'ok') {
+            return data.monitors || [];
+          }
+          return [];
+        } catch (err) {
+          console.error(`Failed to fetch UptimeRobot monitor for key ${key}:`, err);
+          return [];
+        }
       });
-      if (!res.ok) return null;
-      const data = await res.json();
-      if (data.stat === 'ok') {
-        return data.monitors;
-      }
-      return null;
+      const results = await Promise.all(fetchPromises);
+      return results.flat();
     } catch (err) {
-      console.error('Failed to fetch UptimeRobot monitors:', err);
+      console.error('Failed to resolve UptimeRobot monitors:', err);
       return null;
     }
   }

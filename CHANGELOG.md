@@ -4,6 +4,14 @@ Format: `[vX.Y] — Mô tả ngắn` → chi tiết thay đổi.
 
 ---
 
+## [v2.3.16] — Multiple UptimeRobot Monitor API Keys Merging Support (2026-07-23)
+
+**`src/server.js`** — Hỗ trợ gộp kết quả từ nhiều Monitor-specific API Keys của UptimeRobot
+- Hỗ trợ cú pháp phân tách bằng dấu phẩy trong biến môi trường `UPTIMEROBOT_API_KEY` (ví dụ: `key1,key2`).
+- Nâng cấp hàm `getUptimeRobotMonitors` tự động tách các key cấu hình, thực hiện các truy vấn API song song (`Promise.all`), tự động gộp (flat) danh sách kết quả phản hồi từ UptimeRobot để hiển thị đầy đủ trạng thái của tất cả các monitor (Bot Service, Dashboard Service...) cùng lúc trên Dashboard.
+
+---
+
 ## [v2.3.15] — Live UptimeRobot Monitors API Integration (2026-07-23)
 
 **`src/server.js`, `System.jsx`, `UptimeRobotStatus.jsx`** — Tích hợp API UptimeRobot hiển thị trạng thái hệ thống động
