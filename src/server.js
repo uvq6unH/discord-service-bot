@@ -422,23 +422,21 @@ export function createServer({ configStore, stateStore, botClient, redis = null 
 
         // Parse baseline state variables
         let monthlyBaseline = rawMonthlyBaseline ? parseInt(rawMonthlyBaseline, 10) : null;
-        const initialConsoleVal = process.env.UPSTASH_MONTHLY_COMMANDS 
-          ? Number(process.env.UPSTASH_MONTHLY_COMMANDS) 
-          : (monthStr === '2026-07' ? 44000 : 0);
-        let monthlyLastValue = rawMonthlyLastValue ? parseInt(rawMonthlyLastValue, 10) : initialConsoleVal;
+        const envMonthlyCmds = process.env.UPSTASH_MONTHLY_COMMANDS ? Number(process.env.UPSTASH_MONTHLY_COMMANDS) : 0;
+        let monthlyLastValue = rawMonthlyLastValue ? parseInt(rawMonthlyLastValue, 10) : envMonthlyCmds;
         
         let dailyBaseline = rawDailyBaseline ? parseInt(rawDailyBaseline, 10) : null;
         let dailyLastValue = rawDailyLastValue ? parseInt(rawDailyLastValue, 10) : 0;
 
-        // Reads baseline (July starts at 9568)
+        // Reads baseline (configurable via UPSTASH_MONTHLY_READS env var, default 0)
         let readsBaseline = rawReadsBaseline ? parseInt(rawReadsBaseline, 10) : null;
-        const initialReadsVal = monthStr === '2026-07' ? 9568 : 0;
-        let readsLastValue = rawReadsLastValue ? parseInt(rawReadsLastValue, 10) : initialReadsVal;
+        const envMonthlyReads = process.env.UPSTASH_MONTHLY_READS ? Number(process.env.UPSTASH_MONTHLY_READS) : 0;
+        let readsLastValue = rawReadsLastValue ? parseInt(rawReadsLastValue, 10) : envMonthlyReads;
 
-        // Writes baseline (July starts at 34214)
+        // Writes baseline (configurable via UPSTASH_MONTHLY_WRITES env var, default 0)
         let writesBaseline = rawWritesBaseline ? parseInt(rawWritesBaseline, 10) : null;
-        const initialWritesVal = monthStr === '2026-07' ? 34214 : 0;
-        let writesLastValue = rawWritesLastValue ? parseInt(rawWritesLastValue, 10) : initialWritesVal;
+        const envMonthlyWrites = process.env.UPSTASH_MONTHLY_WRITES ? Number(process.env.UPSTASH_MONTHLY_WRITES) : 0;
+        let writesLastValue = rawWritesLastValue ? parseInt(rawWritesLastValue, 10) : envMonthlyWrites;
 
         // 1. Self-Healing Monthly Baseline (handles serverless process resets/migrations)
         let computedMonthlyCmds = Math.max(0, engineCmds - (monthlyBaseline ?? 0));

@@ -4,6 +4,18 @@ Format: `[vX.Y] — Mô tả ngắn` → chi tiết thay đổi.
 
 ---
 
+## [v2.3.14] — Decoupling Hardcoded Baseline Telemetry (2026-07-23)
+
+**`src/server.js`** — Loại bỏ hoàn toàn mốc gán cứng (Hardcoded values) phục vụ phân phối dùng chung
+- Xóa bỏ triệt để các số liệu gán cứng của cá nhân (`44000`, `9568`, `34214`) ra khỏi mã nguồn để đảm bảo tính an toàn và minh bạch cho các máy chủ/Guild khác khi deploy sử dụng chung dự án mã nguồn mở này.
+- Cho phép người vận hành thiết lập mốc bù bắt đầu của riêng họ thông qua các biến môi trường cấu hình động:
+  - `UPSTASH_MONTHLY_COMMANDS` (Mốc bù tổng số lệnh đầu tháng)
+  - `UPSTASH_MONTHLY_READS` (Mốc bù tổng số lượt Reads đầu tháng)
+  - `UPSTASH_MONTHLY_WRITES` (Mốc bù tổng số lượt Writes đầu tháng)
+- Hệ thống mặc định khởi đầu từ **`0`** cho bất kỳ trường hợp cài đặt mới nào không khai báo biến môi trường.
+
+---
+
 ## [v2.3.13] — Live Reads & Writes Telemetry Integration (2026-07-23)
 
 **`src/server.js`, `UpstashMetrics.jsx`** — Trích xuất và đồng bộ thống kê Writes và Reads chi tiết
