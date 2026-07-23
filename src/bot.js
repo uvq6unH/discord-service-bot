@@ -528,14 +528,14 @@ function _startHeartbeat(client, redis) {
       });
 
       await redis.set('heartbeat:bot', payload);
-      await redis.expire('heartbeat:bot', 120).catch(() => null);
+      await redis.expire('heartbeat:bot', 180).catch(() => null);
     } catch (err) {
       console.warn('[heartbeat] Error writing heartbeat:', err.message);
     }
   };
 
   write();
-  const handle = setInterval(write, 15_000);
+  const handle = setInterval(write, 30_000);
   handle.unref();
-  console.log('[heartbeat] Bot heartbeat started — writing every 15 s');
+  console.log('[heartbeat] Bot heartbeat started — writing every 30 s');
 }

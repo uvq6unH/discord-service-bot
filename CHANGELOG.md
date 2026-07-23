@@ -4,6 +4,15 @@ Format: `[vX.Y] — Mô tả ngắn` → chi tiết thay đổi.
 
 ---
 
+## [v2.3.7] — Real-time Upstash Allocation & Quota Protection Optimization (2026-07-23)
+
+**`src/bot.js`, `useSystem.js`, `System.jsx`, `UpstashMetrics.jsx`** — Tối ưu hóa bảo vệ quota Upstash & Real-time Allocation
+- Chuyển khoảng cách Bot Heartbeat ghi đè từ 15s lên **30s** (với expire TTL 180s) trong `src/bot.js`, giúp **tiết kiệm thêm 50% định ngạch lệnh nhịp tim** (giảm từ 5,760 xuống còn 2,880 lệnh/ngày).
+- Tăng chu kỳ poll trạng thái Dashboard lên **45s** (45000ms) trong `useSystem.js` và `System.jsx`, đồng thời tắt tự động truy vấn khi mất focus cửa sổ (`refetchOnWindowFocus: false`) giúp bảo vệ triệt để tài nguyên Upstash.
+- Cập nhật bảng **RESOURCE ALLOCATION & CAPACITY BUDGET** hiển thị dữ liệu thực tế (Real-time data) cho chỉ số sử dụng ngày hôm nay (`commandsToday / 16,666`) và lượng keys hoạt động thực tế (`keys / 50,000`).
+
+---
+
 ## [v2.3.6] — Upstash Capacity Planning & Resource Budget Breakdown (2026-07-23)
 
 **`UpstashMetrics.jsx`** — Bảng phân bổ định ngạch tài nguyên Upstash Cloud Redis (500k cmds/tháng & 256MB)

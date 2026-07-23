@@ -12,7 +12,7 @@ import UptimeRobotStatus from '../components/UptimeRobotStatus.jsx';
 
 export default function SystemPage() {
   const { config } = useGuild();
-  const { status, loading, refetch } = useSystem(10000); // Poll every 10s
+  const { status, loading, refetch } = useSystem(45000); // Poll every 45s
   const { t } = useLanguage();
 
   if (loading || !status) {
@@ -143,7 +143,7 @@ export default function SystemPage() {
 
         {/* Upstash Cloud Redis Metrics */}
         <div className="col-span-12">
-          <UpstashMetrics upstash={status.upstash} redisConnected={status.redisConnected} />
+          <UpstashMetrics upstash={status.upstash} redisConnected={status.redisConnected} commandsToday={status.stats?.commandsToday ?? 0} />
         </div>
 
         {/* UptimeRobot 24/7 Keep-Alive Monitors */}
