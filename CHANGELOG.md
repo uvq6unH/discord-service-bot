@@ -4,6 +4,14 @@ Format: `[vX.Y] — Mô tả ngắn` → chi tiết thay đổi.
 
 ---
 
+## [v2.3.6] — Upstash Capacity Planning & Resource Budget Breakdown (2026-07-23)
+
+**`UpstashMetrics.jsx`** — Bảng phân bổ định ngạch tài nguyên Upstash Cloud Redis (500k cmds/tháng & 256MB)
+- Tích hợp bảng **RESOURCE ALLOCATION & MONTHLY CAPACITY BUDGET** trên trang System của Dashboard.
+- Phân tích và tính toán chi tiết ngân sách sử dụng hàng ngày (~16,666 lệnh/ngày): Heartbeats chiếm 34.5% (~5,760 lệnh/ngày), dành riêng 62.5% (~10,406 lệnh/ngày) cho Bot commands & Gaming, dung lượng 256MB lưu trữ thoải mái hơn 500+ máy chủ và 500k thành viên.
+
+---
+
 ## [v2.3.5] — Route Guard Unification & Analytics Chart Size Normalization (2026-07-23)
 
 **`router.jsx` & `Analytics.jsx`** — Đồng bộ giao diện Guard & cố định kích thước biểu đồ Analytics

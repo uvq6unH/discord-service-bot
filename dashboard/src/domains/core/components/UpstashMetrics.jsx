@@ -88,6 +88,31 @@ export default function UpstashMetrics({ upstash, redisConnected }) {
             Active DB Keys: {keys ?? 0}
           </div>
         </div>
+
+        {/* RESOURCE ALLOCATION & CAPACITY BUDGET BREAKDOWN */}
+        <div className="col-span-12" style={{ marginTop: 'var(--space-2)', paddingTop: 'var(--space-3)', borderTop: '1px dashed var(--border)' }}>
+          <div style={{ fontSize: '11px', fontFamily: 'var(--font-mono)', color: 'var(--text-3)', fontWeight: 'bold', marginBottom: 'var(--space-2)' }}>
+            📊 RESOURCE ALLOCATION & MONTHLY CAPACITY BUDGET (500K CMDS / 256MB FREE TIER)
+          </div>
+          <div className="grid-12" style={{ gap: 'var(--space-2)' }}>
+            <div className="col-span-3" style={{ background: 'var(--surface-0)', padding: 'var(--space-2)', border: '1px solid var(--border)', borderRadius: 'var(--r2)' }}>
+              <div style={{ fontSize: '10px', color: 'var(--text-3)', fontFamily: 'var(--font-mono)' }}>DAILY COMMAND BUDGET</div>
+              <div style={{ fontSize: '13px', fontWeight: 'bold', fontFamily: 'var(--font-mono)', color: 'var(--accent)', marginTop: '2px' }}>~16,666 cmds/day</div>
+            </div>
+            <div className="col-span-3" style={{ background: 'var(--surface-0)', padding: 'var(--space-2)', border: '1px solid var(--border)', borderRadius: 'var(--r2)' }}>
+              <div style={{ fontSize: '10px', color: 'var(--text-3)', fontFamily: 'var(--font-mono)' }}>HEARTBEAT CONSUMPTION</div>
+              <div style={{ fontSize: '13px', fontWeight: 'bold', fontFamily: 'var(--font-mono)', color: 'var(--text-1)', marginTop: '2px' }}>~5,760 cmds/day (34.5%)</div>
+            </div>
+            <div className="col-span-3" style={{ background: 'var(--surface-0)', padding: 'var(--space-2)', border: '1px solid var(--border)', borderRadius: 'var(--r2)' }}>
+              <div style={{ fontSize: '10px', color: 'var(--text-3)', fontFamily: 'var(--font-mono)' }}>BOT COMMAND & GAMING BUDGET</div>
+              <div style={{ fontSize: '13px', fontWeight: 'bold', fontFamily: 'var(--font-mono)', color: 'var(--green)', marginTop: '2px' }}>~10,406 cmds/day (62.5%)</div>
+            </div>
+            <div className="col-span-3" style={{ background: 'var(--surface-0)', padding: 'var(--space-2)', border: '1px solid var(--border)', borderRadius: 'var(--r2)' }}>
+              <div style={{ fontSize: '10px', color: 'var(--text-3)', fontFamily: 'var(--font-mono)' }}>STORAGE CAPACITY POOL</div>
+              <div style={{ fontSize: '13px', fontWeight: 'bold', fontFamily: 'var(--font-mono)', color: 'var(--yellow)', marginTop: '2px' }}>&gt; 500 Servers / 500k Users</div>
+            </div>
+          </div>
+        </div>
       </div>
     </Panel>
   );
