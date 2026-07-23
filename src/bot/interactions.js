@@ -129,6 +129,22 @@ export async function handleComponentInteraction(interaction, { client, config, 
         }
         return;
       }
+      if (action === 'autoplay') {
+        const nextState = !(player.get('autoplay') ?? false);
+        player.set('autoplay', nextState);
+        await interaction.reply({
+          content: nextState
+            ? '📻 Đã BẬT chế độ Tự động phát nhạc liên quan (Radio Mode).'
+            : '📻 Đã TẮT chế độ Tự động phát nhạc liên quan (Radio Mode).',
+          ephemeral: true
+        });
+        if (interaction.message?.editable) {
+          const { buildMusicStatusEmbed } = await import('./commands/handlers/music.js');
+          const updatedEmbed = buildMusicStatusEmbed(player, null, player.paused ? '⏸️ Tạm dừng phát nhạc' : '🎵 Now Playing', player.paused ? 0xFEE75C : 0x5865F2, { showProgress: true });
+          await interaction.message.edit({ embeds: [updatedEmbed], components: [buildMusicControlRow(player)] }).catch(() => null);
+        }
+        return;
+      }
       if (action === 'volup') {
         const currentVol = player.volume ?? 100;
         const newVol = currentVol >= 200 ? 100 : Math.min(currentVol + 10, 200);

@@ -4,6 +4,19 @@ Format: `[vX.Y] — Mô tả ngắn` → chi tiết thay đổi.
 
 ---
 
+## [v2.2.0] — Music Auto-Play (Radio Mode) & Dashboard Live Console Terminal (2026-07-23)
+
+**1. Music Auto-Play / Radio Mode (`src/bot/music/lavalink.js`, `interactions.js`, `music.js`)**
+- Bổ sung chế độ **Auto-Play / Radio Mode**: Khi danh sách nhạc hết (`queueEnd`), Bot tự động tìm kiếm các bài hát liên quan dựa trên tác giả và tên bài vừa phát qua Lavalink và tự động nối tiếp phát nhạc.
+- Thêm nút bấm tương tác **`📻 Radio: ON/OFF`** trên ActionRow điều khiển nhạc Discord và lệnh `/autoplay` (`hb autoplay`).
+
+**2. Live Terminal Console Viewer (`src/bot/logging.js`, `src/server.js`, `LiveConsole.jsx`, `System.jsx`)**
+- Xây dựng bộ thu thập Live Logs (`pushLiveLog` & `getLiveLogs`) ghi vết thời gian thực vào Redis list `telemetry:live_logs` (cấu trúc 100 bản ghi mới nhất).
+- Thêm API `GET /api/system/logs` bảo mật cho Dashboard.
+- Tạo component **LiveConsole** nhúng trực tiếp vào trang **System** hiển thị vết log thời gian thực với màu sắc ANSI, bộ lọc theo loại (INFO/CMD/WARN/ERROR), nút Pause Stream và Clear.
+
+---
+
 ## [v2.1.1] — Fix Upstash Hash Methods & Dashboard Redis Linking (2026-07-23)
 
 **`src/upstash.js` & `src/server.js`** — Fix Redis connection failure & Hash command errors

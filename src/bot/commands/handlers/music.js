@@ -391,6 +391,18 @@ export async function handleMusicCommand({ message, subcommand, args, config }) 
     return message.reply(`🗑️ Đã xóa bài **${removedTrack.info.title}** khỏi hàng chờ.`);
   }
 
+  // ── autoplay ──────────────────────────────────────────────────────────────
+  if (cmd?.type === 'musicautoplay') {
+    if (!player) return message.reply('❌ Bot đang không ở trong Voice Channel!');
+    const nextState = !(player.get('autoplay') ?? false);
+    player.set('autoplay', nextState);
+    return message.reply(
+      nextState
+        ? '📻 Đã BẬT chế độ **Tự động phát nhạc liên quan (Radio Mode)**.'
+        : '📻 Đã TẮT chế độ **Tự động phát nhạc liên quan (Radio Mode)**.'
+    );
+  }
+
   // ── help (fallback) ───────────────────────────────────────────────────────
   const playCmd   = musicCommands.find(c => c.type === 'musicplay');
   const skipCmd   = musicCommands.find(c => c.type === 'musicskip');

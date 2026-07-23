@@ -166,6 +166,8 @@ Region routing uses two separate maps: `accountRouting` for Account-v1 (VN2 → 
 ✅ P4.5 Lavalink Multi-Node Failover & Custom Music UI
 ✅ P4.6 Audit Logs & Unified Commands Hub (CommandManager removal)
 ✅ P4.7 Vitest Automated Testing & GitHub Actions CI/CD
+✅ P4.8 Music Auto-Play / Radio Mode (`/autoplay` & Nút 📻 Radio)
+✅ P4.9 Dashboard Live Console Terminal Viewer (`GET /api/system/logs`)
 ⬜ P5  Real-time Event Queue (BLPOP/Streams)
 ⬜ P6  Member Cache Pagination / On-demand Fetch
 ⬜ P7  Domain Repository Separation

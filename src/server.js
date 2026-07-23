@@ -458,6 +458,16 @@ export function createServer({ configStore, stateStore, botClient, redis = null 
     });
   });
 
+  app.get('/api/system/logs', auth.requireAuth, readRateLimit, async (_req, res) => {
+    try {
+      const { getLiveLogs } = await import('./bot/logging.js');
+      const logs = await getLiveLogs(redis);
+      res.json({ logs });
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
   app.get('/api/config', auth.requireAuth, readRateLimit, requireGuildId, auth.requireGuildAccess, async (req, res) => {
     const config = await configStore.getGuildConfig(req.guildId);
     const sanitized = sanitizeConfigForClient(config);

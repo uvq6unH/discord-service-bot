@@ -6,6 +6,7 @@ import { useSystem } from '../hooks/useSystem.js';
 import { useGuild } from '../../../shared/hooks/useGuild.js';
 import { RefreshCw } from 'lucide-react';
 import { useLanguage } from '../../../shared/context/LanguageContext.jsx';
+import LiveConsole from '../components/LiveConsole.jsx';
 
 export default function SystemPage() {
   const { config } = useGuild();
@@ -162,6 +163,11 @@ export default function SystemPage() {
               </div>
             </div>
           </Panel>
+        </div>
+
+        {/* Live Engine Console Terminal */}
+        <div className="col-span-12">
+          <LiveConsole />
         </div>
       </div>
     </Workspace>

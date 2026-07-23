@@ -322,4 +322,30 @@
 - Trang Analytics và System hiển thị 100% chỉ số thực tế (lượt chạy lệnh, RAM, CPU load, Ping, active users).
 - Hoạt động bất đồng bộ, không tạo độ trễ cho quá trình xử lý lệnh Discord.
 
+---
+
+## ADR-019 — Music Auto-Play (Radio Mode) Mechanism
+
+**Quyết định:** Tích hợp tính năng Radio Auto-Play trong `queueEnd` event handler của Lavalink: khi hết danh sách phát, nếu `autoplay` bật, Bot sử dụng metadata của bài vừa phát để truy vấn bài liên quan và tự động thêm vào hàng chờ.
+
+**Lý do chọn:**
+- Ngắt nhạc đột ngột khi hết danh sách chờ gây gián đoạn trải nghiệm người dùng trong Voice Channel.
+- Tự động tiếp nối các bài hát tương thích tác giả/thể loại giúp giữ chân người dùng nghe nhạc mượt mà.
+
+**Hệ quả:**
+- Thêm nút bấm tương tác `📻 Radio: ON/OFF` và lệnh `/autoplay`.
+- Nhạc tự động nối tiếp khi bật chế độ này mà không cần người dùng nhập URL thủ công.
+
+---
+
+## ADR-020 — Dashboard Live Console Terminal Viewer
+
+**Quyết định:** Lưu vết 100 log hệ thống mới nhất vào danh sách Redis `telemetry:live_logs` (thông qua `pushLiveLog`) và cung cấp API `GET /api/system/logs` cho component `<LiveConsole />` trên Dashboard.
+
+**Lý do chọn:**
+- Quản trị viên cần theo dõi trực tiếp các sự kiện của Bot (lịch sử lệnh, kết nối Lavalink, lỗi hệ thống) trực tiếp từ Dashboard mà không cần mở console của Render/Cloud Host.
+
+**Hệ quả:**
+- Trang System có thêm khung Terminal trực quan hỗ trợ lọc theo loại log (INFO, CMD, WARN, ERROR), tạm dừng luồng log và xóa bộ đệm.
+
 

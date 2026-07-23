@@ -158,8 +158,32 @@ export async function initLavalink(client) {
     player.skip().catch(() => null);
   });
 
-  _manager.on('queueEnd', (player) => {
+  _manager.on('queueEnd', async (player) => {
     console.log(`[lavalink] 📭 queueEnd | guild ${player.guildId}`);
+    const isAutoplay = player.get('autoplay') ?? false;
+    if (isAutoplay && player.queue.previous?.length > 0) {
+      const lastTrack = player.queue.previous[player.queue.previous.length - 1];
+      const author = lastTrack?.info?.author ?? '';
+      const title = lastTrack?.info?.title ?? '';
+
+      if (author || title) {
+        try {
+          const searchQuery = `ytsearch:${author} ${title} audio`;
+          console.log(`[lavalink] 📻 Auto-Play triggering search for "${searchQuery}"...`);
+          const res = await player.search({ query: searchQuery }, lastTrack.requester);
+          if (res?.tracks?.length > 0) {
+            const nextTrack = res.tracks.find(t => t.info.identifier !== lastTrack.info.identifier) ?? res.tracks[0];
+            player.queue.add(nextTrack);
+            const ch = player.get('textChannel');
+            ch?.send(`📻 **Auto-Play (Radio Mode):** Tự động phát bài liên quan tiếp theo: **[${nextTrack.info.title}](${nextTrack.info.uri})**`).catch(() => null);
+            await player.play();
+            return;
+          }
+        } catch (err) {
+          console.error('[lavalink] Auto-Play search error:', err.message);
+        }
+      }
+    }
     const ch = player.get('textChannel');
     ch?.send('📭 Hàng nhạc đã hết.').catch(() => null);
   });
@@ -258,11 +282,13 @@ export function fmt(msOrTrack) {
 }
 
 /**
-  * Tạo ActionRow chứa các nút bấm tương tác phát nhạc (Pause, Skip, Stop, Shuffle, Vol+, Vol-)
+  * Tạo ActionRow chứa các nút bấm tương tác phát nhạc (Pause, Skip, Stop, Shuffle, Auto-Play)
   * @param {import('lavalink-client').Player} [player]
   */
 export function buildMusicControlRow(player) {
   const isPaused = player?.paused ?? false;
+  const isAutoplay = player?.get('autoplay') ?? false;
+
   return new ActionRowBuilder().addComponents(
     new ButtonBuilder()
       .setCustomId('music:control:pause_resume')
@@ -281,8 +307,8 @@ export function buildMusicControlRow(player) {
       .setLabel('🔀 Trộn bài')
       .setStyle(ButtonStyle.Secondary),
     new ButtonBuilder()
-      .setCustomId('music:control:volup')
-      .setLabel('🔊 +10%')
-      .setStyle(ButtonStyle.Secondary)
+      .setCustomId('music:control:autoplay')
+      .setLabel(isAutoplay ? '📻 Radio: ON' : '📻 Radio: OFF')
+      .setStyle(isAutoplay ? ButtonStyle.Success : ButtonStyle.Secondary)
   );
 }

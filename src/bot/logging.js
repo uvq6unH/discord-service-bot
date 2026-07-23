@@ -27,3 +27,51 @@ export async function sendTicketLog(guild, config, message) {
     await channel.send(message).catch(() => null);
   }
 }
+
+// ── Live System Console Logs ──────────────────────────────────────────────────
+
+const _inMemoryLiveLogs = [
+  {
+    id: 'sys-init',
+    ts: new Date().toISOString(),
+    type: 'INFO',
+    message: 'System live telemetry log collector initialized',
+    metadata: 'ENGINE_READY'
+  }
+];
+
+export async function pushLiveLog(redis, { type = 'INFO', message = '', metadata = '' }) {
+  const item = {
+    id: Math.random().toString(36).slice(2, 9),
+    ts: new Date().toISOString(),
+    type: String(type).toUpperCase(),
+    message: String(message),
+    metadata: metadata ? String(metadata) : ''
+  };
+
+  _inMemoryLiveLogs.unshift(item);
+  if (_inMemoryLiveLogs.length > 100) _inMemoryLiveLogs.pop();
+
+  if (redis) {
+    try {
+      await redis.pipeline([
+        ['RPUSH', 'telemetry:live_logs', JSON.stringify(item)],
+        ['LTRIM', 'telemetry:live_logs', -100, -1]
+      ]);
+    } catch {}
+  }
+
+  return item;
+}
+
+export async function getLiveLogs(redis) {
+  if (redis) {
+    try {
+      const rawLogs = await redis._request(['LRANGE', 'telemetry:live_logs', '0', '-1']);
+      if (Array.isArray(rawLogs) && rawLogs.length > 0) {
+        return rawLogs.map(r => (typeof r === 'string' ? JSON.parse(r) : r)).reverse();
+      }
+    } catch {}
+  }
+  return _inMemoryLiveLogs;
+}
