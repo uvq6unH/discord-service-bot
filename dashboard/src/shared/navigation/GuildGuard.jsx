@@ -1,5 +1,6 @@
 import React from 'react';
 import { useGuild } from '../hooks/useGuild.js';
+import { NavLink } from 'react-router-dom';
 import { Bot, Network } from 'lucide-react';
 
 function ScreenLoader({ message, sub }) {
@@ -97,6 +98,23 @@ export default function GuildGuard({ children }) {
           }}>
             <Network size={12} />
             <span>STATUS // WAITING_FOR_OPERATOR_INPUT</span>
+          </div>
+          
+          {/* Public legal links */}
+          <div style={{
+            display: 'flex',
+            gap: 'var(--space-4)',
+            fontSize: '10px',
+            fontFamily: 'var(--font-mono)',
+            marginTop: 'var(--space-2)'
+          }}>
+            <NavLink to="/terms" style={{ color: 'var(--text-3)', textDecoration: 'underline' }} className="hover-accent">
+              TERMS OF SERVICE
+            </NavLink>
+            <span style={{ color: 'var(--border)' }}>|</span>
+            <NavLink to="/privacy" style={{ color: 'var(--text-3)', textDecoration: 'underline' }} className="hover-accent">
+              PRIVACY POLICY
+            </NavLink>
           </div>
         </div>
       </div>

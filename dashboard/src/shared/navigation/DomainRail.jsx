@@ -202,6 +202,25 @@ export default function DomainRail({ selectedGuild }) {
           </div>
         </div>
       </div>
+
+      {/* Public legal links footer */}
+      <div style={{
+        padding: 'var(--space-4)',
+        borderTop: '1px solid var(--border)',
+        display: 'flex',
+        justifyContent: 'space-around',
+        fontSize: '10px',
+        fontFamily: 'var(--font-mono)',
+        backgroundColor: 'var(--surface-0)'
+      }}>
+        <NavLink to="/terms" style={{ color: 'var(--text-3)', textDecoration: 'none' }} className="hover-accent">
+          TERMS OF SERVICE
+        </NavLink>
+        <span style={{ color: 'var(--border)' }}>|</span>
+        <NavLink to="/privacy" style={{ color: 'var(--text-3)', textDecoration: 'none' }} className="hover-accent">
+          PRIVACY POLICY
+        </NavLink>
+      </div>
     </nav>
   );
 }

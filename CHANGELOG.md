@@ -4,6 +4,17 @@ Format: `[vX.Y] — Mô tả ngắn` → chi tiết thay đổi.
 
 ---
 
+## [v2.3.10] — Public Docs Redesign & System Navigation Integration (2026-07-23)
+
+**`TermsPage.jsx`, `PrivacyPage.jsx`, `DomainRail.jsx`, `GuildGuard.jsx`** — Thiết kế lại 2 trang pháp lý & Tích hợp liên kết truy cập
+- Thiết kế lại toàn bộ giao diện `TermsPage.jsx` và `PrivacyPage.jsx` theo chuẩn ngôn ngữ cyberpunk của Dashboard: Cố định `border-radius: 0px` vuông vức, tông màu tối `var(--surface-0)`, font chữ Display (`Bebas Neue`) và JetBrains Mono cực kỳ đồng bộ.
+- Bổ sung nút bấm quay lại `<<< BACK TO MISSION CONTROL` kèm Icon lucide-react trên cả 2 trang tài liệu.
+- Nhúng các liên kết truy cập ToS & Privacy công khai ở:
+  1. Cuối thanh Sidebar trái (`DomainRail.jsx`) phục vụ người dùng đã đăng nhập.
+  2. Bảng chọn máy chủ chính (`GuildGuard.jsx`) phục vụ các khách truy cập chưa đăng nhập.
+
+---
+
 ## [v2.3.9] — Discord Verification Qualifications (Terms of Service & Privacy Policy) (2026-07-23)
 
 **`router.jsx`, `TermsPage.jsx`, `PrivacyPage.jsx`** — Tạo các trang tài liệu công khai phục vụ xác minh Discord Bot
