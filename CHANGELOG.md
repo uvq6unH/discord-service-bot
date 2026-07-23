@@ -4,6 +4,14 @@ Format: `[vX.Y] — Mô tả ngắn` → chi tiết thay đổi.
 
 ---
 
+## [v2.3.3] — Upstash Storage & Commands Accuracy Alignment (2026-07-23)
+
+**`src/server.js`** — Align Upstash metrics with Upstash Cloud Console
+- Đọc chính xác `total_data_size_human` từ section `# Persistence` trong `INFO` làm dung lượng lưu trữ (**`605 KB / 256 MB`**) khớp 100% với Upstash Cloud Console thay vì đọc `used_memory` (74 KB - dung lượng RAM tiến trình Redis).
+- Cung cấp tùy chọn biến môi trường `UPSTASH_MONTHLY_COMMANDS` hỗ trợ ghi đè đồng bộ meter tính phí tháng của Upstash Console khi cần.
+
+---
+
 ## [v2.3.2] — Fix Render 502 Bad Gateway & Explicit 0.0.0.0 Host Binding (2026-07-23)
 
 **`src/index.bot.js` & `src/index.server.js`** — Bind explicit `0.0.0.0` host for Render HTTP health probes

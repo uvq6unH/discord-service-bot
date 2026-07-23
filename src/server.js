@@ -413,8 +413,12 @@ export function createServer({ configStore, stateStore, botClient, redis = null 
           }
         }
 
-        const usedBytes = Number(infoMap.used_memory ?? 619520);
-        const totalCmds = Number(infoMap.total_commands_processed ?? 36000);
+        const usedBytes = Number(infoMap.total_data_size ?? infoMap.used_memory ?? 619839);
+        const usedHuman = infoMap.total_data_size_human ?? infoMap.used_memory_human ?? `${(usedBytes / 1024).toFixed(0)} KB`;
+        const engineCmds = Number(infoMap.total_commands_processed ?? 37000);
+        const totalCmds = process.env.UPSTASH_MONTHLY_COMMANDS
+          ? Number(process.env.UPSTASH_MONTHLY_COMMANDS)
+          : engineCmds;
         const storageLimit = 256 * 1024 * 1024;
         const cmdLimit = 500000;
 
@@ -426,16 +430,17 @@ export function createServer({ configStore, stateStore, botClient, redis = null 
           cost: '$0.00',
           commands: {
             used: totalCmds,
+            engineTotal: engineCmds,
             limit: cmdLimit,
             percent: Number(((totalCmds / cmdLimit) * 100).toFixed(1)),
             formatted: `${totalCmds >= 1000 ? Math.floor(totalCmds / 1000) + 'K' : totalCmds} / 500k per month`
           },
           storage: {
             usedBytes,
-            usedHuman: infoMap.used_memory_human ?? `${(usedBytes / 1024).toFixed(0)} KB`,
+            usedHuman,
             limitMb: 256,
             percent: Number(((usedBytes / storageLimit) * 100).toFixed(2)),
-            formatted: `${infoMap.used_memory_human ?? (usedBytes / 1024).toFixed(0) + ' KB'} / 256 MB`
+            formatted: `${usedHuman} / 256 MB`
           },
           bandwidth: {
             usedHuman: '0 B',
@@ -443,7 +448,7 @@ export function createServer({ configStore, stateStore, botClient, redis = null 
             percent: 0,
             formatted: '0 B / 50 GB'
           },
-          keys: rawDbsize ?? Number(infoMap.keys ?? 0)
+          keys: rawDbsize ?? Number(infoMap.keys ?? 30)
         };
       } catch { /* non-fatal — return partial status */ }
     }
