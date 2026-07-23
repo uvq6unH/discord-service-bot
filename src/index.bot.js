@@ -98,8 +98,8 @@ http.createServer((req, res) => {
     guilds: botClient?.guilds?.cache?.size ?? 0,
     uptime: Math.floor(process.uptime()),
   }));
-}).listen(botPort, () => {
-  console.log(`[bot:health] HTTP health server listening on port ${botPort}`);
+}).listen(botPort, '0.0.0.0', () => {
+  console.log(`[bot:health] HTTP health server listening on 0.0.0.0:${botPort}`);
 });
 
 // ── Login Discord — SAU khi HTTP server đã bind ───────────────────────────────

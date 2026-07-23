@@ -4,6 +4,14 @@ Format: `[vX.Y] — Mô tả ngắn` → chi tiết thay đổi.
 
 ---
 
+## [v2.3.2] — Fix Render 502 Bad Gateway & Explicit 0.0.0.0 Host Binding (2026-07-23)
+
+**`src/index.bot.js` & `src/index.server.js`** — Bind explicit `0.0.0.0` host for Render HTTP health probes
+- Cập nhật `.listen(botPort, '0.0.0.0')` trong `src/index.bot.js` và `app.listen(port, '0.0.0.0')` trong `src/index.server.js`.
+- Khắc phục lỗi `502 Bad Gateway` (Root Cause trong UptimeRobot) do Node.js mặc định bind `127.0.0.1` khiến Nginx reverse proxy của Render không thể định tuyến traffic từ ngoài vào HTTP health server (`/health`).
+
+---
+
 ## [v2.3.1] — Bot Heartbeat Early-Boot Fix & UptimeRobot Status Integration (2026-07-23)
 
 **`src/bot.js`, `UptimeRobotStatus.jsx`, `System.jsx`** — Fix Bot status & add UptimeRobot monitor

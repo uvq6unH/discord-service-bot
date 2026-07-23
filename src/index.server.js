@@ -58,6 +58,6 @@ const app = createServer({
   redis: sharedRedis,
 });
 
-app.listen(port, () => {
-  console.log(`[server] Dashboard running at http://localhost:${port}`);
+app.listen(port, '0.0.0.0', () => {
+  console.log(`[server] Dashboard running on 0.0.0.0:${port}`);
 });
