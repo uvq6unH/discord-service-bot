@@ -374,6 +374,7 @@ export function createServer({ configStore, stateStore, botClient, redis = null 
     // Read heartbeats + stats counters from Redis.
     // All reads are parallel and non-fatal.
     const todayStr = new Date().toISOString().slice(0, 10);
+    const monthStr = new Date().toISOString().slice(0, 7);
     let botHeartbeat = null;
     let dashboardHeartbeat = null;
     let stats = null;
@@ -381,7 +382,7 @@ export function createServer({ configStore, stateStore, botClient, redis = null 
     let upstashMetrics = null;
     if (redis) {
       try {
-        const [rawBot, rawDash, slashSynced, cacheRefresh, discordErrors, queueLen, commandsToday, rawDbsize, rawInfo] = await Promise.all([
+        const [rawBot, rawDash, slashSynced, cacheRefresh, discordErrors, queueLen, commandsToday, rawDbsize, rawInfo, rawMonthlyCmds] = await Promise.all([
           redis.get('heartbeat:bot').catch(() => null),
           redis.get('heartbeat:dashboard').catch(() => null),
           redis.get('stats:slash_sync_processed').catch(() => null),
@@ -391,6 +392,7 @@ export function createServer({ configStore, stateStore, botClient, redis = null 
           redis.hget(`telemetry:global:daily:${todayStr}`, 'commands').catch(() => null),
           redis.dbsize().catch(() => null),
           redis.info().catch(() => null),
+          redis.get(`telemetry:global:monthly:${monthStr}`).catch(() => null),
         ]);
         redisConnected = true;
         if (rawBot) botHeartbeat = typeof rawBot === 'string' ? JSON.parse(rawBot) : rawBot;
@@ -416,9 +418,14 @@ export function createServer({ configStore, stateStore, botClient, redis = null 
         const usedBytes = Number(infoMap.total_data_size ?? infoMap.used_memory ?? 619839);
         const usedHuman = infoMap.total_data_size_human ?? infoMap.used_memory_human ?? `${(usedBytes / 1024).toFixed(0)} KB`;
         const engineCmds = Number(infoMap.total_commands_processed ?? 37000);
-        const totalCmds = process.env.UPSTASH_MONTHLY_COMMANDS
-          ? Number(process.env.UPSTASH_MONTHLY_COMMANDS)
-          : engineCmds;
+
+        let monthlyCmds = rawMonthlyCmds ? parseInt(rawMonthlyCmds, 10) : null;
+        if (monthlyCmds === null || isNaN(monthlyCmds)) {
+          monthlyCmds = process.env.UPSTASH_MONTHLY_COMMANDS ? Number(process.env.UPSTASH_MONTHLY_COMMANDS) : 37000;
+          redis.set(`telemetry:global:monthly:${monthStr}`, String(monthlyCmds)).catch(() => null);
+        }
+
+        const totalCmds = monthlyCmds;
         const storageLimit = 256 * 1024 * 1024;
         const cmdLimit = 500000;
 

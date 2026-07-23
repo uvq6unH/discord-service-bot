@@ -14,6 +14,16 @@ import { handleBlackjackButton, handlePokerButton } from './games.js';
 import { sendTicketLog } from './logging.js';
 
 export async function handleComponentInteraction(interaction, { client, config, stateStore }) {
+  if (client?.sharedRedis) {
+    import('./logging.js').then(({ pushLiveLog }) => {
+      pushLiveLog(client.sharedRedis, {
+        type: 'CMD',
+        message: `Interaction ${interaction.customId} by ${interaction.user.tag} in ${interaction.guild?.name ?? 'DM'}`,
+        metadata: interaction.guild?.id ?? 'GLOBAL'
+      }).catch(() => null);
+    }).catch(() => null);
+  }
+
   if (interaction.isStringSelectMenu()) {
     if (interaction.customId.startsWith('runes:select_menu:')) {
       const targetUserId = interaction.customId.split(':')[2];

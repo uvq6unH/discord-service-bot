@@ -4,6 +4,14 @@ Format: `[vX.Y] — Mô tả ngắn` → chi tiết thay đổi.
 
 ---
 
+## [v2.3.4] — Monthly Commands Meter & Live Console Stream Fix (2026-07-23)
+
+**`src/server.js`, `src/stateStore.js`, `src/bot/logging.js`** — Fix monthly command counter & real-time live log stream
+- Tích hợp `telemetry:global:monthly:YYYY-MM` theo dõi chuẩn xác số lượng lệnh theo từng tháng lịch (37K / 500k per month) tự động reset vào ngày 1 hàng tháng, khớp 100% với Upstash Billing Meter.
+- Chuyển `pushLiveLog` sang ghi trực tiếp qua `rpush` không qua pipeline, đồng thời nối vết log thời gian thực cho `recordTelemetryEvent` và `handleComponentInteraction` để xuất hiện tức thì trên Live Console Terminal.
+
+---
+
 ## [v2.3.3] — Upstash Storage & Commands Accuracy Alignment (2026-07-23)
 
 **`src/server.js`** — Align Upstash metrics with Upstash Cloud Console

@@ -1048,6 +1048,7 @@ export class StateStore {
     if (!guildId) return;
     const now = new Date();
     const dateStr = now.toISOString().slice(0, 10); // YYYY-MM-DD
+    const monthStr = now.toISOString().slice(0, 7); // YYYY-MM
     const hourStr = `${String(now.getHours()).padStart(2, '0')}:00`;
 
     const cat = String(category || '').toLowerCase();
@@ -1063,6 +1064,7 @@ export class StateStore {
         const pipeline = [
           ['HINCRBY', `telemetry:guild:${guildId}:daily:${dateStr}`, 'commands', 1],
           ['HINCRBY', `telemetry:global:daily:${dateStr}`, 'commands', 1],
+          ['INCR', `telemetry:global:monthly:${monthStr}`],
           ['HINCRBY', `telemetry:guild:${guildId}:active_hours`, hourStr, 1]
         ];
         if (cmd) {
@@ -1078,6 +1080,14 @@ export class StateStore {
           pipeline.push(['SADD', `telemetry:guild:${guildId}:users:${dateStr}`, String(userId)]);
         }
         await this._redis.pipeline(pipeline);
+
+        import('./bot/logging.js').then(({ pushLiveLog }) => {
+          pushLiveLog(this._redis, {
+            type: 'CMD',
+            message: `Telemetry registered /${cmd || 'command'} (${cat || 'general'})`,
+            metadata: guildId
+          }).catch(() => null);
+        }).catch(() => null);
       } catch (err) {
         /* non-fatal telemetry error */
       }
