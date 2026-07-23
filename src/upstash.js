@@ -93,6 +93,8 @@ export class UpstashClient {
 
   /** Trả về mảng key khớp với pattern (dùng scan khi có; Upstash REST hỗ trợ KEYS). */
   keys(pattern)                     { return this._request(['KEYS', pattern]); }
+  dbsize()                          { return this._request(['DBSIZE']); }
+  info(section)                     { return section ? this._request(['INFO', section]) : this._request(['INFO']); }
 
   // ── Hash commands ──────────────────────────────────────────────────────────
 

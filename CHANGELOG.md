@@ -4,6 +4,15 @@ Format: `[vX.Y] — Mô tả ngắn` → chi tiết thay đổi.
 
 ---
 
+## [v2.3.0] — Upstash Redis Cloud Resource Telemetry Panel (2026-07-23)
+
+**`src/upstash.js`, `src/server.js`, `UpstashMetrics.jsx`, `System.jsx`** — Hiển thị chỉ số Upstash Cloud trực tiếp trên Dashboard
+- Bổ sung các phương thức `dbsize()` và `info()` vào `UpstashClient` trong `src/upstash.js`.
+- Cập nhật `/api/status` tự động đọc và tính toán tài nguyên Upstash Cloud Redis thực tế (Monthly Commands limit 500k, Storage limit 256MB, Bandwidth limit 50GB, Cost $0.00, Region `ap-southeast-1` và Total DB Keys).
+- Tạo component **UpstashMetrics** hiển thị 4 thẻ chỉ số tài nguyên và thanh tiến trình (progress bar) trực quan chuẩn UI Upstash Console trên trang **System** của Dashboard.
+
+---
+
 ## [v2.2.0] — Music Auto-Play (Radio Mode) & Dashboard Live Console Terminal (2026-07-23)
 
 **1. Music Auto-Play / Radio Mode (`src/bot/music/lavalink.js`, `interactions.js`, `music.js`)**

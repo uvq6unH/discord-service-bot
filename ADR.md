@@ -343,9 +343,21 @@
 **Quyết định:** Lưu vết 100 log hệ thống mới nhất vào danh sách Redis `telemetry:live_logs` (thông qua `pushLiveLog`) và cung cấp API `GET /api/system/logs` cho component `<LiveConsole />` trên Dashboard.
 
 **Lý do chọn:**
-- Quản trị viên cần theo dõi trực tiếp các sự kiện của Bot (lịch sử lệnh, kết nối Lavalink, lỗi hệ thống) trực tiếp từ Dashboard mà không cần mở console của Render/Cloud Host.
+- Quản trị viên cần theo dõi trực tiếp các sự kiện của Bot (lịch sử lệnh, kết nối Lavalink, lỗi hệ thống) trực tiếp từ Dashboard mà không cần mở console of Render/Cloud Host.
 
 **Hệ quả:**
 - Trang System có thêm khung Terminal trực quan hỗ trợ lọc theo loại log (INFO, CMD, WARN, ERROR), tạm dừng luồng log và xóa bộ đệm.
+
+---
+
+## ADR-021 — Upstash Redis Cloud Quota & Telemetry Integration
+
+**Quyết định:** Tích hợp truy vấn `DBSIZE` và `INFO` từ Upstash Redis REST API trong `/api/status`, phân tích cú pháp để tính toán và trả về các chỉ số tài nguyên đám mây (Commands 500k/mo, Storage 256MB, Bandwidth 50GB, Total Active Keys, Cost $0.00, Region `ap-southeast-1`).
+
+**Lý do chọn:**
+- Giúp Quản trị viên theo dõi hạn ngạch sử dụng Upstash Cloud Free Tier ngay trên Dashboard nội bộ mà không cần phải truy cập thủ công vào trang quản trị Console của Upstash.
+
+**Hệ quả:**
+- Component `<UpstashMetrics />` hiển thị trực quan 4 thẻ tài nguyên chuẩn định dạng Upstash Console kèm thanh tiến trình phần trăm trên trang **System**.
 
 

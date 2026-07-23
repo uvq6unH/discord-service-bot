@@ -7,6 +7,7 @@ import { useGuild } from '../../../shared/hooks/useGuild.js';
 import { RefreshCw } from 'lucide-react';
 import { useLanguage } from '../../../shared/context/LanguageContext.jsx';
 import LiveConsole from '../components/LiveConsole.jsx';
+import UpstashMetrics from '../components/UpstashMetrics.jsx';
 
 export default function SystemPage() {
   const { config } = useGuild();
@@ -137,6 +138,11 @@ export default function SystemPage() {
               sub="REDIS_UPSTASH_STATUS"
             />
           </Panel>
+        </div>
+
+        {/* Upstash Cloud Redis Metrics */}
+        <div className="col-span-12">
+          <UpstashMetrics upstash={status.upstash} redisConnected={status.redisConnected} />
         </div>
 
         {/* External integrations telemetry */}
