@@ -4,6 +4,14 @@ Format: `[vX.Y] — Mô tả ngắn` → chi tiết thay đổi.
 
 ---
 
+## [v2.3.1] — Bot Heartbeat Early-Boot Fix & UptimeRobot Status Integration (2026-07-23)
+
+**`src/bot.js`, `UptimeRobotStatus.jsx`, `System.jsx`** — Fix Bot status & add UptimeRobot monitor
+- Khởi chạy `_startHeartbeat` ngay từ đầu callback `ClientReady` thay vì chờ sync hết toàn bộ guilds, giảm khoảng thời gian chờ ghi `heartbeat:bot` từ 30s xuống 15s và tách `redis.expire('heartbeat:bot', 120)` cho tương thích Upstash REST client.
+- Tạo component **UptimeRobotStatus** hiển thị tình trạng các HTTP Monitors 24/7 Keep-Alive cho cả `Bot Service` (`index.bot.js`) và `Dashboard Service` (`index.server.js`) trên trang **System**.
+
+---
+
 ## [v2.3.0] — Upstash Redis Cloud Resource Telemetry Panel (2026-07-23)
 
 **`src/upstash.js`, `src/server.js`, `UpstashMetrics.jsx`, `System.jsx`** — Hiển thị chỉ số Upstash Cloud trực tiếp trên Dashboard

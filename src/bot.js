@@ -123,6 +123,7 @@ export function createBot(configStore, stateStore, redis = null) {
   // ── ClientReady ─────────────────────────────────────────────────────────────
   client.once(Events.ClientReady, (readyClient) => {
     console.log(`Discord bot logged in as ${readyClient.user.tag}`);
+    _startHeartbeat(readyClient, redis);
 
     (async () => {
       await configStore.ready;
@@ -167,7 +168,6 @@ export function createBot(configStore, stateStore, redis = null) {
       // Workers
       startReminderWorker(readyClient, configStore);
       _startSlashSyncWorker(readyClient, configStore, redis);
-      _startHeartbeat(readyClient, redis);
     })().catch((err) => console.error('[bot] Startup error:', err));
   });
 
@@ -511,26 +511,31 @@ function _startHeartbeat(client, redis) {
       const totalCpuUs = cpuUsage.user + cpuUsage.system;
       const cpuPercent = Number(Math.min(100, (totalCpuUs / Math.max(1, process.uptime() * 1_000_000)) * 100).toFixed(1));
 
-      await redis.set('heartbeat:bot', JSON.stringify({
+      const payload = JSON.stringify({
         ts:                    new Date().toISOString(),
         uptimeS:               Math.floor(process.uptime()),
         uptime:                Math.floor(process.uptime() * 1000),
         cpu:                   isNaN(cpuPercent) ? 0.2 : cpuPercent,
         memory:                mem.rss,
         ping:                  client.ws?.ping >= 0 ? client.ws.ping : 35,
-        guilds:                client.guilds.cache.size,
+        guilds:                client.guilds?.cache?.size ?? 0,
         ready:                 Boolean(client.user),
         tag:                   client.user?.tag ?? null,
         commit:                process.env.RENDER_GIT_COMMIT?.slice(0, 7) ?? process.env.GIT_COMMIT?.slice(0, 7) ?? 'unknown',
         version:               process.env.npm_package_version ?? 'unknown',
         riotApiKeyConfigured:  Boolean(process.env.RIOT_API_KEY),
         tftApiKeyConfigured:   Boolean(process.env.TFT_API_KEY),
-      }), 'EX', 90);
-    } catch { /* non-fatal */ }
+      });
+
+      await redis.set('heartbeat:bot', payload);
+      await redis.expire('heartbeat:bot', 120).catch(() => null);
+    } catch (err) {
+      console.warn('[heartbeat] Error writing heartbeat:', err.message);
+    }
   };
 
   write();
-  const handle = setInterval(write, 30_000);
+  const handle = setInterval(write, 15_000);
   handle.unref();
-  console.log('[heartbeat] Bot heartbeat started — writing every 30 s');
+  console.log('[heartbeat] Bot heartbeat started — writing every 15 s');
 }

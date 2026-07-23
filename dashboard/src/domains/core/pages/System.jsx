@@ -8,6 +8,7 @@ import { RefreshCw } from 'lucide-react';
 import { useLanguage } from '../../../shared/context/LanguageContext.jsx';
 import LiveConsole from '../components/LiveConsole.jsx';
 import UpstashMetrics from '../components/UpstashMetrics.jsx';
+import UptimeRobotStatus from '../components/UptimeRobotStatus.jsx';
 
 export default function SystemPage() {
   const { config } = useGuild();
@@ -143,6 +144,11 @@ export default function SystemPage() {
         {/* Upstash Cloud Redis Metrics */}
         <div className="col-span-12">
           <UpstashMetrics upstash={status.upstash} redisConnected={status.redisConnected} />
+        </div>
+
+        {/* UptimeRobot 24/7 Keep-Alive Monitors */}
+        <div className="col-span-12">
+          <UptimeRobotStatus botOnline={status.bot?.online ?? status.botReady} />
         </div>
 
         {/* External integrations telemetry */}
