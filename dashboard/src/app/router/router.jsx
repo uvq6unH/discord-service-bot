@@ -24,11 +24,19 @@ const ReminderServicesPage = lazy(() => import('../../domains/reminder/pages/Rem
 // AI
 const AiServicesPage = lazy(() => import('../../domains/ai/pages/AiServices.jsx'));
 
+// Public documentation pages for Discord verification
+const TermsPage = lazy(() => import('../../shared/pages/TermsPage.jsx'));
+const PrivacyPage = lazy(() => import('../../shared/pages/PrivacyPage.jsx'));
+
 export default function AppRoutes() {
   return (
     <Routes>
       {/* Default redirect to overview */}
       <Route path="/"            element={<Navigate to="/overview" replace />} />
+
+      {/* Public Pages */}
+      <Route path="/terms"       element={<TermsPage />} />
+      <Route path="/privacy"     element={<PrivacyPage />} />
 
       {/* Guild-Scoped Sub-routes Guarded by GuildGuard */}
       <Route element={<GuildGuard><Outlet /></GuildGuard>}>

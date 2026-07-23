@@ -4,6 +4,14 @@ Format: `[vX.Y] — Mô tả ngắn` → chi tiết thay đổi.
 
 ---
 
+## [v2.3.9] — Discord Verification Qualifications (Terms of Service & Privacy Policy) (2026-07-23)
+
+**`router.jsx`, `TermsPage.jsx`, `PrivacyPage.jsx`** — Tạo các trang tài liệu công khai phục vụ xác minh Discord Bot
+- Tạo 2 trang tài liệu điều khoản **Terms of Service** (`TermsPage.jsx`) và chính sách bảo mật **Privacy Policy** (`PrivacyPage.jsx`) chuẩn chỉnh cho Discord Bot.
+- Cấu hình 2 router tĩnh công khai (`/terms` và `/privacy`) bên ngoài khối `GuildGuard` trong `router.jsx` giúp bot dễ dàng vượt qua vòng quét kiểm duyệt tự động của Discord Developer Portal.
+
+---
+
 ## [v2.3.8] — Upstash Billing Console Direct Sync & Dynamic Daily Baseline (2026-07-23)
 
 **`src/server.js`** — Khắc phục triệt để chênh lệch dữ liệu giữa Upstash Console và Dashboard
