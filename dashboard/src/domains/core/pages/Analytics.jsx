@@ -78,7 +78,8 @@ function HeatmapRow({ data }) {
             <div style={{
               width: '100%',
               height: `${Math.max(ratio * 100, 10)}%`,
-              background: ratio > 0 ? `rgba(255, 255, 255, ${0.1 + ratio * 0.9})` : 'var(--surface-2)',
+              background: ratio > 0 ? 'var(--accent)' : 'var(--surface-2)',
+              opacity: ratio > 0 ? Math.max(ratio, 0.3) : 1,
               borderTop: ratio > 0 ? '1px solid var(--accent)' : 'none'
             }} />
           </div>

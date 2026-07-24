@@ -13,7 +13,7 @@ export default function TermsPage() {
       fontFamily: 'var(--font-body)',
       lineHeight: '1.7',
       border: '1px solid var(--border-strong)',
-      boxShadow: '0 8px 32px rgba(0,0,0,0.8)',
+      boxShadow: '0 8px 32px rgba(0,0,0,0.12)',
     }}>
       {/* Go Back / Home */}
       <div style={{ marginBottom: 'var(--space-6)' }}>

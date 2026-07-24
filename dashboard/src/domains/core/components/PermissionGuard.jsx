@@ -8,7 +8,7 @@ export default function PermissionGuard({ role, allowed = ['owner', 'admin'], fa
     <div style={{ 
       padding: 'var(--space-6)', 
       border: '1px solid var(--red)', 
-      backgroundColor: 'rgba(255, 42, 42, 0.05)', 
+      backgroundColor: 'var(--red-dim)', 
       color: 'var(--red)', 
       fontFamily: 'var(--font-mono)', 
       fontSize: '12px' 

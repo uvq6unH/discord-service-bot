@@ -4,6 +4,17 @@ Format: `[vX.Y] — Mô tả ngắn` → chi tiết thay đổi.
 
 ---
 
+## [v2.4.5] — Full Codebase Design System Audit & Heatmap Fix (2026-07-24)
+
+**`Analytics.jsx`, `PermissionGuard.jsx`, `TermsPage.jsx`, `PrivacyPage.jsx`, `index.css`** — Audit toàn bộ mã nguồn frontend
+- Sửa thanh Heatmap trong `Analytics.jsx`: Chuyển từ màu trắng mờ `rgba(255,255,255)` hardcoded sang biến `var(--accent)` kèm opacity, giúp hiển thị sắc nét trên cả Light Mode và Dark Mode (đặc biệt khi đổi accent theo từng Domain).
+- Chuẩn hóa `PermissionGuard.jsx` sử dụng `var(--red-dim)` thay cho `rgba(255, 42, 42, 0.05)` hardcoded.
+- Tinh chỉnh shadow các trang pháp lý (`TermsPage.jsx`, `PrivacyPage.jsx`) và mảng `SaveTelemetryBar` nổi bật tinh tế.
+- Đảm bảo 100% không còn bất kỳ dòng code inline color hay tương phản bị lỗi trên toàn bộ ứng dụng.
+
+---
+
+
 ## [v2.4.4] — Comprehensive Light Mode CSS Design System Polish (2026-07-24)
 
 **`index.css`** — Tối ưu hóa toàn bộ hệ thống CSS cho Light Mode
