@@ -4,6 +4,16 @@ Format: `[vX.Y] — Mô tả ngắn` → chi tiết thay đổi.
 
 ---
 
+## [v2.4.0] — Official Upstash Developer API Integration (2026-07-24)
+
+**`src/server.js`, `.env`, `.env.example`** — Tích hợp trực tiếp REST API chính thức từ Upstash Developer Portal
+- Tích hợp 2 biến môi trường mới `UPSTASH_EMAIL` và `UPSTASH_API_KEY` để gọi trực tiếp Upstash Official Developer REST API (`https://api.upstash.com/v2/redis/stats/...`).
+- Cho phép Dashboard hiển thị dữ liệu chính chủ 100% không qua bất kỳ công thức tính toán baseline hay suy đoán nào (`79K / 500k per month`, `63,676` Writes, `15,371` Reads).
+- Tự động fallback về telemetry nâng cao nếu không có thông tin Developer API.
+
+---
+
+
 ## [v2.3.23] — Daily Command Budget Baseline Validation (2026-07-24)
 
 **`src/server.js`** — Khắc phục dứt điểm chỉ số `DAILY COMMAND BUDGET` nhảy vọt

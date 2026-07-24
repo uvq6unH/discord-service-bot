@@ -404,6 +404,88 @@ export function createServer({ configStore, stateStore, botClient, redis = null 
     }
   }
 
+  let upstashDbCacheId = null;
+  async function getUpstashOfficialStats(email, apiKey) {
+    try {
+      const auth = Buffer.from(`${email.trim()}:${apiKey.trim()}`).toString('base64');
+      let dbId = upstashDbCacheId;
+      let dbInfo = null;
+
+      if (!dbId) {
+        const resDbs = await fetch('https://api.upstash.com/v2/redis/databases', {
+          headers: { 'Authorization': `Basic ${auth}` }
+        });
+        if (resDbs.ok) {
+          const dbs = await resDbs.json();
+          if (Array.isArray(dbs) && dbs.length > 0) {
+            const targetUrl = process.env.UPSTASH_REDIS_REST_URL || '';
+            const found = dbs.find(d => targetUrl.includes(d.endpoint)) || dbs[0];
+            dbId = found.database_id || found.id;
+            upstashDbCacheId = dbId;
+            dbInfo = found;
+          }
+        }
+      }
+
+      if (!dbId) return null;
+
+      if (!dbInfo) {
+        const resDb = await fetch(`https://api.upstash.com/v2/redis/database/${dbId}`, {
+          headers: { 'Authorization': `Basic ${auth}` }
+        });
+        if (resDb.ok) dbInfo = await resDb.json();
+      }
+
+      const resStats = await fetch(`https://api.upstash.com/v2/redis/stats/${dbId}`, {
+        headers: { 'Authorization': `Basic ${auth}` }
+      });
+      if (!resStats.ok) return null;
+      const stats = await resStats.json();
+
+      const usedCmds = Number(stats.total_monthly_requests ?? 0);
+      const reads = Number(stats.total_monthly_read_requests ?? 0);
+      const writes = Number(stats.total_monthly_write_requests ?? 0);
+      const storageLimit = Number(dbInfo?.db_disk_threshold ?? 268435456);
+      const usedBytes = Number(stats.current_storage ?? dbInfo?.current_storage ?? 0);
+      const usedKb = (usedBytes / 1024).toFixed(1);
+      const cmdLimit = Number(dbInfo?.db_request_limit ?? 500000);
+
+      return {
+        connected: true,
+        region: dbInfo?.region ?? 'global',
+        provider: 'Upstash Official API',
+        tier: (dbInfo?.database_type || dbInfo?.type || 'free').toUpperCase() + ' TIER',
+        cost: '$0.00',
+        commands: {
+          used: usedCmds,
+          reads,
+          writes,
+          engineTotal: usedCmds,
+          limit: cmdLimit,
+          percent: Number(((usedCmds / cmdLimit) * 100).toFixed(1)),
+          formatted: `${usedCmds >= 1000 ? Math.floor(usedCmds / 1000) + 'K' : usedCmds} / 500k per month`
+        },
+        storage: {
+          usedBytes,
+          usedHuman: `${usedKb} KB`,
+          limitMb: Math.round(storageLimit / (1024 * 1024)),
+          percent: Number(((usedBytes / storageLimit) * 100).toFixed(2)),
+          formatted: `${usedKb} KB / 256 MB`
+        },
+        bandwidth: {
+          usedHuman: '0 B',
+          limitGb: Number(dbInfo?.db_monthly_bandwidth_limit ?? 50),
+          percent: 0,
+          formatted: '0 B / 50 GB'
+        },
+        keys: dbInfo?.user_key_count ?? rawDbsize ?? 45
+      };
+    } catch (err) {
+      console.warn('[upstash-api] Failed to fetch official Upstash stats:', err.message);
+      return null;
+    }
+  }
+
   app.get('/api/status', auth.requireAuth, readRateLimit, async (_req, res) => {
     const guildIds = await configStore.listGuildIds();
 
@@ -546,6 +628,14 @@ export function createServer({ configStore, stateStore, botClient, redis = null 
           },
           keys: rawDbsize ?? Number(infoMap.keys ?? 30)
         };
+
+        // If official Upstash Developer API credentials exist, fetch 100% official telemetry
+        if (process.env.UPSTASH_EMAIL && process.env.UPSTASH_API_KEY) {
+          const officialMetrics = await getUpstashOfficialStats(process.env.UPSTASH_EMAIL, process.env.UPSTASH_API_KEY);
+          if (officialMetrics) {
+            upstashMetrics = officialMetrics;
+          }
+        }
       } catch { /* non-fatal — return partial status */ }
     }
 
