@@ -533,6 +533,17 @@ export function createServer({ configStore, stateStore, botClient, redis = null 
           const officialMetrics = await getUpstashOfficialStats(process.env.UPSTASH_EMAIL, process.env.UPSTASH_API_KEY);
           if (officialMetrics) {
             upstashMetrics = officialMetrics;
+            redis.set('telemetry:cached_official_stats', JSON.stringify(officialMetrics)).catch(() => null);
+          }
+        }
+
+        // Try reading cached official stats if direct API fetch failed
+        if (!upstashMetrics) {
+          const cached = await redis.get('telemetry:cached_official_stats').catch(() => null);
+          if (cached) {
+            try {
+              upstashMetrics = typeof cached === 'string' ? JSON.parse(cached) : cached;
+            } catch { /* ignore parse error */ }
           }
         }
 
