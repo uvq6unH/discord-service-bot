@@ -574,6 +574,21 @@ function _startHeartbeat(client, redis) {
 
       await redis.set('heartbeat:bot', payload);
       await redis.expire('heartbeat:bot', 180).catch(() => null);
+
+      // Periodically sync global bot presence from Redis if available
+      try {
+        const [dbText, dbType, dbStreamUrl] = await Promise.all([
+          redis.get('config:global:bot_status_text').catch(() => null),
+          redis.get('config:global:bot_status_type').catch(() => null),
+          redis.get('config:global:bot_status_stream_url').catch(() => null),
+        ]);
+        if (dbText !== null) process.env.BOT_STATUS_TEXT = dbText;
+        if (dbType !== null) process.env.BOT_STATUS_TYPE = dbType;
+        if (dbStreamUrl !== null) process.env.BOT_STATUS_STREAM_URL = dbStreamUrl;
+        _updatePresence(client);
+      } catch (err) {
+        console.warn('[heartbeat-presence] Error syncing bot status from Redis:', err.message);
+      }
     } catch (err) {
       console.warn('[heartbeat] Error writing heartbeat:', err.message);
     }

@@ -140,4 +140,9 @@ export const api = {
 
   /** Bot/system status — heartbeats + stats counters */
   status: () => apiFetch('/api/status').then(r => r.json()),
+  updatePresence: (payload) =>
+    apiFetch('/api/system/presence', {
+      method: 'POST',
+      body: payload
+    }).then(r => r.json()),
 };

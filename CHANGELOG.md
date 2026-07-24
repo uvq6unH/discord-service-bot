@@ -4,6 +4,17 @@ Format: `[vX.Y] — Mô tả ngắn` → chi tiết thay đổi.
 
 ---
 
+## [v2.3.19] — Web Dashboard Bot Activity Status Editor (2026-07-24)
+
+**`src/server.js`, `System.jsx`, `api/index.js`, `system.service.js`, `system.repository.js`** — Tích hợp trình sửa trạng thái Bot trực tiếp trên Dashboard
+- Thiết kế và phát triển bảng cấu hình **`BOT ACTIVITY STATUS CONFIGURATION`** tuyệt đẹp đặt ngay trong tab **System** của trang quản trị.
+- Cho phép quản trị viên nhập trực tiếp văn bản trạng thái hiển thị, lựa chọn kiểu hoạt động (`PLAYING`, `WATCHING`, `LISTENING`, `STREAMING`, `COMPETING`), và cấu hình URL Twitch cho kiểu `STREAMING`.
+- Triển khai API Endpoint mới `POST /api/system/presence` để lưu trạng thái trực tiếp vào Redis hoặc biến môi trường, đồng thời lập tức cập nhật trạng thái hoạt động của Bot trong thời gian thực (Real-time).
+- Cập nhật vòng lặp `heartbeat:bot` của Bot tự động tải cấu hình trạng thái hoạt động mới nhất từ Redis sau mỗi 30 giây để đảm bảo đồng bộ hoàn hảo giữa 2 tiến trình độc lập.
+
+---
+
+
 ## [v2.3.18] — Custom Bot Activity Status Presence Support (2026-07-24)
 
 **`src/bot.js`, `.env.example`** — Tùy chỉnh trạng thái hoạt động của Bot

@@ -9,11 +9,49 @@ import { useLanguage } from '../../../shared/context/LanguageContext.jsx';
 import LiveConsole from '../components/LiveConsole.jsx';
 import UpstashMetrics from '../components/UpstashMetrics.jsx';
 import UptimeRobotStatus from '../components/UptimeRobotStatus.jsx';
+import { systemService } from '../services/system.service.js';
 
 export default function SystemPage() {
   const { config } = useGuild();
   const { status, loading, refetch } = useSystem(45000); // Poll every 45s
   const { t } = useLanguage();
+
+  const [presenceText, setPresenceText] = React.useState('');
+  const [presenceType, setPresenceType] = React.useState('PLAYING');
+  const [presenceStreamUrl, setPresenceStreamUrl] = React.useState('');
+  const [saving, setSaving] = React.useState(false);
+  const [saveMessage, setSaveMessage] = React.useState({ text: '', isError: false });
+
+  React.useEffect(() => {
+    if (status?.presence) {
+      setPresenceText(status.presence.text || '');
+      setPresenceType(status.presence.type || 'PLAYING');
+      setPresenceStreamUrl(status.presence.streamUrl || '');
+    }
+  }, [status]);
+
+  const handleSavePresence = async (e) => {
+    e.preventDefault();
+    setSaving(true);
+    setSaveMessage({ text: '', isError: false });
+    try {
+      const res = await systemService.saveBotPresence({
+        text: presenceText,
+        type: presenceType,
+        streamUrl: presenceStreamUrl
+      });
+      if (res.success) {
+        setSaveMessage({ text: t('Presence updated successfully!'), isError: false });
+        refetch();
+      } else {
+        setSaveMessage({ text: res.error || t('Failed to update presence.'), isError: true });
+      }
+    } catch (err) {
+      setSaveMessage({ text: err.message || t('Failed to update presence.'), isError: true });
+    } finally {
+      setSaving(false);
+    }
+  };
 
   if (loading || !status) {
     return (
@@ -174,6 +212,81 @@ export default function SystemPage() {
                 </div>
               </div>
             </div>
+          </Panel>
+        </div>
+
+        {/* Bot Status Configuration */}
+        <div className="col-span-12">
+          <Panel title={t("BOT ACTIVITY STATUS CONFIGURATION")}>
+            <form onSubmit={handleSavePresence} style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
+              <div className="grid-12" style={{ gap: 'var(--space-4)' }}>
+                <div className="col-span-6">
+                  <label style={{ display: 'block', fontSize: '11px', fontFamily: 'var(--font-mono)', color: 'var(--text-3)', fontWeight: 'bold', marginBottom: 'var(--space-2)' }}>
+                    {t("STATUS TEXT")}
+                  </label>
+                  <input 
+                    type="text"
+                    value={presenceText}
+                    onChange={(e) => setPresenceText(e.target.value)}
+                    placeholder="/help | {guilds} servers"
+                    required
+                    maxLength={100}
+                    style={{ width: '100%', padding: 'var(--space-3)', background: 'var(--surface-1)', border: '1px solid var(--border)', color: 'var(--text-1)', outline: 'none', fontFamily: 'var(--font-mono)', borderHeight: '1px' }}
+                  />
+                  <span style={{ fontSize: '11px', color: 'var(--text-3)', display: 'block', marginTop: 'var(--space-2)' }}>
+                    {t("Supports dynamic placeholder: {guilds} to show total bot guilds count.")}
+                  </span>
+                </div>
+
+                <div className="col-span-3">
+                  <label style={{ display: 'block', fontSize: '11px', fontFamily: 'var(--font-mono)', color: 'var(--text-3)', fontWeight: 'bold', marginBottom: 'var(--space-2)' }}>
+                    {t("ACTIVITY TYPE")}
+                  </label>
+                  <select 
+                    value={presenceType}
+                    onChange={(e) => setPresenceType(e.target.value)}
+                    style={{ width: '100%', padding: 'var(--space-3)', background: 'var(--surface-1)', border: '1px solid var(--border)', color: 'var(--text-1)', outline: 'none', fontFamily: 'var(--font-mono)' }}
+                  >
+                    <option value="PLAYING">{t("PLAYING")}</option>
+                    <option value="WATCHING">{t("WATCHING")}</option>
+                    <option value="LISTENING">{t("LISTENING")}</option>
+                    <option value="STREAMING">{t("STREAMING")}</option>
+                    <option value="COMPETING">{t("COMPETING")}</option>
+                  </select>
+                </div>
+
+                <div className="col-span-3">
+                  <label style={{ display: 'block', fontSize: '11px', fontFamily: 'var(--font-mono)', color: 'var(--text-3)', fontWeight: 'bold', marginBottom: 'var(--space-2)' }}>
+                    {t("STREAM URL (TWITCH/YT)")}
+                  </label>
+                  <input 
+                    type="text"
+                    value={presenceStreamUrl}
+                    onChange={(e) => setPresenceStreamUrl(e.target.value)}
+                    placeholder="https://www.twitch.tv/discord"
+                    disabled={presenceType !== 'STREAMING'}
+                    style={{ width: '100%', padding: 'var(--space-3)', background: presenceType === 'STREAMING' ? 'var(--surface-1)' : '#08090b', border: '1px solid var(--border)', color: presenceType === 'STREAMING' ? 'var(--text-1)' : 'var(--text-3)', outline: 'none', fontFamily: 'var(--font-mono)', opacity: presenceType === 'STREAMING' ? 1 : 0.5 }}
+                  />
+                </div>
+              </div>
+
+              {saveMessage.text && (
+                <div style={{ fontSize: '12px', fontFamily: 'var(--font-mono)', color: saveMessage.isError ? 'var(--red)' : 'var(--green)', padding: 'var(--space-2)', border: '1px solid currentColor', background: 'var(--surface-1)' }}>
+                  &gt;&gt;&gt; {saveMessage.text}
+                </div>
+              )}
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                <button 
+                  type="submit"
+                  className="btn btn--primary"
+                  disabled={saving}
+                  style={{ padding: '8px 24px', fontFamily: 'var(--font-mono)', fontWeight: 'bold', letterSpacing: '0.05em' }}
+                >
+                  {saving ? t("SAVING...") : t("COMMIT PRESENCE CONFIG")}
+                </button>
+              </div>
+            </form>
           </Panel>
         </div>
 

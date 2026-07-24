@@ -416,9 +416,11 @@ export function createServer({ configStore, stateStore, botClient, redis = null 
     let stats = null;
     let redisConnected = false;
     let upstashMetrics = null;
+    let dbText = null, dbType = null, dbStreamUrl = null;
+
     if (redis) {
       try {
-        const [rawBot, rawDash, slashSynced, cacheRefresh, discordErrors, queueLen, rawDbsize, rawInfo, rawMonthlyBaseline, rawDailyBaseline, rawMonthlyLastValue, rawDailyLastValue, rawReadsBaseline, rawWritesBaseline, rawReadsLastValue, rawWritesLastValue] = await Promise.all([
+        const [rawBot, rawDash, slashSynced, cacheRefresh, discordErrors, queueLen, rawDbsize, rawInfo, rawMonthlyBaseline, rawDailyBaseline, rawMonthlyLastValue, rawDailyLastValue, rawReadsBaseline, rawWritesBaseline, rawReadsLastValue, rawWritesLastValue, redisText, redisType, redisStreamUrl] = await Promise.all([
           redis.get('heartbeat:bot').catch(() => null),
           redis.get('heartbeat:dashboard').catch(() => null),
           redis.get('stats:slash_sync_processed').catch(() => null),
@@ -435,8 +437,14 @@ export function createServer({ configStore, stateStore, botClient, redis = null 
           redis.get(`telemetry:global:writes_baseline:${monthStr}`).catch(() => null),
           redis.get(`telemetry:global:reads_last_value:${monthStr}`).catch(() => null),
           redis.get(`telemetry:global:writes_last_value:${monthStr}`).catch(() => null),
+          redis.get('config:global:bot_status_text').catch(() => null),
+          redis.get('config:global:bot_status_type').catch(() => null),
+          redis.get('config:global:bot_status_stream_url').catch(() => null),
         ]);
         redisConnected = true;
+        dbText = redisText;
+        dbType = redisType;
+        dbStreamUrl = redisStreamUrl;
         if (rawBot) botHeartbeat = typeof rawBot === 'string' ? JSON.parse(rawBot) : rawBot;
         if (rawDash) dashboardHeartbeat = typeof rawDash === 'string' ? JSON.parse(rawDash) : rawDash;
         
@@ -619,7 +627,71 @@ export function createServer({ configStore, stateStore, botClient, redis = null 
       upstash: upstashMetrics,
       // UptimeRobot live monitors
       uptimeRobot: process.env.UPTIMEROBOT_API_KEY ? await getUptimeRobotMonitors(process.env.UPTIMEROBOT_API_KEY) : null,
+      // Global Bot presence status
+      presence: {
+        text: dbText ?? process.env.BOT_STATUS_TEXT ?? '/help | {guilds} servers',
+        type: dbType ?? process.env.BOT_STATUS_TYPE ?? 'PLAYING',
+        streamUrl: dbStreamUrl ?? process.env.BOT_STATUS_STREAM_URL ?? ''
+      }
     });
+  });
+
+  app.post('/api/system/presence', auth.requireAuth, writeRateLimit, async (req, res) => {
+    try {
+      const { text, type, streamUrl } = req.body;
+      if (typeof text !== 'string' || typeof type !== 'string') {
+        return res.status(400).json({ error: 'Invalid parameters: text and type are required strings.' });
+      }
+
+      const cleanText = text.trim().slice(0, 100);
+      const cleanType = type.trim().toUpperCase();
+      const cleanStreamUrl = (streamUrl ?? '').trim().slice(0, 200);
+
+      const validTypes = ['PLAYING', 'STREAMING', 'LISTENING', 'WATCHING', 'COMPETING'];
+      if (!validTypes.includes(cleanType)) {
+        return res.status(400).json({ error: 'Invalid activity type. Supported types: PLAYING, STREAMING, LISTENING, WATCHING, COMPETING.' });
+      }
+
+      if (redis) {
+        await Promise.all([
+          redis.set('config:global:bot_status_text', cleanText),
+          redis.set('config:global:bot_status_type', cleanType),
+          redis.set('config:global:bot_status_stream_url', cleanStreamUrl)
+        ]);
+      } else {
+        process.env.BOT_STATUS_TEXT = cleanText;
+        process.env.BOT_STATUS_TYPE = cleanType;
+        process.env.BOT_STATUS_STREAM_URL = cleanStreamUrl;
+      }
+
+      // If bot is running in-process, trigger immediate update
+      if (botClient && botClient.user) {
+        try {
+          const guildsCount = botClient.guilds.cache.size;
+          const statusText = cleanText.replace('{guilds}', guildsCount);
+          let activityType = 0; // Playing
+          if (cleanType === 'STREAMING') activityType = 1;
+          else if (cleanType === 'LISTENING') activityType = 2;
+          else if (cleanType === 'WATCHING') activityType = 3;
+          else if (cleanType === 'COMPETING') activityType = 5;
+
+          botClient.user.setPresence({
+            activities: [{
+              name: statusText,
+              type: activityType,
+              url: cleanType === 'STREAMING' ? (cleanStreamUrl || 'https://www.twitch.tv/discord') : undefined
+            }],
+            status: 'online'
+          });
+        } catch (err) {
+          console.warn('[presence-api] Direct bot presence update failed:', err.message);
+        }
+      }
+
+      res.json({ success: true });
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
   });
 
   app.get('/api/system/logs', auth.requireAuth, readRateLimit, async (_req, res) => {
