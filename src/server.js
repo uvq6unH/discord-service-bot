@@ -496,11 +496,14 @@ export function createServer({ configStore, stateStore, botClient, redis = null 
 
         // Daily Commands Baseline
         let dailyBaseline = rawDailyBaseline ? parseInt(rawDailyBaseline, 10) : null;
-        if (dailyBaseline === null || isNaN(dailyBaseline) || dailyBaseline > engineCmds) {
+        if (dailyBaseline === null || isNaN(dailyBaseline) || dailyBaseline > engineCmds || dailyBaseline < monthlyBaseline) {
           dailyBaseline = engineCmds;
           redis.set(`telemetry:global:daily_baseline:${todayStr}`, String(dailyBaseline)).catch(() => null);
         }
-        const actualCommandsToday = Math.max(0, engineCmds - dailyBaseline);
+        let actualCommandsToday = Math.max(0, engineCmds - dailyBaseline);
+        if (actualCommandsToday > totalCmds) {
+          actualCommandsToday = totalCmds;
+        }
 
         stats = {
           slashSyncProcessed: slashSynced ? parseInt(slashSynced, 10) : 0,

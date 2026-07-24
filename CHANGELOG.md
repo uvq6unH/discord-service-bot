@@ -4,6 +4,15 @@ Format: `[vX.Y] — Mô tả ngắn` → chi tiết thay đổi.
 
 ---
 
+## [v2.3.23] — Daily Command Budget Baseline Validation (2026-07-24)
+
+**`src/server.js`** — Khắc phục dứt điểm chỉ số `DAILY COMMAND BUDGET` nhảy vọt
+- Thêm cơ chế tự động ràng buộc và kiểm tra tính hợp lệ của `dailyBaseline` trong Redis.
+- Tự động sửa lỗi nếu `dailyBaseline` bị nhỏ hơn `monthlyBaseline` hoặc lớn hơn `engineCmds`, đảm bảo số lượng lệnh trong ngày (`commandsToday`) không bao giờ bị nhảy vọt bất thường (vượt quá tổng số lệnh trong tháng).
+
+---
+
+
 ## [v2.3.22] — Real Upstash Telemetry & Corrupted Baseline Cleansing (2026-07-24)
 
 **`src/server.js`** — Khắc phục triệt để sai lệch chỉ số Upstash Redis (`193K` $\rightarrow$ `77K` thực tế)
