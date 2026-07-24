@@ -29,6 +29,7 @@ import { handleComponentInteraction }          from './bot/interactions.js';
 import { handleMusicCommand }                  from './bot/commands/handlers/music.js';
 import { initLavalink, forwardVoiceEvent }     from './bot/music/lavalink.js';
 import { startReminderWorker }                 from './bot/reminderWorker.js';
+import { handleVoiceStateUpdate }             from './bot/tempVoice.js';
 import { handleXp }                            from './bot/xpHandler.js';
 import { runAutoMod, runMentionReact }         from './bot/autoMod.js';
 import { activeQuizSessions, buildQuizEmbed }  from './bot/lolQuiz.js';
@@ -181,6 +182,12 @@ export function createBot(configStore, stateStore, redis = null) {
       startReminderWorker(readyClient, configStore);
       _startEventQueueWorker(readyClient, configStore, redis);
     })().catch((err) => console.error('[bot] Startup error:', err));
+  });
+
+  client.on(Events.VoiceStateUpdate, (oldState, newState) => {
+    handleVoiceStateUpdate(oldState, newState, configStore, redis).catch((err) =>
+      console.error('[tempVoice] Event error:', err.message)
+    );
   });
 
   // ── Resilience ──────────────────────────────────────────────────────────────
@@ -627,11 +634,11 @@ function _startHeartbeat(client, redis) {
 
       // Periodically sync global bot presence from Redis if available
       try {
-        const [dbText, dbType, dbStreamUrl] = await Promise.all([
-          redis.get('config:global:bot_status_text').catch(() => null),
-          redis.get('config:global:bot_status_type').catch(() => null),
-          redis.get('config:global:bot_status_stream_url').catch(() => null),
-        ]);
+        const [dbText, dbType, dbStreamUrl] = await redis.mget(
+          'config:global:bot_status_text',
+          'config:global:bot_status_type',
+          'config:global:bot_status_stream_url'
+        ).catch(() => [null, null, null]);
         if (dbText !== null) process.env.BOT_STATUS_TEXT = dbText;
         if (dbType !== null) process.env.BOT_STATUS_TYPE = dbType;
         if (dbStreamUrl !== null) process.env.BOT_STATUS_STREAM_URL = dbStreamUrl;

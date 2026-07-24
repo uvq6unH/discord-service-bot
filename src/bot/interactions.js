@@ -41,6 +41,46 @@ export async function handleComponentInteraction(interaction, { client, config, 
       const { handleQuizButton } = await import('./lolQuiz.js');
       return handleQuizButton(interaction);
     }
+    if (interaction.customId.startsWith('tempvc_settings:') || interaction.customId.startsWith('tempvc_permissions:')) {
+      const [, channelId, ownerId] = interaction.customId.split(':');
+      const action = interaction.values[0];
+      const channel = interaction.guild?.channels.cache.get(channelId);
+
+      if (!channel) {
+        return interaction.reply({ content: '❌ Kênh thoại tạm không còn tồn tại.', ephemeral: true });
+      }
+
+      if (action === 'lock') {
+        await channel.permissionOverwrites.edit(interaction.guild.roles.everyone, { Connect: false });
+        return interaction.reply({ content: '🔒 Đã khóa kênh thoại! Người ngoài sẽ không thể tham gia.', ephemeral: true });
+      }
+      if (action === 'unlock') {
+        await channel.permissionOverwrites.edit(interaction.guild.roles.everyone, { Connect: true });
+        return interaction.reply({ content: '🔓 Đã mở khóa kênh thoại!', ephemeral: true });
+      }
+      if (action === 'rename') {
+        return interaction.reply({ content: '✏️ Vui lòng dùng lệnh `/voice name [tên_mới]` để đổi tên kênh.', ephemeral: true });
+      }
+      if (action === 'limit') {
+        return interaction.reply({ content: '👥 Vui lòng dùng lệnh `/voice limit [số_người]` để đặt giới hạn số người.', ephemeral: true });
+      }
+      if (action === 'permit') {
+        return interaction.reply({ content: '🟢 Vui lòng dùng lệnh `/voice permit [@thành_viên]` để cấp quyền.', ephemeral: true });
+      }
+      if (action === 'reject') {
+        return interaction.reply({ content: '🔴 Vui lòng dùng lệnh `/voice reject [@thành_viên]` để kick và chặn thành viên.', ephemeral: true });
+      }
+      if (action === 'claim') {
+        if (channel.members.has(ownerId)) {
+          return interaction.reply({ content: '👑 Chủ phòng vẫn còn ở trong kênh thoại.', ephemeral: true });
+        }
+        await channel.permissionOverwrites.edit(interaction.user.id, {
+          Connect: true, Speak: true, ManageChannels: true, MoveMembers: true
+        });
+        return interaction.reply({ content: `👑 <@${interaction.user.id}> đã trở thành chủ phòng mới!`, ephemeral: false });
+      }
+      return;
+    }
     if (!interaction.customId.startsWith('help_select:')) return;
     const targetUserId = interaction.customId.slice('help_select:'.length);
     if (interaction.user.id !== targetUserId) {
@@ -75,6 +115,27 @@ export async function handleComponentInteraction(interaction, { client, config, 
   if (interaction.customId.startsWith('duolingo:')) {
     const { handleDuolingoButton } = await import('./commands/handlers/duolingo.js');
     return handleDuolingoButton(interaction);
+  }
+
+  if (interaction.customId.startsWith('tempvc_refresh:')) {
+    const [, channelId, ownerId] = interaction.customId.split(':');
+    const channel = interaction.guild?.channels.cache.get(channelId);
+    if (!channel) return interaction.reply({ content: '❌ Kênh thoại không còn tồn tại.', ephemeral: true });
+    const { buildTempVcControlPanel } = await import('./tempVoice.js');
+    const panel = buildTempVcControlPanel(channel, ownerId);
+    await interaction.update(panel);
+    return;
+  }
+
+  if (interaction.customId.startsWith('esports:')) {
+    const leagueKey = interaction.customId.split(':')[1] || 'lck';
+    const { handleEsports } = await import('./commands/handlers/esports.js');
+    const dummyCtx = {
+      command: { name: 'esports' },
+      args: [leagueKey],
+      reply: (payload) => interaction.update(payload)
+    };
+    return handleEsports(dummyCtx);
   }
 
   if (interaction.customId.startsWith('music:control:')) {

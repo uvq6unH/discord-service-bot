@@ -85,7 +85,8 @@ export class UpstashClient {
   // ── String / key commands ──────────────────────────────────────────────────
 
   get(key)                          { return this._request(['GET', key]); }
-  set(key, value, ...args)          { return this._request(['SET', key, value, ...args]); }
+  mget(...keys)                     { return this._request(['MGET', ...keys]); }
+  set(key, value, ...options)       { return this._request(['SET', key, String(value), ...options]); }
   del(key)                          { return this._request(['DEL', key]); }
   incr(key)                         { return this._request(['INCR', key]); }
   expire(key, seconds)              { return this._request(['EXPIRE', key, String(seconds)]); }

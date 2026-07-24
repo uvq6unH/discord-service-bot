@@ -164,6 +164,9 @@ export const defaultConfig = {
   autoReplyEnabled: false,
   mentionReactEnabled: false,
   mentionReactEmoji: '👋',
+  tempVcEnabled: false,
+  tempVcMasterChannelId: '',
+  tempVcCategoryId: '',
   remindersEnabled: false,
   reminders: [],
   autoReplies: [
