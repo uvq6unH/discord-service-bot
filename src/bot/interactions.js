@@ -127,17 +127,6 @@ export async function handleComponentInteraction(interaction, { client, config, 
     return;
   }
 
-  if (interaction.customId.startsWith('esports:')) {
-    const leagueKey = interaction.customId.split(':')[1] || 'lck';
-    const { handleEsports } = await import('./commands/handlers/esports.js');
-    const dummyCtx = {
-      command: { name: 'esports' },
-      args: [leagueKey],
-      reply: (payload) => interaction.update(payload)
-    };
-    return handleEsports(dummyCtx);
-  }
-
   if (interaction.customId.startsWith('music:control:')) {
     const { getLavalinkManager, buildMusicControlRow } = await import('./music/lavalink.js');
     const manager = getLavalinkManager();

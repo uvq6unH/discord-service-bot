@@ -239,6 +239,43 @@ function buildSlashOptions(command) {
     ];
   }
 
+  if (command.type === 'voice') {
+    return [
+      {
+        name: 'action',
+        description: 'Hành động điều khiển phòng thoại',
+        type: ApplicationCommandOptionType.String,
+        required: true,
+        choices: [
+          { name: '🔒 Khóa phòng (lock)', value: 'lock' },
+          { name: '🔓 Mở khóa phòng (unlock)', value: 'unlock' },
+          { name: '✏️ Đổi tên phòng (name)', value: 'name' },
+          { name: '👥 Giới hạn số người (limit)', value: 'limit' },
+          { name: '🟢 Cấp quyền cho người dùng (permit)', value: 'permit' },
+          { name: '🔴 Chặn/Kick người dùng (reject)', value: 'reject' },
+          { name: '👑 Nhận quyền chủ phòng (claim)', value: 'claim' }
+        ]
+      },
+      {
+        name: 'value',
+        description: 'Tên mới, giới hạn số người, hoặc tag @thành_viên',
+        type: ApplicationCommandOptionType.String,
+        required: false
+      }
+    ];
+  }
+
+  if (command.type === 'setup-temp-vc') {
+    return [
+      {
+        name: 'auto_setup',
+        description: 'Tự động tạo Category và Kênh Master trên Server',
+        type: ApplicationCommandOptionType.Boolean,
+        required: false
+      }
+    ];
+  }
+
   if (command.type === 'purge') {
     return [
       {

@@ -14,7 +14,9 @@ export const defaultConfig = {
       { enabled: true, type: 'say', name: 'say', description: 'Make the bot send a message', response: '{args}' },
       { enabled: true, type: 'announce', name: 'announce', description: 'Send an announcement', response: '{args}' },
       { enabled: true, type: 'translate', name: 'translate', description: 'Dịch văn bản tự động (Nga, Nhật, Trung, Việt, Anh)', response: '' },
-      { enabled: true, type: 'duolingo', name: 'duolingo', description: 'Học tiếng Nga và tiếng Trung giống Duolingo', response: '' }
+      { enabled: true, type: 'duolingo', name: 'duolingo', description: 'Học tiếng Nga và tiếng Trung giống Duolingo', response: '' },
+      { enabled: true, type: 'voice', name: 'voice', description: 'Điều khiển phòng thoại tạm thời VoiceMaster', response: '' },
+      { enabled: true, type: 'setup-temp-vc', name: 'setup-temp-vc', description: 'Admin setup Kênh Thoại Tự Động Master', response: '' }
     ]
   },
   moderationEnabled: true,

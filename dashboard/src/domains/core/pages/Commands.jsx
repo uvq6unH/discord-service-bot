@@ -325,7 +325,8 @@ export default function CommandsPage() {
   }
 
   const roles = guildData?.roles ?? [];
-  const builtInCommands = (config.core?.commands ?? []).filter(c => c.type !== 'custom');
+  const UTILITY_TYPES = ['translate', 'duolingo', 'voice', 'setup-temp-vc'];
+  const builtInCommands = (config.core?.commands ?? []).filter(c => c.type !== 'custom' && !UTILITY_TYPES.includes(c.type));
   const customsCount = (config.core?.commands ?? []).filter(c => c.type === 'custom').length;
   const autoRepliesCount = (config.autoReplies ?? []).length;
 

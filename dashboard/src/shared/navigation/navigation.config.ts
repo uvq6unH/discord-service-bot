@@ -23,6 +23,7 @@ export const NAVIGATION_SCHEMA: DomainConfig[] = [
       { to: "/members", label: "MEMBERS", icon: "Users" },
       { to: "/moderation", label: "MODERATION", icon: "Shield" },
       { to: "/commands", label: "COMMANDS", icon: "Terminal" },
+      { to: "/utilities", label: "UTILITIES", icon: "Wrench" },
       { to: "/audit-logs", label: "AUDIT LOGS", icon: "FileText" },
       { to: "/economy", label: "ECONOMY", icon: "Coins" },
       { to: "/analytics", label: "ANALYTICS", icon: "BarChart2" },
@@ -34,7 +35,10 @@ export const NAVIGATION_SCHEMA: DomainConfig[] = [
     label: "RIOT SERVICES",
     description: "League & TFT Trackers",
     accentColor: "var(--accent-riot)", // Red
-    items: [{ to: "/riot", label: "RIOT TELEMETRY", icon: "Sword" }]
+    items: [
+      { to: "/riot", label: "RIOT TELEMETRY", icon: "Sword" },
+      { to: "/esports", label: "ESPORTS TOURNAMENTS", icon: "Trophy" }
+    ]
   },
   {
     id: "music",

@@ -397,48 +397,6 @@ export default function RiotServicesPage() {
           </div>
         )}
 
-        {/* Esports Tournament Settings Panel */}
-        <div className="col-span-12" style={{ marginTop: 'var(--space-6)' }}>
-          <Panel title={t("ESPORTS TOURNAMENT SETTINGS")} accent>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <div>
-                  <div style={{ fontWeight: 'bold', fontSize: '13px', color: 'var(--text-1)' }}>
-                    {t("Automated Esports Live Notifications")}
-                  </div>
-                  <div style={{ fontSize: '12px', color: 'var(--text-3)' }}>
-                    {t("Automatically post live match alerts when major tournaments start")}
-                  </div>
-                </div>
-                <label className="toggle-switch">
-                  <input
-                    type="checkbox"
-                    checked={Boolean(config.esportsNotifyEnabled)}
-                    onChange={(e) => updateConfig({ esportsNotifyEnabled: e.target.checked })}
-                  />
-                  <span className="slider" />
-                </label>
-              </div>
-
-              <div>
-                <label style={{ display: 'block', fontSize: '12px', fontWeight: 'bold', marginBottom: 'var(--space-1)', color: 'var(--text-2)' }}>
-                  {t("Notification Channel")}
-                </label>
-                <select
-                  className="form-input"
-                  value={config.esportsChannelId || ''}
-                  onChange={(e) => updateConfig({ esportsChannelId: e.target.value })}
-                >
-                  <option value="">-- {t("Select Channel")} --</option>
-                  {(channels || []).filter(c => c.type === 0 || c.type === 5).map(c => (
-                    <option key={c.id} value={c.id}>#{c.name}</option>
-                  ))}
-                </select>
-              </div>
-            </div>
-          </Panel>
-        </div>
-
         {/* Riot / TFT Commands Panel */}
         {visibleCommands.length > 0 && (
           <div className="col-span-12" style={{ marginTop: 'var(--space-6)' }}>

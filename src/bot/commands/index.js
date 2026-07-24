@@ -9,7 +9,7 @@ import { handlePanels } from './handlers/panels.js';
 import { handleRiot } from './handlers/riot.js';
 import { handleTranslate } from './handlers/translate.js';
 import { handleDuolingo } from './handlers/duolingo.js';
-import { handleEsports } from './handlers/esports.js';
+import { handleVoiceControl } from './handlers/tempVcSetup.js';
 
 const HANDLERS = [
   handleHelp,
@@ -21,7 +21,7 @@ const HANDLERS = [
   handleRiot,
   handleTranslate,
   handleDuolingo,
-  handleEsports
+  handleVoiceControl
 ];
 
 export async function runBuiltInCommand(params) {
