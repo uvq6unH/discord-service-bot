@@ -4,6 +4,21 @@ Format: `[vX.Y] — Mô tả ngắn` → chi tiết thay đổi.
 
 ---
 
+## [v2.3.18] — Custom Bot Activity Status Presence Support (2026-07-24)
+
+**`src/bot.js`, `.env.example`** — Tùy chỉnh trạng thái hoạt động của Bot
+- Thiết lập cơ chế tự động cập nhật trạng thái hoạt động (Presence status / Activity) cho Bot trên Discord:
+  - Cập nhật khi khởi động (`ClientReady`) và cập nhật động khi Bot tham gia/rời khỏi bất cứ máy chủ nào (`GuildCreate`, `GuildDelete`).
+  - Hỗ trợ thay thế động biến số lượng máy chủ `{guilds}` trong văn bản hiển thị.
+- Cho phép người dùng tùy cấu hình trạng thái qua các biến môi trường mới:
+  - `BOT_STATUS_TEXT`: Văn bản hiển thị (mặc định: `/help | {guilds} servers`).
+  - `BOT_STATUS_TYPE`: Kiểu hiển thị như `PLAYING`, `WATCHING`, `LISTENING`, `STREAMING`, `COMPETING` (mặc định: `PLAYING`).
+  - `BOT_STATUS_STREAM_URL`: Đường dẫn Twitch stream nếu chọn kiểu `STREAMING`.
+- Cập nhật `.env.example` để tài liệu hóa các biến này.
+
+---
+
+
 ## [v2.3.17] — Global Slash Commands & Profile Card Showcase Support (2026-07-24)
 
 **`src/bot.js`, `.env.example`** — Đồng bộ lệnh Slash toàn cầu & Cập nhật tài liệu biến môi trường mẫu

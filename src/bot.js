@@ -16,6 +16,7 @@ import {
   GatewayIntentBits,
   Partials,
   PermissionFlagsBits,
+  ActivityType,
 } from 'discord.js';
 
 import { CommandCooldowns, formatRetryAfter } from './cooldowns.js';
@@ -125,6 +126,7 @@ export function createBot(configStore, stateStore, redis = null) {
   client.once(Events.ClientReady, (readyClient) => {
     console.log(`Discord bot logged in as ${readyClient.user.tag}`);
     _startHeartbeat(readyClient, redis);
+    _updatePresence(readyClient);
 
     (async () => {
       await configStore.ready;
@@ -255,6 +257,11 @@ export function createBot(configStore, stateStore, redis = null) {
   client.on(Events.GuildCreate, async (guild) => {
     console.log(`[bot] Joined guild: ${guild.name} (${guild.id})`);
     if (redis) await writeGuildCache(guild, redis);
+    _updatePresence(client);
+  });
+  client.on(Events.GuildDelete, async (guild) => {
+    console.log(`[bot] Left guild: ${guild.name} (${guild.id})`);
+    _updatePresence(client);
   });
   client.on(Events.GuildUpdate, async (_old, newGuild) => {
     if (redis) await writeGuildCache(newGuild, redis);
@@ -577,3 +584,31 @@ function _startHeartbeat(client, redis) {
   handle.unref();
   console.log('[heartbeat] Bot heartbeat started — writing every 30 s');
 }
+
+function _updatePresence(client) {
+  try {
+    const guildsCount = client.guilds.cache.size;
+    const rawText = process.env.BOT_STATUS_TEXT || '/help | {guilds} servers';
+    const statusText = rawText.replace('{guilds}', guildsCount);
+
+    const rawType = (process.env.BOT_STATUS_TYPE || 'PLAYING').toUpperCase();
+    let activityType = ActivityType.Playing;
+    if (rawType === 'STREAMING') activityType = ActivityType.Streaming;
+    else if (rawType === 'LISTENING') activityType = ActivityType.Listening;
+    else if (rawType === 'WATCHING') activityType = ActivityType.Watching;
+    else if (rawType === 'COMPETING') activityType = ActivityType.Competing;
+
+    client.user.setPresence({
+      activities: [{
+        name: statusText,
+        type: activityType,
+        url: rawType === 'STREAMING' ? (process.env.BOT_STATUS_STREAM_URL || 'https://www.twitch.tv/discord') : undefined
+      }],
+      status: 'online'
+    });
+    console.log(`[bot] Presence updated: ${rawType} "${statusText}"`);
+  } catch (err) {
+    console.error('[bot] Failed to set presence:', err.message);
+  }
+}
+
