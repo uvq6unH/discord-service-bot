@@ -4,6 +4,16 @@ Format: `[vX.Y] — Mô tả ngắn` → chi tiết thay đổi.
 
 ---
 
+## [v2.3.17] — Global Slash Commands & Profile Card Showcase Support (2026-07-24)
+
+**`src/bot.js`, `.env.example`** — Đồng bộ lệnh Slash toàn cầu & Cập nhật tài liệu biến môi trường mẫu
+- Triển khai chức năng đồng bộ toàn cầu các lệnh mặc định (`client.syncGlobalCommands`) lên thẳng Discord Application giúp hiển thị danh sách câu lệnh trực tiếp dưới phần profile card của Bot (tab "Commands") tương tự MEE6.
+- Cải tiến `client.syncGuildCommands` chỉ đăng ký các lệnh tuỳ chỉnh (Custom Commands) tại từng máy chủ cụ thể, giúp dọn dẹp các lệnh mặc định trùng lặp ở cấp Guild, giải quyết triệt để lỗi hiển thị lặp lệnh trong danh sách gợi ý.
+- Cập nhật `.env.example` bổ sung chi tiết các biến môi trường mới bao gồm `UPTIMEROBOT_API_KEY`, `UPSTASH_MONTHLY_COMMANDS`, `UPSTASH_MONTHLY_READS`, và `UPSTASH_MONTHLY_WRITES`.
+
+---
+
+
 ## [v2.3.16] — Multiple UptimeRobot Monitor API Keys Merging Support (2026-07-23)
 
 **`src/server.js`** — Hỗ trợ gộp kết quả từ nhiều Monitor-specific API Keys của UptimeRobot

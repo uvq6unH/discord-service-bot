@@ -31,6 +31,7 @@ import { startReminderWorker }                 from './bot/reminderWorker.js';
 import { handleXp }                            from './bot/xpHandler.js';
 import { runAutoMod, runMentionReact }         from './bot/autoMod.js';
 import { activeQuizSessions, buildQuizEmbed }  from './bot/lolQuiz.js';
+import { defaultConfig, builtInTypesByName } from './configDefaults.js';
 
 // ── Guild Cache ───────────────────────────────────────────────────────────────
 // Hai key tách biệt để tránh Upstash 1 MB REST limit trên guild lớn:
@@ -137,21 +138,30 @@ export function createBot(configStore, stateStore, redis = null) {
         console.error('[bot] Failed to purge stale game sessions:', err.message)
       );
 
-      // Sync slash commands cho mỗi guild
+      // Sync global slash commands once
+      console.log(`[bot] Syncing global slash commands...`);
+      try {
+        const globalResult = await readyClient.syncGlobalCommands();
+        console.log(`[bot] ✅ Synced ${globalResult.count} global commands`);
+      } catch (error) {
+        console.error(`[bot] ❌ Failed to sync global commands: ${error.message}`);
+      }
+
+      // Sync custom slash commands for each guild
       const guilds  = [...readyClient.guilds.cache.values()];
       let   synced  = 0;
-      console.log(`[bot] Syncing slash commands for ${guilds.length} guild(s)...`);
+      console.log(`[bot] Syncing guild-specific custom commands for ${guilds.length} guild(s)...`);
       for (const guild of guilds) {
         try {
           const config = await configStore.getGuildConfig(guild.id);
           const result = await readyClient.syncGuildCommands(guild.id, config);
-          console.log(`[bot] ✅ Synced ${result.count} commands → ${guild.name} (${guild.id})`);
+          console.log(`[bot] ✅ Synced ${result.count} custom commands → ${guild.name} (${guild.id})`);
           synced += 1;
         } catch (error) {
-          console.error(`[bot] ❌ Failed to sync commands for ${guild.name}: ${error.message}`);
+          console.error(`[bot] ❌ Failed to sync custom commands for ${guild.name}: ${error.message}`);
         }
       }
-      console.log(`[bot] Command sync complete: ${synced}/${guilds.length} guilds OK`);
+      console.log(`[bot] Guild custom command sync complete: ${synced}/${guilds.length} guilds OK`);
 
       // Guild cache initial write
       if (redis) {
@@ -193,11 +203,39 @@ export function createBot(configStore, stateStore, redis = null) {
   });
 
   // ── Slash command sync helper ───────────────────────────────────────────────
+  client.syncGlobalCommands = async () => {
+    const allCommands = [
+      ...(defaultConfig.core?.commands || []),
+      ...(defaultConfig.moderation?.commands || []),
+      ...(defaultConfig.levels?.commands || []),
+      ...(defaultConfig.economy?.commands || []),
+      ...(defaultConfig.riot?.commands || []),
+    ].map(cmd => ({ ...cmd, enabled: true }));
+
+    const mockConfig = { commands: allCommands };
+    const commands = buildSlashCommands(mockConfig);
+    const validCommands = commands.filter((cmd) => {
+      if (!cmd.name || cmd.name.length > 32) return false;
+      if (!cmd.description || cmd.description.length > 100) {
+        cmd.description = (cmd.description ?? cmd.name).slice(0, 100);
+      }
+      return true;
+    });
+
+    console.log(`[sync-global] Syncing ${validCommands.length} global commands to Discord Application...`);
+    await client.application.commands.set(validCommands);
+    return { synced: true, count: validCommands.length };
+  };
+
   client.syncGuildCommands = async (guildId, config) => {
     const guild = await client.guilds.fetch(guildId).catch(() => null);
     if (!guild) return { synced: false, reason: 'guild_not_found' };
 
-    const commands      = buildSlashCommands(config);
+    // Register ONLY custom commands for this guild (built-ins are global)
+    const customCommands = config.commands.filter(
+      (cmd) => cmd.type === 'custom' || !builtInTypesByName.has(cmd.name)
+    );
+    const commands = buildSlashCommands({ commands: customCommands });
     const validCommands = commands.filter((cmd) => {
       if (!cmd.name || cmd.name.length > 32) {
         console.warn(`[sync] Skipping invalid command name: "${cmd.name}"`);
