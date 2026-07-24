@@ -44,7 +44,7 @@ Dự án hỗ trợ hai chế độ chạy linh hoạt:
 2. **Mode B — Split (2 processes)**: Đề xuất cho Production (Render.com, Cloud VPS).
    - **Bot service** (`src/index.bot.js`): Phụ trách Gateway Discord, Slash commands, XP handler, và Audio pipeline.
    - **Dashboard service** (`src/index.server.js`): Đóng vai trò Web Server phục vụ REST API và React SPA Frontend.
-   - **Giao tiếp bất đồng bộ qua Redis**: Mọi cấu hình, session, guild cache và queue đồng bộ slash (`slash_sync_queue`) được truyền tải mượt qua Upstash Redis.
+   - **Giao tiếp bất đồng bộ qua Redis**: Mọi cấu hình, session, guild cache và hàng đợi sự kiện liên tiến trình thời gian thực (`event_queue` / `BLPOP` Fast-drain) được truyền tải mượt qua Upstash Redis.
    - **Keep-alive**: Sử dụng UptimeRobot để duy trì 24/7 (loại bỏ hoàn toàn PM2 và script self-ping).
 
 ---

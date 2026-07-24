@@ -509,19 +509,21 @@ export function createServer({ configStore, stateStore, botClient, redis = null 
 
     if (redis) {
       try {
-        const [rawBot, rawDash, slashSynced, cacheRefresh, discordErrors, queueLen, rawDbsize, rawInfo, redisText, redisType, redisStreamUrl] = await Promise.all([
+        const [rawBot, rawDash, slashSynced, cacheRefresh, discordErrors, eventLen, legacyLen, rawDbsize, rawInfo, redisText, redisType, redisStreamUrl] = await Promise.all([
           redis.get('heartbeat:bot').catch(() => null),
           redis.get('heartbeat:dashboard').catch(() => null),
           redis.get('stats:slash_sync_processed').catch(() => null),
           redis.get('stats:guild_cache_refresh').catch(() => null),
           redis.get('stats:discord_errors').catch(() => null),
-          redis.llen('slash_sync_queue').catch(() => null),
+          redis.llen('event_queue').catch(() => 0),
+          redis.llen('slash_sync_queue').catch(() => 0),
           redis.dbsize().catch(() => null),
           redis.info().catch(() => null),
           redis.get('config:global:bot_status_text').catch(() => null),
           redis.get('config:global:bot_status_type').catch(() => null),
           redis.get('config:global:bot_status_stream_url').catch(() => null),
         ]);
+        const queueLen = (eventLen || 0) + (legacyLen || 0);
         redisConnected = true;
         dbText = redisText;
         dbType = redisType;
@@ -865,8 +867,8 @@ export function createServer({ configStore, stateStore, botClient, redis = null 
       slashSync = await botClient.syncGuildCommands(req.guildId, config)
         .catch((e) => ({ synced: false, reason: e.message }));
     } else if (redis) {
-      // Split mode: đẩy vào queue để bot worker xử lý trong 5s
-      await redis.rpush('slash_sync_queue', JSON.stringify({ guildId: req.guildId, requestedAt: new Date().toISOString() }));
+      // Split mode: đẩy vào event_queue để bot worker xử lý tức thì
+      await redis.rpush('event_queue', JSON.stringify({ type: 'sync_commands', guildId: req.guildId, requestedAt: new Date().toISOString() }));
       slashSync = { synced: false, queued: true, reason: 'bot_not_in_process' };
     } else {
       slashSync = { synced: false, reason: 'bot_not_available' };
@@ -876,8 +878,8 @@ export function createServer({ configStore, stateStore, botClient, redis = null 
   });
 
   app.post('/api/slash-sync', auth.requireAuth, writeRateLimit, requireGuildId, auth.requireGuildAccess, async (req, res) => {
-    // Phase 2: If botClient is present (monolith), sync directly for instant feedback.
-    // If not (split mode), push to Redis queue — bot worker picks it up within 5 seconds.
+    // Phase 2 / Phase 5: If botClient is present (monolith), sync directly for instant feedback.
+    // If not (split mode), push to Real-time Redis Event Queue — bot worker picks it up instantly.
     if (botClient) {
       const config = await configStore.getGuildConfig(req.guildId);
       const slashSync = await botClient.syncGuildCommands(req.guildId, config)
@@ -889,8 +891,8 @@ export function createServer({ configStore, stateStore, botClient, redis = null 
       return res.status(503).json({ error: 'Bot not available and no Redis queue configured.' });
     }
 
-    await redis.rpush('slash_sync_queue', JSON.stringify({ guildId: req.guildId, requestedAt: new Date().toISOString() }));
-    res.json({ queued: true, message: 'Slash sync queued. Bot will process within 5 seconds.' });
+    await redis.rpush('event_queue', JSON.stringify({ type: 'sync_commands', guildId: req.guildId, requestedAt: new Date().toISOString() }));
+    res.json({ queued: true, message: 'Slash sync event dispatched to real-time IPC queue. Bot will process instantly.' });
   });
 
   app.get('/api/state', auth.requireAuth, readRateLimit, requireGuildId, auth.requireGuildAccess, async (req, res) => {

@@ -360,4 +360,29 @@
 **Hệ quả:**
 - Component `<UpstashMetrics />` hiển thị trực quan 4 thẻ tài nguyên chuẩn định dạng Upstash Console kèm thanh tiến trình phần trăm trên trang **System**.
 
+---
+
+## ADR-022 — System Page & Global Dashboard Light/Dark Theme Standardization
+
+**Quyết định:** Loại bỏ hoàn toàn các màu nền cứng (`#0c0d10`, `#0a0a0c`, `#08090b`), chuẩn hóa 100% các thành phần giao diện trên Dashboard theo hệ thống biến CSS Design System (`var(--surface-0)`, `var(--surface-1)`, `var(--text-1)`, `var(--text-2)`, `var(--accent)`, `var(--border)`). Nâng cấp bảng màu trạng thái tương phản cao cho Light Theme.
+
+**Lý do chọn:**
+- Khắc phục triệt để hiện tượng chênh lệch màu nền khi chuyển đổi giữa Light Mode và Dark Mode (tránh lỗi chữ đen chìm trên nền đen), mang lại trải nghiệm người dùng sang trọng, tinh tế và đồng bộ tuyệt đối.
+
+**Hệ quả:**
+- Mọi thẻ component, form input, terminal viewer và biểu đồ heatmap tự động tương thích và chuyển đổi mượt mà theo Theme được chọn mà không cần dùng inline styles dị biệt.
+
+---
+
+## ADR-023 — Real-time Inter-Process Event Queue (`event_queue`) & BLPOP Fast-Drain
+
+**Quyết định:** Thay thế cơ chế thăm dò định kỳ `setInterval` 5 giây cũ bằng Hàng đợi sự kiện thời gian thực `event_queue` trên Redis sử dụng cơ chế `BLPOP` kết hợp vòng lặp Fast-Drain (`setImmediate`).
+
+**Lý do chọn:**
+- Giảm tối đa độ trễ đồng bộ từ Dashboard sang Bot service (xử lý tức thì ~0ms khi có sự kiện), đồng thời loại bỏ việc tiêu tốn request và CPU không cần thiết khi hàng đợi rỗng nhờ cơ chế ngủ thích ứng (Adaptive Sleep).
+
+**Hệ quả:**
+- Giao tiếp liên tiến trình (IPC) được chuẩn hóa qua cấu trúc JSON payload (`sync_commands`, `refresh_guild`, `purge_sessions`), cải thiện vượt bậc hiệu năng và tốc độ phản hồi của toàn bộ hệ thống.
+
+
 

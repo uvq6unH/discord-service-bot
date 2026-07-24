@@ -4,6 +4,20 @@ Format: `[vX.Y] — Mô tả ngắn` → chi tiết thay đổi.
 
 ---
 
+## [v2.5.0] — Phase 5: Real-time IPC Event Queue & BLPOP Optimization (2026-07-24)
+
+**`src/upstash.js`, `src/bot.js`, `src/server.js`** — Triển khai Hàng đợi sự kiện thời gian thực liên tiến trình (IPC)
+- Thêm phương thức `blpop(key, timeoutSeconds)` vào `UpstashClient` hỗ trợ blocking pop / fast-drain.
+- Thay thế worker thăm dò định kỳ `setInterval` 5s cũ bằng `_startEventQueueWorker`: tiêu thụ ngay lập tức trong 0ms khi có sự kiện và tự động ngủ thích ứng khi rỗng.
+- Chuẩn hóa gói tin IPC liên tiến trình qua danh sách `event_queue`:
+  - `{ type: "sync_commands", guildId: "..." }`
+  - `{ type: "refresh_guild", guildId: "..." }`
+  - `{ type: "purge_sessions" }`
+- Dashboard đẩy lệnh trực tiếp vào `event_queue` để bot phản hồi tức thì mà không cần chờ 5s.
+
+---
+
+
 ## [v2.4.5] — Full Codebase Design System Audit & Heatmap Fix (2026-07-24)
 
 **`Analytics.jsx`, `PermissionGuard.jsx`, `TermsPage.jsx`, `PrivacyPage.jsx`, `index.css`** — Audit toàn bộ mã nguồn frontend

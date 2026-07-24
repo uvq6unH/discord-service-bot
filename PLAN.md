@@ -89,7 +89,7 @@ Region routing uses two separate maps: `accountRouting` for Account-v1 (VN2 → 
 
 ---
 
-## Phase 4 — Real-time Event Queue & Queue Optimization (BLPOP) ⬜
+## Phase 4 — Real-time Event Queue & Queue Optimization (BLPOP) ✅
 
 **Mục tiêu:** Tối ưu hóa độ trễ đồng bộ và giảm tải CPU thăm dò (polling wakeups).
 - Thay thế `setInterval` + `lpop` (thăm dò 5 giây) bằng cơ chế blocking pop `BLPOP` hoặc Redis Streams/PubSub để bot phản hồi tức thì khi có lệnh từ dashboard.
@@ -170,7 +170,7 @@ Region routing uses two separate maps: `accountRouting` for Account-v1 (VN2 → 
 ✅ P4.9 Dashboard Live Console Terminal Viewer (`GET /api/system/logs`)
 ✅ P4.10 Official Upstash Developer API Telemetry & Clean Architecture (`v2.4.0`–`v2.4.2`)
 ✅ P4.11 Full Codebase Light & Dark Design System Standardization (`v2.4.3`–`v2.4.5`)
-⬜ P5   Real-time Event Queue (BLPOP/Streams)
+✅ P5   Real-time Event Queue (BLPOP/Streams)
 ⬜ P6   Member Cache Pagination / On-demand Fetch
 ⬜ P7   Domain Repository Separation
 ⬜ P8   Distributed Riot Static Cache (Redis)

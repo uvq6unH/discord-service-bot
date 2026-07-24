@@ -32,7 +32,7 @@
 - Kết nối Discord Gateway (slash commands, messages, interactions)
 - Lavalink Multi-Node Pool (music)
 - Ghi `guild_cache` vào Redis
-- Poll `slash_sync_queue` mỗi 5 s
+- Tiêu thụ sự kiện liên tiến trình từ `event_queue` thời gian thực (`BLPOP` / Fast-drain 0ms latency)
 - Ghi `heartbeat:bot` mỗi 30 s
 
 **Environment variables:**

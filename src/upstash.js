@@ -111,6 +111,7 @@ export class UpstashClient {
   // ── List commands ──────────────────────────────────────────────────────────
 
   lpop(key)                         { return this._request(['LPOP', key]); }
+  blpop(key, timeoutSeconds = 1)    { return this._request(['BLPOP', key, String(timeoutSeconds)]); }
   rpush(key, ...values)             { return this._request(['RPUSH', key, ...values]); }
   llen(key)                         { return this._request(['LLEN', key]); }
 

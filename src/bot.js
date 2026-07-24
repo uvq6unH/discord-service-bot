@@ -179,7 +179,7 @@ export function createBot(configStore, stateStore, redis = null) {
 
       // Workers
       startReminderWorker(readyClient, configStore);
-      _startSlashSyncWorker(readyClient, configStore, redis);
+      _startEventQueueWorker(readyClient, configStore, redis);
     })().catch((err) => console.error('[bot] Startup error:', err));
   });
 
@@ -501,49 +501,98 @@ export function createBot(configStore, stateStore, redis = null) {
 
 // ── Internal workers (private) ────────────────────────────────────────────────
 
-function _startSlashSyncWorker(client, configStore, redis) {
+function _startEventQueueWorker(client, configStore, redis) {
   if (!redis) return;
 
-  const SLASH_SYNC_QUEUE = 'slash_sync_queue';
-  const MAX_RETRIES      = 3;
+  const EVENT_QUEUE = 'event_queue';
+  const LEGACY_SLASH_SYNC_QUEUE = 'slash_sync_queue';
+  const MAX_RETRIES = 3;
+  let isRunning = true;
 
-  const handle = setInterval(async () => {
-    try {
-      const raw = await redis.lpop(SLASH_SYNC_QUEUE);
-      if (!raw) return;
+  const processJob = async (job) => {
+    if (!job || typeof job !== 'object') return;
+    const type = job.type || 'sync_commands';
+    const guildId = job.guildId;
 
-      let job;
-      try { job = typeof raw === 'string' ? JSON.parse(raw) : raw; } catch { return; }
-
-      const { guildId, retries = 0, requestedAt } = job;
+    if (type === 'sync_commands') {
       if (!guildId) return;
-
       const config = await configStore.getGuildConfig(guildId).catch(() => null);
       if (!config) return;
 
       try {
         const result = await client.syncGuildCommands(guildId, config);
         redis.incr('stats:slash_sync_processed').catch(() => null);
-        console.log(`[slash-queue] Synced ${guildId}:`, result);
+        console.log(`[event-queue] Synced commands for ${guildId}:`, result);
       } catch (err) {
+        const retries = job.retries || 0;
         if (retries < MAX_RETRIES) {
-          await redis.rpush(SLASH_SYNC_QUEUE, JSON.stringify({
-            guildId, retries: retries + 1, requestedAt,
-            lastError: err.message, retriedAt: new Date().toISOString(),
+          await redis.rpush(EVENT_QUEUE, JSON.stringify({
+            ...job,
+            retries: retries + 1,
+            lastError: err.message,
+            retriedAt: new Date().toISOString(),
           }));
-          console.warn(`[slash-queue] Retry ${retries + 1}/${MAX_RETRIES} for ${guildId}: ${err.message}`);
+          console.warn(`[event-queue] Retry ${retries + 1}/${MAX_RETRIES} for ${guildId}: ${err.message}`);
         } else {
-          console.error(`[slash-queue] Giving up on ${guildId} after ${MAX_RETRIES} retries: ${err.message}`);
+          console.error(`[event-queue] Giving up on ${guildId} after ${MAX_RETRIES} retries: ${err.message}`);
           redis.incr('stats:slash_sync_failed').catch(() => null);
         }
       }
-    } catch (err) {
-      console.error('[slash-queue] Worker error:', err.message);
+    } else if (type === 'refresh_guild') {
+      if (!guildId) return;
+      const guild = await client.guilds.fetch(guildId).catch(() => null);
+      if (guild) {
+        await writeGuildCache(guild, redis).catch(() => null);
+        console.log(`[event-queue] Refreshed guild cache for ${guildId}`);
+      }
+    } else if (type === 'purge_sessions') {
+      await stateStore.purgeStaleGameSessions().catch(() => null);
+      console.log('[event-queue] Purged stale game sessions');
     }
-  }, 5_000);
+  };
 
-  handle.unref();
-  console.log('[slash-queue] Worker started — polling every 5 s, max 3 retries');
+  const loop = async () => {
+    while (isRunning) {
+      try {
+        let raw = null;
+        try {
+          const res = await redis.blpop(EVENT_QUEUE, 1);
+          if (res) {
+            raw = Array.isArray(res) ? res[1] : res;
+          }
+        } catch {
+          raw = await redis.lpop(EVENT_QUEUE).catch(() => null);
+        }
+
+        if (!raw) {
+          raw = await redis.lpop(LEGACY_SLASH_SYNC_QUEUE).catch(() => null);
+        }
+
+        if (raw) {
+          let job;
+          try {
+            job = typeof raw === 'string' ? JSON.parse(raw) : raw;
+          } catch {
+            job = null;
+          }
+          if (job) {
+            await processJob(job);
+          }
+          await new Promise(resolve => setImmediate(resolve));
+        } else {
+          await new Promise(resolve => setTimeout(resolve, 1500));
+        }
+      } catch (err) {
+        console.error('[event-queue] Worker error:', err.message);
+        await new Promise(resolve => setTimeout(resolve, 3000));
+      }
+    }
+  };
+
+  loop();
+  console.log('[event-queue] Unified Real-time IPC Worker started (BLPOP / Fast-drain active)');
+
+  return () => { isRunning = false; };
 }
 
 function _startHeartbeat(client, redis) {
