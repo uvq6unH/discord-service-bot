@@ -191,7 +191,7 @@ export default function SystemPage() {
 
         {/* External integrations telemetry */}
         <div className="col-span-12">
-          <Panel title={t("INTEGRATIONS & ADAPTERS HEALTH")}>
+          <Panel title={t("INTEGRATIONS & ADAPTERS HEALTH")} accent>
             <div className="grid-12" style={{ gap: 'var(--space-3)' }}>
               <div className="col-span-4" style={{ border: '1px solid var(--border)', padding: 'var(--space-4)' }}>
                 <span style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--text-3)' }}>{t("RIOT API CONNECTIVITY")}</span>
@@ -217,7 +217,7 @@ export default function SystemPage() {
 
         {/* Bot Status Configuration */}
         <div className="col-span-12">
-          <Panel title={t("BOT ACTIVITY STATUS CONFIGURATION")}>
+          <Panel title={t("BOT ACTIVITY STATUS CONFIGURATION")} accent>
             <form onSubmit={handleSavePresence} style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
               <div className="grid-12" style={{ gap: 'var(--space-4)' }}>
                 <div className="col-span-6">

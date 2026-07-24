@@ -57,6 +57,7 @@ export default function LiveConsole() {
   return (
     <Panel
       title={t("LIVE ENGINE CONSOLE LOGS")}
+      accent
       actions={
         <div style={{ display: 'flex', gap: 'var(--space-2)', alignItems: 'center' }}>
           <select

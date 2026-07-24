@@ -10,6 +10,7 @@ export default function UptimeRobotStatus({ uptimeRobot, botOnline }) {
     return (
       <Panel
         title={t("UPTIMEROBOT 24/7 KEEP-ALIVE MONITORS")}
+        accent
         actions={
           <span style={{ fontSize: '11px', fontFamily: 'var(--font-mono)', padding: '2px 8px', background: 'var(--surface-1)', border: '1px solid var(--border)', borderRadius: 'var(--r2)', color: 'var(--text-3)' }}>
             ● STANDBY (LOCAL HEARTBEAT ACTIVE)
@@ -54,6 +55,7 @@ export default function UptimeRobotStatus({ uptimeRobot, botOnline }) {
   return (
     <Panel
       title={t("UPTIMEROBOT 24/7 KEEP-ALIVE MONITORS")}
+      accent
       actions={
         <span style={{ fontSize: '11px', fontFamily: 'var(--font-mono)', padding: '2px 8px', background: 'var(--surface-1)', border: '1px solid var(--border)', borderRadius: 'var(--r2)', color: 'var(--green)' }}>
           ● ACTIVE (LIVE API FEED)

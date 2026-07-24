@@ -8,7 +8,7 @@ export default function UpstashMetrics({ upstash, redisConnected, commandsToday 
 
   if (!redisConnected || !upstash) {
     return (
-      <Panel title={t("UPSTASH REDIS CLOUD USAGE")}>
+      <Panel title={t("UPSTASH REDIS CLOUD USAGE")} accent>
         <div style={{ padding: 'var(--space-4)', color: 'var(--red)', fontFamily: 'var(--font-mono)', fontSize: '12px' }}>
           ⚠️ UPSTASH REDIS LINK OFFLINE OR UNREACHABLE
         </div>
@@ -21,6 +21,7 @@ export default function UpstashMetrics({ upstash, redisConnected, commandsToday 
   return (
     <Panel
       title={t("UPSTASH REDIS CLOUD METRICS")}
+      accent
       actions={
         <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
           <span style={{ fontSize: '11px', fontFamily: 'var(--font-mono)', padding: '2px 8px', background: 'var(--surface-1)', border: '1px solid var(--border)', borderRadius: 'var(--r2)', color: 'var(--green)' }}>

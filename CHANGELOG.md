@@ -4,6 +4,20 @@ Format: `[vX.Y] — Mô tả ngắn` → chi tiết thay đổi.
 
 ---
 
+## [v2.3.21] — Full Panel Accent Border Design Consistency (2026-07-24)
+
+**`System.jsx`, `UpstashMetrics.jsx`, `UptimeRobotStatus.jsx`, `LiveConsole.jsx`** — Đồng bộ hoàn toàn đường viền Accent trên đầu Panel (`panel--accent`)
+- Bổ sung thuộc tính `accent` cho tất cả các Panel mới nâng cấp để đồng bộ 100% ngôn ngữ thiết kế brutalist với các trang khác trong Dashboard.
+- Áp dụng đường viền `border-top: 2px solid var(--accent)` đồng nhất cho:
+  - `UPSTASH REDIS CLOUD METRICS`
+  - `UPTIMEROBOT 24/7 KEEP-ALIVE MONITORS`
+  - `INTEGRATIONS & ADAPTERS HEALTH`
+  - `BOT ACTIVITY STATUS CONFIGURATION`
+  - `LIVE ENGINE CONSOLE LOGS`
+
+---
+
+
 ## [v2.3.20] — Rich Dynamic Presence Placeholders Engine (2026-07-24)
 
 **`src/bot.js`, `src/server.js`, `System.jsx`** — Mở rộng bộ biến thay thế động phong phú cho trạng thái Bot
