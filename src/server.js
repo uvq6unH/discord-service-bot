@@ -458,73 +458,49 @@ export function createServer({ configStore, stateStore, botClient, redis = null 
           }
         }
 
-        const usedBytes = Number(infoMap.total_data_size ?? infoMap.used_memory ?? 619839);
-        const usedHuman = infoMap.total_data_size_human ?? infoMap.used_memory_human ?? `${(usedBytes / 1024).toFixed(0)} KB`;
-        const engineCmds = Number(infoMap.total_commands_processed ?? 37000);
-        const engineReads = Number(infoMap.total_reads_processed ?? 11000);
-        const engineWrites = Number(infoMap.total_writes_processed ?? 180000);
+        const usedBytes = Number(infoMap.total_data_size ?? infoMap.used_memory ?? 0);
+        const usedHuman = infoMap.total_data_size_human ?? infoMap.used_memory_human ?? `${(usedBytes / 1024).toFixed(1)} KB`;
+        const engineCmds = Number(infoMap.total_commands_processed ?? 0);
+        const engineReads = Number(infoMap.total_reads_processed ?? (Number(infoMap.keyspace_hits || 0) + Number(infoMap.keyspace_misses || 0)));
+        const engineWrites = Number(infoMap.total_writes_processed ?? Math.max(0, engineCmds - engineReads));
 
-        // Parse baseline state variables
-        let monthlyBaseline = rawMonthlyBaseline ? parseInt(rawMonthlyBaseline, 10) : null;
-        const envMonthlyCmds = process.env.UPSTASH_MONTHLY_COMMANDS ? Number(process.env.UPSTASH_MONTHLY_COMMANDS) : 0;
-        let monthlyLastValue = rawMonthlyLastValue ? parseInt(rawMonthlyLastValue, 10) : envMonthlyCmds;
-        
+        // Parse baseline state variables (with env overrides if specified)
+        const envMonthlyCmds = process.env.UPSTASH_MONTHLY_COMMANDS ? Number(process.env.UPSTASH_MONTHLY_COMMANDS) : null;
+        const envMonthlyReads = process.env.UPSTASH_MONTHLY_READS ? Number(process.env.UPSTASH_MONTHLY_READS) : null;
+        const envMonthlyWrites = process.env.UPSTASH_MONTHLY_WRITES ? Number(process.env.UPSTASH_MONTHLY_WRITES) : null;
+
+        let monthlyBaseline = rawMonthlyBaseline ? parseInt(rawMonthlyBaseline, 10) : (envMonthlyCmds !== null ? Math.max(0, engineCmds - envMonthlyCmds) : 0);
+        let readsBaseline = rawReadsBaseline ? parseInt(rawReadsBaseline, 10) : (envMonthlyReads !== null ? Math.max(0, engineReads - envMonthlyReads) : 0);
+        let writesBaseline = rawWritesBaseline ? parseInt(rawWritesBaseline, 10) : (envMonthlyWrites !== null ? Math.max(0, engineWrites - envMonthlyWrites) : 0);
+
+        // Sanity check: If baseline stored in Redis is higher than live engine stats (e.g. corrupted old keys), reset baseline
+        if (monthlyBaseline > engineCmds) {
+          monthlyBaseline = 0;
+          redis.del(`telemetry:global:monthly_baseline:${monthStr}`).catch(() => null);
+          redis.del(`telemetry:global:monthly_last_value:${monthStr}`).catch(() => null);
+        }
+        if (readsBaseline > engineReads) {
+          readsBaseline = 0;
+          redis.del(`telemetry:global:reads_baseline:${monthStr}`).catch(() => null);
+          redis.del(`telemetry:global:reads_last_value:${monthStr}`).catch(() => null);
+        }
+        if (writesBaseline > engineWrites) {
+          writesBaseline = 0;
+          redis.del(`telemetry:global:writes_baseline:${monthStr}`).catch(() => null);
+          redis.del(`telemetry:global:writes_last_value:${monthStr}`).catch(() => null);
+        }
+
+        const totalCmds = Math.max(0, engineCmds - monthlyBaseline);
+        const totalReads = Math.max(0, engineReads - readsBaseline);
+        const totalWrites = Math.max(0, engineWrites - writesBaseline);
+
+        // Daily Commands Baseline
         let dailyBaseline = rawDailyBaseline ? parseInt(rawDailyBaseline, 10) : null;
-        let dailyLastValue = rawDailyLastValue ? parseInt(rawDailyLastValue, 10) : 0;
-
-        // Reads baseline (configurable via UPSTASH_MONTHLY_READS env var, default 0)
-        let readsBaseline = rawReadsBaseline ? parseInt(rawReadsBaseline, 10) : null;
-        const envMonthlyReads = process.env.UPSTASH_MONTHLY_READS ? Number(process.env.UPSTASH_MONTHLY_READS) : 0;
-        let readsLastValue = rawReadsLastValue ? parseInt(rawReadsLastValue, 10) : envMonthlyReads;
-
-        // Writes baseline (configurable via UPSTASH_MONTHLY_WRITES env var, default 0)
-        let writesBaseline = rawWritesBaseline ? parseInt(rawWritesBaseline, 10) : null;
-        const envMonthlyWrites = process.env.UPSTASH_MONTHLY_WRITES ? Number(process.env.UPSTASH_MONTHLY_WRITES) : 0;
-        let writesLastValue = rawWritesLastValue ? parseInt(rawWritesLastValue, 10) : envMonthlyWrites;
-
-        // 1. Self-Healing Monthly Baseline (handles serverless process resets/migrations)
-        let computedMonthlyCmds = Math.max(0, engineCmds - (monthlyBaseline ?? 0));
-        if (monthlyBaseline === null || isNaN(monthlyBaseline) || computedMonthlyCmds < monthlyLastValue) {
-          monthlyBaseline = Math.max(0, engineCmds - monthlyLastValue);
-          redis.set(`telemetry:global:monthly_baseline:${monthStr}`, String(monthlyBaseline)).catch(() => null);
-          computedMonthlyCmds = monthlyLastValue;
-        } else {
-          redis.set(`telemetry:global:monthly_last_value:${monthStr}`, String(computedMonthlyCmds)).catch(() => null);
-        }
-        const totalCmds = computedMonthlyCmds;
-
-        // 2. Self-Healing Daily Baseline
-        let computedDailyCmds = Math.max(0, engineCmds - (dailyBaseline ?? 0));
-        if (dailyBaseline === null || isNaN(dailyBaseline) || computedDailyCmds < dailyLastValue) {
-          dailyBaseline = Math.max(0, engineCmds - dailyLastValue);
+        if (dailyBaseline === null || isNaN(dailyBaseline) || dailyBaseline > engineCmds) {
+          dailyBaseline = engineCmds;
           redis.set(`telemetry:global:daily_baseline:${todayStr}`, String(dailyBaseline)).catch(() => null);
-          computedDailyCmds = dailyLastValue;
-        } else {
-          redis.set(`telemetry:global:daily_last_value:${todayStr}`, String(computedDailyCmds)).catch(() => null);
         }
-        const actualCommandsToday = computedDailyCmds;
-
-        // 3. Self-Healing Reads Baseline
-        let computedReads = Math.max(0, engineReads - (readsBaseline ?? 0));
-        if (readsBaseline === null || isNaN(readsBaseline) || computedReads < readsLastValue) {
-          readsBaseline = Math.max(0, engineReads - readsLastValue);
-          redis.set(`telemetry:global:reads_baseline:${monthStr}`, String(readsBaseline)).catch(() => null);
-          computedReads = readsLastValue;
-        } else {
-          redis.set(`telemetry:global:reads_last_value:${monthStr}`, String(computedReads)).catch(() => null);
-        }
-        const totalReads = computedReads;
-
-        // 4. Self-Healing Writes Baseline
-        let computedWrites = Math.max(0, engineWrites - (writesBaseline ?? 0));
-        if (writesBaseline === null || isNaN(writesBaseline) || computedWrites < writesLastValue) {
-          writesBaseline = Math.max(0, engineWrites - writesLastValue);
-          redis.set(`telemetry:global:writes_baseline:${monthStr}`, String(writesBaseline)).catch(() => null);
-          computedWrites = writesLastValue;
-        } else {
-          redis.set(`telemetry:global:writes_last_value:${monthStr}`, String(computedWrites)).catch(() => null);
-        }
-        const totalWrites = computedWrites;
+        const actualCommandsToday = Math.max(0, engineCmds - dailyBaseline);
 
         stats = {
           slashSyncProcessed: slashSynced ? parseInt(slashSynced, 10) : 0,

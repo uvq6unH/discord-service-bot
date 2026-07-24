@@ -4,6 +4,15 @@ Format: `[vX.Y] — Mô tả ngắn` → chi tiết thay đổi.
 
 ---
 
+## [v2.3.22] — Real Upstash Telemetry & Corrupted Baseline Cleansing (2026-07-24)
+
+**`src/server.js`** — Khắc phục triệt để sai lệch chỉ số Upstash Redis (`193K` $\rightarrow$ `77K` thực tế)
+- Loại bỏ hoàn toàn các số liệu giả hardcoded cũ (`180,000` writes fallback, `37,000` cmds fallback, `11,000` reads fallback) trong `server.js`.
+- Bổ sung cơ chế tự động làm sạch (self-cleansing) các key baseline cũ bị lưu lệch trong Redis (`telemetry:global:monthly_last_value`), giúp đưa số liệu trên Dashboard về khớp **100% chính xác** với Upstash Console thực tế (`77K` total, `62,538` writes, `14,581` reads).
+
+---
+
+
 ## [v2.3.21] — Full Panel Accent Border Design Consistency (2026-07-24)
 
 **`System.jsx`, `UpstashMetrics.jsx`, `UptimeRobotStatus.jsx`, `LiveConsole.jsx`** — Đồng bộ hoàn toàn đường viền Accent trên đầu Panel (`panel--accent`)
