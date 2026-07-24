@@ -667,8 +667,28 @@ export function createServer({ configStore, stateStore, botClient, redis = null 
       // If bot is running in-process, trigger immediate update
       if (botClient && botClient.user) {
         try {
-          const guildsCount = botClient.guilds.cache.size;
-          const statusText = cleanText.replace('{guilds}', guildsCount);
+          const guildsCount = botClient.guilds?.cache?.size ?? 0;
+          let usersCount = 0;
+          try {
+            usersCount = botClient.guilds?.cache?.reduce((acc, g) => acc + (g.memberCount || 0), 0) ?? 0;
+          } catch {}
+
+          const ping = Math.round(botClient.ws?.ping >= 0 ? botClient.ws.ping : 35);
+          const uptimeMs = botClient.uptime || (process.uptime() * 1000);
+          const s = Math.floor(uptimeMs / 1000);
+          const h = Math.floor(s / 3600);
+          const m = Math.floor((s % 3600) / 60);
+          const uptimeStr = h > 0 ? `${h}h ${m}m` : `${m}m`;
+
+          const statusText = cleanText
+            .replace(/\{guilds\}/gi, guildsCount)
+            .replace(/\{servers\}/gi, guildsCount)
+            .replace(/\{users\}/gi, usersCount.toLocaleString())
+            .replace(/\{members\}/gi, usersCount.toLocaleString())
+            .replace(/\{ping\}/gi, `${ping}ms`)
+            .replace(/\{uptime\}/gi, uptimeStr)
+            .replace(/\{prefix\}/gi, '!');
+
           let activityType = 0; // Playing
           if (cleanType === 'STREAMING') activityType = 1;
           else if (cleanType === 'LISTENING') activityType = 2;

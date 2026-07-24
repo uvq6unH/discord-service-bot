@@ -234,7 +234,7 @@ export default function SystemPage() {
                     style={{ width: '100%', padding: 'var(--space-3)', background: 'var(--surface-1)', border: '1px solid var(--border)', color: 'var(--text-1)', outline: 'none', fontFamily: 'var(--font-mono)', borderHeight: '1px' }}
                   />
                   <span style={{ fontSize: '11px', color: 'var(--text-3)', display: 'block', marginTop: 'var(--space-2)' }}>
-                    {t("Supports dynamic placeholder: {guilds} to show total bot guilds count.")}
+                    {t("Supports dynamic placeholders: {guilds} (servers), {users} (members), {ping} (latency), {uptime} (uptime), {prefix} (prefix).")}
                   </span>
                 </div>
 

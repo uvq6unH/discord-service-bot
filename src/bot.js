@@ -602,9 +602,28 @@ function _startHeartbeat(client, redis) {
 
 function _updatePresence(client) {
   try {
-    const guildsCount = client.guilds.cache.size;
+    const guildsCount = client.guilds?.cache?.size ?? 0;
+    let usersCount = 0;
+    try {
+      usersCount = client.guilds?.cache?.reduce((acc, g) => acc + (g.memberCount || 0), 0) ?? 0;
+    } catch {}
+
+    const ping = Math.round(client.ws?.ping >= 0 ? client.ws.ping : 35);
+    const uptimeMs = client.uptime || (process.uptime() * 1000);
+    const s = Math.floor(uptimeMs / 1000);
+    const h = Math.floor(s / 3600);
+    const m = Math.floor((s % 3600) / 60);
+    const uptimeStr = h > 0 ? `${h}h ${m}m` : `${m}m`;
+
     const rawText = process.env.BOT_STATUS_TEXT || '/help | {guilds} servers';
-    const statusText = rawText.replace('{guilds}', guildsCount);
+    const statusText = rawText
+      .replace(/\{guilds\}/gi, guildsCount)
+      .replace(/\{servers\}/gi, guildsCount)
+      .replace(/\{users\}/gi, usersCount.toLocaleString())
+      .replace(/\{members\}/gi, usersCount.toLocaleString())
+      .replace(/\{ping\}/gi, `${ping}ms`)
+      .replace(/\{uptime\}/gi, uptimeStr)
+      .replace(/\{prefix\}/gi, '!');
 
     const rawType = (process.env.BOT_STATUS_TYPE || 'PLAYING').toUpperCase();
     let activityType = ActivityType.Playing;

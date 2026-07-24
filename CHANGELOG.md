@@ -4,6 +4,20 @@ Format: `[vX.Y] — Mô tả ngắn` → chi tiết thay đổi.
 
 ---
 
+## [v2.3.20] — Rich Dynamic Presence Placeholders Engine (2026-07-24)
+
+**`src/bot.js`, `src/server.js`, `System.jsx`** — Mở rộng bộ biến thay thế động phong phú cho trạng thái Bot
+- Bổ sung hệ thống biến thay thế động phong phú cho văn bản trạng thái hiển thị của Bot (`BOT_STATUS_TEXT`):
+  - `{guilds}` hoặc `{servers}`: Tổng số máy chủ Bot đang tham gia.
+  - `{users}` hoặc `{members}`: Tổng số lượng thành viên trong tất cả máy chủ.
+  - `{ping}`: Độ trễ WebSocket thời gian thực của Bot (đơn vị `ms`).
+  - `{uptime}`: Thời gian Bot đã online liên tục (ví dụ: `2h 15m`).
+  - `{prefix}`: Tiền tố lệnh mặc định (`!`).
+- Cập nhật giao diện Dashboard hiển thị đầy đủ hướng dẫn sử dụng các biến động này bên dưới ô nhập status.
+
+---
+
+
 ## [v2.3.19] — Web Dashboard Bot Activity Status Editor (2026-07-24)
 
 **`src/server.js`, `System.jsx`, `api/index.js`, `system.service.js`, `system.repository.js`** — Tích hợp trình sửa trạng thái Bot trực tiếp trên Dashboard
