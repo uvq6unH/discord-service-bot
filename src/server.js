@@ -450,12 +450,21 @@ export function createServer({ configStore, stateStore, botClient, redis = null 
       const usedKb = (usedBytes / 1024).toFixed(1);
       const cmdLimit = Number(dbInfo?.db_request_limit ?? 500000);
 
+      const dailyCmds = Array.isArray(stats.dailyrequests) && stats.dailyrequests.length > 0
+        ? Number(stats.dailyrequests[stats.dailyrequests.length - 1]?.y ?? 0)
+        : 0;
+      const dailyBwBytes = Number(stats.dailybandwidth ?? 0);
+      const dailyBwHuman = dailyBwBytes >= 1048576 
+        ? `${(dailyBwBytes / (1024 * 1024)).toFixed(1)} MB` 
+        : `${(dailyBwBytes / 1024).toFixed(1)} KB`;
+
       return {
         connected: true,
         region: dbInfo?.region ?? 'global',
         provider: 'Upstash Official API',
         tier: (dbInfo?.database_type || dbInfo?.type || 'free').toUpperCase() + ' TIER',
         cost: '$0.00',
+        dailyCommands: dailyCmds,
         commands: {
           used: usedCmds,
           reads,
@@ -473,12 +482,12 @@ export function createServer({ configStore, stateStore, botClient, redis = null 
           formatted: `${usedKb} KB / 256 MB`
         },
         bandwidth: {
-          usedHuman: '0 B',
+          usedHuman: dailyBwHuman,
           limitGb: Number(dbInfo?.db_monthly_bandwidth_limit ?? 50),
           percent: 0,
-          formatted: '0 B / 50 GB'
+          formatted: `${dailyBwHuman} / 50 GB`
         },
-        keys: dbInfo?.user_key_count ?? rawDbsize ?? 45
+        keys: dbInfo?.user_key_count ?? 45
       };
     } catch (err) {
       console.warn('[upstash-api] Failed to fetch official Upstash stats:', err.message);
@@ -545,6 +554,10 @@ export function createServer({ configStore, stateStore, botClient, redis = null 
               upstashMetrics = typeof cached === 'string' ? JSON.parse(cached) : cached;
             } catch { /* ignore parse error */ }
           }
+        }
+
+        if (upstashMetrics && typeof upstashMetrics.dailyCommands === 'number') {
+          stats.commandsToday = upstashMetrics.dailyCommands;
         }
 
         // 2. Fallback to raw Redis INFO if Developer API is unconfigured
