@@ -193,19 +193,19 @@ export default function SystemPage() {
         <div className="col-span-12">
           <Panel title={t("INTEGRATIONS & ADAPTERS HEALTH")} accent>
             <div className="grid-12" style={{ gap: 'var(--space-3)' }}>
-              <div className="col-span-4" style={{ border: '1px solid var(--border)', padding: 'var(--space-4)' }}>
+              <div className="col-span-4" style={{ background: 'var(--surface-0)', border: '1px solid var(--border)', borderRadius: 'var(--r2)', padding: 'var(--space-4)' }}>
                 <span style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--text-3)' }}>{t("RIOT API CONNECTIVITY")}</span>
                 <div style={{ fontSize: '14px', fontWeight: 'bold', marginTop: 'var(--space-2)', color: config?.riotApiKeyConfigured ? 'var(--green)' : 'var(--text-3)' }}>
                   &gt;&gt;&gt; {t(config?.riotApiKeyConfigured ? 'KEY_NOMINAL' : 'NO_KEY_PROVIDED')}
                 </div>
               </div>
-              <div className="col-span-4" style={{ border: '1px solid var(--border)', padding: 'var(--space-4)' }}>
+              <div className="col-span-4" style={{ background: 'var(--surface-0)', border: '1px solid var(--border)', borderRadius: 'var(--r2)', padding: 'var(--space-4)' }}>
                 <span style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--text-3)' }}>{t("TFT CONFIG STATUS")}</span>
                 <div style={{ fontSize: '14px', fontWeight: 'bold', marginTop: 'var(--space-2)', color: config?.tftApiKeyConfigured ? 'var(--green)' : 'var(--text-3)' }}>
                   &gt;&gt;&gt; {t(config?.tftApiKeyConfigured ? 'KEY_NOMINAL' : 'NO_KEY_PROVIDED')}
                 </div>
               </div>
-              <div className="col-span-4" style={{ border: '1px solid var(--border)', padding: 'var(--space-4)' }}>
+              <div className="col-span-4" style={{ background: 'var(--surface-0)', border: '1px solid var(--border)', borderRadius: 'var(--r2)', padding: 'var(--space-4)' }}>
                 <span style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--text-3)' }}>{t("LAVALINK NODES ONLINE")}</span>
                 <div style={{ fontSize: '14px', fontWeight: 'bold', marginTop: 'var(--space-2)', color: config?.musicEnabled ? 'var(--yellow)' : 'var(--text-3)' }}>
                   &gt;&gt;&gt; {t(config?.musicEnabled ? 'MODULE_STANDBY' : 'MODULE_DISABLED')}
@@ -231,7 +231,7 @@ export default function SystemPage() {
                     placeholder="/help | {guilds} servers"
                     required
                     maxLength={100}
-                    style={{ width: '100%', padding: 'var(--space-3)', background: 'var(--surface-1)', border: '1px solid var(--border)', color: 'var(--text-1)', outline: 'none', fontFamily: 'var(--font-mono)', borderHeight: '1px' }}
+                    style={{ width: '100%', padding: 'var(--space-3)', background: 'var(--surface-1)', border: '1px solid var(--border)', color: 'var(--text-1)', outline: 'none', fontFamily: 'var(--font-mono)', borderRadius: 'var(--r2)' }}
                   />
                   <span style={{ fontSize: '11px', color: 'var(--text-3)', display: 'block', marginTop: 'var(--space-2)' }}>
                     {t("Supports dynamic placeholders: {guilds} (servers), {users} (members), {ping} (latency), {uptime} (uptime), {prefix} (prefix).")}
@@ -245,7 +245,7 @@ export default function SystemPage() {
                   <select 
                     value={presenceType}
                     onChange={(e) => setPresenceType(e.target.value)}
-                    style={{ width: '100%', padding: 'var(--space-3)', background: 'var(--surface-1)', border: '1px solid var(--border)', color: 'var(--text-1)', outline: 'none', fontFamily: 'var(--font-mono)' }}
+                    style={{ width: '100%', padding: 'var(--space-3)', background: 'var(--surface-1)', border: '1px solid var(--border)', color: 'var(--text-1)', outline: 'none', fontFamily: 'var(--font-mono)', borderRadius: 'var(--r2)' }}
                   >
                     <option value="PLAYING">{t("PLAYING")}</option>
                     <option value="WATCHING">{t("WATCHING")}</option>
@@ -265,7 +265,7 @@ export default function SystemPage() {
                     onChange={(e) => setPresenceStreamUrl(e.target.value)}
                     placeholder="https://www.twitch.tv/discord"
                     disabled={presenceType !== 'STREAMING'}
-                    style={{ width: '100%', padding: 'var(--space-3)', background: presenceType === 'STREAMING' ? 'var(--surface-1)' : '#08090b', border: '1px solid var(--border)', color: presenceType === 'STREAMING' ? 'var(--text-1)' : 'var(--text-3)', outline: 'none', fontFamily: 'var(--font-mono)', opacity: presenceType === 'STREAMING' ? 1 : 0.5 }}
+                    style={{ width: '100%', padding: 'var(--space-3)', background: presenceType === 'STREAMING' ? 'var(--surface-1)' : 'var(--surface-0)', border: '1px solid var(--border)', color: presenceType === 'STREAMING' ? 'var(--text-1)' : 'var(--text-3)', outline: 'none', fontFamily: 'var(--font-mono)', borderRadius: 'var(--r2)', opacity: presenceType === 'STREAMING' ? 1 : 0.6 }}
                   />
                 </div>
               </div>

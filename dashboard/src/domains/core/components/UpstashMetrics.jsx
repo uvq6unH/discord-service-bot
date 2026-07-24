@@ -35,7 +35,7 @@ export default function UpstashMetrics({ upstash, redisConnected, commandsToday 
     >
       <div className="grid-12" style={{ gap: 'var(--space-3)' }}>
         {/* COMMANDS */}
-        <div className="col-span-3" style={{ background: '#0c0d10', border: '1px solid var(--border)', borderRadius: 'var(--r2)', padding: 'var(--space-3)' }}>
+        <div className="col-span-3" style={{ background: 'var(--surface-0)', border: '1px solid var(--border)', borderRadius: 'var(--r2)', padding: 'var(--space-3)' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', color: 'var(--text-3)', fontSize: '11px', fontFamily: 'var(--font-mono)', fontWeight: 'bold' }}>
             <span>COMMANDS</span>
             <Cpu size={14} style={{ color: 'var(--accent)' }} />
@@ -43,7 +43,7 @@ export default function UpstashMetrics({ upstash, redisConnected, commandsToday 
           <div style={{ fontSize: '18px', fontWeight: 'bold', fontFamily: 'var(--font-mono)', marginTop: '8px', color: 'var(--text-1)' }}>
             {commands?.formatted ?? '0 / 500k per month'}
           </div>
-          <div style={{ width: '100%', height: '4px', background: 'rgba(255,255,255,0.1)', borderRadius: '2px', marginTop: '12px', overflow: 'hidden' }}>
+          <div style={{ width: '100%', height: '4px', background: 'var(--surface-2)', borderRadius: '2px', marginTop: '12px', overflow: 'hidden' }}>
             <div style={{ width: `${Math.min(100, commands?.percent ?? 0)}%`, height: '100%', background: 'var(--accent)', transition: 'width 0.3s' }} />
           </div>
           
@@ -67,7 +67,7 @@ export default function UpstashMetrics({ upstash, redisConnected, commandsToday 
         </div>
 
         {/* BANDWIDTH */}
-        <div className="col-span-3" style={{ background: '#0c0d10', border: '1px solid var(--border)', borderRadius: 'var(--r2)', padding: 'var(--space-3)' }}>
+        <div className="col-span-3" style={{ background: 'var(--surface-0)', border: '1px solid var(--border)', borderRadius: 'var(--r2)', padding: 'var(--space-3)' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', color: 'var(--text-3)', fontSize: '11px', fontFamily: 'var(--font-mono)', fontWeight: 'bold' }}>
             <span>BANDWIDTH</span>
             <Activity size={14} style={{ color: 'var(--green)' }} />
@@ -75,13 +75,13 @@ export default function UpstashMetrics({ upstash, redisConnected, commandsToday 
           <div style={{ fontSize: '18px', fontWeight: 'bold', fontFamily: 'var(--font-mono)', marginTop: '8px', color: 'var(--text-1)' }}>
             {bandwidth?.formatted ?? '0 B / 50 GB'}
           </div>
-          <div style={{ width: '100%', height: '4px', background: 'rgba(255,255,255,0.1)', borderRadius: '2px', marginTop: '12px', overflow: 'hidden' }}>
+          <div style={{ width: '100%', height: '4px', background: 'var(--surface-2)', borderRadius: '2px', marginTop: '12px', overflow: 'hidden' }}>
             <div style={{ width: `${Math.min(100, bandwidth?.percent ?? 0)}%`, height: '100%', background: 'var(--green)', transition: 'width 0.3s' }} />
           </div>
         </div>
 
         {/* STORAGE */}
-        <div className="col-span-3" style={{ background: '#0c0d10', border: '1px solid var(--border)', borderRadius: 'var(--r2)', padding: 'var(--space-3)' }}>
+        <div className="col-span-3" style={{ background: 'var(--surface-0)', border: '1px solid var(--border)', borderRadius: 'var(--r2)', padding: 'var(--space-3)' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', color: 'var(--text-3)', fontSize: '11px', fontFamily: 'var(--font-mono)', fontWeight: 'bold' }}>
             <span>STORAGE</span>
             <HardDrive size={14} style={{ color: 'var(--yellow)' }} />
@@ -89,13 +89,13 @@ export default function UpstashMetrics({ upstash, redisConnected, commandsToday 
           <div style={{ fontSize: '18px', fontWeight: 'bold', fontFamily: 'var(--font-mono)', marginTop: '8px', color: 'var(--text-1)' }}>
             {storage?.formatted ?? '0 KB / 256 MB'}
           </div>
-          <div style={{ width: '100%', height: '4px', background: 'rgba(255,255,255,0.1)', borderRadius: '2px', marginTop: '12px', overflow: 'hidden' }}>
+          <div style={{ width: '100%', height: '4px', background: 'var(--surface-2)', borderRadius: '2px', marginTop: '12px', overflow: 'hidden' }}>
             <div style={{ width: `${Math.min(100, storage?.percent ?? 0)}%`, height: '100%', background: 'var(--yellow)', transition: 'width 0.3s' }} />
           </div>
         </div>
 
         {/* COST */}
-        <div className="col-span-3" style={{ background: '#0c0d10', border: '1px solid var(--border)', borderRadius: 'var(--r2)', padding: 'var(--space-3)' }}>
+        <div className="col-span-3" style={{ background: 'var(--surface-0)', border: '1px solid var(--border)', borderRadius: 'var(--r2)', padding: 'var(--space-3)' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', color: 'var(--text-3)', fontSize: '11px', fontFamily: 'var(--font-mono)', fontWeight: 'bold' }}>
             <span>COST</span>
             <DollarSign size={14} style={{ color: 'var(--green)' }} />

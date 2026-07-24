@@ -4,6 +4,16 @@ Format: `[vX.Y] — Mô tả ngắn` → chi tiết thay đổi.
 
 ---
 
+## [v2.4.3] — System Page Light & Dark Theme Alignment (2026-07-24)
+
+**`UpstashMetrics.jsx`, `UptimeRobotStatus.jsx`, `LiveConsole.jsx`, `System.jsx`** — Chuẩn hóa màu sắc toàn bộ thẻ trang System theo Design System
+- Loại bỏ hoàn toàn các màu nền cứng (`#0c0d10`, `#0a0a0c`, `#08090b`), chuyển sang sử dụng biến CSS `var(--surface-0)` và `var(--surface-1)`.
+- Khắc phục triệt để hiện tượng lạc quẻ khi chuyển sang Light Mode (thẻ đen xì, chữ tối màu bị tàng hình trên nền đen, input và terminal bị tương phản dị biệt).
+- Đảm bảo hiển thị sang trọng, tinh tế và đồng bộ 100% ở cả 2 chế độ Light Mode và Dark Mode.
+
+---
+
+
 ## [v2.4.1] — Legacy Baseline Math Clean-Up (2026-07-24)
 
 **`src/server.js`** — Tối giản và làm sạch hoàn toàn logic Telemetry

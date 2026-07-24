@@ -18,7 +18,7 @@ export default function UptimeRobotStatus({ uptimeRobot, botOnline }) {
         }
       >
         <div className="grid-12" style={{ gap: 'var(--space-3)' }}>
-          <div className="col-span-6" style={{ background: '#0c0d10', border: '1px solid var(--border)', borderRadius: 'var(--r2)', padding: 'var(--space-4)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div className="col-span-6" style={{ background: 'var(--surface-0)', border: '1px solid var(--border)', borderRadius: 'var(--r2)', padding: 'var(--space-4)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <div>
               <div style={{ fontSize: '11px', fontFamily: 'var(--font-mono)', color: 'var(--text-3)', fontWeight: 'bold' }}>
                 BOT SERVICE HTTP MONITOR [INDEX.BOT.JS]
@@ -33,7 +33,7 @@ export default function UptimeRobotStatus({ uptimeRobot, botOnline }) {
             <CheckCircle size={24} style={{ color: botOnline ? 'var(--green)' : 'var(--red)' }} />
           </div>
 
-          <div className="col-span-6" style={{ background: '#0c0d10', border: '1px solid var(--border)', borderRadius: 'var(--r2)', padding: 'var(--space-4)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div className="col-span-6" style={{ background: 'var(--surface-0)', border: '1px solid var(--border)', borderRadius: 'var(--r2)', padding: 'var(--space-4)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <div>
               <div style={{ fontSize: '11px', fontFamily: 'var(--font-mono)', color: 'var(--text-3)', fontWeight: 'bold' }}>
                 DASHBOARD SERVICE HTTP MONITOR [INDEX.SERVER.JS]
@@ -72,7 +72,7 @@ export default function UptimeRobotStatus({ uptimeRobot, botOnline }) {
                               monitor.status === 9 ? 'var(--red)' : 'var(--yellow)';
 
           return (
-            <div key={monitor.id} className="col-span-6" style={{ background: '#0c0d10', border: '1px solid var(--border)', borderRadius: 'var(--r2)', padding: 'var(--space-4)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div key={monitor.id} className="col-span-6" style={{ background: 'var(--surface-0)', border: '1px solid var(--border)', borderRadius: 'var(--r2)', padding: 'var(--space-4)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <div>
                 <div style={{ fontSize: '11px', fontFamily: 'var(--font-mono)', color: 'var(--text-3)', fontWeight: 'bold', textTransform: 'uppercase' }}>
                   {monitor.friendly_name}

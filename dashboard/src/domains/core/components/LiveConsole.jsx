@@ -100,7 +100,7 @@ export default function LiveConsole() {
       <div
         ref={scrollRef}
         style={{
-          background: '#0a0a0c',
+          background: 'var(--surface-0)',
           border: '1px solid var(--border)',
           borderRadius: 'var(--r2)',
           padding: 'var(--space-3)',
