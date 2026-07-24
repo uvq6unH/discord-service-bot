@@ -4,6 +4,17 @@ Format: `[vX.Y] — Mô tả ngắn` → chi tiết thay đổi.
 
 ---
 
+## [v2.4.4] — Comprehensive Light Mode CSS Design System Polish (2026-07-24)
+
+**`index.css`** — Tối ưu hóa toàn bộ hệ thống CSS cho Light Mode
+- Tăng cường độ tương phản typography (`--text-1: #111827`, `--text-2: #4B5563`, `--text-3: #6B7280`).
+- Nâng cấp bảng màu trạng thái cao cấp cho Light Theme (`--green: #059669`, `--yellow: #D97706`, `--red: #DC2626`).
+- Thêm hiệu ứng đổ bóng tinh tế (elevation shadows) cho Panel và KPI tiles khi bật Light Mode.
+- Chuẩn hóa scrollbars và trạng thái hover ở cả 2 chế độ sáng/tối.
+
+---
+
+
 ## [v2.4.3] — System Page Light & Dark Theme Alignment (2026-07-24)
 
 **`UpstashMetrics.jsx`, `UptimeRobotStatus.jsx`, `LiveConsole.jsx`, `System.jsx`** — Chuẩn hóa màu sắc toàn bộ thẻ trang System theo Design System

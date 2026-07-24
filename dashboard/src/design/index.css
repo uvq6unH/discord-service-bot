@@ -62,20 +62,46 @@
 }
 
 html[data-theme='light'] {
-  --bg: #F0F2F5;
+  --bg: #F4F5F7;
   --surface-0: #FFFFFF;
   --surface-1: #F8F9FA;
   --surface-2: #E9ECEF;
   --surface-3: #DEE2E6;
 
-  --border: rgba(0, 0, 0, 0.1);
-  --border-strong: rgba(0, 0, 0, 0.2);
+  --border: rgba(0, 0, 0, 0.08);
+  --border-strong: rgba(0, 0, 0, 0.16);
 
-  --text-1: #111111;
-  --text-2: #4A4A4A;
-  --text-3: #777777;
+  --text-1: #111827;
+  --text-2: #4B5563;
+  --text-3: #6B7280;
 
-  --accent-core: #111111;
+  --accent-core: #111827;
+
+  /* High-Contrast Status Colors for Light Theme */
+  --green: #059669;
+  --yellow: #D97706;
+  --red: #DC2626;
+  --green-dim: rgba(5, 150, 105, 0.1);
+  --red-dim: rgba(220, 38, 38, 0.1);
+  --yellow-dim: rgba(217, 119, 6, 0.1);
+}
+
+html[data-theme='light'] .panel {
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05), 0 1px 2px rgba(0, 0, 0, 0.03);
+}
+
+html[data-theme='light'] .kpi-tile {
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+}
+
+html[data-theme='light'] ::-webkit-scrollbar-track {
+  background: var(--bg);
+}
+html[data-theme='light'] ::-webkit-scrollbar-thumb {
+  background: var(--surface-3);
+}
+html[data-theme='light'] ::-webkit-scrollbar-thumb:hover {
+  background: var(--text-2);
 }
 
 /* ── Reset & Base Styles ─────────────────────────────────────────────────── */
