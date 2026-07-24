@@ -148,6 +148,8 @@ function CommandConfigRow({ cmd, roles, onUpdate, displayPrefix = '/' }) {
 export default function RiotServicesPage() {
   const { config, loading, updateConfig, handleApiKeyChange } = useRiot();
   const { guildData } = useGuild();
+  const channels = guildData?.channels ?? [];
+  const roles = guildData?.roles ?? [];
   const { t } = useLanguage();
 
   if (loading || !config) {
@@ -158,7 +160,6 @@ export default function RiotServicesPage() {
     );
   }
 
-  const roles = guildData?.roles ?? [];
   const isRiotConfigured = config.riotApiKeyConfigured ?? false;
   const isTftConfigured = config.tftApiKeyConfigured ?? false;
   const isLolEnabled = config.lolEnabled ?? false;
