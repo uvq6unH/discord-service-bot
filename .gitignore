@@ -19,3 +19,6 @@ scripts/*.txt
 
 # Backup files
 *.bak
+
+# Grapuco local metadata
+.grapuco/

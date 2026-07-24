@@ -15,23 +15,57 @@ export default function LiveConsole() {
     if (paused) return;
 
     let isMounted = true;
-    const fetchLogs = async () => {
-      try {
-        const res = await apiFetch('/api/system/logs', {}, { allowNotOk: true });
-        if (res.ok) {
-          const data = await res.json();
-          if (isMounted && Array.isArray(data.logs)) {
-            setLogs(data.logs);
+    let eventSource = null;
+    let pollInterval = null;
+
+    const startPolling = () => {
+      const fetchLogs = async () => {
+        try {
+          const res = await apiFetch('/api/system/logs', {}, { allowNotOk: true });
+          if (res.ok) {
+            const data = await res.json();
+            if (isMounted && Array.isArray(data.logs)) {
+              setLogs(data.logs);
+            }
           }
-        }
-      } catch {}
+        } catch {}
+      };
+      fetchLogs();
+      pollInterval = setInterval(fetchLogs, 3000);
     };
 
-    fetchLogs();
-    const interval = setInterval(fetchLogs, 3000);
+    if (typeof EventSource !== 'undefined') {
+      try {
+        eventSource = new EventSource('/api/system/logs/stream', { withCredentials: true });
+        eventSource.onmessage = (event) => {
+          if (!isMounted) return;
+          try {
+            const data = JSON.parse(event.data);
+            if (data.type === 'init' && Array.isArray(data.logs)) {
+              setLogs(data.logs);
+            } else if (data.type === 'log' && data.log) {
+              setLogs((prev) => [data.log, ...prev].slice(0, 100));
+            }
+          } catch {}
+        };
+        eventSource.onerror = () => {
+          if (eventSource) {
+            eventSource.close();
+            eventSource = null;
+          }
+          if (isMounted && !pollInterval) startPolling();
+        };
+      } catch {
+        startPolling();
+      }
+    } else {
+      startPolling();
+    }
+
     return () => {
       isMounted = false;
-      clearInterval(interval);
+      if (eventSource) eventSource.close();
+      if (pollInterval) clearInterval(pollInterval);
     };
   }, [paused]);
 

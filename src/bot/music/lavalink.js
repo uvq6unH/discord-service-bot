@@ -139,6 +139,17 @@ export async function initLavalink(client) {
     console.log(`[lavalink] ▶️ trackStart: "${track.info.title}" | guild ${player.guildId}`);
     const ch = player.get('textChannel');
     ch?.send(`▶️ Bắt đầu phát: **${track.info.title}**`).catch(() => null);
+
+    // Persist queue to Redis (TTL 2h)
+    const stateStore = client._stateStore;
+    if (stateStore && player.guildId) {
+      const queueData = {
+        current: { title: track.info.title, uri: track.info.uri, author: track.info.author, duration: track.info.duration },
+        tracks: (player.queue.tracks || []).map(t => ({ title: t.info?.title, uri: t.info?.uri, author: t.info?.author, duration: t.info?.duration })),
+        updatedAt: new Date().toISOString()
+      };
+      stateStore.saveMusicQueue(player.guildId, queueData).catch(() => null);
+    }
   });
 
   _manager.on('trackEnd', (player, track, payload) => {
@@ -160,6 +171,10 @@ export async function initLavalink(client) {
 
   _manager.on('queueEnd', async (player) => {
     console.log(`[lavalink] 📭 queueEnd | guild ${player.guildId}`);
+    const stateStore = client._stateStore;
+    if (stateStore && player.guildId) {
+      stateStore.clearMusicQueue(player.guildId).catch(() => null);
+    }
     const isAutoplay = player.get('autoplay') ?? true;
     if (isAutoplay && player.queue.previous?.length > 0) {
       const lastTrack = player.queue.previous[player.queue.previous.length - 1];
@@ -195,6 +210,10 @@ export async function initLavalink(client) {
 
   _manager.on('playerDestroy', (player) => {
     console.log(`[lavalink] playerDestroy | guild ${player.guildId}`);
+    const stateStore = client._stateStore;
+    if (stateStore && player.guildId) {
+      stateStore.clearMusicQueue(player.guildId).catch(() => null);
+    }
   });
 
   // ── manager-level error catch ─────────────────────────────────────────────

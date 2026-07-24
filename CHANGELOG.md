@@ -4,6 +4,17 @@ Format: `[vX.Y] — Mô tả ngắn` → chi tiết thay đổi.
 
 ---
 
+## [v2.6.0] — System Performance & Resilience Upgrades (#1, #2, #4, #5) (2026-07-24)
+
+**`src/stateStore.js`, `src/bot/music/lavalink.js`, `src/server.js`, `src/bot/logging.js`, `src/lolApi.js`, `LiveConsole.jsx`**
+- **Lavalink Queue Persistence (#1)**: Lưu vết danh sách phát nhạc `guild:{guildId}:music:queue` trên Redis với TTL 2h.
+- **Live Console SSE Streaming (#2)**: Chuyển đổi Terminal Console sang Server-Sent Events (`/api/system/logs/stream`, 0ms latency) kết hợp HTTP polling fallback.
+- **Riot API 429 Exponential Backoff (#4)**: Tự động trích xuất header `Retry-After` và tạm dừng thử lại khi chạm rate limit HTTP 429 của Riot.
+- **StateStore Optimization (#5)**: Bypass các thao tác ghi đĩa cục bộ không cần thiết khi chạy ở chế độ Redis.
+
+---
+
+
 ## [v2.5.0] — Phase 5: Real-time IPC Event Queue & BLPOP Optimization (2026-07-24)
 
 **`src/upstash.js`, `src/bot.js`, `src/server.js`** — Triển khai Hàng đợi sự kiện thời gian thực liên tiến trình (IPC)

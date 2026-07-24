@@ -143,7 +143,9 @@ function httpGet(url, headers = {}) {
           return;
         }
         if (res.statusCode === 429) {
-          reject(Object.assign(new Error('Rate limited'), { status: 429 }));
+          const retryAfterHeader = res.headers['retry-after'];
+          const retryAfterSec = retryAfterHeader ? Number(retryAfterHeader) : 1;
+          reject(Object.assign(new Error('Rate limited'), { status: 429, retryAfter: retryAfterSec }));
           return;
         }
         if (res.statusCode >= 400) {
@@ -160,9 +162,19 @@ function httpGet(url, headers = {}) {
   });
 }
 
-function riotGet(path, platform, apiKey) {
+async function riotGet(path, platform, apiKey, attempt = 0) {
   const url = `https://${platform}.api.riotgames.com${path}`;
-  return httpGet(url, { 'X-Riot-Token': apiKey });
+  try {
+    return await httpGet(url, { 'X-Riot-Token': apiKey });
+  } catch (err) {
+    if (err.status === 429 && attempt < 2) {
+      const waitMs = ((err.retryAfter || 1) * 1000) + 200;
+      console.warn(`[RiotAPI] Rate limited (429) for ${path}. Retrying in ${waitMs}ms (attempt ${attempt + 1}/2)...`);
+      await new Promise(r => setTimeout(r, waitMs));
+      return riotGet(path, platform, apiKey, attempt + 1);
+    }
+    throw err;
+  }
 }
 
 // ── Global Riot API rate limit bucket ────────────────────────────────────────

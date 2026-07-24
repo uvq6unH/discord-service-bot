@@ -40,6 +40,13 @@ const _inMemoryLiveLogs = [
   }
 ];
 
+const _sseSubscribers = new Set();
+
+export function subscribeLiveLogs(cb) {
+  _sseSubscribers.add(cb);
+  return () => _sseSubscribers.delete(cb);
+}
+
 export async function pushLiveLog(redis, { type = 'INFO', message = '', metadata = '' }) {
   const item = {
     id: Math.random().toString(36).slice(2, 9),
@@ -51,6 +58,10 @@ export async function pushLiveLog(redis, { type = 'INFO', message = '', metadata
 
   _inMemoryLiveLogs.unshift(item);
   if (_inMemoryLiveLogs.length > 100) _inMemoryLiveLogs.pop();
+
+  for (const cb of _sseSubscribers) {
+    try { cb(item); } catch {}
+  }
 
   if (redis) {
     try {

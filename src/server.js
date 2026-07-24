@@ -771,6 +771,30 @@ export function createServer({ configStore, stateStore, botClient, redis = null 
     }
   });
 
+  app.get('/api/system/logs/stream', auth.requireAuth, async (req, res) => {
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Connection', 'keep-alive');
+    res.setHeader('X-Accel-Buffering', 'no');
+
+    try {
+      const { getLiveLogs, subscribeLiveLogs } = await import('./bot/logging.js');
+      const initialLogs = await getLiveLogs(redis);
+      res.write(`data: ${JSON.stringify({ type: 'init', logs: initialLogs })}\n\n`);
+
+      const unsubscribe = subscribeLiveLogs((logItem) => {
+        res.write(`data: ${JSON.stringify({ type: 'log', log: logItem })}\n\n`);
+      });
+
+      req.on('close', () => {
+        unsubscribe();
+      });
+    } catch (err) {
+      res.write(`data: ${JSON.stringify({ type: 'error', error: err.message })}\n\n`);
+      res.end();
+    }
+  });
+
   app.get('/api/config', auth.requireAuth, readRateLimit, requireGuildId, auth.requireGuildAccess, async (req, res) => {
     const config = await configStore.getGuildConfig(req.guildId);
     const sanitized = sanitizeConfigForClient(config);

@@ -109,6 +109,7 @@ export class StateStore {
     game:              (gId, type, msgId)           => `guild:${gId}:game:${type}:${msgId}`,
     lolAccount:        (gId, uId)                  => `guild:${gId}:lolAccount:${uId}`,
     tftAccount:        (gId, uId)                  => `guild:${gId}:tftAccount:${uId}`,
+    musicQueue:        (gId)                       => `guild:${gId}:music:queue`,
     // Compat: blob key cũ (đọc migrate, không ghi)
     legacyGuild:       (gId)                       => `guild:${gId}`,
   };
@@ -223,6 +224,7 @@ export class StateStore {
   }
 
   _save() {
+    if (this._useRedis) return Promise.resolve();
     this._saveQueue = this._saveQueue
       .then(() => this._writeToDisk())
       .catch(err => console.error('[StateStore] Save error:', err));
@@ -1111,6 +1113,43 @@ export class StateStore {
         fs.writeFileSync(this._filePath, JSON.stringify(state, null, 2), 'utf8');
       } catch { /* non-fatal */ }
     }
+  }
+
+  // ── Music Queue Persistence (TTL 2h) ─────────────────────────────────────────
+  async saveMusicQueue(guildId, queueData) {
+    if (!guildId) return;
+    const key = this._k.musicQueue(guildId);
+    if (this._useRedis) {
+      if (!queueData || !queueData.tracks || queueData.tracks.length === 0) {
+        await this._rDel(key);
+      } else {
+        await this._redis.set(key, JSON.stringify(queueData), 'EX', 7200); // 2 hours TTL
+      }
+      return;
+    }
+    const guild = await this._fileGetGuild(guildId);
+    guild.musicQueue = queueData;
+    await this._save();
+  }
+
+  async getMusicQueue(guildId) {
+    if (!guildId) return null;
+    if (this._useRedis) {
+      return this._rGet(this._k.musicQueue(guildId));
+    }
+    const guild = await this._fileGetGuild(guildId);
+    return guild.musicQueue ?? null;
+  }
+
+  async clearMusicQueue(guildId) {
+    if (!guildId) return;
+    if (this._useRedis) {
+      await this._rDel(this._k.musicQueue(guildId));
+      return;
+    }
+    const guild = await this._fileGetGuild(guildId);
+    delete guild.musicQueue;
+    await this._save();
   }
 
 }
