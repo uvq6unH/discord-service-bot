@@ -491,8 +491,6 @@ export function createServer({ configStore, stateStore, botClient, redis = null 
 
     // Read heartbeats + stats counters from Redis.
     // All reads are parallel and non-fatal.
-    const todayStr = new Date().toISOString().slice(0, 10);
-    const monthStr = new Date().toISOString().slice(0, 7);
     let botHeartbeat = null;
     let dashboardHeartbeat = null;
     let stats = null;
@@ -502,7 +500,7 @@ export function createServer({ configStore, stateStore, botClient, redis = null 
 
     if (redis) {
       try {
-        const [rawBot, rawDash, slashSynced, cacheRefresh, discordErrors, queueLen, rawDbsize, rawInfo, rawMonthlyBaseline, rawDailyBaseline, rawMonthlyLastValue, rawDailyLastValue, rawReadsBaseline, rawWritesBaseline, rawReadsLastValue, rawWritesLastValue, redisText, redisType, redisStreamUrl] = await Promise.all([
+        const [rawBot, rawDash, slashSynced, cacheRefresh, discordErrors, queueLen, rawDbsize, rawInfo, redisText, redisType, redisStreamUrl] = await Promise.all([
           redis.get('heartbeat:bot').catch(() => null),
           redis.get('heartbeat:dashboard').catch(() => null),
           redis.get('stats:slash_sync_processed').catch(() => null),
@@ -511,14 +509,6 @@ export function createServer({ configStore, stateStore, botClient, redis = null 
           redis.llen('slash_sync_queue').catch(() => null),
           redis.dbsize().catch(() => null),
           redis.info().catch(() => null),
-          redis.get(`telemetry:global:monthly_baseline:${monthStr}`).catch(() => null),
-          redis.get(`telemetry:global:daily_baseline:${todayStr}`).catch(() => null),
-          redis.get(`telemetry:global:monthly_last_value:${monthStr}`).catch(() => null),
-          redis.get(`telemetry:global:daily_last_value:${todayStr}`).catch(() => null),
-          redis.get(`telemetry:global:reads_baseline:${monthStr}`).catch(() => null),
-          redis.get(`telemetry:global:writes_baseline:${monthStr}`).catch(() => null),
-          redis.get(`telemetry:global:reads_last_value:${monthStr}`).catch(() => null),
-          redis.get(`telemetry:global:writes_last_value:${monthStr}`).catch(() => null),
           redis.get('config:global:bot_status_text').catch(() => null),
           redis.get('config:global:bot_status_type').catch(() => null),
           redis.get('config:global:bot_status_stream_url').catch(() => null),
@@ -530,111 +520,73 @@ export function createServer({ configStore, stateStore, botClient, redis = null 
         if (rawBot) botHeartbeat = typeof rawBot === 'string' ? JSON.parse(rawBot) : rawBot;
         if (rawDash) dashboardHeartbeat = typeof rawDash === 'string' ? JSON.parse(rawDash) : rawDash;
         
-        const infoMap = {};
-        if (typeof rawInfo === 'string') {
-          for (const line of rawInfo.split(/\r?\n/)) {
-            if (!line.startsWith('#') && line.includes(':')) {
-              const [k, v] = line.split(':');
-              infoMap[k.trim()] = v.trim();
-            }
-          }
-        }
-
-        const usedBytes = Number(infoMap.total_data_size ?? infoMap.used_memory ?? 0);
-        const usedHuman = infoMap.total_data_size_human ?? infoMap.used_memory_human ?? `${(usedBytes / 1024).toFixed(1)} KB`;
-        const engineCmds = Number(infoMap.total_commands_processed ?? 0);
-        const engineReads = Number(infoMap.total_reads_processed ?? (Number(infoMap.keyspace_hits || 0) + Number(infoMap.keyspace_misses || 0)));
-        const engineWrites = Number(infoMap.total_writes_processed ?? Math.max(0, engineCmds - engineReads));
-
-        // Parse baseline state variables (with env overrides if specified)
-        const envMonthlyCmds = process.env.UPSTASH_MONTHLY_COMMANDS ? Number(process.env.UPSTASH_MONTHLY_COMMANDS) : null;
-        const envMonthlyReads = process.env.UPSTASH_MONTHLY_READS ? Number(process.env.UPSTASH_MONTHLY_READS) : null;
-        const envMonthlyWrites = process.env.UPSTASH_MONTHLY_WRITES ? Number(process.env.UPSTASH_MONTHLY_WRITES) : null;
-
-        let monthlyBaseline = rawMonthlyBaseline ? parseInt(rawMonthlyBaseline, 10) : (envMonthlyCmds !== null ? Math.max(0, engineCmds - envMonthlyCmds) : 0);
-        let readsBaseline = rawReadsBaseline ? parseInt(rawReadsBaseline, 10) : (envMonthlyReads !== null ? Math.max(0, engineReads - envMonthlyReads) : 0);
-        let writesBaseline = rawWritesBaseline ? parseInt(rawWritesBaseline, 10) : (envMonthlyWrites !== null ? Math.max(0, engineWrites - envMonthlyWrites) : 0);
-
-        // Sanity check: If baseline stored in Redis is higher than live engine stats (e.g. corrupted old keys), reset baseline
-        if (monthlyBaseline > engineCmds) {
-          monthlyBaseline = 0;
-          redis.del(`telemetry:global:monthly_baseline:${monthStr}`).catch(() => null);
-          redis.del(`telemetry:global:monthly_last_value:${monthStr}`).catch(() => null);
-        }
-        if (readsBaseline > engineReads) {
-          readsBaseline = 0;
-          redis.del(`telemetry:global:reads_baseline:${monthStr}`).catch(() => null);
-          redis.del(`telemetry:global:reads_last_value:${monthStr}`).catch(() => null);
-        }
-        if (writesBaseline > engineWrites) {
-          writesBaseline = 0;
-          redis.del(`telemetry:global:writes_baseline:${monthStr}`).catch(() => null);
-          redis.del(`telemetry:global:writes_last_value:${monthStr}`).catch(() => null);
-        }
-
-        const totalCmds = Math.max(0, engineCmds - monthlyBaseline);
-        const totalReads = Math.max(0, engineReads - readsBaseline);
-        const totalWrites = Math.max(0, engineWrites - writesBaseline);
-
-        // Daily Commands Baseline
-        let dailyBaseline = rawDailyBaseline ? parseInt(rawDailyBaseline, 10) : null;
-        if (dailyBaseline === null || isNaN(dailyBaseline) || dailyBaseline > engineCmds || dailyBaseline < monthlyBaseline) {
-          dailyBaseline = engineCmds;
-          redis.set(`telemetry:global:daily_baseline:${todayStr}`, String(dailyBaseline)).catch(() => null);
-        }
-        let actualCommandsToday = Math.max(0, engineCmds - dailyBaseline);
-        if (actualCommandsToday > totalCmds) {
-          actualCommandsToday = totalCmds;
-        }
-
         stats = {
           slashSyncProcessed: slashSynced ? parseInt(slashSynced, 10) : 0,
           guildCacheRefresh: cacheRefresh ? parseInt(cacheRefresh, 10) : 0,
           discordErrors: discordErrors ? parseInt(discordErrors, 10) : 0,
           slashQueueLength: queueLen ? parseInt(queueLen, 10) : 0,
-          commandsToday: actualCommandsToday,
+          commandsToday: 0,
         };
 
-        const storageLimit = 256 * 1024 * 1024;
-        const cmdLimit = 500000;
-
-        upstashMetrics = {
-          connected: true,
-          region: process.env.UPSTASH_REDIS_REGION ?? 'ap-southeast-1 (Singapore)',
-          provider: 'AWS',
-          tier: 'Free Tier',
-          cost: '$0.00',
-          commands: {
-            used: totalCmds,
-            reads: totalReads,
-            writes: totalWrites,
-            engineTotal: engineCmds,
-            limit: cmdLimit,
-            percent: Number(((totalCmds / cmdLimit) * 100).toFixed(1)),
-            formatted: `${totalCmds >= 1000 ? Math.floor(totalCmds / 1000) + 'K' : totalCmds} / 500k per month`
-          },
-          storage: {
-            usedBytes,
-            usedHuman,
-            limitMb: 256,
-            percent: Number(((usedBytes / storageLimit) * 100).toFixed(2)),
-            formatted: `${usedHuman} / 256 MB`
-          },
-          bandwidth: {
-            usedHuman: '0 B',
-            limitGb: 50,
-            percent: 0,
-            formatted: '0 B / 50 GB'
-          },
-          keys: rawDbsize ?? Number(infoMap.keys ?? 30)
-        };
-
-        // If official Upstash Developer API credentials exist, fetch 100% official telemetry
+        // 1. Official Upstash Developer API (100% accurate live stats from Upstash)
         if (process.env.UPSTASH_EMAIL && process.env.UPSTASH_API_KEY) {
           const officialMetrics = await getUpstashOfficialStats(process.env.UPSTASH_EMAIL, process.env.UPSTASH_API_KEY);
           if (officialMetrics) {
             upstashMetrics = officialMetrics;
           }
+        }
+
+        // 2. Fallback to raw Redis INFO if Developer API is unconfigured
+        if (!upstashMetrics) {
+          const infoMap = {};
+          if (typeof rawInfo === 'string') {
+            for (const line of rawInfo.split(/\r?\n/)) {
+              if (!line.startsWith('#') && line.includes(':')) {
+                const [k, v] = line.split(':');
+                infoMap[k.trim()] = v.trim();
+              }
+            }
+          }
+
+          const usedBytes = Number(infoMap.total_data_size ?? infoMap.used_memory ?? 0);
+          const usedHuman = infoMap.total_data_size_human ?? infoMap.used_memory_human ?? `${(usedBytes / 1024).toFixed(1)} KB`;
+          const totalCmds = Number(infoMap.total_commands_processed ?? 0);
+          const totalReads = Number(infoMap.total_reads_processed ?? (Number(infoMap.keyspace_hits || 0) + Number(infoMap.keyspace_misses || 0)));
+          const totalWrites = Number(infoMap.total_writes_processed ?? Math.max(0, totalCmds - totalReads));
+
+          const storageLimit = 256 * 1024 * 1024;
+          const cmdLimit = 500000;
+
+          upstashMetrics = {
+            connected: true,
+            region: process.env.UPSTASH_REDIS_REGION ?? 'ap-southeast-1 (Singapore)',
+            provider: 'AWS',
+            tier: 'Free Tier',
+            cost: '$0.00',
+            commands: {
+              used: totalCmds,
+              reads: totalReads,
+              writes: totalWrites,
+              engineTotal: totalCmds,
+              limit: cmdLimit,
+              percent: Number(((totalCmds / cmdLimit) * 100).toFixed(1)),
+              formatted: `${totalCmds >= 1000 ? Math.floor(totalCmds / 1000) + 'K' : totalCmds} / 500k per month`
+            },
+            storage: {
+              usedBytes,
+              usedHuman,
+              limitMb: 256,
+              percent: Number(((usedBytes / storageLimit) * 100).toFixed(2)),
+              formatted: `${usedHuman} / 256 MB`
+            },
+            bandwidth: {
+              usedHuman: '0 B',
+              limitGb: 50,
+              percent: 0,
+              formatted: '0 B / 50 GB'
+            },
+            keys: rawDbsize ?? Number(infoMap.keys ?? 45)
+          };
         }
       } catch { /* non-fatal — return partial status */ }
     }

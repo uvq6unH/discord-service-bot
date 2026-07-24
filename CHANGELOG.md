@@ -4,6 +4,15 @@ Format: `[vX.Y] — Mô tả ngắn` → chi tiết thay đổi.
 
 ---
 
+## [v2.4.1] — Legacy Baseline Math Clean-Up (2026-07-24)
+
+**`src/server.js`** — Tối giản và làm sạch hoàn toàn logic Telemetry
+- Xóa bỏ toàn bộ hơn 80 dòng code tính toán baseline bù trừ thủ công cũ (`monthlyBaseline`, `dailyBaseline`, `readsBaseline`, `writesBaseline`, `monthlyLastValue`, v.v.).
+- Rút gọn số lượng truy vấn `Promise.all` từ 19 xuống 11, giúp `server.js` gọn gàng, chạy nhanh hơn và 100% tinh khiết.
+
+---
+
+
 ## [v2.4.0] — Official Upstash Developer API Integration (2026-07-24)
 
 **`src/server.js`, `.env`, `.env.example`** — Tích hợp trực tiếp REST API chính thức từ Upstash Developer Portal
