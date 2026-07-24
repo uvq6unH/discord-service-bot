@@ -580,11 +580,12 @@ function _startEventQueueWorker(client, configStore, redis) {
           }
           await new Promise(resolve => setImmediate(resolve));
         } else {
-          await new Promise(resolve => setTimeout(resolve, 1500));
+          // Adaptive idle sleep 6s — tối ưu hạn ngạch 500k requests/tháng của Upstash Free Tier
+          await new Promise(resolve => setTimeout(resolve, 6000));
         }
       } catch (err) {
         console.error('[event-queue] Worker error:', err.message);
-        await new Promise(resolve => setTimeout(resolve, 3000));
+        await new Promise(resolve => setTimeout(resolve, 5000));
       }
     }
   };
