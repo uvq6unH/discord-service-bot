@@ -101,19 +101,17 @@ export default function EsportsServicesPage() {
                   </div>
                 </div>
 
-                <button
-                  type="button"
-                  className={`btn ${isEnabled ? 'btn--primary' : 'btn--secondary'}`}
-                  style={{
-                    fontFamily: 'var(--font-mono)',
-                    fontSize: '11px',
-                    padding: 'var(--space-2) var(--space-4)',
-                    cursor: 'pointer'
-                  }}
-                  onClick={() => updateConfig({ esportsNotifyEnabled: !isEnabled })}
-                >
-                  {isEnabled ? t("SYSTEM_ONLINE") : t("SYSTEM_OFFLINE")}
-                </button>
+                <label className="toggle-switch">
+                  <input
+                    type="checkbox"
+                    className="toggle-switch__input"
+                    checked={isEnabled}
+                    onChange={(e) => updateConfig({ esportsNotifyEnabled: e.target.checked })}
+                  />
+                  <div className="toggle-switch__track">
+                    <div className="toggle-switch__thumb" />
+                  </div>
+                </label>
               </div>
 
               {/* Select Notification Channel */}
