@@ -580,8 +580,8 @@ function _startEventQueueWorker(client, configStore, redis) {
           }
           await new Promise(resolve => setImmediate(resolve));
         } else {
-          // Adaptive idle sleep 6s — tối ưu hạn ngạch 500k requests/tháng của Upstash Free Tier
-          await new Promise(resolve => setTimeout(resolve, 6000));
+          // Adaptive idle sleep 8s — tối ưu hạn ngạch 500k requests/tháng của Upstash Free Tier (chỉ chiếm ~288k reqs/tháng)
+          await new Promise(resolve => setTimeout(resolve, 8000));
         }
       } catch (err) {
         console.error('[event-queue] Worker error:', err.message);
@@ -645,9 +645,9 @@ function _startHeartbeat(client, redis) {
   };
 
   write();
-  const handle = setInterval(write, 30_000);
+  const handle = setInterval(write, 60_000);
   handle.unref();
-  console.log('[heartbeat] Bot heartbeat started — writing every 30 s');
+  console.log('[heartbeat] Bot heartbeat started — writing every 60 s');
 }
 
 function _updatePresence(client) {

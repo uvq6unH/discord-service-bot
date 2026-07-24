@@ -1385,8 +1385,8 @@ export function createServer({ configStore, stateStore, botClient, redis = null 
       } catch { /* non-fatal */ }
     };
     writeDashboardHeartbeat();
-    setInterval(writeDashboardHeartbeat, 30_000).unref();
-    console.log('[heartbeat] Dashboard heartbeat started — writing every 30s');
+    setInterval(writeDashboardHeartbeat, 60_000).unref();
+    console.log('[heartbeat] Dashboard heartbeat started — writing every 60s');
   }
 
   return app;
