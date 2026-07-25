@@ -12,7 +12,7 @@ import UptimeRobotStatus from '../components/UptimeRobotStatus.jsx';
 import { systemService } from '../services/system.service.js';
 
 export default function SystemPage() {
-  const { config } = useGuild();
+  const { config, selectedGuild } = useGuild();
   const { status, loading, refetch } = useSystem(45000); // Poll every 45s
   const { t } = useLanguage();
 

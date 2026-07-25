@@ -5,6 +5,7 @@ import Panel from '../../../shared/primitives/Panel.jsx';
 import DataSlab from '../../../shared/primitives/DataSlab.jsx';
 import PermissionGuard from '../components/PermissionGuard.jsx';
 import { useModeration } from '../hooks/useModeration.js';
+import { useGuild } from '../../../shared/hooks/useGuild.js';
 import { useLanguage } from '../../../shared/context/LanguageContext.jsx';
 
 function CommandConfigRow({ cmd, roles, onUpdate, displayPrefix = '/' }) {
@@ -258,6 +259,7 @@ function SelfRoleEditor({ roles, allRoles, onChange }) {
 export default function ModerationPage() {
   const location = useLocation();
   const highlight = location.state?.highlight;
+  const { selectedGuild } = useGuild();
   const {
     config,
     loading,

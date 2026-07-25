@@ -153,7 +153,7 @@ export default function MusicServicesPage() {
     handleVolumeChange, 
     handlePrefixChange 
   } = useMusic();
-  const { guildData } = useGuild();
+  const { guildData, selectedGuild } = useGuild();
   const { t } = useLanguage();
 
   if (loading || !config) {

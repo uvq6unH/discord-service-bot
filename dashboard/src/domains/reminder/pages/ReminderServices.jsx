@@ -2,6 +2,7 @@ import React from 'react';
 import Workspace, { HeaderZone, StatusZone, KpiTile } from '../../../shared/layouts/Workspace.jsx';
 import Panel from '../../../shared/primitives/Panel.jsx';
 import { useReminders } from '../hooks/useReminders.js';
+import { useGuild } from '../../../shared/hooks/useGuild.js';
 import { Trash2, Plus } from 'lucide-react';
 import { useLanguage } from '../../../shared/context/LanguageContext.jsx';
 
@@ -226,6 +227,7 @@ function ReminderItemRow({ reminder, channels, members, roles, onUpdate, onRemov
 }
 
 export default function ReminderServicesPage() {
+  const { selectedGuild } = useGuild();
   const {
     config,
     loading,

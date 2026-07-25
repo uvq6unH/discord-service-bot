@@ -152,7 +152,7 @@ const VOICE_TYPES = ['voice', 'setup'];
 
 export default function VoiceServicesPage() {
   const { config, loading, updateConfig } = useMusic();
-  const { guildData } = useGuild();
+  const { guildData, selectedGuild } = useGuild();
   const { t } = useLanguage();
   const [settingUp, setSettingUp] = useState(false);
   const [setupStatus, setSetupStatus] = useState(null);

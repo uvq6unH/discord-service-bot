@@ -147,7 +147,7 @@ function CommandConfigRow({ cmd, roles, onUpdate, displayPrefix = '/' }) {
 
 export default function RiotServicesPage() {
   const { config, loading, updateConfig, handleApiKeyChange } = useRiot();
-  const { guildData } = useGuild();
+  const { guildData, selectedGuild } = useGuild();
   const channels = guildData?.channels ?? [];
   const roles = guildData?.roles ?? [];
   const { t } = useLanguage();

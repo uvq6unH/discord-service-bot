@@ -28,7 +28,7 @@ const TIME_OPTIONS = Array.from({ length: 48 }, (_, i) => {
 
 export default function EsportsServicesPage() {
   const { config, loading, updateConfig } = useRiot();
-  const { guildData } = useGuild();
+  const { guildData, selectedGuild } = useGuild();
   const { t } = useLanguage();
 
   const [testing, setTesting] = useState(false);

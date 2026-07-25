@@ -291,7 +291,7 @@ export default function EconomyPage() {
   const location = useLocation();
   const highlight = location.state?.highlight;
   const { config, loading, updateConfig, handleBetChange } = useEconomy();
-  const { guildData } = useGuild();
+  const { guildData, selectedGuild } = useGuild();
   const { t } = useLanguage();
 
   if (loading || !config) {
