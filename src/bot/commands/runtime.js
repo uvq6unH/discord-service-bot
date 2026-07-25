@@ -2,7 +2,7 @@ import { memberCanUseCommand } from '../../commandAccess.js';
 import { AUTO_DEFER_COMMAND_TYPES } from '../constants.js';
 import { renderCommandResponse } from '../responses.js';
 
-export async function createCommandContext({ client, config, command, source, args }) {
+export async function createCommandContext({ client, config, configStore, command, source, args }) {
   const isInteraction = 'isChatInputCommand' in source;
   const guild = source.guild;
   const channel = source.channel;
@@ -43,7 +43,7 @@ export async function createCommandContext({ client, config, command, source, ar
 
   return {
     denied: false,
-    client, config, command, source, args, isInteraction, guild, channel, user, permissions,
+    client, config, configStore, command, source, args, isInteraction, guild, channel, user, permissions,
     reply, context, actorMember
   };
 }

@@ -1,6 +1,12 @@
 import { ChannelType, PermissionFlagsBits, EmbedBuilder } from 'discord.js';
 
 export async function executeAutoVoiceMasterSetup(guild, configStore) {
+  let targetStore = configStore;
+  if (!targetStore || typeof targetStore.updateGuildConfig !== 'function') {
+    const { configStore: singletonStore } = await import('../../../configStore.js');
+    targetStore = singletonStore;
+  }
+
   // 1. Create Voice Category
   const category = await guild.channels.create({
     name: '🔊 VoiceMaster Channels',
@@ -52,8 +58,8 @@ export async function executeAutoVoiceMasterSetup(guild, configStore) {
     await controlMsg.pin().catch(() => null);
   }
 
-  // 5. Save to configStore
-  await configStore.updateGuildConfig(guild.id, {
+  // 5. Save to targetStore
+  await targetStore.updateGuildConfig(guild.id, {
     tempVcEnabled: true,
     tempVcMasterChannelId: masterChannel.id,
     tempVcCategoryId: category.id,
