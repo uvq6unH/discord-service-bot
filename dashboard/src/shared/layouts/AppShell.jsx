@@ -174,20 +174,26 @@ export default function AppShell({
           transform: dirty || saveStatus === 'saved' || saveStatus === 'error' ? 'translateY(0)' : 'translateY(150%)',
           transition: 'transform 0.25s cubic-bezier(0.16, 1, 0.3, 1)'
         }}>
-          <span style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--text-2)' }}>
+          <span style={{
+            fontFamily: 'var(--font-mono)',
+            fontSize: '11px',
+            color: saveStatus === 'saved' ? 'var(--green)' : 'var(--text-2)'
+          }}>
             {saveStatus === 'saving' && t('>>> COMMITTING TELEMETRY CHANGES...')}
-            {saveStatus === 'saved'  && t('>>> TELEMETRY COMMITTED SUCCESSFULLY.')}
-            {saveStatus === 'error'  && t('>>> ERROR COMMITTING CONFIG.')}
-            {saveStatus === 'idle'   && t('>>> UNCOMMITTED TELEMETRY DETECTED.')}
+            {saveStatus === 'saved'  && t('✔ TELEMETRY COMMITTED SUCCESSFULLY.')}
+            {saveStatus === 'error'  && t('✖ ERROR COMMITTING CONFIG.')}
+            {saveStatus === 'idle' && dirty && t('>>> UNCOMMITTED TELEMETRY DETECTED.')}
           </span>
-          <button
-            className="btn btn--primary"
-            onClick={saveConfig}
-            disabled={saveStatus === 'saving'}
-            style={{ padding: 'var(--space-1-5) var(--space-3)' }}
-          >
-            {saveStatus === 'saving' ? t('Committing...') : t('Commit Changes')}
-          </button>
+          {saveStatus !== 'saved' && (
+            <button
+              className="btn btn--primary"
+              onClick={saveConfig}
+              disabled={saveStatus === 'saving'}
+              style={{ padding: 'var(--space-1-5) var(--space-3)' }}
+            >
+              {saveStatus === 'saving' ? t('Committing...') : t('Commit Changes')}
+            </button>
+          )}
         </div>
       </div>
     </div>
