@@ -91,12 +91,22 @@ async function processEsportsWorkerCycle(client, configStore, redis) {
             });
 
             await channel.send({ content: `📅 **[LỊCH THI ĐẤU HÀNG NGÀY - ${todayYMD}]**`, embeds }).catch((err) => console.error('[esportsWorker] Send daily error:', err.message));
+          } else {
+            // Không có trận đấu — vẫn gửi thông báo để user biết bot hoạt động
+            const noMatchEmbed = new EmbedBuilder()
+              .setTitle('📅 Lịch thi đấu hôm nay')
+              .setDescription(`Hôm nay (**${todayYMD}**) không có trận đấu nào trong các giải đang theo dõi.\n\n🔍 Các giải: ${targetLeagues.map(l => `\`${l.toUpperCase()}\``).join(', ')}`)
+              .setColor(0x95A5A6)
+              .setFooter({ text: 'Riot LoL Esports Pipeline' })
+              .setTimestamp();
+            await channel.send({ embeds: [noMatchEmbed] }).catch((err) => console.error('[esportsWorker] Send no-match daily error:', err.message));
+          }
 
-            if (redis) {
-              await redis.set(dailyKey, '1', { ex: 86400 * 2 }).catch(() => null);
-            } else {
-              _postedDailyCache.add(dailyKey);
-            }
+          // Mark as posted for today (both cases)
+          if (redis) {
+            await redis.set(dailyKey, '1', { ex: 86400 * 2 }).catch(() => null);
+          } else {
+            _postedDailyCache.add(dailyKey);
           }
         }
       }

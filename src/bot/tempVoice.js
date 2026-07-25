@@ -93,8 +93,19 @@ export async function handleVoiceStateUpdate(oldState, newState, configStore, re
       const parentCategory = config.tempVcCategoryId || masterChannel?.parentId || undefined;
       const roomName = `🔊 ${member.displayName}'s Room`.slice(0, 90);
 
-      // Build permission overwrites
+      // Ensure bot has MoveMembers permission on the Master channel
       const me = guild.members.me || await guild.members.fetchMe().catch(() => null);
+      if (me && masterChannel) {
+        const botPerms = masterChannel.permissionsFor(me);
+        if (!botPerms?.has(PermissionFlagsBits.MoveMembers)) {
+          console.warn(`[tempVoice] Bot missing MoveMembers on Master channel ${masterChannelId}, attempting to fix...`);
+          await masterChannel.permissionOverwrites.edit(me.id, {
+            Connect: true, Speak: true, MoveMembers: true, ManageChannels: true, ViewChannel: true
+          }).catch((e) => console.error('[tempVoice] Cannot fix Master channel perms:', e.message));
+        }
+      }
+
+      // Build permission overwrites for the new temp channel
       const overwrites = [
         {
           id: member.id,
@@ -134,14 +145,24 @@ export async function handleVoiceStateUpdate(oldState, newState, configStore, re
         await redis.hset(`guild:${guild.id}:temp_vcs`, tempChannel.id, member.id).catch(() => null);
       }
 
-      // Move member into the new channel
-      try {
-        await member.voice.setChannel(tempChannel);
-      } catch (moveErr) {
-        console.warn(`[tempVoice] setChannel failed (${moveErr.message}), trying newState.setChannel`);
-        try { await newState.setChannel(tempChannel); } catch (e2) {
-          console.error(`[tempVoice] Failed to move ${member.user.tag}:`, e2.message);
+      // Move member into the new channel — re-fetch to ensure fresh voice state
+      const freshMember = await guild.members.fetch(member.id).catch(() => member);
+      if (freshMember.voice?.channelId) {
+        try {
+          await freshMember.voice.setChannel(tempChannel);
+          console.log(`[tempVoice] ✅ Moved ${freshMember.user.tag} → "${roomName}" (${tempChannel.id})`);
+        } catch (moveErr) {
+          console.error(`[tempVoice] ❌ setChannel failed for ${freshMember.user.tag}: ${moveErr.message} (code: ${moveErr.code})`);
+          // Fallback: try via newState
+          try {
+            await newState.setChannel(tempChannel);
+            console.log(`[tempVoice] ✅ Fallback move worked for ${freshMember.user.tag}`);
+          } catch (e2) {
+            console.error(`[tempVoice] ❌ Fallback also failed: ${e2.message}`);
+          }
         }
+      } else {
+        console.warn(`[tempVoice] ⚠️ ${member.user.tag} left voice before we could move them`);
       }
 
       // Post the control panel into the channel's text chat
@@ -150,7 +171,7 @@ export async function handleVoiceStateUpdate(oldState, newState, configStore, re
 
       console.log(`[tempVoice] Created "${roomName}" (${tempChannel.id}) for ${member.user.tag}`);
     } catch (err) {
-      console.error('[tempVoice] Error creating temp channel:', err.message);
+      console.error('[tempVoice] Error creating temp channel:', err.message, err.stack);
     }
   }
 
