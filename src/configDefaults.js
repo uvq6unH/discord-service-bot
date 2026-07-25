@@ -16,6 +16,8 @@ export const defaultConfig = {
       { enabled: true, type: 'translate', name: 'translate', description: 'Dịch văn bản tự động (Nga, Nhật, Trung, Việt, Anh)', response: '' },
       { enabled: true, type: 'duolingo', name: 'duolingo', description: 'Học tiếng Nga và tiếng Trung giống Duolingo', response: '' },
       { enabled: true, type: 'voice', name: 'voice', description: 'Điều khiển phòng thoại tạm thời VoiceMaster', response: '' },
+      { enabled: true, type: 'setup', name: 'setup', description: 'Tự động khởi tạo hệ thống phòng thoại VoiceMaster', response: '' },
+      { enabled: true, type: 'vcsetup', name: 'vcsetup', description: 'Tự động khởi tạo hệ thống phòng thoại VoiceMaster', response: '' },
       { enabled: true, type: 'setup-temp-vc', name: 'setup-temp-vc', description: 'Admin setup Kênh Thoại Tự Động Master', response: '' }
     ]
   },

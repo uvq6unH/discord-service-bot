@@ -1,42 +1,94 @@
 import { ChannelType, PermissionFlagsBits, EmbedBuilder } from 'discord.js';
 
+export async function executeAutoVoiceMasterSetup(guild, configStore) {
+  // 1. Create Voice Category
+  const category = await guild.channels.create({
+    name: '🔊 VoiceMaster Channels',
+    type: ChannelType.GuildCategory
+  });
+
+  // 2. Create Master Join Voice Channel
+  const masterChannel = await guild.channels.create({
+    name: '➕ Join to Create',
+    type: ChannelType.GuildVoice,
+    parent: category.id
+  });
+
+  // 3. Create Voice Control Panel Text Channel
+  const controlChannel = await guild.channels.create({
+    name: '🎛️-voice-interface',
+    type: ChannelType.GuildText,
+    parent: category.id,
+    topic: '🔒 Control Panel điều khiển phòng thoại tạm thời VoiceMaster'
+  });
+
+  // 4. Build & send Control Panel embed in controlChannel
+  const panelEmbed = new EmbedBuilder()
+    .setTitle('🎛️ VoiceMaster Control Interface')
+    .setDescription(
+      `Chào mừng đến với hệ thống **VoiceMaster**!\n\n` +
+      `Tham gia kênh **${masterChannel.name}** (<#${masterChannel.id}>) để tự động khởi tạo phòng thoại riêng.\n` +
+      `Sử dụng các nút bấm bên dưới hoặc lệnh \`/voice\` / \`hb voice\` để quản lý phòng thoại của bạn:`
+    )
+    .addFields(
+      { name: '🔒 Khóa / 🔓 Mở', value: `\`hb voice lock\` / \`hb voice unlock\``, inline: true },
+      { name: '👥 Giới hạn người', value: `\`hb voice limit <số>\``, inline: true },
+      { name: '✏️ Đổi tên phòng', value: `\`hb voice name <tên>\``, inline: true },
+      { name: '🟢 Cho phép / 🔴 Cấm', value: `\`hb voice permit @user\` / \`hb voice reject @user\``, inline: true },
+      { name: '👑 Nhận chủ phòng', value: `\`hb voice claim\``, inline: true }
+    )
+    .setColor(0x00FF88)
+    .setFooter({ text: 'VoiceMaster Automated Engine' });
+
+  const { buildTempVcControlPanel } = await import('../../tempVoice.js');
+  const controlMsg = await controlChannel.send({
+    embeds: [panelEmbed],
+    components: [
+      buildTempVcControlPanel({ id: 'template' }, '0')
+    ]
+  }).catch(() => null);
+
+  if (controlMsg) {
+    await controlMsg.pin().catch(() => null);
+  }
+
+  // 5. Save to configStore
+  await configStore.updateGuildConfig(guild.id, {
+    tempVcEnabled: true,
+    tempVcMasterChannelId: masterChannel.id,
+    tempVcCategoryId: category.id,
+    tempVcControlChannelId: controlChannel.id
+  });
+
+  return {
+    category,
+    masterChannel,
+    controlChannel
+  };
+}
+
 export async function handleVoiceControl(ctx) {
   const { command, reply, args, source, guild, actorMember, configStore } = ctx;
   if (!command) return undefined;
 
-  // 1. Slash Command /setup-temp-vc (Admin Setup)
-  if (command.name === 'setup-temp-vc') {
+  // 1. Setup Commands: /setup, /vcsetup, /setup-temp-vc, hb setup, hb vcsetup
+  const isSetupCmd = ['setup', 'vcsetup', 'setup-temp-vc'].includes(command.name?.toLowerCase());
+  if (isSetupCmd) {
     if (!actorMember?.permissions?.has(PermissionFlagsBits.Administrator)) {
       return reply({ content: '❌ Bạn cần có quyền **Administrator** để sử dụng lệnh này.', ephemeral: true });
     }
 
     try {
-      // Auto Setup Master Category & Master Channel
-      const category = await guild.channels.create({
-        name: '🔊 KÊNH THOẠI TẠM THỜI',
-        type: ChannelType.GuildCategory
-      });
-
-      const masterChannel = await guild.channels.create({
-        name: '➕ Tạo phòng thoại',
-        type: ChannelType.GuildVoice,
-        parent: category.id
-      });
-
-      // Save to configStore
-      await configStore.updateGuildConfig(guild.id, {
-        tempVcEnabled: true,
-        tempVcMasterChannelId: masterChannel.id,
-        tempVcCategoryId: category.id
-      });
+      const result = await executeAutoVoiceMasterSetup(guild, configStore);
 
       const embed = new EmbedBuilder()
-        .setTitle('⚡ Thiết Lập Kênh Thoại Tự Động Thành Công')
+        .setTitle('⚡ VoiceMaster Automated Setup Completed')
         .setDescription(
-          `Đã tạo thành công:\n` +
-          `• Category: **${category.name}**\n` +
-          `• Kênh Master: **${masterChannel.name}** (\`<#${masterChannel.id}>\`)\n\n` +
-          `Thành viên chỉ cần bấm vào kênh **${masterChannel.name}** để tự tạo phòng thoại riêng!`
+          `Đã tạo thành công toàn bộ hệ thống VoiceMaster:\n\n` +
+          `• **Danh mục (Category):** ${result.category.name}\n` +
+          `• **Kênh tạo phòng:** **${result.masterChannel.name}** (<#${result.masterChannel.id}>)\n` +
+          `• **Bảng điều khiển:** **#${result.controlChannel.name}** (<#${result.controlChannel.id}>)\n\n` +
+          `Thành viên chỉ cần bấm vào kênh **${result.masterChannel.name}** để tự động tạo phòng thoại riêng!`
         )
         .setColor(0x00FF88)
         .setTimestamp();
@@ -44,7 +96,7 @@ export async function handleVoiceControl(ctx) {
       return reply({ embeds: [embed] });
     } catch (err) {
       console.error('[tempVcSetup] Setup error:', err.message);
-      return reply({ content: `❌ Lỗi khi tự động tạo kênh: ${err.message}`, ephemeral: true });
+      return reply({ content: `❌ Lỗi khi tự động tạo hệ thống VoiceMaster: ${err.message}`, ephemeral: true });
     }
   }
 

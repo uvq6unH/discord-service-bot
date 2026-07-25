@@ -1443,6 +1443,48 @@ export function createServer({ configStore, stateStore, botClient, redis = null 
     res.json({ success: true, disabledCommands: updatedConfig.disabledCommands });
   });
 
+  app.post('/api/guilds/:guildId/temp-vc-setup', auth.requireAuth, writeRateLimit, requireGuildId, auth.requireGuildAccess, async (req, res) => {
+    try {
+      const botClient = req.app.get('botClient');
+      if (!botClient) {
+        return res.status(503).json({ error: 'Bot Client hiện chưa kết nối.' });
+      }
+
+      const guild = botClient.guilds.cache.get(req.guildId) || await botClient.guilds.fetch(req.guildId).catch(() => null);
+      if (!guild) {
+        return res.status(404).json({ error: 'Không tìm thấy Server Discord trong hệ thống Bot.' });
+      }
+
+      const { executeAutoVoiceMasterSetup } = await import('./bot/commands/handlers/tempVcSetup.js');
+      const result = await executeAutoVoiceMasterSetup(guild, configStore);
+
+      return res.json({
+        success: true,
+        message: 'Đã khởi tạo hệ thống VoiceMaster thành công!',
+        categoryName: result.category.name,
+        masterChannelName: result.masterChannel.name,
+        controlChannelName: result.controlChannel.name
+      });
+    } catch (err) {
+      console.error('[server] temp-vc-setup error:', err.message);
+      return res.status(500).json({ error: `Lỗi khi tự động khởi tạo VoiceMaster: ${err.message}` });
+    }
+  });
+
+  app.post('/api/guilds/:guildId/temp-vc-reset', auth.requireAuth, writeRateLimit, requireGuildId, auth.requireGuildAccess, async (req, res) => {
+    try {
+      await configStore.updateGuildConfig(req.guildId, {
+        tempVcEnabled: false,
+        tempVcMasterChannelId: '',
+        tempVcCategoryId: '',
+        tempVcControlChannelId: ''
+      });
+      return res.json({ success: true, message: 'Đã reset cấu hình VoiceMaster thành công.' });
+    } catch (err) {
+      return res.status(500).json({ error: err.message });
+    }
+  });
+
   // Central error handler — catches unhandled async errors in Express 5 routes
   app.use((err, req, res, _next) => {
     console.error('[server] Unhandled error:', err?.message ?? err);

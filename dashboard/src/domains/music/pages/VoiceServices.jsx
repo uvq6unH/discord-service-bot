@@ -5,7 +5,7 @@ import DataSlab from '../../../shared/primitives/DataSlab.jsx';
 import { useMusic } from '../hooks/useMusic.js';
 import { useGuild } from '../../../shared/hooks/useGuild.js';
 import { useLanguage } from '../../../shared/context/LanguageContext.jsx';
-import { Mic, Radio, Volume2, ShieldCheck } from 'lucide-react';
+import { Mic, Radio, Volume2, ShieldCheck, Wand2 } from 'lucide-react';
 
 function CommandConfigRow({ cmd, roles, onUpdate, displayPrefix = '/' }) {
   const [expanded, setExpanded] = useState(false);
@@ -153,6 +153,8 @@ export default function VoiceServicesPage() {
   const { config, loading, updateConfig } = useMusic();
   const { guildData } = useGuild();
   const { t } = useLanguage();
+  const [settingUp, setSettingUp] = useState(false);
+  const [setupStatus, setSetupStatus] = useState(null);
 
   if (loading || !config) {
     return (
@@ -170,6 +172,46 @@ export default function VoiceServicesPage() {
   const isTempVcActive = Boolean(config.tempVcEnabled);
   const masterChannel = channels.find(c => c.id === config.tempVcMasterChannelId);
   const parentCategory = categories.find(c => c.id === config.tempVcCategoryId);
+
+  const handleRunAutoSetup = async () => {
+    setSettingUp(true);
+    setSetupStatus(null);
+    try {
+      const selectedGuildId = localStorage.getItem('selectedGuildId') || '';
+      const res = await fetch(`/api/guilds/${selectedGuildId}/temp-vc-setup`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+      });
+      const data = await res.json();
+      if (data.success) {
+        setSetupStatus({ success: true, message: data.message });
+        window.location.reload();
+      } else {
+        setSetupStatus({ success: false, message: data.error || 'Lỗi thiết lập.' });
+      }
+    } catch (err) {
+      setSetupStatus({ success: false, message: err.message });
+    } finally {
+      setSettingUp(false);
+    }
+  };
+
+  const handleResetSetup = async () => {
+    if (!window.confirm('Bạn có chắc chắn muốn reset cấu hình VoiceMaster không?')) return;
+    setSettingUp(true);
+    try {
+      const selectedGuildId = localStorage.getItem('selectedGuildId') || '';
+      await fetch(`/api/guilds/${selectedGuildId}/temp-vc-reset`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+      });
+      window.location.reload();
+    } catch (err) {
+      alert(err.message);
+    } finally {
+      setSettingUp(false);
+    }
+  };
 
   return (
     <Workspace>
@@ -199,68 +241,75 @@ export default function VoiceServicesPage() {
       <div className="grid-12">
         {/* Master Voice Engine Config Panel */}
         <div className="col-span-12">
-          <Panel title={t("AUTOMATED JOIN-TO-CREATE CONFIGURATION")} accent>
+          <Panel title={t("AUTOMATED JOIN-TO-CREATE CONFIGURATION (VOICEMASTER)")} accent>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
               
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              {/* Discord Command Instructions Box */}
+              <div style={{
+                padding: 'var(--space-4)',
+                background: 'rgba(0, 255, 136, 0.05)',
+                border: '1px solid var(--accent)',
+                borderRadius: '4px'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', fontFamily: 'var(--font-mono)', fontWeight: 'bold', fontSize: '13px', color: 'var(--accent)' }}>
+                  <Wand2 size={18} />
+                  {t("Discord Command Automated Setup")}
+                </div>
+                <div style={{ fontSize: '12px', color: 'var(--text-1)', marginTop: 'var(--space-2)', lineHeight: '1.5' }}>
+                  Gõ lệnh <code style={{ background: 'var(--surface-2)', padding: '2px 6px', color: 'var(--accent)', fontFamily: 'var(--font-mono)', fontWeight: 'bold' }}>hb setup</code> hoặc <code style={{ background: 'var(--surface-2)', padding: '2px 6px', color: 'var(--accent)', fontFamily: 'var(--font-mono)', fontWeight: 'bold' }}>/setup</code> trực tiếp trong Discord Server để Bot **tự động tạo toàn bộ hệ thống VoiceMaster** (Category, Kênh ➕ Join to Create & Control Panel 🎛️ voice-interface)!
+                </div>
+              </div>
+
+              {/* Status and Direct Web Setup Trigger */}
+              <div style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                padding: 'var(--space-4)',
+                background: 'var(--surface-1)',
+                border: '1px solid var(--border)'
+              }}>
                 <div>
                   <div style={{ fontFamily: 'var(--font-mono)', fontWeight: 'bold', fontSize: '13px', color: 'var(--text-1)', display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
                     <Mic size={16} color="var(--accent)" />
-                    {t("Enable VoiceMaster Engine")}
+                    Trạng thái hệ thống: {isTempVcActive ? '🟢 ĐÃ BẬT (ACTIVE)' : '⚪ CHƯA TẠO (STANDBY)'}
                   </div>
                   <div style={{ fontSize: '11px', color: 'var(--text-3)', marginTop: 'var(--space-1)' }}>
-                    {t("Automatically generate temporary voice channels when members join the master channel")}
+                    • Category: {parentCategory ? parentCategory.name : (config.tempVcCategoryId ? config.tempVcCategoryId : 'Chưa khởi tạo')}<br />
+                    • Master Channel: {masterChannel ? `🔊 ${masterChannel.name}` : (config.tempVcMasterChannelId ? config.tempVcMasterChannelId : 'Chưa khởi tạo')}
                   </div>
                 </div>
 
-                <label className="toggle-switch">
-                  <input
-                    type="checkbox"
-                    className="toggle-switch__input"
-                    checked={isTempVcActive}
-                    onChange={(e) => updateConfig({ tempVcEnabled: e.target.checked })}
-                  />
-                  <div className="toggle-switch__track">
-                    <div className="toggle-switch__thumb" />
-                  </div>
-                </label>
-              </div>
-
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-4)', marginTop: 'var(--space-2)' }}>
-                <div>
-                  <label className="form-label" style={{ fontSize: '11px', fontFamily: 'var(--font-mono)' }}>
-                    {t("Master Join-to-Create Voice Channel")}
-                  </label>
-                  <select
-                    className="form-input"
-                    style={{ fontSize: '12px', fontFamily: 'var(--font-mono)', width: '100%' }}
-                    value={config.tempVcMasterChannelId || ''}
-                    onChange={(e) => updateConfig({ tempVcMasterChannelId: e.target.value })}
+                <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
+                  <button
+                    type="button"
+                    className="btn btn--primary"
+                    disabled={settingUp}
+                    onClick={handleRunAutoSetup}
+                    style={{ fontSize: '12px', fontFamily: 'var(--font-mono)', padding: 'var(--space-2) var(--space-4)' }}
                   >
-                    <option value="">-- {t("Select Voice Channel")} --</option>
-                    {(channels || []).filter(c => c.type === 2).map(c => (
-                      <option key={c.id} value={c.id}>🔊 {c.name}</option>
-                    ))}
-                  </select>
-                </div>
+                    {settingUp ? '⏳ Creating...' : '⚡ Auto-Setup Now (Web)'}
+                  </button>
 
-                <div>
-                  <label className="form-label" style={{ fontSize: '11px', fontFamily: 'var(--font-mono)' }}>
-                    {t("Temp VC Parent Category")}
-                  </label>
-                  <select
-                    className="form-input"
-                    style={{ fontSize: '12px', fontFamily: 'var(--font-mono)', width: '100%' }}
-                    value={config.tempVcCategoryId || ''}
-                    onChange={(e) => updateConfig({ tempVcCategoryId: e.target.value })}
-                  >
-                    <option value="">-- {t("Select Category")} --</option>
-                    {categories.map(c => (
-                      <option key={c.id} value={c.id}>📁 {c.name}</option>
-                    ))}
-                  </select>
+                  {isTempVcActive && (
+                    <button
+                      type="button"
+                      className="btn btn--outline"
+                      disabled={settingUp}
+                      onClick={handleResetSetup}
+                      style={{ fontSize: '12px', fontFamily: 'var(--font-mono)', padding: 'var(--space-2) var(--space-4)', color: 'var(--red)' }}
+                    >
+                      🗑️ Reset
+                    </button>
+                  )}
                 </div>
               </div>
+
+              {setupStatus && (
+                <div style={{ fontSize: '12px', fontFamily: 'var(--font-mono)', color: setupStatus.success ? 'var(--green)' : 'var(--red)' }}>
+                  {setupStatus.success ? '✔ ' : '✖ '}{setupStatus.message}
+                </div>
+              )}
 
             </div>
           </Panel>
