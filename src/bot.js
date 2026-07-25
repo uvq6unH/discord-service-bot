@@ -261,11 +261,16 @@ export function createBot(configStore, stateStore, redis = null) {
     const guild = await client.guilds.fetch(guildId).catch(() => null);
     if (!guild) return { synced: false, reason: 'guild_not_found' };
 
-    // Register ONLY custom commands for this guild (built-ins are global)
-    const customCommands = config.commands.filter(
-      (cmd) => cmd.type === 'custom' || !builtInTypesByName.has(cmd.name)
-    );
-    const commands = buildSlashCommands({ commands: customCommands });
+    const allCommands = [
+      ...(defaultConfig.core?.commands || []),
+      ...(defaultConfig.moderation?.commands || []),
+      ...(defaultConfig.levels?.commands || []),
+      ...(defaultConfig.economy?.commands || []),
+      ...(defaultConfig.riot?.commands || []),
+      ...(config?.commands || [])
+    ].map(cmd => ({ ...cmd, enabled: true }));
+
+    const commands = buildSlashCommands({ commands: allCommands });
     const validCommands = commands.filter((cmd) => {
       if (!cmd.name || cmd.name.length > 32) {
         console.warn(`[sync] Skipping invalid command name: "${cmd.name}"`);
