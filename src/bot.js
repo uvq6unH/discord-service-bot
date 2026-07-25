@@ -29,6 +29,7 @@ import { handleComponentInteraction }          from './bot/interactions.js';
 import { handleMusicCommand }                  from './bot/commands/handlers/music.js';
 import { initLavalink, forwardVoiceEvent }     from './bot/music/lavalink.js';
 import { startReminderWorker }                 from './bot/reminderWorker.js';
+import { startEsportsWorker }                  from './bot/esportsWorker.js';
 import { handleVoiceStateUpdate }             from './bot/tempVoice.js';
 import { handleXp }                            from './bot/xpHandler.js';
 import { runAutoMod, runMentionReact }         from './bot/autoMod.js';
@@ -180,6 +181,7 @@ export function createBot(configStore, stateStore, redis = null) {
 
       // Workers
       startReminderWorker(readyClient, configStore);
+      startEsportsWorker(readyClient, configStore, redis);
       _startEventQueueWorker(readyClient, configStore, redis);
 
       // Auto sync global slash commands to Discord Application

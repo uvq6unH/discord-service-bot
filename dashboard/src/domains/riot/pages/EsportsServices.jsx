@@ -17,6 +17,12 @@ const LEAGUES = [
   { key: 'msi', name: 'MSI Mid-Season', icon: '🥇' }
 ];
 
+const TIME_OPTIONS = Array.from({ length: 48 }, (_, i) => {
+  const h = String(Math.floor(i / 2)).padStart(2, '0');
+  const m = i % 2 === 0 ? '00' : '30';
+  return `${h}:${m}`;
+});
+
 export default function EsportsServicesPage() {
   const { config, loading, updateConfig } = useRiot();
   const { guildData } = useGuild();
@@ -37,6 +43,8 @@ export default function EsportsServicesPage() {
   const selectedLeagues = Array.isArray(config.esportsLeagues)
     ? config.esportsLeagues
     : ['lck', 'lcp', 'worlds', 'msi', 'lpl', 'lec', 'lcs'];
+  const dailyTime = config.esportsDailyTime || '08:00';
+  const preMatchAlert = config.esportsPreMatchAlert !== false;
 
   const handleLeagueToggle = (leagueKey) => {
     const nextLeagues = selectedLeagues.includes(leagueKey)
@@ -49,7 +57,7 @@ export default function EsportsServicesPage() {
     <Workspace>
       <HeaderZone
         title={t("ESPORTS TOURNAMENTS CONSOLE")}
-        subtitle={t("Automated Esports Live Match Tracker, Match Schedule Feeds & Multi-league Notifications")}
+        subtitle={t("Automated Esports Live Match Tracker, Daily Schedule Broadcasts & 15-Minute Pre-match Alerts")}
       />
 
       <StatusZone>
@@ -59,14 +67,14 @@ export default function EsportsServicesPage() {
           sub={t("LCK, LCP, WORLDS, LPL")}
         />
         <KpiTile
-          label={t("Live Notification Pipeline")}
-          value={isEnabled ? t("ACTIVE") : t("DISABLED")}
-          sub={isEnabled ? t("AUTO_BROADCAST_ON") : t("STANDBY_MODE")}
+          label={t("Daily Broadcast Time")}
+          value={`📅 ${dailyTime}`}
+          sub={t("DAILY_SCHEDULE_CARD")}
         />
         <KpiTile
-          label={t("Broadcast Target Channel")}
-          value={selectedChannelId ? `#${channels.find(c => c.id === selectedChannelId)?.name ?? 'selected'}` : t("UNCONFIGURED")}
-          sub={t("DISCORD_TEXT_CHANNEL")}
+          label={t("15m Pre-Match Alert")}
+          value={preMatchAlert ? t("ACTIVE") : t("DISABLED")}
+          sub={preMatchAlert ? t("15M_PRE_MATCH_ON") : t("STANDBY")}
         />
       </StatusZone>
 
@@ -79,7 +87,7 @@ export default function EsportsServicesPage() {
               {/* Toggle Broadcaster */}
               <div style={{
                 display: 'flex',
-                justify: 'space-between',
+                justifyContent: 'space-between',
                 alignItems: 'center',
                 padding: 'var(--space-4)',
                 background: 'var(--surface-1)',
@@ -116,41 +124,120 @@ export default function EsportsServicesPage() {
                 </label>
               </div>
 
-              {/* Select Notification Channel */}
+              {/* Grid 2 Column: Channel & Daily Broadcast Time */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-4)' }}>
+                {/* Select Notification Channel */}
+                <div style={{
+                  padding: 'var(--space-4)',
+                  background: 'var(--surface-1)',
+                  border: '1px solid var(--border)'
+                }}>
+                  <label style={{
+                    display: 'block',
+                    fontFamily: 'var(--font-mono)',
+                    fontSize: '12px',
+                    fontWeight: 'bold',
+                    marginBottom: 'var(--space-2)',
+                    color: 'var(--text-1)'
+                  }}>
+                    {t("Target Notification Text Channel")}
+                  </label>
+                  <select
+                    className="form-input"
+                    style={{
+                      width: '100%',
+                      fontFamily: 'var(--font-mono)',
+                      fontSize: '12px',
+                      padding: 'var(--space-3)',
+                      background: 'var(--surface-0)',
+                      border: '1px solid var(--border)',
+                      color: 'var(--text-1)'
+                    }}
+                    value={selectedChannelId}
+                    onChange={(e) => updateConfig({ esportsChannelId: e.target.value })}
+                  >
+                    <option value="">-- {t("Select Channel")} --</option>
+                    {(channels || []).filter(c => c.type === 0 || c.type === 5).map(c => (
+                      <option key={c.id} value={c.id}>#{c.name}</option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Daily Schedule Broadcast Time Selector */}
+                <div style={{
+                  padding: 'var(--space-4)',
+                  background: 'var(--surface-1)',
+                  border: '1px solid var(--border)'
+                }}>
+                  <label style={{
+                    display: 'block',
+                    fontFamily: 'var(--font-mono)',
+                    fontSize: '12px',
+                    fontWeight: 'bold',
+                    marginBottom: 'var(--space-2)',
+                    color: 'var(--text-1)'
+                  }}>
+                    {t("Daily Schedule Broadcast Time")}
+                  </label>
+                  <select
+                    className="form-input"
+                    style={{
+                      width: '100%',
+                      fontFamily: 'var(--font-mono)',
+                      fontSize: '12px',
+                      padding: 'var(--space-3)',
+                      background: 'var(--surface-0)',
+                      border: '1px solid var(--border)',
+                      color: 'var(--text-1)'
+                    }}
+                    value={dailyTime}
+                    onChange={(e) => updateConfig({ esportsDailyTime: e.target.value })}
+                  >
+                    {TIME_OPTIONS.map(time => (
+                      <option key={time} value={time}>⏰ {time} (Hàng ngày)</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              {/* 15-Minute Pre-Match Live Alert */}
               <div style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
                 padding: 'var(--space-4)',
                 background: 'var(--surface-1)',
                 border: '1px solid var(--border)'
               }}>
-                <label style={{
-                  display: 'block',
-                  fontFamily: 'var(--font-mono)',
-                  fontSize: '12px',
-                  fontWeight: 'bold',
-                  marginBottom: 'var(--space-2)',
-                  color: 'var(--text-1)'
-                }}>
-                  {t("Target Notification Text Channel")}
-                </label>
-                <select
-                  className="form-input"
-                  style={{
-                    width: '100%',
+                <div>
+                  <div style={{
                     fontFamily: 'var(--font-mono)',
-                    fontSize: '12px',
-                    padding: 'var(--space-3)',
-                    background: 'var(--surface-0)',
-                    border: '1px solid var(--border)',
-                    color: 'var(--text-1)'
-                  }}
-                  value={selectedChannelId}
-                  onChange={(e) => updateConfig({ esportsChannelId: e.target.value })}
-                >
-                  <option value="">-- {t("Select Channel")} --</option>
-                  {(channels || []).filter(c => c.type === 0 || c.type === 5).map(c => (
-                    <option key={c.id} value={c.id}>#{c.name}</option>
-                  ))}
-                </select>
+                    fontWeight: 'bold',
+                    fontSize: '13px',
+                    color: 'var(--text-1)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 'var(--space-2)'
+                  }}>
+                    <Tv size={16} color="var(--accent)" />
+                    {t("15-Minute Pre-Match Live Alert")}
+                  </div>
+                  <div style={{ fontSize: '11px', color: 'var(--text-3)', marginTop: 'var(--space-1)' }}>
+                    {t("Automatically post a high-priority alert 15 minutes before any scheduled match begins")}
+                  </div>
+                </div>
+
+                <label className="toggle-switch">
+                  <input
+                    type="checkbox"
+                    className="toggle-switch__input"
+                    checked={preMatchAlert}
+                    onChange={(e) => updateConfig({ esportsPreMatchAlert: e.target.checked })}
+                  />
+                  <div className="toggle-switch__track">
+                    <div className="toggle-switch__thumb" />
+                  </div>
+                </label>
               </div>
 
               {/* League Selector Grid */}
@@ -215,13 +302,13 @@ export default function EsportsServicesPage() {
             <DataSlab
               label={t("Official Riot Esports API")}
               value={t("CONNECTED (esports-api.lolesports.com)")}
-              sub={t("15m Cache TTL • Real-time BO3/BO5 Parsing")}
+              sub={t("Real-time Schedule • Daily Summaries • 15m Pre-Match Alerts")}
               highlight
             />
             <DataSlab
-              label={t("Esports Feed Manager")}
-              value={t("Dashboard Only Configuration")}
-              sub={t("Multi-League Live Broadcast Pipeline")}
+              label={t("Esports Broadcast Manager")}
+              value={t("Dashboard Automated Pipeline")}
+              sub={t("Multi-League Daily Summaries & Live Pre-Match Broadcasts")}
             />
           </Panel>
         </div>

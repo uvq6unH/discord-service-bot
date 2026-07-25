@@ -127,3 +127,31 @@ export function getAvailableLeagues() {
     icon: val.icon
   }));
 }
+
+export async function getDailyMatchesForLeagues(leagueKeys = ['lck', 'lcp', 'worlds'], targetDateStr) {
+  const results = [];
+  const targetDate = targetDateStr ? new Date(targetDateStr) : new Date();
+  const targetYMD = targetDate.toISOString().slice(0, 10);
+
+  for (const key of leagueKeys) {
+    try {
+      const schedule = await getEsportsSchedule(key);
+      const matchesOnDate = (schedule?.matches || []).filter(m => {
+        if (!m.startTime) return false;
+        const matchYMD = new Date(m.startTime).toISOString().slice(0, 10);
+        return matchYMD === targetYMD;
+      });
+
+      if (matchesOnDate.length > 0) {
+        results.push({
+          league: schedule.league,
+          matches: matchesOnDate
+        });
+      }
+    } catch (err) {
+      console.error(`[esportsApi] Error compiling daily matches for ${key}:`, err.message);
+    }
+  }
+
+  return results;
+}

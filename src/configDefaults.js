@@ -172,6 +172,8 @@ export const defaultConfig = {
   esportsNotifyEnabled: false,
   esportsChannelId: '',
   esportsLeagues: ['lck', 'lcp', 'worlds', 'msi', 'lpl', 'lec', 'lcs'],
+  esportsDailyTime: '08:00',
+  esportsPreMatchAlert: true,
   remindersEnabled: false,
   reminders: [],
   autoReplies: [
