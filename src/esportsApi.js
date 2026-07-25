@@ -1,13 +1,13 @@
 import https from 'node:https';
 
 const ESPORTS_LEAGUES = {
-  lck: { id: '98767991310872058', name: 'LCK Korea', icon: '🇰🇷' },
-  lcp: { id: '110371976858074408', name: 'LCP Pacific', icon: '🌏' },
-  lpl: { id: '98767991314006698', name: 'LPL China', icon: '🇨🇳' },
-  lec: { id: '98767991305261587', name: 'LEC Europe', icon: '🇪🇺' },
-  lcs: { id: '98767991299242408', name: 'LCS Americas', icon: '🇺🇸' },
-  worlds: { id: '98767991325878492', name: 'Worlds Championship', icon: '🏆' },
-  msi: { id: '98767991331506619', name: 'MSI Mid-Season', icon: '🥇' }
+  lck: { id: '98767991310872058', name: 'LCK Korea', icon: '🇰🇷', logoUrl: 'http://static.lolesports.com/leagues/lck-color-on-black.png' },
+  lcp: { id: '110371976858074408', name: 'LCP Pacific', icon: '🌏', logoUrl: 'http://static.lolesports.com/leagues/1733468139601_lcp-color-golden.png' },
+  lpl: { id: '98767991314006698', name: 'LPL China', icon: '🇨🇳', logoUrl: 'http://static.lolesports.com/leagues/1592516115322_LPL-01-FullonDark.png' },
+  lec: { id: '98767991305261587', name: 'LEC Europe', icon: '🇪🇺', logoUrl: 'http://static.lolesports.com/leagues/1592516184297_LEC-01-FullonDark.png' },
+  lcs: { id: '98767991299242408', name: 'LCS Americas', icon: '🇺🇸', logoUrl: 'http://static.lolesports.com/leagues/1706356907418_LCSNew-01-FullonDark.png' },
+  worlds: { id: '98767991325878492', name: 'Worlds Championship', icon: '🏆', logoUrl: 'http://static.lolesports.com/leagues/1592594612171_WorldsDarkBG.png' },
+  msi: { id: '98767991331506619', name: 'MSI Mid-Season', icon: '🥇', logoUrl: 'http://static.lolesports.com/leagues/1592594634248_MSIDarkBG.png' }
 };
 
 const _cache = new Map();

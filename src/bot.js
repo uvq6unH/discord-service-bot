@@ -583,7 +583,7 @@ function _startEventQueueWorker(client, configStore, redis) {
           `⏰ **Thời gian:** ${match1Time} (${match1Rel})\n` +
           `🎮 **Thể thức:** \`BO3\` | 🔴 **TRỰC TIẾP**`
         )
-        .setThumbnail('http://static.lolesports.com/teams/1773829250929_GENGLOGO_GOLD.png')
+        .setThumbnail('http://static.lolesports.com/leagues/lck-color-on-black.png')
         .setColor(0xFF4655);
 
       const embed2 = new EmbedBuilder()
@@ -593,7 +593,7 @@ function _startEventQueueWorker(client, configStore, redis) {
           `⏰ **Thời gian:** ${match2Time} (${match2Rel})\n` +
           `🎮 **Thể thức:** \`BO5\` | 📅 **SẮP BẮT ĐẦU**`
         )
-        .setThumbnail('http://static.lolesports.com/teams/1774247803537_horizontal_EN_Wh.png')
+        .setThumbnail('http://static.lolesports.com/leagues/1733468139601_lcp-color-golden.png')
         .setColor(0x00FF88)
         .setFooter({ text: 'Riot Games LoL Esports Pipeline • Real-time Test' })
         .setTimestamp();

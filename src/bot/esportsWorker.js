@@ -66,8 +66,7 @@ async function processEsportsWorkerCycle(client, configStore, redis) {
                 .setDescription(matchesText || 'Không có trận đấu nào.')
                 .setColor(idx % 2 === 0 ? 0xFF4655 : 0x00FF88);
 
-              const firstLogo = group.matches.find(m => m.logo1)?.logo1;
-              if (firstLogo) card.setThumbnail(firstLogo);
+              if (group.league?.logoUrl) card.setThumbnail(group.league.logoUrl);
 
               if (idx === dailyData.length - 1) {
                 card.setFooter({ text: `Riot LoL Esports Pipeline • Today (${todayYMD})` }).setTimestamp();
@@ -120,7 +119,7 @@ async function processEsportsWorkerCycle(client, configStore, redis) {
                   .setColor(0xFF0055)
                   .setTimestamp();
 
-                if (match.logo1) alertEmbed.setThumbnail(match.logo1);
+                if (scheduleData?.league?.logoUrl) alertEmbed.setThumbnail(scheduleData.league.logoUrl);
 
                 const leagueRole = config.esportsLeagueRoles?.[leagueKey.toLowerCase()];
                 const pingText = leagueRole ? `<@&${leagueRole}>` : '';
