@@ -570,15 +570,34 @@ function _startEventQueueWorker(client, configStore, redis) {
       if (!channel || !channel.isTextBased()) return;
 
       const { EmbedBuilder } = await import('discord.js');
+      const nowSec = Math.floor(Date.now() / 1000);
+      const match1Time = `<t:${nowSec}:t>`;
+      const match1Rel = `<t:${nowSec}:R>`;
+      const match2Time = `<t:${nowSec + 7200}:t>`;
+      const match2Rel = `<t:${nowSec + 7200}:R>`;
+
       const embed = new EmbedBuilder()
-        .setTitle('🧪 [TEST BROADCAST] ESPORTS LIVE NOTIFICATION PIPELINE')
-        .setDescription('Đây là tin nhắn **thử nghiệm** được phát từ **Esports Operations Console** trên Dashboard.')
+        .setTitle('🎮 ESPORTS LIVE TELEMETRY (TEST BROADCAST)')
+        .setDescription('Đây là tin nhắn **thử nghiệm** cấu hình từ **Esports Operations Console** trên Dashboard.')
         .addFields(
-          { name: '🇰🇷 LCK Korea (Trận 1)', value: '• **T1** 🆚 **Gen.G Esports** — `🔴 LIVE MATCH IN PROGRESS` (BO3)', inline: false },
-          { name: '🌏 LCP Pacific (Trận 2)', value: '• **GAM Esports** 🆚 **Vikings Esports** — `📅 19:30 HÔM NAY` (BO5)', inline: false }
+          {
+            name: '### 🇰🇷 LCK KOREA 2026',
+            value:
+              `⚔️ **T1** 🆚 **Gen.G Esports**\n` +
+              `⏰ **Thời gian:** ${match1Time} (${match1Rel}) | 🎮 **Thể thức:** \`BO3\` | 🔴 **TRỰC TIẾP**\n`,
+            inline: false
+          },
+          {
+            name: '### 🌏 LCP PACIFIC 2026',
+            value:
+              `⚔️ **GAM Esports** 🆚 **Vikings Esports**\n` +
+              `⏰ **Thời gian:** ${match2Time} (${match2Rel}) | 🎮 **Thể thức:** \`BO5\` | 📅 **SẮP BẮT ĐẦU**\n`,
+            inline: false
+          }
         )
+        .setThumbnail('http://static.lolesports.com/teams/1773829250929_GENGLOGO_GOLD.png')
         .setColor(0xFF4655)
-        .setFooter({ text: 'Riot LoL Esports Pipeline • Real-time Test' })
+        .setFooter({ text: 'Riot Games LoL Esports Pipeline • Real-time Test' })
         .setTimestamp();
 
       await channel.send({

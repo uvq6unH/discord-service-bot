@@ -269,6 +269,19 @@ function getModuleCommands(stored, moduleName, defaultModuleCommands) {
   return defaultModuleCommands;
 }
 
+function normalizeEsportsLeagueRoles(obj) {
+  if (!obj || typeof obj !== 'object' || Array.isArray(obj)) return {};
+  const clean = {};
+  for (const [key, val] of Object.entries(obj)) {
+    if (typeof key === 'string' && typeof val === 'string') {
+      const cleanKey = key.toLowerCase().trim();
+      const cleanVal = normalizeSnowflakeId(val);
+      if (cleanKey && cleanVal) clean[cleanKey] = cleanVal;
+    }
+  }
+  return clean;
+}
+
 function mergeModuleCommands(storedCommands, defaultModuleCommands, moduleName) {
   const merged = [...(Array.isArray(storedCommands) ? storedCommands : (defaultModuleCommands || []))];
   const existingTypes = new Set(merged.map((command) => String(command?.type ?? '').toLowerCase()).filter(Boolean));
@@ -574,6 +587,7 @@ export class ConfigStore {
       esportsLeagues: normalizeEsportsLeagues(stored.esportsLeagues ?? defaultConfig.esportsLeagues),
       esportsDailyTime: String(stored.esportsDailyTime ?? defaultConfig.esportsDailyTime ?? '08:00').trim().slice(0, 5),
       esportsPreMatchAlert: pickBoolean(stored, 'esportsPreMatchAlert', defaultConfig.esportsPreMatchAlert),
+      esportsLeagueRoles: normalizeEsportsLeagueRoles(stored.esportsLeagueRoles ?? defaultConfig.esportsLeagueRoles),
       lolEnabled: pickBoolean(stored, 'lolEnabled', defaultConfig),
       tftEnabled: pickBoolean(stored, 'tftEnabled', defaultConfig),
       autoModEnabled: (stored.moderation ?? defaultConfig.moderation)?.enabled ?? defaultConfig.autoModEnabled,
@@ -764,6 +778,7 @@ export class ConfigStore {
         esportsLeagues: normalizeEsportsLeagues(patch.esportsLeagues ?? current.esportsLeagues),
         esportsDailyTime: String(patch.esportsDailyTime ?? current.esportsDailyTime ?? '08:00').trim().slice(0, 5),
         esportsPreMatchAlert: pickBoolean(patch, 'esportsPreMatchAlert', current),
+        esportsLeagueRoles: normalizeEsportsLeagueRoles(patch.esportsLeagueRoles ?? current.esportsLeagueRoles),
         remindersEnabled: pickBoolean(patch, 'remindersEnabled', current),
         reminders: normalizeReminders(patch.reminders ?? current.reminders),
         musicEnabled: pickBoolean(patch, 'musicEnabled', current),

@@ -49,12 +49,22 @@ export default function EsportsServicesPage() {
     : ['lck', 'lcp', 'worlds', 'msi', 'lpl', 'lec', 'lcs'];
   const dailyTime = config.esportsDailyTime || '08:00';
   const preMatchAlert = config.esportsPreMatchAlert !== false;
+  const leagueRoles = config.esportsLeagueRoles || {};
 
   const handleLeagueToggle = (leagueKey) => {
     const nextLeagues = selectedLeagues.includes(leagueKey)
       ? selectedLeagues.filter(k => k !== leagueKey)
       : [...selectedLeagues, leagueKey];
     updateConfig({ esportsLeagues: nextLeagues });
+  };
+
+  const handleRoleChange = (leagueKey, roleId) => {
+    updateConfig({
+      esportsLeagueRoles: {
+        ...leagueRoles,
+        [leagueKey]: roleId
+      }
+    });
   };
 
   const handleTestNotify = async () => {
@@ -342,6 +352,55 @@ export default function EsportsServicesPage() {
                         <span style={{ fontSize: '14px' }}>{league.icon}</span>
                         <span>{league.name}</span>
                       </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* League Specific Ping Roles */}
+              <div style={{
+                padding: 'var(--space-4)',
+                background: 'var(--surface-1)',
+                border: '1px solid var(--border)'
+              }}>
+                <label style={{
+                  display: 'block',
+                  fontFamily: 'var(--font-mono)',
+                  fontSize: '12px',
+                  fontWeight: 'bold',
+                  marginBottom: 'var(--space-1)',
+                  color: 'var(--text-1)'
+                }}>
+                  {t("League Mention Roles (15m Pre-match Ping)")}
+                </label>
+                <div style={{ fontSize: '11px', color: 'var(--text-3)', marginBottom: 'var(--space-3)' }}>
+                  {t("Ping specific Discord roles when a match for that league starts in 15 minutes (Leave empty for no ping)")}
+                </div>
+
+                <div style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))',
+                  gap: 'var(--space-3)'
+                }}>
+                  {LEAGUES.filter(l => selectedLeagues.includes(l.key)).map(league => {
+                    const currentRoleId = leagueRoles[league.key] || '';
+                    return (
+                      <div key={league.key} style={{ background: 'var(--surface-0)', padding: 'var(--space-3)', border: '1px solid var(--border)' }}>
+                        <div style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', fontWeight: 'bold', color: 'var(--text-1)', marginBottom: 'var(--space-1-5)' }}>
+                          {league.icon} {league.name} Role
+                        </div>
+                        <select
+                          className="form-input"
+                          style={{ width: '100%', fontSize: '11px', fontFamily: 'var(--font-mono)', padding: 'var(--space-1-5)' }}
+                          value={currentRoleId}
+                          onChange={(e) => handleRoleChange(league.key, e.target.value)}
+                        >
+                          <option value="">-- {t("No Mention")} --</option>
+                          {(guildData?.roles ?? []).map(r => (
+                            <option key={r.id} value={r.id}>@{r.name}</option>
+                          ))}
+                        </select>
+                      </div>
                     );
                   })}
                 </div>

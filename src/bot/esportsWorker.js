@@ -57,13 +57,19 @@ async function processEsportsWorkerCycle(client, configStore, redis) {
               .setFooter({ text: 'Riot LoL Esports Live Schedule Pipeline' });
 
             for (const group of dailyData) {
-              const matchesText = group.matches.map((m, idx) => {
-                const timeStr = new Date(m.startTime).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
-                return `• **${m.team1}** vs **${m.team2}** — \`${timeStr}\` (${m.strategy || 'BO3'})`;
+              const matchesText = group.matches.map((m) => {
+                const unixSec = Math.floor(new Date(m.startTime).getTime() / 1000);
+                const timeTag = `<t:${unixSec}:t>`;
+                const relativeTag = `<t:${unixSec}:R>`;
+                const stateBadge = m.state === 'inProgress' ? '🔴 **ĐANG THI ĐẤU**' : (m.state === 'completed' ? '✅ **ĐÃ KẾT THÚC**' : '📅 **SẮP BẮT ĐẦU**');
+                return (
+                  `⚔️ **${m.team1}** 🆚 **${m.team2}**\n` +
+                  `⏰ **Thời gian:** ${timeTag} (${relativeTag}) | 🎮 **Thể thức:** \`${m.strategy || 'BO3'}\` | ${stateBadge}\n`
+                );
               }).join('\n');
 
               embed.addFields({
-                name: `${group.league.icon} ${group.league.name}`,
+                name: `### ${group.league.icon} ${group.league.name.toUpperCase()}`,
                 value: matchesText || 'Không có trận đấu nào.',
                 inline: false
               });
@@ -101,23 +107,26 @@ async function processEsportsWorkerCycle(client, configStore, redis) {
                 : _postedPre15Cache.has(preKey);
 
               if (!alreadyAlerted) {
-                const timeStr = new Date(match.startTime).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
+                const unixSec = Math.floor(new Date(match.startTime).getTime() / 1000);
 
                 const alertEmbed = new EmbedBuilder()
                   .setTitle(`⚔️ TRẬN ĐẤU SẮP DIỄN RA TRONG 15 PHÚT!`)
-                  .setDescription(`Trận đấu thuộc giải **${scheduleData.league.icon} ${scheduleData.league.name}** sắp khởi tranh!`)
-                  .addFields(
-                    { name: '🔥 Trận đấu', value: `**${match.team1}** 🆚 **${match.team2}**`, inline: true },
-                    { name: '⏰ Thời gian', value: `\`${timeStr}\` (${Math.round(diffMinutes)} phút nữa)`, inline: true },
-                    { name: '🎮 Thể thức', value: match.strategy || 'BO3', inline: true }
+                  .setDescription(
+                    `### ${scheduleData.league.icon} ${scheduleData.league.name.toUpperCase()}\n\n` +
+                    `🔥 **Trận đấu:** **${match.team1}** 🆚 **${match.team2}**\n` +
+                    `⏰ **Thời gian:** <t:${unixSec}:t> (<t:${unixSec}:R>)\n` +
+                    `🎮 **Thể thức:** \`${match.strategy || 'BO3'}\``
                   )
                   .setColor(0xFF0055)
                   .setTimestamp();
 
                 if (match.logo1) alertEmbed.setThumbnail(match.logo1);
 
+                const leagueRole = config.esportsLeagueRoles?.[leagueKey.toLowerCase()];
+                const pingText = leagueRole ? `<@&${leagueRole}>` : '';
+
                 await channel.send({
-                  content: `🚨 **[ESPORTS LIVE ALERT]** <@&everyone>`,
+                  content: `🚨 **[ESPORTS LIVE ALERT]** ${pingText}`.trim(),
                   embeds: [alertEmbed]
                 }).catch((err) => console.error('[esportsWorker] Send pre-match alert error:', err.message));
 
