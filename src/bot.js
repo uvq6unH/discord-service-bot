@@ -562,6 +562,29 @@ function _startEventQueueWorker(client, configStore, redis) {
     } else if (type === 'purge_sessions') {
       await stateStore.purgeStaleGameSessions().catch(() => null);
       console.log('[event-queue] Purged stale game sessions');
+    } else if (type === 'esports_test_notify') {
+      if (!guildId || !job.channelId) return;
+      const guild = client.guilds.cache.get(guildId) || await client.guilds.fetch(guildId).catch(() => null);
+      if (!guild) return;
+      const channel = guild.channels.cache.get(job.channelId);
+      if (!channel || !channel.isTextBased()) return;
+
+      const { EmbedBuilder } = await import('discord.js');
+      const embed = new EmbedBuilder()
+        .setTitle('🧪 [TEST BROADCAST] ESPORTS LIVE NOTIFICATION PIPELINE')
+        .setDescription('Đây là tin nhắn **thử nghiệm** được phát từ **Esports Operations Console** trên Dashboard.')
+        .addFields(
+          { name: '🇰🇷 LCK Korea (Trận 1)', value: '• **T1** 🆚 **Gen.G Esports** — `🔴 LIVE MATCH IN PROGRESS` (BO3)', inline: false },
+          { name: '🌏 LCP Pacific (Trận 2)', value: '• **GAM Esports** 🆚 **Vikings Esports** — `📅 19:30 HÔM NAY` (BO5)', inline: false }
+        )
+        .setColor(0xFF4655)
+        .setFooter({ text: 'Riot LoL Esports Pipeline • Real-time Test' })
+        .setTimestamp();
+
+      await channel.send({
+        content: '🧪 **[TEST ESPORTS NOTIFICATION]**',
+        embeds: [embed]
+      }).catch((err) => console.error('[esportsTest] Error sending test alert:', err.message));
     }
   };
 

@@ -926,38 +926,48 @@ export function createServer({ configStore, stateStore, botClient, redis = null 
         return res.status(400).json({ error: 'Chưa cài đặt Kênh nhận thông báo Esports.' });
       }
 
-      if (!botClient) {
-        return res.status(503).json({ error: 'Bot Client hiện chưa kết nối.' });
+      if (botClient && botClient.user) {
+        const guild = botClient.guilds.cache.get(req.guildId);
+        if (!guild) {
+          return res.status(404).json({ error: 'Không tìm thấy Server Discord trong hệ thống Bot.' });
+        }
+
+        const channel = guild.channels.cache.get(config.esportsChannelId);
+        if (!channel || !channel.isTextBased()) {
+          return res.status(404).json({ error: 'Kênh Discord không tồn tại hoặc không phải kênh chat văn bản.' });
+        }
+
+        const { EmbedBuilder } = await import('discord.js');
+        const embed = new EmbedBuilder()
+          .setTitle('🧪 [TEST BROADCAST] ESPORTS LIVE NOTIFICATION PIPELINE')
+          .setDescription('Đây là tin nhắn **thử nghiệm** được phát từ **Esports Operations Console** trên Dashboard.')
+          .addFields(
+            { name: '🇰🇷 LCK Korea (Trận 1)', value: '• **T1** 🆚 **Gen.G Esports** — `🔴 LIVE MATCH IN PROGRESS` (BO3)', inline: false },
+            { name: '🌏 LCP Pacific (Trận 2)', value: '• **GAM Esports** 🆚 **Vikings Esports** — `📅 19:30 HÔM NAY` (BO5)', inline: false }
+          )
+          .setColor(0xFF4655)
+          .setFooter({ text: 'Riot LoL Esports Pipeline • Real-time Test' })
+          .setTimestamp();
+
+        await channel.send({
+          content: '🧪 **[TEST ESPORTS NOTIFICATION]**',
+          embeds: [embed]
+        });
+
+        return res.json({ success: true, channelName: channel.name, message: `Đã gửi thông báo thử nghiệm thành công vào #${channel.name}!` });
       }
 
-      const guild = botClient.guilds.cache.get(req.guildId);
-      if (!guild) {
-        return res.status(404).json({ error: 'Không tìm thấy Server Discord trong hệ thống Bot.' });
+      if (redis) {
+        await redis.rpush('event_queue', JSON.stringify({
+          type: 'esports_test_notify',
+          guildId: req.guildId,
+          channelId: config.esportsChannelId,
+          requestedAt: new Date().toISOString()
+        }));
+        return res.json({ success: true, message: 'Đã gửi yêu cầu test thông báo tới Bot Worker!' });
       }
 
-      const channel = guild.channels.cache.get(config.esportsChannelId);
-      if (!channel || !channel.isTextBased()) {
-        return res.status(404).json({ error: 'Kênh Discord không tồn tại hoặc không phải kênh chat văn bản.' });
-      }
-
-      const { EmbedBuilder } = await import('discord.js');
-      const embed = new EmbedBuilder()
-        .setTitle('🧪 [TEST BROADCAST] ESPORTS LIVE NOTIFICATION PIPELINE')
-        .setDescription('Đây là tin nhắn **thử nghiệm** được phát từ **Esports Operations Console** trên Dashboard.')
-        .addFields(
-          { name: '🇰🇷 LCK Korea (Trận 1)', value: '• **T1** 🆚 **Gen.G Esports** — `🔴 LIVE MATCH IN PROGRESS` (BO3)', inline: false },
-          { name: '🌏 LCP Pacific (Trận 2)', value: '• **GAM Esports** 🆚 **Vikings Esports** — `📅 19:30 HÔM NAY` (BO5)', inline: false }
-        )
-        .setColor(0xFF4655)
-        .setFooter({ text: 'Riot LoL Esports Pipeline • Real-time Test' })
-        .setTimestamp();
-
-      await channel.send({
-        content: '🧪 **[TEST ESPORTS NOTIFICATION]**',
-        embeds: [embed]
-      });
-
-      res.json({ success: true, channelName: channel.name, message: `Đã gửi thông báo thử nghiệm thành công vào #${channel.name}!` });
+      return res.status(503).json({ error: 'Bot Client hiện chưa kết nối.' });
     } catch (err) {
       console.error('[server] Error sending test esports notify:', err.message);
       res.status(500).json({ error: `Lỗi khi gửi thông báo: ${err.message}` });
