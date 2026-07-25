@@ -26,12 +26,45 @@ export default function OverviewPage() {
     return `${h}h ${m}m`;
   };
 
+  const isBotEnabled = config?.enabled !== false;
+
   return (
     <Workspace>
-      {/* 1. Header Zone */}
+      {/* 1. Header Zone with Master Switch Action */}
       <HeaderZone
         title={selectedGuild?.name ? `${selectedGuild.name.toUpperCase()} // OVERVIEW` : 'OVERVIEW'}
         subtitle={t("Operations center telemetry and community parameters snapshot.")}
+        actions={
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 'var(--space-3)',
+            padding: 'var(--space-2) var(--space-4)',
+            background: 'var(--surface-1)',
+            border: '1px solid var(--border)',
+            borderRadius: '4px'
+          }}>
+            <div style={{ display: 'flex', flexDirection: 'column' }}>
+              <span style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', fontWeight: 'bold', color: isBotEnabled ? 'var(--green)' : 'var(--red)' }}>
+                {isBotEnabled ? t("● BOT ACTIVATED") : t("○ BOT DEACTIVATED")}
+              </span>
+              <span style={{ fontSize: '9px', color: 'var(--text-3)', fontFamily: 'var(--font-mono)' }}>
+                {t("Guild Master Switch")}
+              </span>
+            </div>
+            <label className="toggle-switch">
+              <input
+                type="checkbox"
+                className="toggle-switch__input"
+                checked={isBotEnabled}
+                onChange={(e) => updateConfig && updateConfig({ enabled: e.target.checked })}
+              />
+              <div className="toggle-switch__track">
+                <div className="toggle-switch__thumb" />
+              </div>
+            </label>
+          </div>
+        }
       />
 
       {/* 2. Status Zone (KPIs) */}
@@ -58,42 +91,14 @@ export default function OverviewPage() {
         />
       </StatusZone>
 
-      {/* 3. Workspace Zone - Asymmetric Grids */}
+      {/* 3. Navigation & Core Modules Directory Grid */}
       <div className="grid-12">
-        {/* Panel 1: Master Bot Control */}
-        <div className="col-span-12">
-          <Panel title={t("BOT MASTER CONTROL ENGINE")} accent>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <div>
-                <div style={{ fontFamily: 'var(--font-mono)', fontWeight: 'bold', fontSize: '13px', color: 'var(--text-1)' }}>
-                  {t("Bot Master Activation Switch")}
-                </div>
-                <div style={{ fontSize: '11px', color: 'var(--text-3)', marginTop: '2px' }}>
-                  {t("Enable or disable bot operations completely for this guild")}
-                </div>
-              </div>
-
-              <label className="toggle-switch">
-                <input
-                  type="checkbox"
-                  className="toggle-switch__input"
-                  checked={config?.enabled !== false}
-                  onChange={(e) => updateConfig && updateConfig({ enabled: e.target.checked })}
-                />
-                <div className="toggle-switch__track">
-                  <div className="toggle-switch__thumb" />
-                </div>
-              </label>
-            </div>
-          </Panel>
-        </div>
-
-        {/* Panel 2: Member Welcome & Log Settings */}
+        {/* Panel 1: Welcome & Announcement Quick Settings */}
         <div className="col-span-6">
-          <Panel title={t("WELCOME & LOGGING CONFIG")} accent>
+          <Panel title={t("WELCOME & ANNOUNCEMENTS")} accent>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
               
-              {/* Welcome Toggle */}
+              {/* Welcome Toggle & Setup */}
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <div>
                   <div style={{ fontFamily: 'var(--font-mono)', fontWeight: 'bold', fontSize: '12px', color: 'var(--text-1)' }}>
@@ -139,49 +144,20 @@ export default function OverviewPage() {
                       onChange={(e) => updateConfig && updateConfig({ welcomeMessage: e.target.value })}
                       placeholder="Welcome {user} to {server}!"
                     />
-                    <span style={{ fontSize: '10px', color: 'var(--text-3)', fontFamily: 'var(--font-mono)' }}>
-                      {t("Variables: {user}, {server}, {memberCount}")}
-                    </span>
                   </div>
                 </div>
               )}
 
               <hr style={{ border: 'none', borderTop: '1px solid var(--border)' }} />
 
-              {/* Security Log Channel */}
-              <div className="form-group" style={{ margin: 0 }}>
-                <label className="form-label" style={{ fontSize: '11px', fontFamily: 'var(--font-mono)', fontWeight: 'bold' }}>
-                  {t("Security Logging Channel")}
-                </label>
-                <select
-                  className="form-select"
-                  value={config?.logChannelId || ''}
-                  onChange={(e) => updateConfig && updateConfig({ logChannelId: e.target.value })}
-                >
-                  <option value="">-- {t("Select Log Channel")} --</option>
-                  {textChannels.map(c => <option key={c.id} value={c.id}>#{c.name}</option>)}
-                </select>
-                <span style={{ fontSize: '10px', color: 'var(--text-3)', fontFamily: 'var(--font-mono)', marginTop: '2px' }}>
-                  {t("Target channel for member audit logs and moderation events")}
-                </span>
-              </div>
-
-            </div>
-          </Panel>
-        </div>
-
-        {/* Panel 3: Announcements Settings */}
-        <div className="col-span-6">
-          <Panel title={t("BROADCAST ANNOUNCEMENTS")} accent>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
-              
+              {/* Announcements Toggle */}
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <div>
                   <div style={{ fontFamily: 'var(--font-mono)', fontWeight: 'bold', fontSize: '12px', color: 'var(--text-1)' }}>
                     {t("Announcements System")}
                   </div>
                   <div style={{ fontSize: '11px', color: 'var(--text-3)' }}>
-                    {t("Broadcast system announcements to designated channel")}
+                    {t("Broadcast system notifications to channel")}
                   </div>
                 </div>
                 <label className="toggle-switch">
@@ -210,16 +186,6 @@ export default function OverviewPage() {
                       {textChannels.map(c => <option key={c.id} value={c.id}>#{c.name}</option>)}
                     </select>
                   </div>
-
-                  <div className="form-group" style={{ margin: 0 }}>
-                    <label className="form-label" style={{ fontSize: '11px' }}>{t("Announcement Role Mention")}</label>
-                    <input
-                      className="form-input"
-                      value={config?.announcementMention || ''}
-                      onChange={(e) => updateConfig && updateConfig({ announcementMention: e.target.value })}
-                      placeholder="@everyone"
-                    />
-                  </div>
                 </div>
               )}
 
@@ -227,59 +193,71 @@ export default function OverviewPage() {
           </Panel>
         </div>
 
-        {/* Panel 4: Moderation & Command Status Overview */}
+        {/* Panel 2: Core Operations Navigation Hub */}
         <div className="col-span-6">
-          <Panel title={t("MODERATION CONTROLS")} accent>
-            <DataSlab 
-              label={t("Auto Moderation")} 
-              value={config?.moderation?.enabled ? t('ACTIVE') : t('INACTIVE')} 
-              sub={t("Automated chat filter state")}
-              highlight={config?.moderation?.enabled}
-              onClick={() => navigate('/moderation', { state: { highlight: 'automod' } })}
-            />
-            <DataSlab 
-              label={t("Anti Spam Protocol")} 
-              value={config?.moderation?.antiSpam ? t('ACTIVE') : t('INACTIVE')} 
-              sub={t("Rate limiting message spikes")}
-              onClick={() => navigate('/moderation', { state: { highlight: 'automod' } })}
-            />
-            <DataSlab 
-              label={t("Anti Link Broadcast")} 
-              value={config?.moderation?.antiLink ? t('ACTIVE') : t('INACTIVE')} 
-              sub={t("Filtering unapproved hyper-links")}
-              onClick={() => navigate('/moderation', { state: { highlight: 'automod' } })}
-            />
-            <DataSlab 
-              label={t("Anti Raid Shield")} 
-              value={config?.moderation?.antiRaid ? t('ACTIVE') : t('INACTIVE')} 
-              sub={t("Guild lockdown operations toggle")}
-              onClick={() => navigate('/moderation', { state: { highlight: 'automod' } })}
-            />
-          </Panel>
-        </div>
+          <Panel title={t("CORE MODULES DIRECTORY")} accent>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
+              
+              <DataSlab 
+                label={t("Moderation & Security")} 
+                value={config?.moderation?.enabled ? t('ACTIVE') : t('STANDBY')} 
+                sub={t("AutoMod, Anti-Spam, Anti-Link, Anti-Raid & Tickets")}
+                highlight={config?.moderation?.enabled}
+                onClick={() => navigate('/moderation')}
+              />
 
-        {/* Panel 5: Economy config */}
-        <div className="col-span-6">
-          <Panel title={t("ECONOMY TELEMETRY")} accent>
-            <DataSlab 
-              label={t("Economy Ledger Status")} 
-              value={config?.economyEnabled ? t('ACTIVE') : t('INACTIVE')} 
-              sub={t("Global virtual transaction module")}
-              highlight={config?.economyEnabled}
-              onClick={() => navigate('/economy', { state: { highlight: 'ledger' } })}
-            />
-            <DataSlab 
-              label={t("XP Leveling Pipeline")} 
-              value={config?.levelsEnabled ? t('ACTIVE') : t('INACTIVE')} 
-              sub={t("Chat participation score module")}
-              onClick={() => navigate('/economy', { state: { highlight: 'ledger' } })}
-            />
-            <DataSlab 
-              label={t("Primary Ledger Currency")} 
-              value={config?.currencyGoldName ? config.currencyGoldName.toUpperCase() : 'GOLD'} 
-              sub={t("Current ledger name token")}
-              onClick={() => navigate('/economy', { state: { highlight: 'currency' } })}
-            />
+              <DataSlab 
+                label={t("Utility Services")} 
+                value={t('CONFIGURE')} 
+                sub={t("Translation, Duolingo, Mention React, AutoReply & Custom Responders")}
+                onClick={() => navigate('/utilities')}
+              />
+
+              <DataSlab 
+                label={t("Commands Gateway")} 
+                value={t('CONFIGURE')} 
+                sub={t("Core console system command routing & permissions")}
+                onClick={() => navigate('/commands')}
+              />
+
+              <DataSlab 
+                label={t("Audit Logs & Security Channel")} 
+                value={config?.logChannelId ? t('LOGGING_ACTIVE') : t('LOGGING_UNSET')} 
+                sub={t("System audit trail & security log channel configuration")}
+                highlight={!!config?.logChannelId}
+                onClick={() => navigate('/audit-logs')}
+              />
+
+              <DataSlab 
+                label={t("Economy & XP Leveling")} 
+                value={config?.economyEnabled ? t('ACTIVE') : t('STANDBY')} 
+                sub={t("Virtual currency ledger, XP scores & mini-games")}
+                highlight={config?.economyEnabled}
+                onClick={() => navigate('/economy')}
+              />
+
+              <DataSlab 
+                label={t("Member Directory")} 
+                value={t('VIEW_MEMBERS')} 
+                sub={t("Guild member list, roles & moderation actions")}
+                onClick={() => navigate('/members')}
+              />
+
+              <DataSlab 
+                label={t("Analytics & Telemetry")} 
+                value={t('VIEW_METRICS')} 
+                sub={t("Command usage statistics & engagement charts")}
+                onClick={() => navigate('/analytics')}
+              />
+
+              <DataSlab 
+                label={t("System & Infrastructure")} 
+                value={t('VIEW_SYSTEM')} 
+                sub={t("Bot process health, uptime & environment status")}
+                onClick={() => navigate('/system')}
+              />
+
+            </div>
           </Panel>
         </div>
       </div>

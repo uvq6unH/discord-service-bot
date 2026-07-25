@@ -325,35 +325,28 @@ export default function CommandsPage() {
   }
 
   const roles = guildData?.roles ?? [];
-  const VOICE_TYPES = ['voice', 'setup'];
-  const builtInCommands = (config.core?.commands ?? []).filter(c => c.type !== 'custom' && !VOICE_TYPES.includes(c.type));
-  const customsCount = (config.core?.commands ?? []).filter(c => c.type === 'custom').length;
-  const autoRepliesCount = (config.autoReplies ?? []).length;
+  const EXCLUDED_TYPES = ['translate', 'duolingo', 'voice', 'setup'];
+  const builtInCommands = (config.core?.commands ?? []).filter(c => c.type !== 'custom' && !EXCLUDED_TYPES.includes(c.type));
 
   return (
     <Workspace>
       {/* 1. Header Zone */}
       <HeaderZone
         title={t("COMMAND GATEWAY ROUTING")}
-        subtitle={t("Manage available console applications, custom command responders, and automatic keyword listeners.")}
+        subtitle={t("Manage core system console applications and invocation permissions.")}
       />
 
       {/* 2. Status Zone */}
       <StatusZone>
         <KpiTile 
-          label={t("Core Commands")} 
+          label={t("Core System Commands")} 
           value={builtInCommands.length} 
           sub="SYS_CORE_CMDS"
         />
         <KpiTile 
-          label={t("Custom Operations")} 
-          value={customsCount} 
-          sub="CUSTOM_COMMAND_REGISTRY"
-        />
-        <KpiTile 
-          label={t("Keyword Transponders")} 
-          value={autoRepliesCount} 
-          sub="AUTO_REPLIES_DB"
+          label={t("Gateway Prefix")} 
+          value={config.prefix ? `"${config.prefix}"` : '"!"'} 
+          sub="INVOCATION_PREFIX"
         />
       </StatusZone>
 
@@ -361,7 +354,7 @@ export default function CommandsPage() {
       <div className="grid-12">
         {/* Core System Commands Panel */}
         <div className="col-span-12">
-          <Panel title={t("CORE OPERATIONS MODULES")} accent className={highlight === 'commands' ? 'flash-target' : ''}>
+          <Panel title={t("CORE OPERATIONS SYSTEM COMMANDS")} accent className={highlight === 'commands' ? 'flash-target' : ''}>
             {/* List core commands */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
               {builtInCommands.map(c => {
@@ -382,47 +375,6 @@ export default function CommandsPage() {
                 );
               })}
             </div>
-          </Panel>
-        </div>
-
-        {/* Custom Commands Panels */}
-        <div className="col-span-6">
-          <Panel title={t("CUSTOM RESPONSE OPERATORS")} accent>
-            <CustomCommandEditor
-              commands={config.core?.commands ?? []}
-              onChange={v => updateConfig({ core: { commands: v } })}
-            />
-          </Panel>
-        </div>
-
-        {/* Auto Reply Panels */}
-        <div className="col-span-6">
-          <Panel title={t("KEYWORD AUTO-RESPONDERS")} accent>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 'var(--space-4)', paddingBottom: 'var(--space-3)', borderBottom: '1px solid var(--border)' }}>
-              <div>
-                <span style={{ fontFamily: 'var(--font-mono)', fontSize: '12px', fontWeight: 'bold', color: 'var(--text-1)' }}>
-                  {t("ENABLE AUTO-RESPONDERS")}
-                </span>
-                <div style={{ fontSize: '11px', color: 'var(--text-3)', marginTop: '2px' }}>
-                  {t("Master switch for keyword triggered auto replies")}
-                </div>
-              </div>
-              <label className="toggle-switch">
-                <input
-                  type="checkbox"
-                  className="toggle-switch__input"
-                  checked={config.autoReplyEnabled ?? true}
-                  onChange={e => updateConfig({ autoReplyEnabled: e.target.checked })}
-                />
-                <div className="toggle-switch__track">
-                  <div className="toggle-switch__thumb" />
-                </div>
-              </label>
-            </div>
-            <AutoReplyEditor
-              replies={config.autoReplies ?? []}
-              onChange={v => updateConfig({ autoReplies: v })}
-            />
           </Panel>
         </div>
       </div>

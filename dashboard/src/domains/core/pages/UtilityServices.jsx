@@ -147,7 +147,170 @@ function CommandConfigRow({ cmd, roles, onUpdate, displayPrefix = '/' }) {
   );
 }
 
-const UTILITY_TYPES = ['translate', 'duolingo', 'voice', 'setup'];
+const UTILITY_TYPES = ['translate', 'duolingo'];
+
+const BUILTIN_COMMAND_NAMES = new Set([
+  'ping', 'help', 'config', 'server', 'user', 'avatar', 'say', 'announce', 'translate', 'duolingo',
+  'purge', 'warn', 'kick', 'ban', 'timeout', 'warnings', 'clearwarns', 'ticketpanel', 'rolepanel',
+  'rank', 'leaderboard', 'balance', 'daily', 'lsd', 'lolprofile', 'lolmatch', 'lolchamp', 'lolitem',
+  'lolrunes', 'lolpatch', 'lollink', 'lolunlink', 'tftlsd', 'tftprofile', 'tftmatch', 'tftlink',
+  'tftunlink', 'lolquiz', 'play', 'skip', 'stop', 'pause', 'resume', 'loop', 'queue', 'np', 'volume', 'remove'
+]);
+
+function CustomCommandEditor({ commands, onChange }) {
+  const customs = commands.filter(c => c.type === 'custom' && !BUILTIN_COMMAND_NAMES.has(c.name));
+  const { t } = useLanguage();
+
+  const add = () => onChange([
+    ...commands,
+    {
+      type: 'custom',
+      id: `cmd_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+      name: '',
+      description: '',
+      response: '',
+      enabled: true,
+      allowedRoles: [],
+    },
+  ]);
+
+  const matchesCmd = (c, targetKey) => {
+    if (c.type !== 'custom') return false;
+    if (targetKey && c.id) return c.id === targetKey;
+    if (targetKey && c.name) return c.name === targetKey;
+    return false;
+  };
+
+  const remove = (targetKey) => onChange(commands.filter(c => !matchesCmd(c, targetKey)));
+
+  const update = (targetKey, field, val) =>
+    onChange(commands.map(c =>
+      matchesCmd(c, targetKey) ? { ...c, [field]: val } : c
+    ));
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
+      {customs.length === 0 && (
+        <p style={{ color: 'var(--text-3)', fontSize: '13px', fontFamily: 'var(--font-mono)' }}>
+          {t("[ NO CUSTOM ROUTED COMMANDS ]")}
+        </p>
+      )}
+      {customs.map((c, idx) => {
+        const itemKey = c.id || c.name || `custom_${idx}`;
+        return (
+          <div key={itemKey} style={{
+            background: 'var(--surface-1)',
+            border: '1px solid var(--border)',
+            padding: 'var(--space-4)',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 'var(--space-3)'
+          }}>
+            <div className="custom-command-header-row">
+              <span style={{ fontFamily: 'var(--font-mono)', fontSize: '12px', color: 'var(--text-3)' }}>/</span>
+              <input
+                className="form-input"
+                style={{ width: '150px', fontSize: '12px', fontFamily: 'var(--font-mono)' }}
+                placeholder={t("command-handle")}
+                value={c.name}
+                onChange={e => update(itemKey, 'name', e.target.value.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9_-]/g, ''))}
+              />
+              <input
+                className="form-input"
+                style={{ flex: 1, fontSize: '12px' }}
+                placeholder={t("Description metadata...")}
+                value={c.description}
+                onChange={e => update(itemKey, 'description', e.target.value)}
+              />
+              <label className="toggle-switch">
+                <input
+                  type="checkbox"
+                  className="toggle-switch__input"
+                  checked={c.enabled ?? true}
+                  onChange={e => update(itemKey, 'enabled', e.target.checked)}
+                />
+                <div className="toggle-switch__track">
+                  <div className="toggle-switch__thumb" />
+                </div>
+              </label>
+              <button className="btn btn--danger" onClick={() => remove(itemKey)} style={{ padding: 'var(--space-2) var(--space-3)' }}>
+                ×
+              </button>
+            </div>
+            <textarea
+              className="form-input"
+              rows={2}
+              style={{ fontSize: '12px', fontFamily: 'var(--font-mono)' }}
+              placeholder={t("Command Response template. Variables: {user} {args} {server} {prefix}")}
+              value={c.response}
+              onChange={e => update(itemKey, 'response', e.target.value)}
+            />
+          </div>
+        );
+      })}
+      <button className="btn btn--secondary" style={{ alignSelf: 'flex-start' }} onClick={add}>
+        {t("+ ADD CUSTOM COMMAND")}
+      </button>
+    </div>
+  );
+}
+
+function AutoReplyEditor({ replies, onChange }) {
+  const { t } = useLanguage();
+  const add = () => onChange([...replies, { keyword: '', response: '' }]);
+  const remove = (idx) => onChange(replies.filter((_, i) => i !== idx));
+  const update = (idx, field, val) => {
+    const next = [...replies];
+    next[idx] = { ...next[idx], [field]: val };
+    onChange(next);
+  };
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
+      {replies.length === 0 && (
+        <p style={{ color: 'var(--text-3)', fontSize: '13px', fontFamily: 'var(--font-mono)' }}>
+          {t("[ NO KEYWORD AUTO-REPLIES CONFIGURED ]")}
+        </p>
+      )}
+      {replies.map((r, i) => (
+        <div key={i} style={{
+          background: 'var(--surface-1)',
+          border: '1px solid var(--border)',
+          padding: 'var(--space-4)',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 'var(--space-3)'
+        }}>
+          <div className="auto-reply-header-row">
+            <span style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--text-3)' }}>{t("KEYWORD")}</span>
+            <input
+              className="form-input"
+              style={{ width: '180px', fontSize: '12px', fontFamily: 'var(--font-mono)' }}
+              placeholder={t("Query trigger word...")}
+              value={r.keyword}
+              onChange={e => update(i, 'keyword', e.target.value.toLowerCase())}
+            />
+            <div style={{ flex: 1 }} />
+            <button className="btn btn--danger" onClick={() => remove(i)} style={{ padding: 'var(--space-2) var(--space-3)' }}>
+              ×
+            </button>
+          </div>
+          <textarea
+            className="form-input"
+            rows={2}
+            style={{ fontSize: '12px' }}
+            placeholder={t("Reply content body payload...")}
+            value={r.response}
+            onChange={e => update(i, 'response', e.target.value)}
+          />
+        </div>
+      ))}
+      <button className="btn btn--secondary" style={{ alignSelf: 'flex-start' }} onClick={add}>
+        {t("+ ADD AUTO-REPLY TRIGGER")}
+      </button>
+    </div>
+  );
+}
 
 export default function UtilityServicesPage() {
   const { config, loading, updateConfig } = useCommands();
@@ -163,17 +326,15 @@ export default function UtilityServicesPage() {
   }
 
   const roles = guildData?.roles ?? [];
-  const channels = guildData?.channels ?? [];
-  const categories = (channels || []).filter(c => c.type === 4);
-
   const utilityCmds = (config.core?.commands ?? []).filter(c => UTILITY_TYPES.includes(c.type));
-  const isTempVcActive = Boolean(config.tempVcEnabled);
+  const customsCount = (config.core?.commands ?? []).filter(c => c.type === 'custom').length;
+  const autoRepliesCount = (config.autoReplies ?? []).length;
 
   return (
     <Workspace>
       <HeaderZone
-        title={t("UTILITY & VOICE SERVICES")}
-        subtitle={t("Manage language translation, Duolingo learning modules, and VoiceMaster temporary voice channels.")}
+        title={t("UTILITY SERVICES")}
+        subtitle={t("Manage language translation, Duolingo learning, bot mention reactions, custom responders, and keyword listeners.")}
       />
 
       <StatusZone>
@@ -188,83 +349,20 @@ export default function UtilityServicesPage() {
           sub="GAMIFIED_LEARNING"
         />
         <KpiTile
-          label={t("Temp Voice System")}
-          value={isTempVcActive ? t("ACTIVE") : t("DISABLED")}
-          sub="VOICEMASTER_ENGINE"
+          label={t("Custom Operations")}
+          value={customsCount}
+          sub="CUSTOM_COMMAND_REGISTRY"
+        />
+        <KpiTile
+          label={t("Keyword Transponders")}
+          value={autoRepliesCount}
+          sub="AUTO_REPLIES_DB"
         />
       </StatusZone>
 
       <div className="grid-12">
-        {/* Temp Voice Channels Config Panel */}
-        <div className="col-span-12">
-          <Panel title={t("VOICEMASTER TEMP VOICE ENGINE")} accent>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
-              
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <div>
-                  <div style={{ fontFamily: 'var(--font-mono)', fontWeight: 'bold', fontSize: '13px', color: 'var(--text-1)' }}>
-                    {t("Join-to-Create Voice Engine")}
-                  </div>
-                  <div style={{ fontSize: '11px', color: 'var(--text-3)', marginTop: 'var(--space-1)' }}>
-                    {t("Automatically generate temporary voice channels when members join the master channel")}
-                  </div>
-                </div>
-
-                <label className="toggle-switch">
-                  <input
-                    type="checkbox"
-                    className="toggle-switch__input"
-                    checked={isTempVcActive}
-                    onChange={(e) => updateConfig({ tempVcEnabled: e.target.checked })}
-                  />
-                  <div className="toggle-switch__track">
-                    <div className="toggle-switch__thumb" />
-                  </div>
-                </label>
-              </div>
-
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-4)', marginTop: 'var(--space-2)' }}>
-                <div>
-                  <label className="form-label" style={{ fontSize: '11px', fontFamily: 'var(--font-mono)' }}>
-                    {t("Master Join-to-Create Voice Channel")}
-                  </label>
-                  <select
-                    className="form-input"
-                    style={{ fontSize: '12px', fontFamily: 'var(--font-mono)', width: '100%' }}
-                    value={config.tempVcMasterChannelId || ''}
-                    onChange={(e) => updateConfig({ tempVcMasterChannelId: e.target.value })}
-                  >
-                    <option value="">-- {t("Select Voice Channel")} --</option>
-                    {(channels || []).filter(c => c.type === 2).map(c => (
-                      <option key={c.id} value={c.id}>🔊 {c.name}</option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="form-label" style={{ fontSize: '11px', fontFamily: 'var(--font-mono)' }}>
-                    {t("Temp VC Parent Category")}
-                  </label>
-                  <select
-                    className="form-input"
-                    style={{ fontSize: '12px', fontFamily: 'var(--font-mono)', width: '100%' }}
-                    value={config.tempVcCategoryId || ''}
-                    onChange={(e) => updateConfig({ tempVcCategoryId: e.target.value })}
-                  >
-                    <option value="">-- {t("Select Category")} --</option>
-                    {categories.map(c => (
-                      <option key={c.id} value={c.id}>📁 {c.name}</option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-
-            </div>
-          </Panel>
-        </div>
-
         {/* Mention React Panel */}
-        <div className="col-span-12" style={{ marginTop: 'var(--space-6)' }}>
+        <div className="col-span-12">
           <Panel title={t("BOT MENTION REACT ENGINE")} accent>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -329,6 +427,48 @@ export default function UtilityServicesPage() {
             </div>
           </Panel>
         </div>
+
+        {/* Custom Commands Panels */}
+        <div className="col-span-6" style={{ marginTop: 'var(--space-6)' }}>
+          <Panel title={t("CUSTOM RESPONSE OPERATORS")} accent>
+            <CustomCommandEditor
+              commands={config.core?.commands ?? []}
+              onChange={v => updateConfig({ core: { commands: v } })}
+            />
+          </Panel>
+        </div>
+
+        {/* Auto Reply Panels */}
+        <div className="col-span-6" style={{ marginTop: 'var(--space-6)' }}>
+          <Panel title={t("KEYWORD AUTO-RESPONDERS")} accent>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 'var(--space-4)', paddingBottom: 'var(--space-3)', borderBottom: '1px solid var(--border)' }}>
+              <div>
+                <span style={{ fontFamily: 'var(--font-mono)', fontSize: '12px', fontWeight: 'bold', color: 'var(--text-1)' }}>
+                  {t("ENABLE AUTO-RESPONDERS")}
+                </span>
+                <div style={{ fontSize: '11px', color: 'var(--text-3)', marginTop: '2px' }}>
+                  {t("Master switch for keyword triggered auto replies")}
+                </div>
+              </div>
+              <label className="toggle-switch">
+                <input
+                  type="checkbox"
+                  className="toggle-switch__input"
+                  checked={config.autoReplyEnabled ?? true}
+                  onChange={e => updateConfig({ autoReplyEnabled: e.target.checked })}
+                />
+                <div className="toggle-switch__track">
+                  <div className="toggle-switch__thumb" />
+                </div>
+              </label>
+            </div>
+            <AutoReplyEditor
+              replies={config.autoReplies ?? []}
+              onChange={v => updateConfig({ autoReplies: v })}
+            />
+          </Panel>
+        </div>
+
       </div>
     </Workspace>
   );

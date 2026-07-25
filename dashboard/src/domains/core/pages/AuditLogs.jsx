@@ -6,10 +6,12 @@ import { useGuild } from '../../../shared/hooks/useGuild.js';
 import { useLanguage } from '../../../shared/context/LanguageContext.jsx';
 
 export default function AuditLogsPage() {
-  const { selectedGuild } = useGuild();
+  const { config, updateConfig, guildData, selectedGuild } = useGuild();
   const { t } = useLanguage();
   const [logs, setLogs] = useState([]);
   const [loading, setLoading] = useState(true);
+
+  const textChannels = (guildData?.channels || []).filter(c => c.type === 0);
 
   useEffect(() => {
     if (!selectedGuild?.id) return;
@@ -53,6 +55,11 @@ export default function AuditLogsPage() {
           sub="REDIS_AUDIT_LOG_BUFFER"
         />
         <KpiTile 
+          label={t("Logging Target")} 
+          value={config?.logChannelId ? `#${(textChannels.find(c => c.id === config.logChannelId)?.name || config.logChannelId)}` : t("UNSET")} 
+          sub="SECURITY_LOG_CHANNEL"
+        />
+        <KpiTile 
           label={t("Audit Status")} 
           value={loading ? t("LOADING...") : t("ACTIVE")} 
           sub="TELEMETRY_LOG_LINK"
@@ -61,7 +68,30 @@ export default function AuditLogsPage() {
 
       {/* 3. Workspace Zone */}
       <div className="grid-12">
+        {/* Logging Integration Panel */}
         <div className="col-span-12">
+          <Panel title={t("SECURITY LOGGING CHANNEL INTEGRATION")} accent>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
+              <label className="form-label" style={{ fontSize: '11px', fontFamily: 'var(--font-mono)', fontWeight: 'bold' }}>
+                {t("Security & Audit Events Logging Target Channel")}
+              </label>
+              <select
+                className="form-select"
+                value={config?.logChannelId || ''}
+                onChange={(e) => updateConfig && updateConfig({ logChannelId: e.target.value })}
+              >
+                <option value="">-- {t("Select Log Channel")} --</option>
+                {textChannels.map(c => <option key={c.id} value={c.id}>#{c.name}</option>)}
+              </select>
+              <span style={{ fontSize: '10px', color: 'var(--text-3)', fontFamily: 'var(--font-mono)' }}>
+                {t("Automated audit notifications, moderation actions, and guild security logs target channel.")}
+              </span>
+            </div>
+          </Panel>
+        </div>
+
+        {/* Administrative Activity Logs Panel */}
+        <div className="col-span-12" style={{ marginTop: 'var(--space-6)' }}>
           <Panel title={t("ADMINISTRATIVE ACTIVITY LOGS")} accent>
             {loading ? (
               <div style={{ padding: 'var(--space-6)', textAlign: 'center', fontFamily: 'var(--font-mono)', color: 'var(--text-3)' }}>
