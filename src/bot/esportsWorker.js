@@ -49,14 +49,7 @@ async function processEsportsWorkerCycle(client, configStore, redis) {
         if (!alreadyPosted) {
           const dailyData = await getDailyMatchesForLeagues(targetLeagues, todayYMD);
           if (dailyData && dailyData.length > 0) {
-            const embed = new EmbedBuilder()
-              .setTitle(`📅 LỊCH THI ĐẤU ESPORTS NỔI BẬT HÔM NAY (${todayYMD})`)
-              .setDescription(`Tổng hợp lịch thi đấu của các giải đấu: **${targetLeagues.map(l => l.toUpperCase()).join(', ')}**`)
-              .setColor(0xFF4655)
-              .setTimestamp()
-              .setFooter({ text: 'Riot LoL Esports Live Schedule Pipeline' });
-
-            for (const group of dailyData) {
+            const embeds = dailyData.map((group, idx) => {
               const matchesText = group.matches.map((m) => {
                 const unixSec = Math.floor(new Date(m.startTime).getTime() / 1000);
                 const timeTag = `<t:${unixSec}:t>`;
@@ -68,14 +61,21 @@ async function processEsportsWorkerCycle(client, configStore, redis) {
                 );
               }).join('\n');
 
-              embed.addFields({
-                name: `### ${group.league.icon} ${group.league.name.toUpperCase()}`,
-                value: matchesText || 'Không có trận đấu nào.',
-                inline: false
-              });
-            }
+              const card = new EmbedBuilder()
+                .setTitle(`${group.league.icon} ${group.league.name.toUpperCase()}`)
+                .setDescription(matchesText || 'Không có trận đấu nào.')
+                .setColor(idx % 2 === 0 ? 0xFF4655 : 0x00FF88);
 
-            await channel.send({ embeds: [embed] }).catch((err) => console.error('[esportsWorker] Send daily error:', err.message));
+              const firstLogo = group.matches.find(m => m.logo1)?.logo1;
+              if (firstLogo) card.setThumbnail(firstLogo);
+
+              if (idx === dailyData.length - 1) {
+                card.setFooter({ text: `Riot LoL Esports Pipeline • Today (${todayYMD})` }).setTimestamp();
+              }
+              return card;
+            });
+
+            await channel.send({ content: `📅 **[LỊCH THI ĐẤU HÀNG NGÀY - ${todayYMD}]**`, embeds }).catch((err) => console.error('[esportsWorker] Send daily error:', err.message));
 
             if (redis) {
               await redis.set(dailyKey, '1', { ex: 86400 * 2 }).catch(() => null);

@@ -944,33 +944,31 @@ export function createServer({ configStore, stateStore, botClient, redis = null 
         const match2Time = `<t:${nowSec + 7200}:t>`;
         const match2Rel = `<t:${nowSec + 7200}:R>`;
 
-        const embed = new EmbedBuilder()
-          .setTitle('🎮 ESPORTS LIVE TELEMETRY (TEST BROADCAST)')
-          .setDescription('Đây là tin nhắn **thử nghiệm** cấu hình từ **Esports Operations Console** trên Dashboard.')
-          .addFields(
-            {
-              name: '### 🇰🇷 LCK KOREA 2026',
-              value:
-                `⚔️ **T1** 🆚 **Gen.G Esports**\n` +
-                `⏰ **Thời gian:** ${match1Time} (${match1Rel}) | 🎮 **Thể thức:** \`BO3\` | 🔴 **TRỰC TIẾP**\n`,
-              inline: false
-            },
-            {
-              name: '### 🌏 LCP PACIFIC 2026',
-              value:
-                `⚔️ **GAM Esports** 🆚 **Vikings Esports**\n` +
-                `⏰ **Thời gian:** ${match2Time} (${match2Rel}) | 🎮 **Thể thức:** \`BO5\` | 📅 **SẮP BẮT ĐẦU**\n`,
-              inline: false
-            }
+        const embed1 = new EmbedBuilder()
+          .setTitle('🇰🇷 LCK KOREA 2026 — TRẬN 1')
+          .setDescription(
+            `⚔️ **T1** 🆚 **Gen.G Esports**\n\n` +
+            `⏰ **Thời gian:** ${match1Time} (${match1Rel})\n` +
+            `🎮 **Thể thức:** \`BO3\` | 🔴 **TRỰC TIẾP**`
           )
           .setThumbnail('http://static.lolesports.com/teams/1773829250929_GENGLOGO_GOLD.png')
-          .setColor(0xFF4655)
+          .setColor(0xFF4655);
+
+        const embed2 = new EmbedBuilder()
+          .setTitle('🌏 LCP PACIFIC 2026 — TRẬN 2')
+          .setDescription(
+            `⚔️ **GAM Esports** 🆚 **Vikings Esports**\n\n` +
+            `⏰ **Thời gian:** ${match2Time} (${match2Rel})\n` +
+            `🎮 **Thể thức:** \`BO5\` | 📅 **SẮP BẮT ĐẦU**`
+          )
+          .setThumbnail('http://static.lolesports.com/teams/1774247803537_horizontal_EN_Wh.png')
+          .setColor(0x00FF88)
           .setFooter({ text: 'Riot Games LoL Esports Pipeline • Real-time Test' })
           .setTimestamp();
 
         await channel.send({
           content: '🧪 **[TEST ESPORTS NOTIFICATION]**',
-          embeds: [embed]
+          embeds: [embed1, embed2]
         });
 
         return res.json({ success: true, channelName: channel.name, message: `Đã gửi thông báo thử nghiệm thành công vào #${channel.name}!` });
