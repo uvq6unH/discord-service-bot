@@ -32,6 +32,8 @@ export default function EsportsServicesPage() {
     );
   }
 
+  const isEnabled = Boolean(config.esportsNotifyEnabled);
+  const selectedChannelId = config.esportsChannelId || '';
   const selectedLeagues = Array.isArray(config.esportsLeagues)
     ? config.esportsLeagues
     : ['lck', 'lcp', 'worlds', 'msi', 'lpl', 'lec', 'lcs'];
