@@ -234,11 +234,28 @@ export function createBot(configStore, stateStore, redis = null) {
 
   // ── Slash command sync helper ───────────────────────────────────────────────
   client.syncGlobalCommands = async () => {
-    console.log('[sync-global] Clearing legacy global commands to enforce instant Guild command sync...');
-    await client.application.commands.set([]).catch((err) => {
-      console.warn('[sync-global] Warning clearing application commands:', err.message);
+    const allCommands = [
+      ...(defaultConfig.core?.commands || []),
+      ...(defaultConfig.moderation?.commands || []),
+      ...(defaultConfig.levels?.commands || []),
+      ...(defaultConfig.economy?.commands || []),
+      ...(defaultConfig.riot?.commands || [])
+    ].map(cmd => ({ ...cmd, enabled: true }));
+
+    const commands = buildSlashCommands({ commands: allCommands });
+    const validCommands = commands.filter((cmd) => {
+      if (!cmd.name || cmd.name.length > 32) {
+        console.warn(`[sync-global] Skipping invalid command name: "${cmd.name}"`);
+        return false;
+      }
+      if (!cmd.description || cmd.description.length > 100) {
+        cmd.description = (cmd.description ?? cmd.name).slice(0, 100);
+      }
+      return true;
     });
-    return { synced: true, count: 0 };
+
+    await client.application.commands.set(validCommands);
+    return { synced: true, count: validCommands.length };
   };
 
   client.syncGuildCommands = async (guildId, config) => {
