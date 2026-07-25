@@ -111,55 +111,79 @@ async function processEsportsWorkerCycle(client, configStore, redis) {
         }
       }
 
-      // ── Job 2: 15-Minute Pre-Match Live Alert ──────────────────────────────
+      // ── Job 2: Pre-Match Live Alert (15m, 10m, 5m) ─────────────────────────
       if (config.esportsPreMatchAlert !== false) {
         for (const leagueKey of targetLeagues) {
           const scheduleData = await getEsportsSchedule(leagueKey).catch(() => null);
           const matches = scheduleData?.matches || [];
 
           for (const match of matches) {
-            if (!match.startTime) continue;
+            if (!match.startTime || match.state === 'completed') continue;
+
             const matchTime = new Date(match.startTime).getTime();
             const diffMinutes = (matchTime - Date.now()) / (60 * 1000);
 
-            // Trigger alert if match starts in 0 - 16 minutes
-            if (diffMinutes >= 0 && diffMinutes <= 16) {
-              const matchId = match.id || `${leagueKey}_${match.team1}_${match.team2}_${match.startTime}`;
-              const preKey = `guild:${guild.id}:esports_pre15:${matchId}`;
+            // Calculate alert milestone: 15m (14-15.9m), 10m (9-10.9m), 5m (4-5.9m)
+            let stage = null;
+            let stageLabel = '';
+            let stageColor = 0xFF0055;
 
-              const alreadyAlerted = redis
-                ? await redis.get(preKey).catch(() => null)
-                : _postedPre15Cache.has(preKey);
+            if (diffMinutes >= 14.0 && diffMinutes <= 15.9) {
+              stage = '15m';
+              stageLabel = '15 PHÚT';
+              stageColor = 0xFF4655;
+            } else if (diffMinutes >= 9.0 && diffMinutes <= 10.9) {
+              stage = '10m';
+              stageLabel = '10 PHÚT';
+              stageColor = 0xFF8800;
+            } else if (diffMinutes >= 4.0 && diffMinutes <= 5.9) {
+              stage = '5m';
+              stageLabel = '5 PHÚT';
+              stageColor = 0xFF0055;
+            }
 
-              if (!alreadyAlerted) {
-                const unixSec = Math.floor(new Date(match.startTime).getTime() / 1000);
+            if (!stage) continue;
 
-                const alertEmbed = new EmbedBuilder()
-                  .setTitle(`⚔️ TRẬN ĐẤU SẮP DIỄN RA TRONG 15 PHÚT!`)
-                  .setDescription(
-                    `### ${scheduleData.league.icon} ${scheduleData.league.name.toUpperCase()}\n\n` +
-                    `🔥 **Trận đấu:** **${match.team1}** 🆚 **${match.team2}**\n` +
-                    `⏰ **Thời gian:** <t:${unixSec}:t> (<t:${unixSec}:R>)\n` +
-                    `🎮 **Thể thức:** \`${match.strategy || 'BO3'}\``
-                  )
-                  .setColor(0xFF0055)
-                  .setTimestamp();
+            // Normalize match ID to prevent false key misses
+            const cleanTeam1 = (match.team1 || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+            const cleanTeam2 = (match.team2 || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+            const matchMin = Math.floor(matchTime / 60000);
+            const matchId = match.id || `${leagueKey}_${cleanTeam1}_${cleanTeam2}_${matchMin}`;
 
-                if (scheduleData?.league?.logoUrl) alertEmbed.setThumbnail(scheduleData.league.logoUrl);
+            const preKey = `guild:${guild.id}:esports_alert:${stage}:${matchId}`;
 
-                const leagueRole = config.esportsLeagueRoles?.[leagueKey.toLowerCase()];
-                const pingText = leagueRole ? `<@&${leagueRole}>` : '';
+            const alreadyAlerted = redis
+              ? await redis.get(preKey).catch(() => null)
+              : _postedPre15Cache.has(preKey);
 
-                await channel.send({
-                  content: `🚨 **[ESPORTS LIVE ALERT]** ${pingText}`.trim(),
-                  embeds: [alertEmbed]
-                }).catch((err) => console.error('[esportsWorker] Send pre-match alert error:', err.message));
+            if (!alreadyAlerted) {
+              const unixSec = Math.floor(matchTime / 1000);
 
-                if (redis) {
-                  await redis.set(preKey, '1', { ex: 86400 * 2 }).catch(() => null);
-                } else {
-                  _postedPre15Cache.add(preKey);
-                }
+              const alertEmbed = new EmbedBuilder()
+                .setTitle(`⚔️ TRẬN ĐẤU SẮP DIỄN RA TRONG ${stageLabel}!`)
+                .setDescription(
+                  `### ${scheduleData.league.icon} ${scheduleData.league.name.toUpperCase()}\n\n` +
+                  `🔥 **Trận đấu:** **${match.team1}** 🆚 **${match.team2}**\n` +
+                  `⏰ **Thời gian:** <t:${unixSec}:t> (<t:${unixSec}:R>)\n` +
+                  `🎮 **Thể thức:** \`${match.strategy || 'BO3'}\``
+                )
+                .setColor(stageColor)
+                .setTimestamp();
+
+              if (scheduleData?.league?.logoUrl) alertEmbed.setThumbnail(scheduleData.league.logoUrl);
+
+              const leagueRole = config.esportsLeagueRoles?.[leagueKey.toLowerCase()];
+              const pingText = leagueRole ? `<@&${leagueRole}>` : '';
+
+              await channel.send({
+                content: `🚨 **[ESPORTS LIVE ALERT - ${stageLabel}]** ${pingText}`.trim(),
+                embeds: [alertEmbed]
+              }).catch((err) => console.error('[esportsWorker] Send pre-match alert error:', err.message));
+
+              if (redis) {
+                await redis.set(preKey, '1', { ex: 86400 * 2 }).catch(() => null);
+              } else {
+                _postedPre15Cache.add(preKey);
               }
             }
           }
