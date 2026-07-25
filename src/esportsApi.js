@@ -7,7 +7,9 @@ const ESPORTS_LEAGUES = {
   lec: { id: '98767991305261587', name: 'LEC Europe', icon: '🇪🇺', logoUrl: 'http://static.lolesports.com/leagues/1592516184297_LEC-01-FullonDark.png' },
   lcs: { id: '98767991299242408', name: 'LCS Americas', icon: '🇺🇸', logoUrl: 'http://static.lolesports.com/leagues/1706356907418_LCSNew-01-FullonDark.png' },
   worlds: { id: '98767991325878492', name: 'Worlds Championship', icon: '🏆', logoUrl: 'http://static.lolesports.com/leagues/1592594612171_WorldsDarkBG.png' },
-  msi: { id: '98767991331506619', name: 'MSI Mid-Season', icon: '🥇', logoUrl: 'http://static.lolesports.com/leagues/1592594634248_MSIDarkBG.png' }
+  msi: { id: '98767991331506619', name: 'MSI Mid-Season', icon: '🥇', logoUrl: 'http://static.lolesports.com/leagues/1592594634248_MSIDarkBG.png' },
+  first_stand: { id: '113464388705111224', name: 'First Stand', icon: '🥊', logoUrl: 'http://static.lolesports.com/leagues/1740042025201_RG_LOL_FIRST_STAND_LOGO_VOLT_ALPHA.png' },
+  ewc: { id: '116838530616006090', name: 'Esports World Cup', icon: '🇸🇦', logoUrl: 'http://static.lolesports.com/leagues/1782814488205_EWC26_PRIMARY_ABBREVIATED_LOGO_WHITE.png' }
 };
 
 const _cache = new Map();

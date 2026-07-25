@@ -171,7 +171,7 @@ export const defaultConfig = {
   tempVcCategoryId: '',
   esportsNotifyEnabled: false,
   esportsChannelId: '',
-  esportsLeagues: ['lck', 'lcp', 'worlds', 'msi', 'lpl', 'lec', 'lcs'],
+  esportsLeagues: ['lck', 'lcp', 'worlds', 'msi', 'lpl', 'lec', 'lcs', 'first_stand', 'ewc'],
   esportsDailyTime: '08:00',
   esportsPreMatchAlert: true,
   esportsLeagueRoles: {},

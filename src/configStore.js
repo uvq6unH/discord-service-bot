@@ -11,7 +11,7 @@ function clone(value) {
 
 function normalizeEsportsLeagues(leagues) {
   if (!Array.isArray(leagues)) return defaultConfig.esportsLeagues;
-  const valid = new Set(['lck', 'lcp', 'lpl', 'lec', 'lcs', 'worlds', 'msi']);
+  const valid = new Set(['lck', 'lcp', 'lpl', 'lec', 'lcs', 'worlds', 'msi', 'first_stand', 'ewc']);
   return Array.from(new Set(leagues.map(l => String(l).toLowerCase()).filter(l => valid.has(l))));
 }
 

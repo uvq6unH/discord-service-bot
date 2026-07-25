@@ -15,7 +15,9 @@ const LEAGUES = [
   { key: 'lec', name: 'LEC Europe', icon: '🇪🇺' },
   { key: 'lcs', name: 'LCS Americas', icon: '🇺🇸' },
   { key: 'worlds', name: 'Worlds Championship', icon: '🏆' },
-  { key: 'msi', name: 'MSI Mid-Season', icon: '🥇' }
+  { key: 'msi', name: 'MSI Mid-Season', icon: '🥇' },
+  { key: 'first_stand', name: 'First Stand', icon: '🥊' },
+  { key: 'ewc', name: 'Esports World Cup', icon: '🇸🇦' }
 ];
 
 const TIME_OPTIONS = Array.from({ length: 48 }, (_, i) => {
