@@ -163,7 +163,7 @@ export const defaultConfig = {
   logChannelId: '',
   musicEnabled: true,
   musicPrefix: 'hb',
-  autoReplyEnabled: false,
+  autoReplyEnabled: true,
   mentionReactEnabled: false,
   mentionReactEmoji: '👋',
   tempVcEnabled: false,

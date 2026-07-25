@@ -486,14 +486,16 @@ export function createBot(configStore, stateStore, redis = null) {
       await handleXp(message, config, stateStore);
 
       // 6. AutoReply
-      if (!config.autoReplyEnabled) return;
-      const lowerContent = content.toLowerCase();
-      const match = config.autoReplies.find((r) => lowerContent.includes(r.keyword.toLowerCase()));
-      if (match) {
-        await message.reply({
-          content: sanitizeAnnouncementText(match.response),
-          allowedMentions: { parse: [] },
-        });
+      const isAutoReplyActive = (config.autoReplyEnabled !== false || (Array.isArray(config.autoReplies) && config.autoReplies.length > 0));
+      if (isAutoReplyActive && Array.isArray(config.autoReplies) && config.autoReplies.length > 0) {
+        const lowerContent = content.toLowerCase();
+        const match = config.autoReplies.find((r) => r.keyword && lowerContent.includes(r.keyword.toLowerCase()));
+        if (match) {
+          await message.reply({
+            content: sanitizeAnnouncementText(match.response),
+            allowedMentions: { parse: [] },
+          }).catch(() => null);
+        }
       }
 
       // 7. Auto reposition active quiz embeds to the bottom of the channel
