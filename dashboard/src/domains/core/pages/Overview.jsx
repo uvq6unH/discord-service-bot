@@ -9,13 +9,14 @@ import { useLanguage } from '../../../shared/context/LanguageContext.jsx';
 
 export default function OverviewPage() {
   const navigate = useNavigate();
-  const { config, selectedGuild } = useGuild();
+  const { config, selectedGuild, updateConfig, guildData } = useGuild();
   const { status } = useSystem();
   const { t } = useLanguage();
 
   const bot = status?.bot;
   const stats = status?.stats;
   const online = bot?.online ?? status?.botReady ?? false;
+  const textChannels = (guildData?.channels || []).filter(c => c.type === 0);
 
   const fmtUptime = (ms) => {
     if (!ms) return '—';
@@ -23,11 +24,6 @@ export default function OverviewPage() {
     const h = Math.floor(s / 3600);
     const m = Math.floor((s % 3600) / 60);
     return `${h}h ${m}m`;
-  };
-
-  const getWelcomeChannelHint = () => {
-    if (!config?.welcomeEnabled) return t('DISABLED');
-    return config?.welcomeChannelId ? `#${config.welcomeChannelId}` : t('CHƯA CẤU HÌNH');
   };
 
   return (
@@ -64,58 +60,174 @@ export default function OverviewPage() {
 
       {/* 3. Workspace Zone - Asymmetric Grids */}
       <div className="grid-12">
-        {/* Panel 1: Member growth */}
-        <div className="col-span-6">
-          <Panel title={t("MEMBER GROWTH CONFIG")} accent>
-            <DataSlab 
-              label={t("Welcome System")} 
-              value={config?.welcomeEnabled ? t('ACTIVE') : t('INACTIVE')} 
-              sub={t("New member greeting broadcast")}
-              highlight={config?.welcomeEnabled}
-              onClick={() => navigate('/moderation', { state: { highlight: 'selfroles' } })}
-            />
-            <DataSlab 
-              label={t("Welcome Target Channel")} 
-              value={getWelcomeChannelHint()} 
-              sub={t("Broadcast target room")}
-              onClick={() => navigate('/moderation', { state: { highlight: 'selfroles' } })}
-            />
-            <DataSlab 
-              label={t("Logging Integration")} 
-              value={config?.logChannelId ? t('ACTIVE') : t('INACTIVE')} 
-              sub={t("Member activity logs target")}
-              highlight={!!config?.logChannelId}
-              onClick={() => navigate('/moderation', { state: { highlight: 'selfroles' } })}
-            />
-            <DataSlab 
-              label={t("Broadcast Announcements")} 
-              value={config?.announcementsEnabled ? t('ACTIVE') : t('INACTIVE')} 
-              sub={t("System notifications module")}
-              onClick={() => navigate('/moderation', { state: { highlight: 'selfroles' } })}
-            />
+        {/* Panel 1: Master Bot Control */}
+        <div className="col-span-12">
+          <Panel title={t("BOT MASTER CONTROL ENGINE")} accent>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div>
+                <div style={{ fontFamily: 'var(--font-mono)', fontWeight: 'bold', fontSize: '13px', color: 'var(--text-1)' }}>
+                  {t("Bot Master Activation Switch")}
+                </div>
+                <div style={{ fontSize: '11px', color: 'var(--text-3)', marginTop: '2px' }}>
+                  {t("Enable or disable bot operations completely for this guild")}
+                </div>
+              </div>
+
+              <label className="toggle-switch">
+                <input
+                  type="checkbox"
+                  className="toggle-switch__input"
+                  checked={config?.enabled !== false}
+                  onChange={(e) => updateConfig && updateConfig({ enabled: e.target.checked })}
+                />
+                <div className="toggle-switch__track">
+                  <div className="toggle-switch__thumb" />
+                </div>
+              </label>
+            </div>
           </Panel>
         </div>
 
-        {/* Panel 2: Command activity */}
+        {/* Panel 2: Member Welcome & Log Settings */}
         <div className="col-span-6">
-          <Panel title={t("COMMAND ENGINE STATUS")} accent>
-            <DataSlab 
-              label={t("Prefix Parameter")} 
-              value={config?.prefix ? `"${config.prefix}"` : '"!"'} 
-              sub={t("Legacy text command invocation prefix")}
-              onClick={() => navigate('/commands', { state: { highlight: 'commands' } })}
-            />
-            <DataSlab 
-              label={t("Command Module Status")} 
-              value={(config?.enabled ?? true) ? t('ACTIVE') : t('INACTIVE')} 
-              sub={t("Guild commands routing status")}
-              highlight={config?.enabled ?? true}
-              onClick={() => navigate('/commands', { state: { highlight: 'commands' } })}
-            />
+          <Panel title={t("WELCOME & LOGGING CONFIG")} accent>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
+              
+              {/* Welcome Toggle */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div>
+                  <div style={{ fontFamily: 'var(--font-mono)', fontWeight: 'bold', fontSize: '12px', color: 'var(--text-1)' }}>
+                    {t("Welcome Greeting System")}
+                  </div>
+                  <div style={{ fontSize: '11px', color: 'var(--text-3)' }}>
+                    {t("Send a greeting message when new members join")}
+                  </div>
+                </div>
+                <label className="toggle-switch">
+                  <input
+                    type="checkbox"
+                    className="toggle-switch__input"
+                    checked={Boolean(config?.welcomeEnabled)}
+                    onChange={(e) => updateConfig && updateConfig({ welcomeEnabled: e.target.checked })}
+                  />
+                  <div className="toggle-switch__track">
+                    <div className="toggle-switch__thumb" />
+                  </div>
+                </label>
+              </div>
+
+              {config?.welcomeEnabled && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)', paddingLeft: 'var(--space-3)', borderLeft: '2px solid var(--accent)' }}>
+                  <div className="form-group" style={{ margin: 0 }}>
+                    <label className="form-label" style={{ fontSize: '11px' }}>{t("Welcome Target Channel")}</label>
+                    <select
+                      className="form-select"
+                      value={config?.welcomeChannelId || ''}
+                      onChange={(e) => updateConfig && updateConfig({ welcomeChannelId: e.target.value })}
+                    >
+                      <option value="">-- {t("Select Channel")} --</option>
+                      {textChannels.map(c => <option key={c.id} value={c.id}>#{c.name}</option>)}
+                    </select>
+                  </div>
+
+                  <div className="form-group" style={{ margin: 0 }}>
+                    <label className="form-label" style={{ fontSize: '11px' }}>{t("Welcome Message Template")}</label>
+                    <textarea
+                      className="form-input"
+                      rows={2}
+                      value={config?.welcomeMessage || ''}
+                      onChange={(e) => updateConfig && updateConfig({ welcomeMessage: e.target.value })}
+                      placeholder="Welcome {user} to {server}!"
+                    />
+                    <span style={{ fontSize: '10px', color: 'var(--text-3)', fontFamily: 'var(--font-mono)' }}>
+                      {t("Variables: {user}, {server}, {memberCount}")}
+                    </span>
+                  </div>
+                </div>
+              )}
+
+              <hr style={{ border: 'none', borderTop: '1px solid var(--border)' }} />
+
+              {/* Security Log Channel */}
+              <div className="form-group" style={{ margin: 0 }}>
+                <label className="form-label" style={{ fontSize: '11px', fontFamily: 'var(--font-mono)', fontWeight: 'bold' }}>
+                  {t("Security Logging Channel")}
+                </label>
+                <select
+                  className="form-select"
+                  value={config?.logChannelId || ''}
+                  onChange={(e) => updateConfig && updateConfig({ logChannelId: e.target.value })}
+                >
+                  <option value="">-- {t("Select Log Channel")} --</option>
+                  {textChannels.map(c => <option key={c.id} value={c.id}>#{c.name}</option>)}
+                </select>
+                <span style={{ fontSize: '10px', color: 'var(--text-3)', fontFamily: 'var(--font-mono)', marginTop: '2px' }}>
+                  {t("Target channel for member audit logs and moderation events")}
+                </span>
+              </div>
+
+            </div>
           </Panel>
         </div>
 
-        {/* Panel 3: Moderation config */}
+        {/* Panel 3: Announcements Settings */}
+        <div className="col-span-6">
+          <Panel title={t("BROADCAST ANNOUNCEMENTS")} accent>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
+              
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div>
+                  <div style={{ fontFamily: 'var(--font-mono)', fontWeight: 'bold', fontSize: '12px', color: 'var(--text-1)' }}>
+                    {t("Announcements System")}
+                  </div>
+                  <div style={{ fontSize: '11px', color: 'var(--text-3)' }}>
+                    {t("Broadcast system announcements to designated channel")}
+                  </div>
+                </div>
+                <label className="toggle-switch">
+                  <input
+                    type="checkbox"
+                    className="toggle-switch__input"
+                    checked={Boolean(config?.announcementsEnabled)}
+                    onChange={(e) => updateConfig && updateConfig({ announcementsEnabled: e.target.checked })}
+                  />
+                  <div className="toggle-switch__track">
+                    <div className="toggle-switch__thumb" />
+                  </div>
+                </label>
+              </div>
+
+              {config?.announcementsEnabled && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)', paddingLeft: 'var(--space-3)', borderLeft: '2px solid var(--accent)' }}>
+                  <div className="form-group" style={{ margin: 0 }}>
+                    <label className="form-label" style={{ fontSize: '11px' }}>{t("Announcement Target Channel")}</label>
+                    <select
+                      className="form-select"
+                      value={config?.announcementChannelId || ''}
+                      onChange={(e) => updateConfig && updateConfig({ announcementChannelId: e.target.value })}
+                    >
+                      <option value="">-- {t("Select Channel")} --</option>
+                      {textChannels.map(c => <option key={c.id} value={c.id}>#{c.name}</option>)}
+                    </select>
+                  </div>
+
+                  <div className="form-group" style={{ margin: 0 }}>
+                    <label className="form-label" style={{ fontSize: '11px' }}>{t("Announcement Role Mention")}</label>
+                    <input
+                      className="form-input"
+                      value={config?.announcementMention || ''}
+                      onChange={(e) => updateConfig && updateConfig({ announcementMention: e.target.value })}
+                      placeholder="@everyone"
+                    />
+                  </div>
+                </div>
+              )}
+
+            </div>
+          </Panel>
+        </div>
+
+        {/* Panel 4: Moderation & Command Status Overview */}
         <div className="col-span-6">
           <Panel title={t("MODERATION CONTROLS")} accent>
             <DataSlab 
@@ -146,7 +258,7 @@ export default function OverviewPage() {
           </Panel>
         </div>
 
-        {/* Panel 4: Economy config */}
+        {/* Panel 5: Economy config */}
         <div className="col-span-6">
           <Panel title={t("ECONOMY TELEMETRY")} accent>
             <DataSlab 

@@ -263,6 +263,50 @@ export default function UtilityServicesPage() {
           </Panel>
         </div>
 
+        {/* Mention React Panel */}
+        <div className="col-span-12" style={{ marginTop: 'var(--space-6)' }}>
+          <Panel title={t("BOT MENTION REACT ENGINE")} accent>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div>
+                  <div style={{ fontFamily: 'var(--font-mono)', fontWeight: 'bold', fontSize: '13px', color: 'var(--text-1)' }}>
+                    {t("Auto React When Mentioned")}
+                  </div>
+                  <div style={{ fontSize: '11px', color: 'var(--text-3)', marginTop: 'var(--space-1)' }}>
+                    {t("Automatically react with an emoji when the bot or its role is mentioned in chat")}
+                  </div>
+                </div>
+                <label className="toggle-switch">
+                  <input
+                    type="checkbox"
+                    className="toggle-switch__input"
+                    checked={Boolean(config.mentionReactEnabled)}
+                    onChange={(e) => updateConfig({ mentionReactEnabled: e.target.checked })}
+                  />
+                  <div className="toggle-switch__track">
+                    <div className="toggle-switch__thumb" />
+                  </div>
+                </label>
+              </div>
+
+              {config.mentionReactEnabled && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
+                  <label className="form-label" style={{ fontSize: '11px', fontFamily: 'var(--font-mono)' }}>
+                    {t("Reaction Emoji")}
+                  </label>
+                  <input
+                    className="form-input"
+                    style={{ fontSize: '14px', width: '120px', fontFamily: 'var(--font-mono)' }}
+                    value={config.mentionReactEmoji || '👋'}
+                    onChange={(e) => updateConfig({ mentionReactEmoji: e.target.value })}
+                    placeholder="👋"
+                  />
+                </div>
+              )}
+            </div>
+          </Panel>
+        </div>
+
         {/* Utility Commands Routing Panel */}
         <div className="col-span-12" style={{ marginTop: 'var(--space-6)' }}>
           <Panel title={t("UTILITY COMMANDS ROUTING")} accent>

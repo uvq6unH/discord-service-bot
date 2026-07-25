@@ -267,7 +267,7 @@ export default function RiotServicesPage() {
             <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
               
               {/* LoL Toggle */}
-              <div style={{ display: 'flex', alignItems: 'center', justifycontent: 'space-between' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-half)' }}>
                   <span style={{ fontFamily: 'var(--font-mono)', fontSize: '12px', fontWeight: 'bold', color: 'var(--text-1)' }}>
                     {t("LEAGUE OF LEGENDS TELEMETRY")}
@@ -305,7 +305,7 @@ export default function RiotServicesPage() {
               <hr style={{ border: 'none', borderTop: '1px solid var(--border)' }} />
 
               {/* TFT Toggle */}
-              <div style={{ display: 'flex', alignItems: 'center', justifycontent: 'space-between' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-half)' }}>
                   <span style={{ fontFamily: 'var(--font-mono)', fontSize: '12px', fontWeight: 'bold', color: 'var(--text-1)' }}>
                     {t("TEAMFIGHT TACTICS TELEMETRY")}

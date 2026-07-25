@@ -387,6 +387,24 @@ export default function ModerationPage() {
                   </label>
                 </div>
 
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', opacity: mod.enabled ? 1 : 0.4 }}>
+                  <span style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--text-2)' }}>
+                    {t("AUTO-DELETE BLOCKED MESSAGES")}
+                  </span>
+                  <label className="toggle-switch">
+                    <input
+                      type="checkbox"
+                      className="toggle-switch__input"
+                      disabled={!mod.enabled}
+                      checked={config.deleteBlockedMessages ?? true}
+                      onChange={e => updateConfig({ deleteBlockedMessages: e.target.checked })}
+                    />
+                    <div className="toggle-switch__track">
+                      <div className="toggle-switch__thumb" />
+                    </div>
+                  </label>
+                </div>
+
                 <div className="form-group" style={{ opacity: mod.enabled ? 1 : 0.4 }}>
                   <label className="form-label">{t("Auto-Warn Threshold")}</label>
                   <input
@@ -417,6 +435,23 @@ export default function ModerationPage() {
           {/* Panel 2: Ticket and Self Role */}
           <div className="col-span-6">
             <Panel title={t("TICKET CONSOLE SYSTEM")} className={highlight === 'tickets' ? 'flash-target' : ''}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 'var(--space-4)', paddingBottom: 'var(--space-3)', borderBottom: '1px solid var(--border)' }}>
+                <span style={{ fontFamily: 'var(--font-mono)', fontSize: '12px', fontWeight: 'bold', color: 'var(--text-1)' }}>
+                  {t("ENABLE TICKET SYSTEM")}
+                </span>
+                <label className="toggle-switch">
+                  <input
+                    type="checkbox"
+                    className="toggle-switch__input"
+                    checked={config.ticketsEnabled ?? false}
+                    onChange={e => updateConfig({ ticketsEnabled: e.target.checked })}
+                  />
+                  <div className="toggle-switch__track">
+                    <div className="toggle-switch__thumb" />
+                  </div>
+                </label>
+              </div>
+
               <div className="form-group">
                 <label className="form-label">{t("Ticket Category Target")}</label>
                 <select
@@ -464,6 +499,23 @@ export default function ModerationPage() {
             </Panel>
 
             <Panel title={t("SELF-ROLE ASSIGNMENT")} style={{ marginTop: 'var(--space-5)' }} className={highlight === 'selfroles' ? 'flash-target' : ''}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 'var(--space-4)', paddingBottom: 'var(--space-3)', borderBottom: '1px solid var(--border)' }}>
+                <span style={{ fontFamily: 'var(--font-mono)', fontSize: '12px', fontWeight: 'bold', color: 'var(--text-1)' }}>
+                  {t("ENABLE SELF-ROLE SYSTEM")}
+                </span>
+                <label className="toggle-switch">
+                  <input
+                    type="checkbox"
+                    className="toggle-switch__input"
+                    checked={config.rolesEnabled ?? false}
+                    onChange={e => updateConfig({ rolesEnabled: e.target.checked })}
+                  />
+                  <div className="toggle-switch__track">
+                    <div className="toggle-switch__thumb" />
+                  </div>
+                </label>
+              </div>
+
               <div className="form-group">
                 <label className="form-label">{t("Auto-Gained Role on Join")}</label>
                 <select

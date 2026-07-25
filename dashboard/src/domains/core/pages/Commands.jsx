@@ -398,6 +398,27 @@ export default function CommandsPage() {
         {/* Auto Reply Panels */}
         <div className="col-span-6">
           <Panel title={t("KEYWORD AUTO-RESPONDERS")} accent>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 'var(--space-4)', paddingBottom: 'var(--space-3)', borderBottom: '1px solid var(--border)' }}>
+              <div>
+                <span style={{ fontFamily: 'var(--font-mono)', fontSize: '12px', fontWeight: 'bold', color: 'var(--text-1)' }}>
+                  {t("ENABLE AUTO-RESPONDERS")}
+                </span>
+                <div style={{ fontSize: '11px', color: 'var(--text-3)', marginTop: '2px' }}>
+                  {t("Master switch for keyword triggered auto replies")}
+                </div>
+              </div>
+              <label className="toggle-switch">
+                <input
+                  type="checkbox"
+                  className="toggle-switch__input"
+                  checked={config.autoReplyEnabled ?? true}
+                  onChange={e => updateConfig({ autoReplyEnabled: e.target.checked })}
+                />
+                <div className="toggle-switch__track">
+                  <div className="toggle-switch__thumb" />
+                </div>
+              </label>
+            </div>
             <AutoReplyEditor
               replies={config.autoReplies ?? []}
               onChange={v => updateConfig({ autoReplies: v })}
