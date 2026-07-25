@@ -5,6 +5,7 @@ import DataSlab from '../../../shared/primitives/DataSlab.jsx';
 import { useRiot } from '../hooks/useRiot.js';
 import { useGuild } from '../../../shared/hooks/useGuild.js';
 import { useLanguage } from '../../../shared/context/LanguageContext.jsx';
+import { apiFetch } from '../../../api.js';
 import { Trophy, Tv, BellRing, ShieldCheck, Send } from 'lucide-react';
 
 const LEAGUES = [
@@ -62,12 +63,9 @@ export default function EsportsServicesPage() {
     setTestStatus(null);
     try {
       const selectedGuildId = localStorage.getItem('selectedGuildId') || '';
-      const res = await fetch(`/api/esports/test-notify?guildId=${selectedGuildId}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' }
+      const data = await apiFetch(`/api/esports/test-notify?guildId=${selectedGuildId}`, {
+        method: 'POST'
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Failed to send test notification');
       setTestStatus({ success: true, message: data.message });
     } catch (err) {
       setTestStatus({ success: false, message: err.message });
