@@ -17,8 +17,9 @@ const AuditLogsPage = lazy(() => import('../../domains/core/pages/AuditLogs.jsx'
 const RiotServicesPage = lazy(() => import('../../domains/riot/pages/RiotServices.jsx'));
 const EsportsServicesPage = lazy(() => import('../../domains/riot/pages/EsportsServices.jsx'));
 
-// Music
+// Music & Voice
 const MusicServicesPage = lazy(() => import('../../domains/music/pages/MusicServices.jsx'));
+const VoiceServicesPage = lazy(() => import('../../domains/music/pages/VoiceServices.jsx'));
 
 // Reminder
 const ReminderServicesPage = lazy(() => import('../../domains/reminder/pages/ReminderServices.jsx'));
@@ -54,6 +55,7 @@ export default function AppRoutes() {
         <Route path="/riot"            element={<RiotServicesPage />} />
         <Route path="/esports"         element={<EsportsServicesPage />} />
         <Route path="/music"           element={<MusicServicesPage />} />
+        <Route path="/voice"           element={<VoiceServicesPage />} />
         <Route path="/reminders"       element={<ReminderServicesPage />} />
         <Route path="/ai"              element={<AiServicesPage />} />
       </Route>

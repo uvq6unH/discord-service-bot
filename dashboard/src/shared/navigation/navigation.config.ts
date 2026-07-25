@@ -23,7 +23,6 @@ export const NAVIGATION_SCHEMA: DomainConfig[] = [
       { to: "/members", label: "MEMBERS", icon: "Users" },
       { to: "/moderation", label: "MODERATION", icon: "Shield" },
       { to: "/commands", label: "COMMANDS", icon: "Terminal" },
-      { to: "/utilities", label: "UTILITIES", icon: "Wrench" },
       { to: "/audit-logs", label: "AUDIT LOGS", icon: "FileText" },
       { to: "/economy", label: "ECONOMY", icon: "Coins" },
       { to: "/analytics", label: "ANALYTICS", icon: "BarChart2" },
@@ -42,10 +41,13 @@ export const NAVIGATION_SCHEMA: DomainConfig[] = [
   },
   {
     id: "music",
-    label: "MUSIC SERVICES",
-    description: "Lavalink Node Console",
+    label: "AUDIO & VOICE SERVICES",
+    description: "Lavalink Audio & VoiceMaster VC Engine",
     accentColor: "var(--accent-music)", // Amber
-    items: [{ to: "/music", label: "AUDIO CONSOLE", icon: "Music" }]
+    items: [
+      { to: "/music", label: "AUDIO CONSOLE", icon: "Music" },
+      { to: "/voice", label: "VOICEMASTER VC ENGINE", icon: "Mic" }
+    ]
   },
   {
     id: "reminder",
