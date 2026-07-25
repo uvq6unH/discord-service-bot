@@ -127,22 +127,39 @@ export async function handleVoiceStateUpdate(oldState, newState, configStore, re
       const parentCategory = config.tempVcCategoryId || masterChannel?.parentId || undefined;
       const roomName = `🔊 ${member.displayName}'s Room`.slice(0, 90);
 
+      const me = guild.members.me || await guild.members.fetchMe().catch(() => null);
+      const overwrites = [
+        {
+          id: member.id,
+          allow: [
+            PermissionFlagsBits.Connect,
+            PermissionFlagsBits.Speak,
+            PermissionFlagsBits.ManageChannels,
+            PermissionFlagsBits.MoveMembers,
+            PermissionFlagsBits.ViewChannel,
+          ],
+        },
+      ];
+
+      if (me) {
+        overwrites.push({
+          id: me.id,
+          allow: [
+            PermissionFlagsBits.Connect,
+            PermissionFlagsBits.Speak,
+            PermissionFlagsBits.MoveMembers,
+            PermissionFlagsBits.ManageChannels,
+            PermissionFlagsBits.ViewChannel,
+          ],
+        });
+      }
+
       // Create temporary voice channel with built-in text chat
       const newChannel = await guild.channels.create({
         name: roomName,
         type: ChannelType.GuildVoice,
         parent: parentCategory,
-        permissionOverwrites: [
-          {
-            id: member.id,
-            allow: [
-              PermissionFlagsBits.Connect,
-              PermissionFlagsBits.Speak,
-              PermissionFlagsBits.ManageChannels,
-              PermissionFlagsBits.MoveMembers,
-            ],
-          },
-        ],
+        permissionOverwrites: overwrites,
       });
 
       _localTempVcStore.set(newChannel.id, { ownerId: member.id, isLocked: false });
@@ -150,14 +167,25 @@ export async function handleVoiceStateUpdate(oldState, newState, configStore, re
         await redis.hset(`guild:${guild.id}:temp_vcs`, newChannel.id, member.id).catch(() => null);
       }
 
-      // Move member to new channel
-      await newState.setChannel(newChannel).catch(() => null);
+      // Move member to new channel (try both member.voice and newState)
+      let moved = false;
+      try {
+        if (member.voice?.channelId) {
+          await member.voice.setChannel(newChannel);
+          moved = true;
+        } else {
+          await newState.setChannel(newChannel);
+          moved = true;
+        }
+      } catch (moveErr) {
+        console.error('[tempVoice] Failed to move member to new channel:', moveErr.message);
+      }
 
       // Post VoiceMaster Control Interface into the channel's text chat
       const controlPanel = buildTempVcControlPanel(newChannel, member.id);
       await newChannel.send(controlPanel).catch(() => null);
 
-      console.log(`[tempVoice] Created temp voice channel "${roomName}" (${newChannel.id}) for ${member.user.tag}`);
+      console.log(`[tempVoice] Created temp voice channel "${roomName}" (${newChannel.id}) for ${member.user.tag} (moved: ${moved})`);
     } catch (err) {
       console.error('[tempVoice] Error creating temp channel:', err.message);
     }

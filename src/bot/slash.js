@@ -269,11 +269,24 @@ function buildSlashOptions(command) {
     ];
   }
 
-  if (command.type === 'setup-temp-vc') {
+  if (['setup', 'vcsetup', 'setup-temp-vc'].includes(command.type)) {
     return [
       {
-        name: 'auto_setup',
-        description: 'Tự động tạo Category và Kênh Master trên Server',
+        name: 'category',
+        description: 'Chọn Category có sẵn để tạo kênh Join to Create (Tùy chọn)',
+        type: ApplicationCommandOptionType.Channel,
+        channelTypes: [ChannelType.GuildCategory],
+        required: false
+      },
+      {
+        name: 'name',
+        description: 'Tên kênh thoại Master (Mặc định: ➕ Join to Create)',
+        type: ApplicationCommandOptionType.String,
+        required: false
+      },
+      {
+        name: 'create_interface',
+        description: 'Có tạo thêm kênh text Control Panel hay không (Mặc định: False)',
         type: ApplicationCommandOptionType.Boolean,
         required: false
       }

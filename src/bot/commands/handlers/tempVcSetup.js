@@ -1,68 +1,78 @@
 import { ChannelType, PermissionFlagsBits, EmbedBuilder } from 'discord.js';
 
-export async function executeAutoVoiceMasterSetup(guild, configStore) {
+export async function executeAutoVoiceMasterSetup(guild, configStore, options = {}) {
   const targetStore = configStore || guild?.client?.configStore;
   if (!targetStore || typeof targetStore.updateGuildConfig !== 'function') {
     throw new Error('Hệ thống chưa sẵn sàng: Không tìm thấy ConfigStore.');
   }
 
-  // 1. Create Voice Category
-  const category = await guild.channels.create({
-    name: '🔊 VoiceMaster Channels',
-    type: ChannelType.GuildCategory
-  });
+  const { categoryId, masterName = '➕ Join to Create', createInterface = false } = options;
 
-  // 2. Create Master Join Voice Channel
+  let category = null;
+  if (categoryId) {
+    category = guild.channels.cache.get(categoryId) || await guild.channels.fetch(categoryId).catch(() => null);
+  }
+
+  // If no category specified, create "🔊 Voice Channels" category only if needed
+  if (!category) {
+    category = await guild.channels.create({
+      name: '🔊 Voice Channels',
+      type: ChannelType.GuildCategory
+    });
+  }
+
+  // Create Master Join Voice Channel
   const masterChannel = await guild.channels.create({
-    name: '➕ Join to Create',
+    name: masterName,
     type: ChannelType.GuildVoice,
     parent: category.id
   });
 
-  // 3. Create Voice Control Panel Text Channel
-  const controlChannel = await guild.channels.create({
-    name: '🎛️-voice-interface',
-    type: ChannelType.GuildText,
-    parent: category.id,
-    topic: '🔒 Control Panel điều khiển phòng thoại tạm thời VoiceMaster'
-  });
+  let controlChannel = null;
+  if (createInterface) {
+    controlChannel = await guild.channels.create({
+      name: '🎛️-voice-interface',
+      type: ChannelType.GuildText,
+      parent: category.id,
+      topic: '🔒 Control Panel điều khiển phòng thoại tạm thời VoiceMaster'
+    });
 
-  // 4. Build & send Control Panel embed in controlChannel
-  const panelEmbed = new EmbedBuilder()
-    .setTitle('🎛️ VoiceMaster Control Interface')
-    .setDescription(
-      `Chào mừng đến với hệ thống **VoiceMaster**!\n\n` +
-      `Tham gia kênh **${masterChannel.name}** (<#${masterChannel.id}>) để tự động khởi tạo phòng thoại riêng.\n` +
-      `Sử dụng các nút bấm bên dưới hoặc lệnh \`/voice\` / \`hb voice\` để quản lý phòng thoại của bạn:`
-    )
-    .addFields(
-      { name: '🔒 Khóa / 🔓 Mở', value: `\`hb voice lock\` / \`hb voice unlock\``, inline: true },
-      { name: '👥 Giới hạn người', value: `\`hb voice limit <số>\``, inline: true },
-      { name: '✏️ Đổi tên phòng', value: `\`hb voice name <tên>\``, inline: true },
-      { name: '🟢 Cho phép / 🔴 Cấm', value: `\`hb voice permit @user\` / \`hb voice reject @user\``, inline: true },
-      { name: '👑 Nhận chủ phòng', value: `\`hb voice claim\``, inline: true }
-    )
-    .setColor(0x00FF88)
-    .setFooter({ text: 'VoiceMaster Automated Engine' });
+    const panelEmbed = new EmbedBuilder()
+      .setTitle('🎛️ VoiceMaster Control Interface')
+      .setDescription(
+        `Chào mừng đến với hệ thống **VoiceMaster**!\n\n` +
+        `Tham gia kênh **${masterChannel.name}** (<#${masterChannel.id}>) để tự động khởi tạo phòng thoại riêng.\n` +
+        `Sử dụng các nút bấm bên dưới hoặc lệnh \`/voice\` / \`hb voice\` để quản lý phòng thoại của bạn:`
+      )
+      .addFields(
+        { name: '🔒 Khóa / 🔓 Mở', value: `\`hb voice lock\` / \`hb voice unlock\``, inline: true },
+        { name: '👥 Giới hạn người', value: `\`hb voice limit <số>\``, inline: true },
+        { name: '✏️ Đổi tên phòng', value: `\`hb voice name <tên>\``, inline: true },
+        { name: '🟢 Cho phép / 🔴 Cấm', value: `\`hb voice permit @user\` / \`hb voice reject @user\``, inline: true },
+        { name: '👑 Nhận chủ phòng', value: `\`hb voice claim\``, inline: true }
+      )
+      .setColor(0x00FF88)
+      .setFooter({ text: 'VoiceMaster Automated Engine' });
 
-  const { buildTempVcControlPanel } = await import('../../tempVoice.js');
-  const controlMsg = await controlChannel.send({
-    embeds: [panelEmbed],
-    components: [
-      buildTempVcControlPanel({ id: 'template' }, '0')
-    ]
-  }).catch(() => null);
+    const { buildTempVcControlPanel } = await import('../../tempVoice.js');
+    const controlMsg = await controlChannel.send({
+      embeds: [panelEmbed],
+      components: [
+        buildTempVcControlPanel({ id: 'template' }, '0')
+      ]
+    }).catch(() => null);
 
-  if (controlMsg) {
-    await controlMsg.pin().catch(() => null);
+    if (controlMsg) {
+      await controlMsg.pin().catch(() => null);
+    }
   }
 
-  // 5. Save to targetStore
+  // Save to targetStore
   await targetStore.updateGuildConfig(guild.id, {
     tempVcEnabled: true,
     tempVcMasterChannelId: masterChannel.id,
     tempVcCategoryId: category.id,
-    tempVcControlChannelId: controlChannel.id
+    tempVcControlChannelId: controlChannel ? controlChannel.id : ''
   });
 
   return {
@@ -73,7 +83,7 @@ export async function executeAutoVoiceMasterSetup(guild, configStore) {
 }
 
 export async function handleVoiceControl(ctx) {
-  const { command, reply, args, source, guild, actorMember, configStore } = ctx;
+  const { command, reply, args, source, guild, actorMember, configStore, isInteraction } = ctx;
   if (!command) return undefined;
 
   // 1. Setup Commands: /setup, /vcsetup, /setup-temp-vc, hb setup, hb vcsetup
@@ -84,16 +94,33 @@ export async function handleVoiceControl(ctx) {
     }
 
     try {
-      const result = await executeAutoVoiceMasterSetup(guild, configStore);
+      let categoryId = undefined;
+      let masterName = '➕ Join to Create';
+      let createInterface = false;
+
+      if (isInteraction && source?.options) {
+        const catOption = source.options.getChannel('category');
+        if (catOption) categoryId = catOption.id;
+        const nameOpt = source.options.getString('name') || source.options.getString('channel_name');
+        if (nameOpt) masterName = nameOpt;
+        const interfaceOpt = source.options.getBoolean('create_interface');
+        if (typeof interfaceOpt === 'boolean') createInterface = interfaceOpt;
+      }
+
+      const result = await executeAutoVoiceMasterSetup(guild, configStore || ctx.client?.configStore, {
+        categoryId,
+        masterName,
+        createInterface
+      });
 
       const embed = new EmbedBuilder()
-        .setTitle('⚡ VoiceMaster Automated Setup Completed')
+        .setTitle('⚡ VoiceMaster Setup Completed')
         .setDescription(
-          `Đã tạo thành công toàn bộ hệ thống VoiceMaster:\n\n` +
-          `• **Danh mục (Category):** ${result.category.name}\n` +
-          `• **Kênh tạo phòng:** **${result.masterChannel.name}** (<#${result.masterChannel.id}>)\n` +
-          `• **Bảng điều khiển:** **#${result.controlChannel.name}** (<#${result.controlChannel.id}>)\n\n` +
-          `Thành viên chỉ cần bấm vào kênh **${result.masterChannel.name}** để tự động tạo phòng thoại riêng!`
+          `Đã tạo kênh Master Voice thành công:\n\n` +
+          `• **Category:** ${result.category.name}\n` +
+          `• **Kênh Join-to-Create:** **${result.masterChannel.name}** (<#${result.masterChannel.id}>)\n` +
+          (result.controlChannel ? `• **Bảng điều khiển:** **#${result.controlChannel.name}** (<#${result.controlChannel.id}>)\n\n` : '\n') +
+          `Thành viên chỉ cần tham gia kênh **${result.masterChannel.name}** để tự động khởi tạo và được tự động chuyển vào phòng thoại riêng!`
         )
         .setColor(0x00FF88)
         .setTimestamp();
@@ -101,7 +128,7 @@ export async function handleVoiceControl(ctx) {
       return reply({ embeds: [embed] });
     } catch (err) {
       console.error('[tempVcSetup] Setup error:', err.message);
-      return reply({ content: `❌ Lỗi khi tự động tạo hệ thống VoiceMaster: ${err.message}`, ephemeral: true });
+      return reply({ content: `❌ Lỗi khi thiết lập VoiceMaster: ${err.message}`, ephemeral: true });
     }
   }
 
