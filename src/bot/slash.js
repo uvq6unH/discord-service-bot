@@ -272,10 +272,48 @@ function buildSlashOptions(command) {
   if (['setup', 'vcsetup', 'setup-temp-vc'].includes(command.type)) {
     return [
       {
+        name: 'default',
+        description: 'Tạo hệ thống kênh thoại tự động Join to Create mặc định',
+        type: ApplicationCommandOptionType.Subcommand,
+        options: [
+          {
+            name: 'category',
+            description: 'Chọn Danh mục (Category) có sẵn để tạo kênh Join to Create',
+            type: ApplicationCommandOptionType.Channel,
+            channelTypes: [ChannelType.GuildCategory],
+            required: false
+          },
+          {
+            name: 'editable',
+            description: 'Cho phép thành viên tự chỉnh sửa phòng của mình (Mặc định: True)',
+            type: ApplicationCommandOptionType.Boolean,
+            required: false
+          },
+          {
+            name: 'permission',
+            description: 'Tên kênh thoại Master (Mặc định: ➕ Join to Create)',
+            type: ApplicationCommandOptionType.String,
+            required: false
+          }
+        ]
+      },
+      {
         name: 'category',
-        description: 'Chọn Category có sẵn để tạo kênh Join to Create (Tùy chọn)',
+        description: 'Chọn Danh mục (Category) có sẵn để tạo kênh Join to Create',
         type: ApplicationCommandOptionType.Channel,
         channelTypes: [ChannelType.GuildCategory],
+        required: false
+      },
+      {
+        name: 'editable',
+        description: 'Cho phép thành viên tự chỉnh sửa phòng của mình (Mặc định: True)',
+        type: ApplicationCommandOptionType.Boolean,
+        required: false
+      },
+      {
+        name: 'permission',
+        description: 'Tên kênh thoại Master (Mặc định: ➕ Join to Create)',
+        type: ApplicationCommandOptionType.String,
         required: false
       },
       {

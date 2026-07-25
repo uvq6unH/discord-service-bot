@@ -122,8 +122,12 @@ export async function handleVoiceControl(ctx) {
       if (isInteraction && source?.options) {
         const catOption = source.options.getChannel('category');
         if (catOption) categoryId = catOption.id;
+
+        const permOpt = source.options.getString('permission');
         const nameOpt = source.options.getString('name') || source.options.getString('channel_name');
-        if (nameOpt) masterName = nameOpt;
+        if (permOpt) masterName = permOpt;
+        else if (nameOpt) masterName = nameOpt;
+
         const interfaceOpt = source.options.getBoolean('create_interface');
         if (typeof interfaceOpt === 'boolean') createInterface = interfaceOpt;
       }
