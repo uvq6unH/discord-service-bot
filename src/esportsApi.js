@@ -132,15 +132,21 @@ export function getAvailableLeagues() {
 
 export async function getDailyMatchesForLeagues(leagueKeys = ['lck', 'lcp', 'worlds'], targetDateStr) {
   const results = [];
-  const targetDate = targetDateStr ? new Date(targetDateStr) : new Date();
-  const targetYMD = targetDate.toISOString().slice(0, 10);
+
+  const dateFormatter = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Ho_Chi_Minh',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit'
+  });
+  const targetYMD = targetDateStr || dateFormatter.format(new Date());
 
   for (const key of leagueKeys) {
     try {
       const schedule = await getEsportsSchedule(key);
       const matchesOnDate = (schedule?.matches || []).filter(m => {
         if (!m.startTime) return false;
-        const matchYMD = new Date(m.startTime).toISOString().slice(0, 10);
+        const matchYMD = dateFormatter.format(new Date(m.startTime));
         return matchYMD === targetYMD;
       });
 

@@ -19,8 +19,24 @@ export function startEsportsWorker(client, configStore, redis) {
 
 async function processEsportsWorkerCycle(client, configStore, redis) {
   const now = new Date();
-  const todayYMD = now.toISOString().slice(0, 10);
-  const currentHHMM = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+
+  // Get current HH:MM in Asia/Ho_Chi_Minh (UTC+7)
+  const timeFormatter = new Intl.DateTimeFormat('en-GB', {
+    timeZone: 'Asia/Ho_Chi_Minh',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false
+  });
+  const currentHHMM = timeFormatter.format(now);
+
+  // Get YYYY-MM-DD in Asia/Ho_Chi_Minh (UTC+7)
+  const dateFormatter = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Ho_Chi_Minh',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit'
+  });
+  const todayYMD = dateFormatter.format(now);
 
   for (const guild of client.guilds.cache.values()) {
     try {

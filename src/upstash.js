@@ -112,8 +112,11 @@ export class UpstashClient {
   // ── List commands ──────────────────────────────────────────────────────────
 
   lpop(key)                         { return this._request(['LPOP', key]); }
+  lpush(key, ...values)             { return this._request(['LPUSH', key, ...values]); }
   blpop(key, timeoutSeconds = 1)    { return this._request(['BLPOP', key, String(timeoutSeconds)]); }
   rpush(key, ...values)             { return this._request(['RPUSH', key, ...values]); }
+  lrange(key, start, stop)          { return this._request(['LRANGE', key, String(start), String(stop)]); }
+  ltrim(key, start, stop)           { return this._request(['LTRIM', key, String(start), String(stop)]); }
   llen(key)                         { return this._request(['LLEN', key]); }
 
   // ── Scripting ──────────────────────────────────────────────────────────────
