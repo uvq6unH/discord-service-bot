@@ -52,7 +52,7 @@ async function processEsportsWorkerCycle(client, configStore, redis) {
 
       const targetLeagues = Array.isArray(config.esportsLeagues) && config.esportsLeagues.length > 0
         ? config.esportsLeagues
-        : ['lck', 'lcp', 'worlds', 'msi', 'lpl', 'lec', 'lcs'];
+        : ['lck', 'lcp', 'lpl', 'lec', 'lcs', 'cblol', 'vcs', 'worlds', 'msi', 'first_stand', 'ewc'];
 
       // ── Job 1: Daily Schedule Broadcast ───────────────────────────────────
       const configuredDailyTime = config.esportsDailyTime || '08:00';
