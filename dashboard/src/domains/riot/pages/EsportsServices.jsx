@@ -398,7 +398,7 @@ export default function EsportsServicesPage() {
                           onChange={(e) => handleRoleChange(league.key, e.target.value)}
                         >
                           <option value="">-- {t("No Mention")} --</option>
-                          {(guildData?.roles ?? []).map(r => (
+                          {(guildData?.roles ?? []).filter(r => r.name !== '@everyone').map(r => (
                             <option key={r.id} value={r.id}>@{r.name}</option>
                           ))}
                         </select>

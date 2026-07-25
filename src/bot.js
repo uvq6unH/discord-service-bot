@@ -50,8 +50,14 @@ const GUILD_CACHE_REFRESH_MS  = 10 * 60_000;
 async function writeGuildCache(guild, redis) {
   if (!redis) return;
   try {
-    const channels = guild.channels.cache.map((c) => ({ id: c.id, name: c.name, type: c.type }));
-    const roles = guild.roles.cache
+    let fetchedRoles;
+    try {
+      fetchedRoles = await guild.roles.fetch();
+    } catch (err) {
+      fetchedRoles = guild.roles.cache;
+    }
+
+    const roles = fetchedRoles
       .map((r) => ({
         id: r.id, name: r.name, rawPosition: r.rawPosition,
         color: r.color ? `#${r.color.toString(16).padStart(6, '0')}` : null,

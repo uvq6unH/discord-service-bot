@@ -1274,7 +1274,16 @@ export function createServer({ configStore, stateStore, botClient, redis = null 
 
     try {
       const channels = guild.channels.cache.map((c) => ({ id: c.id, name: c.name, type: c.type }));
-      const roles = guild.roles.cache
+
+      let fetchedRoles;
+      try {
+        fetchedRoles = await guild.roles.fetch();
+      } catch (err) {
+        console.warn(`[guild-data] roles.fetch failed (${err.message}), falling back to cache`);
+        fetchedRoles = guild.roles.cache;
+      }
+
+      const roles = fetchedRoles
         .map((r) => ({
           id: r.id,
           name: r.name,
