@@ -255,11 +255,13 @@ export default function ReminderServicesPage() {
     reminders.map(r => r.channelId).filter(Boolean)
   ).size;
 
+  const serverName = selectedGuild?.name ? selectedGuild.name.toUpperCase() : '';
+
   return (
     <Workspace>
       {/* 1. Header Zone */}
       <HeaderZone
-        title={t("REMINDER JOBS PIPELINE")}
+        title={serverName ? `${serverName} // SCHEDULED REMINDER SERVICES` : 'SCHEDULED REMINDER SERVICES'}
         subtitle={t("Manage scheduled alert notifications, recurring cron tasks, and target channels broadcasts.")}
       />
 

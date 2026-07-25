@@ -82,11 +82,13 @@ export default function SystemPage() {
     return `${mb.toFixed(1)} MB`;
   };
 
+  const serverName = selectedGuild?.name ? selectedGuild.name.toUpperCase() : '';
+
   return (
     <Workspace>
       {/* 1. Header Zone */}
       <HeaderZone
-        title={t("SYSTEM RUNTIME MONITOR")}
+        title={serverName ? `${serverName} // SYSTEM RUNTIME MONITOR` : 'SYSTEM RUNTIME MONITOR'}
         subtitle={t("Real-time process load, microservices heartbeats, socket latencies, and transaction queues.")}
         actions={
           <button 

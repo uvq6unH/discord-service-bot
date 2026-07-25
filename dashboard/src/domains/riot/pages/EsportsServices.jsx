@@ -86,10 +86,12 @@ export default function EsportsServicesPage() {
     }
   };
 
+  const serverName = selectedGuild?.name ? selectedGuild.name.toUpperCase() : '';
+
   return (
     <Workspace>
       <HeaderZone
-        title={t("ESPORTS TOURNAMENTS CONSOLE")}
+        title={serverName ? `${serverName} // ESPORTS TOURNAMENTS` : 'ESPORTS TOURNAMENTS'}
         subtitle={t("Automated Esports Live Match Tracker, Daily Schedule Broadcasts & 15-Minute Pre-match Alerts")}
       />
 

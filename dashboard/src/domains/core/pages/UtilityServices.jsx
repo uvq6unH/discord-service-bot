@@ -312,9 +312,13 @@ function AutoReplyEditor({ replies, onChange }) {
   );
 }
 
+import { useLocation } from 'react-router-dom';
+
 export default function UtilityServicesPage() {
   const { config, loading, updateConfig } = useCommands();
-  const { guildData } = useGuild();
+  const { guildData, selectedGuild } = useGuild();
+  const location = useLocation();
+  const highlight = location.state?.highlight;
   const { t } = useLanguage();
 
   if (loading || !config) {
@@ -329,11 +333,12 @@ export default function UtilityServicesPage() {
   const utilityCmds = (config.core?.commands ?? []).filter(c => UTILITY_TYPES.includes(c.type));
   const customsCount = (config.core?.commands ?? []).filter(c => c.type === 'custom').length;
   const autoRepliesCount = (config.autoReplies ?? []).length;
+  const serverName = selectedGuild?.name ? selectedGuild.name.toUpperCase() : '';
 
   return (
     <Workspace>
       <HeaderZone
-        title={t("UTILITY SERVICES")}
+        title={serverName ? `${serverName} // UTILITY SERVICES` : 'UTILITY SERVICES'}
         subtitle={t("Manage language translation, Duolingo learning, bot mention reactions, custom responders, and keyword listeners.")}
       />
 
@@ -363,7 +368,7 @@ export default function UtilityServicesPage() {
       <div className="grid-12">
         {/* Mention React Panel */}
         <div className="col-span-12">
-          <Panel title={t("BOT MENTION REACT ENGINE")} accent>
+          <Panel title={t("BOT MENTION REACT ENGINE")} accent className={highlight === 'mentionreact' ? 'flash-target' : ''}>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <div>
@@ -407,7 +412,7 @@ export default function UtilityServicesPage() {
 
         {/* Utility Commands Routing Panel */}
         <div className="col-span-12" style={{ marginTop: 'var(--space-6)' }}>
-          <Panel title={t("UTILITY COMMANDS ROUTING")} accent>
+          <Panel title={t("UTILITY COMMANDS ROUTING")} accent className={highlight === 'utilitycmds' ? 'flash-target' : ''}>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
               {utilityCmds.map(c => (
                 <CommandConfigRow
@@ -430,7 +435,7 @@ export default function UtilityServicesPage() {
 
         {/* Custom Commands Panels */}
         <div className="col-span-6" style={{ marginTop: 'var(--space-6)' }}>
-          <Panel title={t("CUSTOM RESPONSE OPERATORS")} accent>
+          <Panel title={t("CUSTOM RESPONSE OPERATORS")} accent className={highlight === 'customcmds' ? 'flash-target' : ''}>
             <CustomCommandEditor
               commands={config.core?.commands ?? []}
               onChange={v => updateConfig({ core: { commands: v } })}
@@ -440,7 +445,7 @@ export default function UtilityServicesPage() {
 
         {/* Auto Reply Panels */}
         <div className="col-span-6" style={{ marginTop: 'var(--space-6)' }}>
-          <Panel title={t("KEYWORD AUTO-RESPONDERS")} accent>
+          <Panel title={t("KEYWORD AUTO-RESPONDERS")} accent className={highlight === 'autoreplies' ? 'flash-target' : ''}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 'var(--space-4)', paddingBottom: 'var(--space-3)', borderBottom: '1px solid var(--border)' }}>
               <div>
                 <span style={{ fontFamily: 'var(--font-mono)', fontSize: '12px', fontWeight: 'bold', color: 'var(--text-1)' }}>

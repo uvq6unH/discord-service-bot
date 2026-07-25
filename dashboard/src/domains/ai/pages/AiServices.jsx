@@ -4,13 +4,18 @@ import Panel from '../../../shared/primitives/Panel.jsx';
 import DataSlab from '../../../shared/primitives/DataSlab.jsx';
 import { useLanguage } from '../../../shared/context/LanguageContext.jsx';
 
+import { useGuild } from '../../../shared/hooks/useGuild.js';
+
 export default function AiServicesPage() {
+  const { selectedGuild } = useGuild();
   const { t } = useLanguage();
+
+  const serverName = selectedGuild?.name ? selectedGuild.name.toUpperCase() : '';
 
   return (
     <Workspace>
       <HeaderZone
-        title={t("AI OPERATIONS CONSOLE")}
+        title={serverName ? `${serverName} // NEURAL AI AGENT CONSOLE` : 'NEURAL AI AGENT CONSOLE'}
         subtitle={t("Manage neural command parsing, automated chat responses, and context window configurations.")}
       />
       <StatusZone>

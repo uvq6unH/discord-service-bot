@@ -304,12 +304,13 @@ export default function EconomyPage() {
 
   const isEnabled = config.economyEnabled ?? false;
   const isLeveling = config.levelsEnabled ?? false;
+  const serverName = selectedGuild?.name ? selectedGuild.name.toUpperCase() : '';
 
   return (
     <Workspace>
       {/* 1. Header Zone */}
       <HeaderZone
-        title={t("FINANCIAL LEDGER OPERATIONS")}
+        title={serverName ? `${serverName} // FINANCIAL LEDGER OPERATIONS` : 'FINANCIAL LEDGER OPERATIONS'}
         subtitle={t("Manage virtual currency balances, reward distributions pipelines, and casino module configurations.")}
       />
 
@@ -587,7 +588,7 @@ export default function EconomyPage() {
             </div>
           </Panel>
 
-          <Panel title={t("BETTING REGULATION SYSTEM")} style={{ marginTop: 'var(--space-5)', opacity: isEnabled ? 1 : 0.4 }}>
+          <Panel title={t("BETTING REGULATION SYSTEM")} accent className={highlight === 'games' ? 'flash-target' : ''} style={{ marginTop: 'var(--space-5)', opacity: isEnabled ? 1 : 0.4 }}>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
               <CasinoGameRow 
                 title="Blackjack Module" 

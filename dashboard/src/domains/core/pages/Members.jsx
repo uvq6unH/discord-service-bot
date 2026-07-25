@@ -6,6 +6,8 @@ import { useMembers } from '../hooks/useMembers.js';
 import { Search } from 'lucide-react';
 import { useLanguage } from '../../../shared/context/LanguageContext.jsx';
 
+import { useLocation } from 'react-router-dom';
+
 function getDefaultAvatarIndex(id) {
   try {
     return Number(BigInt(id || '0') % 5n);
@@ -16,6 +18,8 @@ function getDefaultAvatarIndex(id) {
 
 export default function MembersPage() {
   const { selectedGuild } = useGuild();
+  const location = useLocation();
+  const highlight = location.state?.highlight;
   const {
     members,
     total,
@@ -28,11 +32,13 @@ export default function MembersPage() {
   } = useMembers(selectedGuild?.id);
   const { t } = useLanguage();
 
+  const serverName = selectedGuild?.name ? selectedGuild.name.toUpperCase() : '';
+
   return (
     <Workspace>
       {/* 1. Header Zone */}
       <HeaderZone
-        title={t("MEMBERS REGISTRY")}
+        title={serverName ? `${serverName} // MEMBERS REGISTRY` : 'MEMBERS REGISTRY'}
         subtitle={t("Operational directory of all registered server member accounts.")}
       />
 

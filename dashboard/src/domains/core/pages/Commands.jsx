@@ -328,11 +328,13 @@ export default function CommandsPage() {
   const EXCLUDED_TYPES = ['translate', 'duolingo', 'voice', 'setup'];
   const builtInCommands = (config.core?.commands ?? []).filter(c => c.type !== 'custom' && !EXCLUDED_TYPES.includes(c.type));
 
+  const serverName = selectedGuild?.name ? selectedGuild.name.toUpperCase() : '';
+
   return (
     <Workspace>
       {/* 1. Header Zone */}
       <HeaderZone
-        title={t("COMMAND GATEWAY ROUTING")}
+        title={serverName ? `${serverName} // COMMAND GATEWAY ROUTING` : 'COMMAND GATEWAY ROUTING'}
         subtitle={t("Manage core system console applications and invocation permissions.")}
       />
 

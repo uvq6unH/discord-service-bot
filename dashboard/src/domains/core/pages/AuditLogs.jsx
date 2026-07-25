@@ -5,13 +5,18 @@ import DataSlab from '../../../shared/primitives/DataSlab.jsx';
 import { useGuild } from '../../../shared/hooks/useGuild.js';
 import { useLanguage } from '../../../shared/context/LanguageContext.jsx';
 
+import { useLocation } from 'react-router-dom';
+
 export default function AuditLogsPage() {
   const { config, updateConfig, guildData, selectedGuild } = useGuild();
+  const location = useLocation();
+  const highlight = location.state?.highlight;
   const { t } = useLanguage();
   const [logs, setLogs] = useState([]);
   const [loading, setLoading] = useState(true);
 
   const textChannels = (guildData?.channels || []).filter(c => c.type === 0);
+  const serverName = selectedGuild?.name ? selectedGuild.name.toUpperCase() : '';
 
   useEffect(() => {
     if (!selectedGuild?.id) return;
@@ -43,7 +48,7 @@ export default function AuditLogsPage() {
     <Workspace>
       {/* 1. Header Zone */}
       <HeaderZone
-        title={selectedGuild?.name ? `${selectedGuild.name.toUpperCase()} // AUDIT LOGS` : 'AUDIT LOGS'}
+        title={serverName ? `${serverName} // AUDIT LOGS` : 'AUDIT LOGS'}
         subtitle={t("System Audit Trail & Administrator Configuration Activity History.")}
       />
 
@@ -70,7 +75,7 @@ export default function AuditLogsPage() {
       <div className="grid-12">
         {/* Logging Integration Panel */}
         <div className="col-span-12">
-          <Panel title={t("SECURITY LOGGING CHANNEL INTEGRATION")} accent>
+          <Panel title={t("SECURITY LOGGING CHANNEL INTEGRATION")} accent className={highlight === 'logchannel' ? 'flash-target' : ''}>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
               <label className="form-label" style={{ fontSize: '11px', fontFamily: 'var(--font-mono)', fontWeight: 'bold' }}>
                 {t("Security & Audit Events Logging Target Channel")}
@@ -92,7 +97,7 @@ export default function AuditLogsPage() {
 
         {/* Administrative Activity Logs Panel */}
         <div className="col-span-12" style={{ marginTop: 'var(--space-6)' }}>
-          <Panel title={t("ADMINISTRATIVE ACTIVITY LOGS")} accent>
+          <Panel title={t("ADMINISTRATIVE ACTIVITY LOGS")} accent className={highlight === 'activity' ? 'flash-target' : ''}>
             {loading ? (
               <div style={{ padding: 'var(--space-6)', textAlign: 'center', fontFamily: 'var(--font-mono)', color: 'var(--text-3)' }}>
                 {t("LOADING AUDIT LOGS BUFFER...")}

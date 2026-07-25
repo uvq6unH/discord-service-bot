@@ -131,11 +131,13 @@ export default function AnalyticsPage() {
     );
   };
 
+  const serverName = selectedGuild?.name ? selectedGuild.name.toUpperCase() : '';
+
   return (
     <Workspace>
       {/* 1. Header Zone */}
       <HeaderZone
-        title={t("OPERATIONAL TELEMETRY LOGS")}
+        title={serverName ? `${serverName} // OPERATIONAL TELEMETRY LOGS` : 'OPERATIONAL TELEMETRY LOGS'}
         subtitle={t("Historical execution statistics, user interaction profiles, and network query traffic load.")}
         actions={
           <button 

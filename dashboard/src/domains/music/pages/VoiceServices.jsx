@@ -207,10 +207,12 @@ export default function VoiceServicesPage() {
     }
   };
 
+  const serverName = selectedGuild?.name ? selectedGuild.name.toUpperCase() : '';
+
   return (
     <Workspace>
       <HeaderZone
-        title={t("VOICEMASTER VC ENGINE")}
+        title={serverName ? `${serverName} // VOICEMASTER VC ENGINE` : 'VOICEMASTER VC ENGINE'}
         subtitle={t("Automated Join-to-Create Temporary Voice Channels, Interactive Control Panels & Voice Moderation")}
       />
 

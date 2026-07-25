@@ -282,12 +282,14 @@ export default function ModerationPage() {
   const textChannels = channels.filter(c => c.type === 0 || c.type === 5);
   const categoryChannels = channels.filter(c => c.type === 4);
 
+  const serverName = selectedGuild?.name ? selectedGuild.name.toUpperCase() : '';
+
   return (
     <PermissionGuard role={userRole} allowed={['owner', 'admin', 'moderator']}>
       <Workspace>
         {/* 1. Header Zone */}
         <HeaderZone
-          title={t("AUTOMATED MODERATION CONTROL")}
+          title={serverName ? `${serverName} // AUTOMATED MODERATION CONTROL` : 'AUTOMATED MODERATION CONTROL'}
           subtitle={t("Configure security firewalls, filters, ticket panels, and user self-assignment roles.")}
         />
 

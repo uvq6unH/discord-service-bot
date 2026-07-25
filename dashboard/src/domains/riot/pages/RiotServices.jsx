@@ -177,11 +177,13 @@ export default function RiotServicesPage() {
     return false;
   });
 
+  const serverName = selectedGuild?.name ? selectedGuild.name.toUpperCase() : '';
+
   return (
     <Workspace>
       {/* 1. Header Zone */}
       <HeaderZone
-        title={t("RIOT TELEMETRY PIPELINE")}
+        title={serverName ? `${serverName} // RIOT GAMES TELEMETRY` : 'RIOT GAMES TELEMETRY'}
         subtitle={t("Manage authentication tokens, API keys, and active game tracking modules for League and TFT.")}
       />
 

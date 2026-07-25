@@ -169,11 +169,13 @@ export default function MusicServicesPage() {
   const music = config.music ?? {};
   const volume = music.defaultVolume ?? 70;
 
+  const serverName = selectedGuild?.name ? selectedGuild.name.toUpperCase() : '';
+
   return (
     <Workspace>
       {/* 1. Header Zone */}
       <HeaderZone
-        title={t("AUDIO STREAM CONTROLLER")}
+        title={serverName ? `${serverName} // LAVALINK AUDIO CONSOLE` : 'LAVALINK AUDIO CONSOLE'}
         subtitle={t("Manage active Lavalink voice connections, player volumes, and song request command routing.")}
       />
 
