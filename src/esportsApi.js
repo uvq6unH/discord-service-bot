@@ -16,8 +16,8 @@ function httpGet(url) {
   return new Promise((resolve, reject) => {
     const options = {
       headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
-        'x-api-key': '0588577317765103444' // Public LoL Esports API Key
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+        'x-api-key': '0TvQnueqKa5mxJntVWt0w4LpLfEkrV1Ta8rQBb9Z' // Active Public LoL Esports API Key
       }
     };
     https.get(url, options, (res) => {
