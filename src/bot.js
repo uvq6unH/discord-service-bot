@@ -181,6 +181,11 @@ export function createBot(configStore, stateStore, redis = null) {
       // Workers
       startReminderWorker(readyClient, configStore);
       _startEventQueueWorker(readyClient, configStore, redis);
+
+      // Auto sync global slash commands to Discord Application
+      await client.syncGlobalCommands().catch((err) => {
+        console.error('[bot] Error syncing global commands:', err.message);
+      });
     })().catch((err) => console.error('[bot] Startup error:', err));
   });
 
