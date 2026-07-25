@@ -166,6 +166,10 @@ function normalizeCommands(commands, defaultFallback = []) {
       };
     })
     .filter((item) => {
+      // Filter out legacy setup command aliases
+      if (['vcsetup', 'setup-temp-vc'].includes(item.name) || ['vcsetup', 'setup-temp-vc'].includes(item.type)) {
+        return false;
+      }
       // custom commands require a name, but can be saved with an empty response while being drafted
       if (!item.name || seen.has(item.name)) {
         return false;

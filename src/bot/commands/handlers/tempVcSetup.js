@@ -135,8 +135,8 @@ export async function handleVoiceControl(ctx) {
   const { command, reply, args, source, guild, actorMember, configStore, isInteraction } = ctx;
   if (!command) return undefined;
 
-  // 1. Setup Commands: /setup, /vcsetup, /setup-temp-vc, hb setup, hb vcsetup
-  const isSetupCmd = ['setup', 'vcsetup', 'setup-temp-vc'].includes(command.name?.toLowerCase());
+  // 1. Setup Command: /setup, hb setup
+  const isSetupCmd = command.name?.toLowerCase() === 'setup' || command.type?.toLowerCase() === 'setup';
   if (isSetupCmd) {
     if (!actorMember?.permissions?.has(PermissionFlagsBits.Administrator)) {
       return reply({ content: '❌ Bạn cần có quyền **Administrator** để sử dụng lệnh này.', ephemeral: true });
