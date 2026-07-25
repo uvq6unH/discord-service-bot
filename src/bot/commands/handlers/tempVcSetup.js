@@ -1,10 +1,9 @@
 import { ChannelType, PermissionFlagsBits, EmbedBuilder } from 'discord.js';
 
 export async function executeAutoVoiceMasterSetup(guild, configStore) {
-  let targetStore = configStore;
+  const targetStore = configStore || guild?.client?.configStore;
   if (!targetStore || typeof targetStore.updateGuildConfig !== 'function') {
-    const { configStore: singletonStore } = await import('../../../configStore.js');
-    targetStore = singletonStore;
+    throw new Error('Hệ thống chưa sẵn sàng: Không tìm thấy ConfigStore.');
   }
 
   // 1. Create Voice Category

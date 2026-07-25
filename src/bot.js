@@ -377,6 +377,7 @@ export function createBot(configStore, stateStore, redis = null) {
       await runBuiltInCommand({
         client,
         config,
+        configStore,
         command,
         source: interaction,
         args: interaction.options.getString('args') ?? '',
@@ -455,7 +456,7 @@ export function createBot(configStore, stateStore, redis = null) {
             return;
           }
 
-          await runBuiltInCommand({ client, config, command, source: message, args: argParts.join(' ') });
+          await runBuiltInCommand({ client, config, configStore, command, source: message, args: argParts.join(' ') });
           return;
         }
         // Unknown prefix → fall through to XP + autoReply
