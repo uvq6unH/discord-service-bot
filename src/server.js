@@ -1273,7 +1273,13 @@ export function createServer({ configStore, stateStore, botClient, redis = null 
     if (cached) { res.json(cached); return; }
 
     try {
-      const channels = guild.channels.cache.map((c) => ({ id: c.id, name: c.name, type: c.type }));
+      let fetchedChannels;
+      try {
+        fetchedChannels = await guild.channels.fetch();
+      } catch (err) {
+        fetchedChannels = guild.channels.cache;
+      }
+      const channels = [...fetchedChannels.values()].map((c) => ({ id: c.id, name: c.name, type: c.type }));
 
       let fetchedRoles;
       try {
