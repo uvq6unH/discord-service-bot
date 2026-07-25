@@ -1,4 +1,4 @@
-import { ApplicationCommandOptionType } from 'discord.js';
+import { ApplicationCommandOptionType, ChannelType } from 'discord.js';
 import { buildLolSlashOptions } from '../lolCommands.js';
 import { buildTftSlashOptions } from '../tftCommands.js';
 
