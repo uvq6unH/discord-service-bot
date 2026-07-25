@@ -142,7 +142,7 @@ export function getAvailableLeagues() {
 /**
  * Fetch all matches taking place on a target date (YYYY-MM-DD in UTC+7 / Asia/Ho_Chi_Minh).
  */
-export async function getDailyMatchesForLeagues(leagueKeys = ['lck', 'lcp', 'lpl', 'lec', 'lcs', 'cblol', 'vcs', 'worlds', 'msi'], targetDateStr) {
+export async function getDailyMatchesForLeagues(leagueKeys = ['lck', 'lcp', 'worlds', 'msi', 'lpl', 'lec', 'lcs'], targetDateStr) {
   const results = [];
 
   const dateFormatter = new Intl.DateTimeFormat('en-CA', {
