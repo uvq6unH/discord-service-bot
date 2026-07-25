@@ -1,11 +1,11 @@
-import React from 'react';
+import React, { useState } from 'react';
 import Workspace, { HeaderZone, StatusZone, KpiTile } from '../../../shared/layouts/Workspace.jsx';
 import Panel from '../../../shared/primitives/Panel.jsx';
 import DataSlab from '../../../shared/primitives/DataSlab.jsx';
 import { useRiot } from '../hooks/useRiot.js';
 import { useGuild } from '../../../shared/hooks/useGuild.js';
 import { useLanguage } from '../../../shared/context/LanguageContext.jsx';
-import { Trophy, Tv, BellRing, ShieldCheck } from 'lucide-react';
+import { Trophy, Tv, BellRing, ShieldCheck, Send } from 'lucide-react';
 
 const LEAGUES = [
   { key: 'lck', name: 'LCK Korea', icon: '🇰🇷' },
@@ -27,6 +27,9 @@ export default function EsportsServicesPage() {
   const { config, loading, updateConfig } = useRiot();
   const { guildData } = useGuild();
   const { t } = useLanguage();
+
+  const [testing, setTesting] = useState(false);
+  const [testStatus, setTestStatus] = useState(null);
 
   const channels = guildData?.channels ?? [];
 
@@ -51,6 +54,26 @@ export default function EsportsServicesPage() {
       ? selectedLeagues.filter(k => k !== leagueKey)
       : [...selectedLeagues, leagueKey];
     updateConfig({ esportsLeagues: nextLeagues });
+  };
+
+  const handleTestNotify = async () => {
+    if (!selectedChannelId) return;
+    setTesting(true);
+    setTestStatus(null);
+    try {
+      const selectedGuildId = localStorage.getItem('selectedGuildId') || '';
+      const res = await fetch(`/api/esports/test-notify?guildId=${selectedGuildId}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to send test notification');
+      setTestStatus({ success: true, message: data.message });
+    } catch (err) {
+      setTestStatus({ success: false, message: err.message });
+    } finally {
+      setTesting(false);
+    }
   };
 
   return (
@@ -83,7 +106,7 @@ export default function EsportsServicesPage() {
         <div className="col-span-12">
           <Panel title={t("AUTOMATED LIVE MATCH BROADCASTER")} accent>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-5)' }}>
-              
+
               {/* Toggle Broadcaster */}
               <div style={{
                 display: 'flex',
@@ -132,16 +155,39 @@ export default function EsportsServicesPage() {
                   background: 'var(--surface-1)',
                   border: '1px solid var(--border)'
                 }}>
-                  <label style={{
-                    display: 'block',
-                    fontFamily: 'var(--font-mono)',
-                    fontSize: '12px',
-                    fontWeight: 'bold',
-                    marginBottom: 'var(--space-2)',
-                    color: 'var(--text-1)'
-                  }}>
-                    {t("Target Notification Text Channel")}
-                  </label>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--space-2)' }}>
+                    <label style={{
+                      fontFamily: 'var(--font-mono)',
+                      fontSize: '12px',
+                      fontWeight: 'bold',
+                      color: 'var(--text-1)'
+                    }}>
+                      {t("Target Notification Text Channel")}
+                    </label>
+
+                    <button
+                      type="button"
+                      onClick={handleTestNotify}
+                      disabled={testing || !selectedChannelId}
+                      style={{
+                        padding: 'var(--space-1) var(--space-2-5)',
+                        fontSize: '10px',
+                        fontFamily: 'var(--font-mono)',
+                        border: '1px solid var(--accent)',
+                        background: testing ? 'var(--surface-2)' : 'var(--accent-dim)',
+                        color: 'var(--text-1)',
+                        cursor: selectedChannelId ? 'pointer' : 'not-allowed',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '4px',
+                        opacity: selectedChannelId ? 1 : 0.5
+                      }}
+                    >
+                      <Send size={10} />
+                      {testing ? '⚡ SENDING...' : '🧪 TEST NOTIFY'}
+                    </button>
+                  </div>
+
                   <select
                     className="form-input"
                     style={{
@@ -161,6 +207,17 @@ export default function EsportsServicesPage() {
                       <option key={c.id} value={c.id}>#{c.name}</option>
                     ))}
                   </select>
+
+                  {testStatus && (
+                    <div style={{
+                      fontSize: '11px',
+                      fontFamily: 'var(--font-mono)',
+                      marginTop: 'var(--space-2)',
+                      color: testStatus.success ? 'var(--green)' : 'var(--red)'
+                    }}>
+                      {testStatus.success ? '✔ ' : '✖ '}{testStatus.message}
+                    </div>
+                  )}
                 </div>
 
                 {/* Daily Schedule Broadcast Time Selector */}
@@ -194,7 +251,7 @@ export default function EsportsServicesPage() {
                     onChange={(e) => updateConfig({ esportsDailyTime: e.target.value })}
                   >
                     {TIME_OPTIONS.map(time => (
-                      <option key={time} value={time}>⏰ {time} (Hàng ngày)</option>
+                      <option key={time} value={time}>⏰ {time}</option>
                     ))}
                   </select>
                 </div>
