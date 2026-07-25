@@ -13,95 +13,97 @@ const _localTempVcStore = new Map(); // channelId -> { ownerId, isLocked, userLi
 
 export function buildTempVcControlPanel(channel, ownerId) {
   const embed = new EmbedBuilder()
-    .setTitle('⚙️ Welcome to your temporary voice channel')
+    .setTitle('⚙️ Welcome to your own temporary voice channel')
     .setDescription(
       `Control your channel using the menus below:\n` +
       `• Use the dropdowns to manage settings and permissions\n` +
-      `• Alternatively use \`/voice\` commands\n` +
-      `• Owner: <@${ownerId}>`
+      `• Alternatively use \`/voice\` or \`hb voice\` commands\n` +
+      `• Channel Owner: <@${ownerId}>\n\n` +
+      `Create a **user profile** on the dashboard to save and load your custom channel settings!`
     )
+    .setThumbnail('https://raw.githubusercontent.com/twitter/twemoji/master/assets/72x72/1f399.png')
     .setColor(0x5865F2)
-    .setFooter({ text: 'VoiceMaster Control Engine • Discord Bot' });
+    .setFooter({ text: 'VoiceMaster Engine • Powered by Antigravity' });
 
   const settingsSelect = new StringSelectMenuBuilder()
     .setCustomId(`tempvc_settings:${channel.id}:${ownerId}`)
-    .setPlaceholder('Change channel settings...')
+    .setPlaceholder('Change channel settings')
     .addOptions(
       new StringSelectMenuOptionBuilder()
         .setLabel('Lock Channel')
         .setValue('lock')
-        .setDescription('Prevent new users from joining your voice channel')
+        .setDescription('Prevent new members from joining')
         .setEmoji('🔒'),
       new StringSelectMenuOptionBuilder()
         .setLabel('Unlock Channel')
         .setValue('unlock')
-        .setDescription('Allow anyone to join your voice channel')
+        .setDescription('Allow members to join')
         .setEmoji('🔓'),
       new StringSelectMenuOptionBuilder()
         .setLabel('Rename Channel')
         .setValue('rename')
-        .setDescription('Change the name of your voice channel')
+        .setDescription('Change channel name')
         .setEmoji('✏️'),
       new StringSelectMenuOptionBuilder()
         .setLabel('User Limit')
         .setValue('limit')
-        .setDescription('Set max user limit for your channel')
+        .setDescription('Set max user limit (0 - 99)')
         .setEmoji('👥'),
       new StringSelectMenuOptionBuilder()
-        .setLabel('Bitrate Audio')
+        .setLabel('Bitrate Quality')
         .setValue('bitrate')
-        .setDescription('Set audio quality / bitrate')
-        .setEmoji('📻')
+        .setDescription('Adjust channel audio bitrate')
+        .setEmoji('🔊'),
+      new StringSelectMenuOptionBuilder()
+        .setLabel('Claim Ownership')
+        .setValue('claim')
+        .setDescription('Claim ownership if owner left')
+        .setEmoji('👑')
     );
 
   const permissionsSelect = new StringSelectMenuBuilder()
     .setCustomId(`tempvc_permissions:${channel.id}:${ownerId}`)
-    .setPlaceholder('Change channel permissions & member management...')
+    .setPlaceholder('Change channel permissions')
     .addOptions(
       new StringSelectMenuOptionBuilder()
         .setLabel('Permit Member')
         .setValue('permit')
-        .setDescription('Allow a specific user to join locked channel')
+        .setDescription('Grant a member access to locked channel')
         .setEmoji('🟢'),
       new StringSelectMenuOptionBuilder()
         .setLabel('Reject Member')
         .setValue('reject')
-        .setDescription('Kick and block a user from channel')
+        .setDescription('Kick & ban a member from channel')
         .setEmoji('🔴'),
       new StringSelectMenuOptionBuilder()
         .setLabel('Kick Member')
         .setValue('kick')
-        .setDescription('Kick a member out of voice channel')
+        .setDescription('Disconnect a member from channel')
         .setEmoji('🥾'),
       new StringSelectMenuOptionBuilder()
-        .setLabel('Invite Member')
-        .setValue('invite')
-        .setDescription('Send an invitation to join channel')
-        .setEmoji('📩'),
+        .setLabel('Hide Channel')
+        .setValue('hide')
+        .setDescription('Hide channel from everyone')
+        .setEmoji('👁️'),
       new StringSelectMenuOptionBuilder()
-        .setLabel('Transfer Ownership')
-        .setValue('transfer')
-        .setDescription('Transfer channel ownership to another member')
-        .setEmoji('👑'),
-      new StringSelectMenuOptionBuilder()
-        .setLabel('Claim Ownership')
-        .setValue('claim')
-        .setDescription('Claim ownership if original owner left')
-        .setEmoji('👑')
+        .setLabel('Unhide Channel')
+        .setValue('unhide')
+        .setDescription('Make channel visible to everyone')
+        .setEmoji('👁️‍🗨️')
     );
 
   const row1 = new ActionRowBuilder().addComponents(settingsSelect);
   const row2 = new ActionRowBuilder().addComponents(permissionsSelect);
   const row3 = new ActionRowBuilder().addComponents(
     new ButtonBuilder()
-      .setCustomId(`tempvc_refresh:${channel.id}:${ownerId}`)
-      .setLabel('Refresh Status')
+      .setCustomId(`tempvc_load_settings:${channel.id}:${ownerId}`)
+      .setLabel('Load Settings')
       .setEmoji('🔄')
-      .setStyle(ButtonStyle.Secondary),
+      .setStyle(ButtonStyle.Primary),
     new ButtonBuilder()
       .setLabel('Dashboard')
       .setStyle(ButtonStyle.Link)
-      .setURL('http://localhost:10001')
+      .setURL('https://discord-dashboard-g3xb.onrender.com')
   );
 
   return { embeds: [embed], components: [row1, row2, row3] };
@@ -167,18 +169,19 @@ export async function handleVoiceStateUpdate(oldState, newState, configStore, re
         await redis.hset(`guild:${guild.id}:temp_vcs`, newChannel.id, member.id).catch(() => null);
       }
 
-      // Move member to new channel (try both member.voice and newState)
+      // Move member to new channel
       let moved = false;
       try {
-        if (member.voice?.channelId) {
-          await member.voice.setChannel(newChannel);
-          moved = true;
-        } else {
+        await member.voice.setChannel(newChannel);
+        moved = true;
+      } catch (moveErr) {
+        console.warn(`[tempVoice] Primary setChannel failed (${moveErr.message}), trying newState.setChannel`);
+        try {
           await newState.setChannel(newChannel);
           moved = true;
+        } catch (e2) {
+          console.error(`[tempVoice] Failed to move member ${member.user.tag}:`, e2.message);
         }
-      } catch (moveErr) {
-        console.error('[tempVoice] Failed to move member to new channel:', moveErr.message);
       }
 
       // Post VoiceMaster Control Interface into the channel's text chat

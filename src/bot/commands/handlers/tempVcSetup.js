@@ -21,11 +21,32 @@ export async function executeAutoVoiceMasterSetup(guild, configStore, options = 
     });
   }
 
+  const me = guild.members.me || await guild.members.fetchMe().catch(() => null);
+  const masterOverwrites = [
+    {
+      id: guild.roles.everyone.id,
+      allow: [PermissionFlagsBits.Connect, PermissionFlagsBits.Speak, PermissionFlagsBits.ViewChannel]
+    }
+  ];
+  if (me) {
+    masterOverwrites.push({
+      id: me.id,
+      allow: [
+        PermissionFlagsBits.Connect,
+        PermissionFlagsBits.Speak,
+        PermissionFlagsBits.MoveMembers,
+        PermissionFlagsBits.ManageChannels,
+        PermissionFlagsBits.ViewChannel
+      ]
+    });
+  }
+
   // Create Master Join Voice Channel
   const masterChannel = await guild.channels.create({
     name: masterName,
     type: ChannelType.GuildVoice,
-    parent: category.id
+    parent: category.id,
+    permissionOverwrites: masterOverwrites
   });
 
   let controlChannel = null;
