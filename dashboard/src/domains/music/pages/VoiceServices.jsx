@@ -6,6 +6,7 @@ import { useMusic } from '../hooks/useMusic.js';
 import { useGuild } from '../../../shared/hooks/useGuild.js';
 import { useLanguage } from '../../../shared/context/LanguageContext.jsx';
 import { Mic, Radio, Volume2, ShieldCheck, Wand2 } from 'lucide-react';
+import { apiFetch } from '../../../api.js';
 
 function CommandConfigRow({ cmd, roles, onUpdate, displayPrefix = '/' }) {
   const [expanded, setExpanded] = useState(false);
@@ -178,17 +179,11 @@ export default function VoiceServicesPage() {
     setSetupStatus(null);
     try {
       const selectedGuildId = localStorage.getItem('selectedGuildId') || '';
-      const res = await fetch(`/api/guilds/${selectedGuildId}/temp-vc-setup`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' }
+      const data = await apiFetch(`/api/guilds/${selectedGuildId}/temp-vc-setup`, {
+        method: 'POST'
       });
-      const data = await res.json();
-      if (data.success) {
-        setSetupStatus({ success: true, message: data.message });
-        window.location.reload();
-      } else {
-        setSetupStatus({ success: false, message: data.error || 'Lỗi thiết lập.' });
-      }
+      setSetupStatus({ success: true, message: data.message });
+      setTimeout(() => window.location.reload(), 1200);
     } catch (err) {
       setSetupStatus({ success: false, message: err.message });
     } finally {
@@ -201,9 +196,8 @@ export default function VoiceServicesPage() {
     setSettingUp(true);
     try {
       const selectedGuildId = localStorage.getItem('selectedGuildId') || '';
-      await fetch(`/api/guilds/${selectedGuildId}/temp-vc-reset`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' }
+      await apiFetch(`/api/guilds/${selectedGuildId}/temp-vc-reset`, {
+        method: 'POST'
       });
       window.location.reload();
     } catch (err) {
