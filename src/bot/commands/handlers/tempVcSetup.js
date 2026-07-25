@@ -103,6 +103,34 @@ export async function executeAutoVoiceMasterSetup(guild, configStore, options = 
   };
 }
 
+export async function executeVoiceMasterReset(guild, configStore) {
+  const targetStore = configStore || guild?.client?.configStore;
+  if (!targetStore || typeof targetStore.updateGuildConfig !== 'function') {
+    throw new Error('Hệ thống chưa sẵn sàng: Không tìm thấy ConfigStore.');
+  }
+
+  const config = await targetStore.getGuildConfig(guild.id).catch(() => null);
+  if (config) {
+    if (config.tempVcMasterChannelId) {
+      const ch = guild.channels.cache.get(config.tempVcMasterChannelId);
+      if (ch) await ch.delete('VoiceMaster reset').catch(() => null);
+    }
+    if (config.tempVcControlChannelId) {
+      const ch = guild.channels.cache.get(config.tempVcControlChannelId);
+      if (ch) await ch.delete('VoiceMaster reset').catch(() => null);
+    }
+  }
+
+  await targetStore.updateGuildConfig(guild.id, {
+    tempVcEnabled: false,
+    tempVcMasterChannelId: '',
+    tempVcCategoryId: '',
+    tempVcControlChannelId: ''
+  });
+
+  return { reset: true };
+}
+
 export async function handleVoiceControl(ctx) {
   const { command, reply, args, source, guild, actorMember, configStore, isInteraction } = ctx;
   if (!command) return undefined;
@@ -115,6 +143,23 @@ export async function handleVoiceControl(ctx) {
     }
 
     try {
+      let subCmd = undefined;
+      if (isInteraction && source?.options) {
+        subCmd = source.options.getSubcommand(false);
+      } else if (args && args.length > 0) {
+        subCmd = args[0]?.toLowerCase();
+      }
+
+      if (subCmd === 'reset') {
+        await executeVoiceMasterReset(guild, configStore || ctx.client?.configStore);
+        const embed = new EmbedBuilder()
+          .setTitle('🗑️ VoiceMaster Reset Completed')
+          .setDescription('Đã đặt lại và xóa bỏ cấu hình VoiceMaster thành công trên máy chủ!')
+          .setColor(0xFF4757)
+          .setTimestamp();
+        return reply({ embeds: [embed] });
+      }
+
       let categoryId = undefined;
       let masterName = '➕ Join to Create';
       let createInterface = false;
