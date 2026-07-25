@@ -9,7 +9,7 @@ import { Trophy, Tv, BellRing, ShieldCheck } from 'lucide-react';
 
 const LEAGUES = [
   { key: 'lck', name: 'LCK Korea', icon: '🇰🇷' },
-  { key: 'vcs', name: 'VCS Việt Nam', icon: '🇻🇳' },
+  { key: 'lcp', name: 'LCP Pacific', icon: '🌏' },
   { key: 'lpl', name: 'LPL China', icon: '🇨🇳' },
   { key: 'lec', name: 'LEC Europe', icon: '🇪🇺' },
   { key: 'lcs', name: 'LCS Americas', icon: '🇺🇸' },
@@ -34,7 +34,7 @@ export default function EsportsServicesPage() {
 
   const selectedLeagues = Array.isArray(config.esportsLeagues)
     ? config.esportsLeagues
-    : ['lck', 'vcs', 'worlds', 'msi', 'lpl', 'lec', 'lcs'];
+    : ['lck', 'lcp', 'worlds', 'msi', 'lpl', 'lec', 'lcs'];
 
   const handleLeagueToggle = (leagueKey) => {
     const nextLeagues = selectedLeagues.includes(leagueKey)
@@ -54,7 +54,7 @@ export default function EsportsServicesPage() {
         <KpiTile
           label={t("Tracked Leagues")}
           value={`${selectedLeagues.length} LEAGUES`}
-          sub={t("LCK, VCS, WORLDS, LPL")}
+          sub={t("LCK, LCP, WORLDS, LPL")}
         />
         <KpiTile
           label={t("Live Notification Pipeline")}
@@ -217,9 +217,9 @@ export default function EsportsServicesPage() {
               highlight
             />
             <DataSlab
-              label={t("Available Slash Commands")}
-              value="/esports [league], /lck, /vcs"
-              sub={t("Interactive Dropdown Buttons Active")}
+              label={t("Esports Feed Manager")}
+              value={t("Dashboard Only Configuration")}
+              sub={t("Multi-League Live Broadcast Pipeline")}
             />
           </Panel>
         </div>

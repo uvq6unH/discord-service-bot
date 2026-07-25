@@ -2,7 +2,7 @@ import https from 'node:https';
 
 const ESPORTS_LEAGUES = {
   lck: { id: '98767991310872058', name: 'LCK Korea', icon: '🇰🇷' },
-  vcs: { id: '98767991349978712', name: 'VCS Việt Nam', icon: '🇻🇳' },
+  lcp: { id: '110371976858074408', name: 'LCP Pacific', icon: '🌏' },
   lpl: { id: '98767991314006698', name: 'LPL China', icon: '🇨🇳' },
   lec: { id: '98767991305261587', name: 'LEC Europe', icon: '🇪🇺' },
   lcs: { id: '98767991299242408', name: 'LCS Americas', icon: '🇺🇸' },
@@ -104,9 +104,9 @@ export async function getEsportsSchedule(leagueKey = 'lck') {
         },
         {
           id: 'fallback-2',
-          leagueName: 'VCS Việt Nam',
-          icon: '🇻🇳',
-          blockName: 'Chung Kết VCS',
+          leagueName: 'LCP Pacific',
+          icon: '🌏',
+          blockName: 'Chung Kết LCP',
           team1: 'GAM Esports',
           team2: 'Viking Esports',
           code1: 'GAM',
