@@ -269,64 +269,65 @@ function buildSlashOptions(command) {
     ];
   }
 
-  if (['setup', 'vcsetup'].includes(command.type)) {
-    return [
-      {
-        name: 'default',
-        description: 'Tạo hệ thống kênh thoại tự động Join to Create mặc định',
-        type: ApplicationCommandOptionType.Subcommand,
-        options: [
-          {
-            name: 'category',
-            description: 'Chọn Danh mục (Category) có sẵn để tạo kênh Join to Create',
-            type: ApplicationCommandOptionType.Channel,
-            channelTypes: [ChannelType.GuildCategory],
-            required: false
-          },
-          {
-            name: 'editable',
-            description: 'Cho phép thành viên tự chỉnh sửa phòng của mình (Mặc định: True)',
-            type: ApplicationCommandOptionType.Boolean,
-            required: false
-          },
-          {
-            name: 'permission',
-            description: 'Tên kênh thoại Master (Mặc định: ➕ Join to Create)',
-            type: ApplicationCommandOptionType.String,
-            required: false
-          }
-        ]
-      },
-      {
-        name: 'custom',
-        description: 'Tạo hệ thống VoiceMaster với các tùy chỉnh mở rộng',
-        type: ApplicationCommandOptionType.Subcommand,
-        options: [
-          {
-            name: 'category',
-            description: 'Chọn Danh mục (Category) có sẵn',
-            type: ApplicationCommandOptionType.Channel,
-            channelTypes: [ChannelType.GuildCategory],
-            required: false
-          },
-          {
-            name: 'name',
-            description: 'Tên kênh thoại Master',
-            type: ApplicationCommandOptionType.String,
-            required: false
-          },
-          {
-            name: 'create_interface',
-            description: 'Tạo kênh text Control Panel (Mặc định: False)',
-            type: ApplicationCommandOptionType.Boolean,
-            required: false
-          }
-        ]
-      }
-    ];
-  }
+  const setupTypes = ['setup', 'vcsetup', 'setup-temp-vc'];
+  if (setupTypes.includes(command.type) || setupTypes.includes(command.name)) {
+    if (command.name === 'setup' || command.type === 'setup') {
+      return [
+        {
+          name: 'default',
+          description: 'Tạo hệ thống kênh thoại tự động Join to Create mặc định',
+          type: ApplicationCommandOptionType.Subcommand,
+          options: [
+            {
+              name: 'category',
+              description: 'Chọn Danh mục (Category) có sẵn để tạo kênh Join to Create',
+              type: ApplicationCommandOptionType.Channel,
+              channelTypes: [ChannelType.GuildCategory],
+              required: false
+            },
+            {
+              name: 'permission',
+              description: 'Tên kênh thoại Master (Mặc định: ➕ Join to Create)',
+              type: ApplicationCommandOptionType.String,
+              required: false
+            },
+            {
+              name: 'editable',
+              description: 'Cho phép thành viên tự chỉnh sửa phòng của mình (Mặc định: True)',
+              type: ApplicationCommandOptionType.Boolean,
+              required: false
+            }
+          ]
+        },
+        {
+          name: 'custom',
+          description: 'Tạo hệ thống VoiceMaster với các tùy chỉnh mở rộng',
+          type: ApplicationCommandOptionType.Subcommand,
+          options: [
+            {
+              name: 'category',
+              description: 'Chọn Danh mục (Category) có sẵn',
+              type: ApplicationCommandOptionType.Channel,
+              channelTypes: [ChannelType.GuildCategory],
+              required: false
+            },
+            {
+              name: 'name',
+              description: 'Tên kênh thoại Master',
+              type: ApplicationCommandOptionType.String,
+              required: false
+            },
+            {
+              name: 'create_interface',
+              description: 'Tạo kênh text Control Panel (Mặc định: False)',
+              type: ApplicationCommandOptionType.Boolean,
+              required: false
+            }
+          ]
+        }
+      ];
+    }
 
-  if (command.type === 'setup-temp-vc') {
     return [
       {
         name: 'category',
