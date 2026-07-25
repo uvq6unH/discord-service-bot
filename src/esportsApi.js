@@ -6,8 +6,6 @@ const ESPORTS_LEAGUES = {
   lpl: { id: '98767991314006698', name: 'LPL China', icon: '🇨🇳', logoUrl: 'http://static.lolesports.com/leagues/1592516115322_LPL-01-FullonDark.png' },
   lec: { id: '98767991302996019', name: 'LEC Europe', icon: '🇪🇺', logoUrl: 'http://static.lolesports.com/leagues/1592516184297_LEC-01-FullonDark.png' },
   lcs: { id: '98767991299243165', name: 'LCS Americas', icon: '🇺🇸', logoUrl: 'http://static.lolesports.com/leagues/1706356907418_LCSNew-01-FullonDark.png' },
-  cblol: { id: '98767991332355509', name: 'CBLOL Brazil', icon: '🇧🇷', logoUrl: 'http://static.lolesports.com/leagues/1592516115322_LPL-01-FullonDark.png' },
-  vcs: { id: '107213827295848783', name: 'VCS Vietnam', icon: '🇻🇳', logoUrl: 'http://static.lolesports.com/leagues/1592516184297_LEC-01-FullonDark.png' },
   worlds: { id: '98767975604431411', name: 'Worlds Championship', icon: '🏆', logoUrl: 'http://static.lolesports.com/leagues/1592594612171_WorldsDarkBG.png' },
   msi: { id: '98767991325878492', name: 'MSI Mid-Season', icon: '🥇', logoUrl: 'http://static.lolesports.com/leagues/1592594634248_MSIDarkBG.png' },
   first_stand: { id: '113464388705111224', name: 'First Stand', icon: '🥊', logoUrl: 'http://static.lolesports.com/leagues/1740042025201_RG_LOL_FIRST_STAND_LOGO_VOLT_ALPHA.png' },

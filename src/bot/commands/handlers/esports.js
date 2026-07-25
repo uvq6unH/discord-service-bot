@@ -3,7 +3,7 @@ import { getEsportsSchedule, getAvailableLeagues } from '../../../esportsApi.js'
 
 export async function handleEsports(ctx) {
   const { command, reply, args } = ctx;
-  if (!command || !['esports', 'lcs', 'lck', 'vcs'].includes(command.name)) return undefined;
+  if (!command || !['esports', 'lcs', 'lck', 'lcp', 'lpl', 'lec'].includes(command.name)) return undefined;
 
   let leagueKey = args?.[0] || command.name;
   if (leagueKey === 'esports') leagueKey = 'lck';
@@ -31,7 +31,7 @@ export async function handleEsports(ctx) {
 
   const row = new ActionRowBuilder().addComponents(
     new ButtonBuilder().setCustomId('esports:lck').setLabel('🇰🇷 LCK').setStyle(ButtonStyle.Primary),
-    new ButtonBuilder().setCustomId('esports:vcs').setLabel('🇻🇳 VCS').setStyle(ButtonStyle.Success),
+    new ButtonBuilder().setCustomId('esports:lcp').setLabel('🌏 LCP').setStyle(ButtonStyle.Success),
     new ButtonBuilder().setCustomId('esports:worlds').setLabel('🏆 Worlds').setStyle(ButtonStyle.Danger)
   );
 
