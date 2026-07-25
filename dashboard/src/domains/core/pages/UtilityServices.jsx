@@ -147,7 +147,7 @@ function CommandConfigRow({ cmd, roles, onUpdate, displayPrefix = '/' }) {
   );
 }
 
-const UTILITY_TYPES = ['translate', 'duolingo', 'voice', 'setup-temp-vc'];
+const UTILITY_TYPES = ['translate', 'duolingo', 'voice', 'setup'];
 
 export default function UtilityServicesPage() {
   const { config, loading, updateConfig } = useCommands();

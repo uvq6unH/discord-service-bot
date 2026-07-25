@@ -148,7 +148,7 @@ function CommandConfigRow({ cmd, roles, onUpdate, displayPrefix = '/' }) {
   );
 }
 
-const VOICE_TYPES = ['voice', 'setup-temp-vc'];
+const VOICE_TYPES = ['voice', 'setup'];
 
 export default function VoiceServicesPage() {
   const { config, loading, updateConfig } = useMusic();

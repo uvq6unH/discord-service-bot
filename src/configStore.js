@@ -283,10 +283,7 @@ function normalizeEsportsLeagueRoles(obj) {
 }
 
 function mergeModuleCommands(storedCommands, defaultModuleCommands, moduleName) {
-  const cleanStored = Array.isArray(storedCommands)
-    ? storedCommands.filter((c) => !['vcsetup', 'setup-temp-vc'].includes(c?.type) && !['vcsetup', 'setup-temp-vc'].includes(c?.name))
-    : (defaultModuleCommands || []);
-  const merged = [...cleanStored];
+  const merged = [...(Array.isArray(storedCommands) ? storedCommands : (defaultModuleCommands || []))];
   const existingTypes = new Set(merged.map((command) => String(command?.type ?? '').toLowerCase()).filter(Boolean));
   const existingNames = new Set(merged.map((command) => normalizeCommandName(command?.name)).filter(Boolean));
 
@@ -321,10 +318,9 @@ function mergeWithDefaultCommands(commands) {
     return defaultConfig.commands;
   }
 
-  const cleanCommands = commands.filter((c) => !['vcsetup', 'setup-temp-vc'].includes(c?.type) && !['vcsetup', 'setup-temp-vc'].includes(c?.name));
-  const merged = [...cleanCommands];
-  const existingTypes = new Set(cleanCommands.map((command) => String(command?.type ?? '').toLowerCase()).filter(Boolean));
-  const existingNames = new Set(cleanCommands.map((command) => normalizeCommandName(command?.name)).filter(Boolean));
+  const merged = [...commands];
+  const existingTypes = new Set(commands.map((command) => String(command?.type ?? '').toLowerCase()).filter(Boolean));
+  const existingNames = new Set(commands.map((command) => normalizeCommandName(command?.name)).filter(Boolean));
 
   for (const command of defaultConfig.commands) {
     if (!existingTypes.has(command.type) && !existingNames.has(command.name)) {
