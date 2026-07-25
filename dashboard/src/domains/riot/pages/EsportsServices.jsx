@@ -97,7 +97,7 @@ export default function EsportsServicesPage() {
         <KpiTile
           label={t("Tracked Leagues")}
           value={`${selectedLeagues.length} LEAGUES`}
-          sub={t("LCK, LCP, WORLDS, LPL")}
+          sub={selectedLeagues.length > 0 ? selectedLeagues.map(l => l.toUpperCase()).join(', ') : 'NONE'}
         />
         <KpiTile
           label={t("Daily Broadcast Time")}
