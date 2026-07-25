@@ -234,27 +234,11 @@ export function createBot(configStore, stateStore, redis = null) {
 
   // ── Slash command sync helper ───────────────────────────────────────────────
   client.syncGlobalCommands = async () => {
-    const allCommands = [
-      ...(defaultConfig.core?.commands || []),
-      ...(defaultConfig.moderation?.commands || []),
-      ...(defaultConfig.levels?.commands || []),
-      ...(defaultConfig.economy?.commands || []),
-      ...(defaultConfig.riot?.commands || []),
-    ].map(cmd => ({ ...cmd, enabled: true }));
-
-    const mockConfig = { commands: allCommands };
-    const commands = buildSlashCommands(mockConfig);
-    const validCommands = commands.filter((cmd) => {
-      if (!cmd.name || cmd.name.length > 32) return false;
-      if (!cmd.description || cmd.description.length > 100) {
-        cmd.description = (cmd.description ?? cmd.name).slice(0, 100);
-      }
-      return true;
+    console.log('[sync-global] Clearing legacy global commands to enforce instant Guild command sync...');
+    await client.application.commands.set([]).catch((err) => {
+      console.warn('[sync-global] Warning clearing application commands:', err.message);
     });
-
-    console.log(`[sync-global] Syncing ${validCommands.length} global commands to Discord Application...`);
-    await client.application.commands.set(validCommands);
-    return { synced: true, count: validCommands.length };
+    return { synced: true, count: 0 };
   };
 
   client.syncGuildCommands = async (guildId, config) => {
