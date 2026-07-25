@@ -83,6 +83,65 @@ export async function handleVoiceControl(ctx) {
       return reply({ content: `👥 Đã đặt giới hạn số người trong phòng là **${limitNum === 0 ? 'Không giới hạn' : limitNum}**!`, ephemeral: true });
     }
 
+    if (action === 'permit') {
+      const targetId = value?.replace(/[<@!>]/g, '');
+      if (!targetId) return reply({ content: '❌ Vui lòng tag hoặc nhập ID người dùng cần cấp quyền.', ephemeral: true });
+      await voiceChannel.permissionOverwrites.edit(targetId, { Connect: true, ViewChannel: true });
+      return reply({ content: `🟢 Đã cấp quyền truy cập kênh cho <@${targetId}>!`, ephemeral: true });
+    }
+
+    if (action === 'reject') {
+      const targetId = value?.replace(/[<@!>]/g, '');
+      if (!targetId) return reply({ content: '❌ Vui lòng tag hoặc nhập ID người dùng cần cấm.', ephemeral: true });
+      await voiceChannel.permissionOverwrites.edit(targetId, { Connect: false });
+      const targetMember = guild.members.cache.get(targetId);
+      if (targetMember?.voice?.channelId === voiceChannel.id) {
+        await targetMember.voice.disconnect().catch(() => null);
+      }
+      return reply({ content: `🔴 Đã cấm và ngắt kết nối <@${targetId}> khỏi phòng thoại!`, ephemeral: true });
+    }
+
+    if (action === 'kick') {
+      const targetId = value?.replace(/[<@!>]/g, '');
+      if (!targetId) return reply({ content: '❌ Vui lòng tag hoặc nhập ID người dùng cần đuổi.', ephemeral: true });
+      const targetMember = guild.members.cache.get(targetId);
+      if (targetMember?.voice?.channelId === voiceChannel.id) {
+        await targetMember.voice.disconnect().catch(() => null);
+        return reply({ content: `🥾 Đã đuổi <@${targetId}> ra khỏi phòng thoại!`, ephemeral: true });
+      }
+      return reply({ content: '❌ Thành viên này hiện không có trong phòng thoại.', ephemeral: true });
+    }
+
+    if (action === 'invite') {
+      const targetId = value?.replace(/[<@!>]/g, '');
+      if (!targetId) return reply({ content: '❌ Vui lòng tag thành viên muốn mời vào phòng.', ephemeral: true });
+      await voiceChannel.permissionOverwrites.edit(targetId, { Connect: true, ViewChannel: true });
+      const targetMember = guild.members.cache.get(targetId);
+      if (targetMember) {
+        await targetMember.send(`📩 **${actorMember.user.tag}** đã mời bạn tham gia kênh thoại **${voiceChannel.name}** tại server **${guild.name}**!`).catch(() => null);
+      }
+      return reply({ content: `📩 Đã gửi lời mời tham gia phòng thoại tới <@${targetId}>!`, ephemeral: true });
+    }
+
+    if (action === 'bitrate') {
+      const kbps = parseInt(value, 10);
+      if (isNaN(kbps) || kbps < 8 || kbps > 384) {
+        return reply({ content: '❌ Bitrate phải từ 8 kbps đến 384 kbps (phụ thuộc Boost Tier server).', ephemeral: true });
+      }
+      const targetBitrate = Math.min(kbps * 1000, guild.maximumBitrate || 96000);
+      await voiceChannel.setBitrate(targetBitrate);
+      return reply({ content: `📻 Đã điều chỉnh Bitrate âm thanh phòng thoại lên **${targetBitrate / 1000} kbps**!`, ephemeral: true });
+    }
+
+    if (action === 'transfer') {
+      const targetId = value?.replace(/[<@!>]/g, '');
+      if (!targetId) return reply({ content: '❌ Vui lòng tag thành viên muốn chuyển quyền chủ phòng.', ephemeral: true });
+      await voiceChannel.permissionOverwrites.edit(targetId, {
+        Connect: true, Speak: true, ManageChannels: true, MoveMembers: true
+      });
+      return reply({ content: `👑 Đã chuyển quyền chủ phòng thoại cho <@${targetId}>!`, ephemeral: false });
+    }
+
     if (action === 'claim') {
       await voiceChannel.permissionOverwrites.edit(actorMember.id, {
         Connect: true, Speak: true, ManageChannels: true, MoveMembers: true
@@ -90,7 +149,7 @@ export async function handleVoiceControl(ctx) {
       return reply({ content: `👑 <@${actorMember.id}> đã trở thành chủ phòng mới!`, ephemeral: false });
     }
 
-    return reply({ content: '❓ Lệnh voice không hợp lệ. Hãy dùng `/voice action: lock/unlock/name/limit/claim`', ephemeral: true });
+    return reply({ content: '❓ Lệnh voice không hợp lệ. Hãy chọn các thao tác: lock, unlock, name, limit, permit, reject, kick, invite, bitrate, transfer, claim', ephemeral: true });
   }
 
   return undefined;

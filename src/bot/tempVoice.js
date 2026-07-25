@@ -46,12 +46,17 @@ export function buildTempVcControlPanel(channel, ownerId) {
         .setLabel('User Limit')
         .setValue('limit')
         .setDescription('Set max user limit for your channel')
-        .setEmoji('👥')
+        .setEmoji('👥'),
+      new StringSelectMenuOptionBuilder()
+        .setLabel('Bitrate Audio')
+        .setValue('bitrate')
+        .setDescription('Set audio quality / bitrate')
+        .setEmoji('📻')
     );
 
   const permissionsSelect = new StringSelectMenuBuilder()
     .setCustomId(`tempvc_permissions:${channel.id}:${ownerId}`)
-    .setPlaceholder('Change channel permissions...')
+    .setPlaceholder('Change channel permissions & member management...')
     .addOptions(
       new StringSelectMenuOptionBuilder()
         .setLabel('Permit Member')
@@ -63,6 +68,21 @@ export function buildTempVcControlPanel(channel, ownerId) {
         .setValue('reject')
         .setDescription('Kick and block a user from channel')
         .setEmoji('🔴'),
+      new StringSelectMenuOptionBuilder()
+        .setLabel('Kick Member')
+        .setValue('kick')
+        .setDescription('Kick a member out of voice channel')
+        .setEmoji('🥾'),
+      new StringSelectMenuOptionBuilder()
+        .setLabel('Invite Member')
+        .setValue('invite')
+        .setDescription('Send an invitation to join channel')
+        .setEmoji('📩'),
+      new StringSelectMenuOptionBuilder()
+        .setLabel('Transfer Ownership')
+        .setValue('transfer')
+        .setDescription('Transfer channel ownership to another member')
+        .setEmoji('👑'),
       new StringSelectMenuOptionBuilder()
         .setLabel('Claim Ownership')
         .setValue('claim')

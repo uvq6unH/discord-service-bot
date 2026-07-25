@@ -251,8 +251,12 @@ function buildSlashOptions(command) {
           { name: '🔓 Mở khóa phòng (unlock)', value: 'unlock' },
           { name: '✏️ Đổi tên phòng (name)', value: 'name' },
           { name: '👥 Giới hạn số người (limit)', value: 'limit' },
-          { name: '🟢 Cấp quyền cho người dùng (permit)', value: 'permit' },
-          { name: '🔴 Chặn/Kick người dùng (reject)', value: 'reject' },
+          { name: '🟢 Cấp quyền truy cập (permit)', value: 'permit' },
+          { name: '🔴 Cấm truy cập (reject)', value: 'reject' },
+          { name: '🥾 Đuổi người khỏi phòng (kick)', value: 'kick' },
+          { name: '📩 Mời người dùng vào phòng (invite)', value: 'invite' },
+          { name: '📻 Đổi Bitrate âm thanh (bitrate)', value: 'bitrate' },
+          { name: '👑 Nhượng quyền chủ phòng (transfer)', value: 'transfer' },
           { name: '👑 Nhận quyền chủ phòng (claim)', value: 'claim' }
         ]
       },
