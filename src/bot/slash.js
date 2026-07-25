@@ -287,7 +287,13 @@ function buildSlashOptions(command) {
             name: 'permission',
             description: 'Tên kênh Join to Create (Mặc định: ➕ Join to Create)',
             type: ApplicationCommandOptionType.String,
-            required: false
+            required: false,
+            choices: [
+              { name: '➕ Join to Create', value: '➕ Join to Create' },
+              { name: '🔊 Join to Create', value: '🔊 Join to Create' },
+              { name: '🎙️ Create Voice Channel', value: '🎙️ Create Voice Channel' },
+              { name: '🎧 Tạo phòng thoại', value: '🎧 Tạo phòng thoại' }
+            ]
           },
           {
             name: 'editable',
