@@ -826,7 +826,7 @@ export function createServer({ configStore, stateStore, botClient, redis = null 
     const errors = [];
 
     // Array length limits
-    const arrayLimits = { commands: 100, autoReplies: 100, reminders: 100 };
+    const arrayLimits = { commands: 100, autoReplies: 100, reminders: 100, esportsLeagues: 20 };
     for (const [key, limit] of Object.entries(arrayLimits)) {
       if (body[key] !== undefined && !Array.isArray(body[key])) {
         errors.push(`${key} phải là array.`);

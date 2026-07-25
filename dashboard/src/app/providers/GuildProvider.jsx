@@ -83,12 +83,10 @@ export function GuildProvider({ children }) {
       serverSnapshotRef.current = config ? structuredClone(config) : null;
       setDirty(false);
       setSaveStatus('saved');
-      toast.success('Lưu cấu hình thành công');
       setTimeout(() => setSaveStatus('idle'), 2000);
     },
-    onError: (err) => {
+    onError: () => {
       setSaveStatus('error');
-      toast.error('Lỗi khi lưu: ' + (err?.message ?? 'unknown'));
       setTimeout(() => setSaveStatus('idle'), 3000);
     },
   });

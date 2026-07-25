@@ -32,9 +32,9 @@ export default function EsportsServicesPage() {
     );
   }
 
-  const isEnabled = Boolean(config.esportsNotifyEnabled);
-  const selectedChannelId = config.esportsChannelId || '';
-  const selectedLeagues = config.esportsLeagues ?? ['lck', 'vcs', 'worlds'];
+  const selectedLeagues = Array.isArray(config.esportsLeagues)
+    ? config.esportsLeagues
+    : ['lck', 'vcs', 'worlds', 'msi', 'lpl', 'lec', 'lcs'];
 
   const handleLeagueToggle = (leagueKey) => {
     const nextLeagues = selectedLeagues.includes(leagueKey)

@@ -9,6 +9,12 @@ function clone(value) {
   return structuredClone(value);
 }
 
+function normalizeEsportsLeagues(leagues) {
+  if (!Array.isArray(leagues)) return defaultConfig.esportsLeagues;
+  const valid = new Set(['lck', 'vcs', 'lpl', 'lec', 'lcs', 'worlds', 'msi']);
+  return Array.from(new Set(leagues.map(l => String(l).toLowerCase()).filter(l => valid.has(l))));
+}
+
 function normalizeAutoReplies(autoReplies) {
   if (!Array.isArray(autoReplies)) {
     return [];
@@ -563,6 +569,9 @@ export class ConfigStore {
       autoReplies: normalizeAutoReplies(stored.autoReplies ?? defaultConfig.autoReplies),
       reminders: normalizeReminders(stored.reminders ?? defaultConfig.reminders),
       quizScoring: normalizeQuizScoring(stored.quizScoring ?? defaultConfig.quizScoring),
+      esportsNotifyEnabled: pickBoolean(stored, 'esportsNotifyEnabled', defaultConfig.esportsNotifyEnabled),
+      esportsChannelId: normalizeSnowflakeId(stored.esportsChannelId ?? defaultConfig.esportsChannelId),
+      esportsLeagues: normalizeEsportsLeagues(stored.esportsLeagues ?? defaultConfig.esportsLeagues),
       lolEnabled: pickBoolean(stored, 'lolEnabled', defaultConfig),
       tftEnabled: pickBoolean(stored, 'tftEnabled', defaultConfig),
       autoModEnabled: (stored.moderation ?? defaultConfig.moderation)?.enabled ?? defaultConfig.autoModEnabled,
@@ -750,6 +759,7 @@ export class ConfigStore {
         tempVcCategoryId: normalizeSnowflakeId(patch.tempVcCategoryId),
         esportsNotifyEnabled: pickBoolean(patch, 'esportsNotifyEnabled', current),
         esportsChannelId: normalizeSnowflakeId(patch.esportsChannelId),
+        esportsLeagues: normalizeEsportsLeagues(patch.esportsLeagues ?? current.esportsLeagues),
         remindersEnabled: pickBoolean(patch, 'remindersEnabled', current),
         reminders: normalizeReminders(patch.reminders ?? current.reminders),
         musicEnabled: pickBoolean(patch, 'musicEnabled', current),
