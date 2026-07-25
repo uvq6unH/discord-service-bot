@@ -262,14 +262,20 @@ export function createBot(configStore, stateStore, redis = null) {
     const guild = await client.guilds.fetch(guildId).catch(() => null);
     if (!guild) return { synced: false, reason: 'guild_not_found' };
 
-    const allCommands = [
+    // Merge defaults + guild custom, deduplicate by name (custom overrides default)
+    const cmdMap = new Map();
+    const sources = [
       ...(defaultConfig.core?.commands || []),
       ...(defaultConfig.moderation?.commands || []),
       ...(defaultConfig.levels?.commands || []),
       ...(defaultConfig.economy?.commands || []),
       ...(defaultConfig.riot?.commands || []),
       ...(config?.commands || [])
-    ].map(cmd => ({ ...cmd, enabled: true }));
+    ];
+    for (const cmd of sources) {
+      cmdMap.set(cmd.name, { ...cmd, enabled: true });
+    }
+    const allCommands = [...cmdMap.values()];
 
     const commands = buildSlashCommands({ commands: allCommands });
     const validCommands = commands.filter((cmd) => {

@@ -100,6 +100,8 @@ export class UpstashClient {
   // ── Hash commands ──────────────────────────────────────────────────────────
 
   hget(key, field)                  { return this._request(['HGET', key, field]); }
+  hset(key, field, value)           { return this._request(['HSET', key, field, String(value)]); }
+  hdel(key, ...fields)              { return this._request(['HDEL', key, ...fields]); }
   hgetall(key)                      { return this._request(['HGETALL', key]); }
   hincrby(key, field, increment)    { return this._request(['HINCRBY', key, field, String(increment)]); }
 
