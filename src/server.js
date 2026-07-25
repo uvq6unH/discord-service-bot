@@ -1461,15 +1461,14 @@ export function createServer({ configStore, stateStore, botClient, redis = null 
         return res.status(404).json({ error: 'Không tìm thấy Server Discord trong hệ thống Bot.' });
       }
 
-      const { executeAutoVoiceMasterSetup } = await import('./bot/commands/handlers/tempVcSetup.js');
-      const result = await executeAutoVoiceMasterSetup(guild, configStore);
+      const { executeSetupDefault } = await import('./bot/commands/handlers/tempVcSetup.js');
+      const result = await executeSetupDefault(guild, configStore);
 
       return res.json({
         success: true,
         message: 'Đã khởi tạo hệ thống VoiceMaster thành công!',
         categoryName: result.category.name,
-        masterChannelName: result.masterChannel.name,
-        controlChannelName: result.controlChannel.name
+        masterChannelName: result.masterChannel.name
       });
     } catch (err) {
       console.error('[server] temp-vc-setup error:', err.message);

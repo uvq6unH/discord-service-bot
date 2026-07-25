@@ -273,19 +273,19 @@ function buildSlashOptions(command) {
     return [
       {
         name: 'default',
-        description: 'Tạo kênh thoại tự động Join to Create mặc định',
+        description: 'Tạo kênh Join to Create mặc định',
         type: ApplicationCommandOptionType.Subcommand,
         options: [
           {
             name: 'category',
-            description: 'Chọn Danh mục (Category) có sẵn để đặt kênh Join to Create',
+            description: 'Chọn Category có sẵn để đặt kênh Join to Create',
             type: ApplicationCommandOptionType.Channel,
             channelTypes: [ChannelType.GuildCategory],
             required: false
           },
           {
             name: 'permission',
-            description: 'Tên kênh thoại Master (Mặc định: ➕ Join to Create)',
+            description: 'Tên kênh Join to Create (Mặc định: ➕ Join to Create)',
             type: ApplicationCommandOptionType.String,
             required: false
           },
@@ -298,39 +298,13 @@ function buildSlashOptions(command) {
         ]
       },
       {
-        name: 'custom',
-        description: 'Tạo kênh thoại tự động VoiceMaster với các tùy chỉnh mở rộng',
-        type: ApplicationCommandOptionType.Subcommand,
-        options: [
-          {
-            name: 'category',
-            description: 'Chọn Danh mục (Category) có sẵn',
-            type: ApplicationCommandOptionType.Channel,
-            channelTypes: [ChannelType.GuildCategory],
-            required: false
-          },
-          {
-            name: 'name',
-            description: 'Tên kênh thoại Master',
-            type: ApplicationCommandOptionType.String,
-            required: false
-          },
-          {
-            name: 'create_interface',
-            description: 'Tạo kênh text Control Panel (Mặc định: False)',
-            type: ApplicationCommandOptionType.Boolean,
-            required: false
-          }
-        ]
-      },
-      {
         name: 'reset',
-        description: 'Khôi phục và đặt lại toàn bộ cài đặt VoiceMaster trên máy chủ',
+        description: 'Xóa cấu hình VoiceMaster và kênh Master',
         type: ApplicationCommandOptionType.Subcommand,
         options: [
           {
             name: 'confirm',
-            description: 'Xác nhận xóa bỏ toàn bộ kênh Master cũ (Mặc định: True)',
+            description: 'Xác nhận xóa (Mặc định: True)',
             type: ApplicationCommandOptionType.Boolean,
             required: false
           }

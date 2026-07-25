@@ -25,53 +25,72 @@ export async function handleComponentInteraction(interaction, { client, config, 
   }
 
   if (interaction.isModalSubmit()) {
-    if (interaction.customId.startsWith('tempvc_modal_rename:')) {
-      const channelId = interaction.customId.split(':')[1];
+    // ── VoiceMaster Modal handlers ────────────────────────────────────────
+    if (interaction.customId.startsWith('vm:modal:rename:')) {
+      const channelId = interaction.customId.split(':')[3];
       const newName = interaction.fields.getTextInputValue('room_name')?.trim();
       const channel = interaction.guild?.channels.cache.get(channelId);
-      if (!channel) return interaction.reply({ content: '❌ Kênh thoại không còn tồn tại.', ephemeral: true });
+      if (!channel) return interaction.reply({ content: '❌ Kênh không còn tồn tại.', ephemeral: true });
       if (!newName) return interaction.reply({ content: '❌ Tên không được để rỗng.', ephemeral: true });
       await channel.setName(`🔊 ${newName}`.slice(0, 90));
-      return interaction.reply({ content: `✏️ Đã đổi tên kênh thoại thành **${newName}**!`, ephemeral: true });
+      return interaction.reply({ content: `✏️ Đã đổi tên thành **${newName}**`, ephemeral: true });
     }
-
-    if (interaction.customId.startsWith('tempvc_modal_limit:')) {
-      const channelId = interaction.customId.split(':')[1];
+    if (interaction.customId.startsWith('vm:modal:limit:')) {
+      const channelId = interaction.customId.split(':')[3];
       const limitStr = interaction.fields.getTextInputValue('user_limit')?.trim();
       const channel = interaction.guild?.channels.cache.get(channelId);
-      if (!channel) return interaction.reply({ content: '❌ Kênh thoại không còn tồn tại.', ephemeral: true });
-      const limitNum = parseInt(limitStr, 10);
-      if (isNaN(limitNum) || limitNum < 0 || limitNum > 99) {
-        return interaction.reply({ content: '❌ Giới hạn người dùng phải là số từ 0 đến 99.', ephemeral: true });
-      }
-      await channel.setUserLimit(limitNum);
-      return interaction.reply({ content: `👥 Đã chỉnh giới hạn người dùng thành **${limitNum === 0 ? 'Không giới hạn' : limitNum}**!`, ephemeral: true });
+      if (!channel) return interaction.reply({ content: '❌ Kênh không còn tồn tại.', ephemeral: true });
+      const n = parseInt(limitStr, 10);
+      if (isNaN(n) || n < 0 || n > 99) return interaction.reply({ content: '❌ Giới hạn: 0–99.', ephemeral: true });
+      await channel.setUserLimit(n);
+      return interaction.reply({ content: `👥 Giới hạn: **${n === 0 ? 'Không giới hạn' : n}**`, ephemeral: true });
     }
-
-    if (interaction.customId.startsWith('tempvc_modal_permit:')) {
-      const channelId = interaction.customId.split(':')[1];
+    if (interaction.customId.startsWith('vm:modal:permit:')) {
+      const channelId = interaction.customId.split(':')[3];
       const targetStr = interaction.fields.getTextInputValue('target_user')?.trim();
       const channel = interaction.guild?.channels.cache.get(channelId);
-      if (!channel) return interaction.reply({ content: '❌ Kênh thoại không còn tồn tại.', ephemeral: true });
-      const targetId = targetStr?.replace(/[<@!>]/g, '');
-      if (!targetId) return interaction.reply({ content: '❌ Vui lòng nhập ID hoặc tag thành viên hợp lệ.', ephemeral: true });
-      await channel.permissionOverwrites.edit(targetId, { Connect: true, ViewChannel: true });
-      return interaction.reply({ content: `🟢 Đã cấp quyền truy cập phòng thoại cho <@${targetId}>!`, ephemeral: true });
+      if (!channel) return interaction.reply({ content: '❌ Kênh không còn tồn tại.', ephemeral: true });
+      const id = targetStr?.replace(/[<@!>]/g, '');
+      if (!id) return interaction.reply({ content: '❌ Nhập ID hoặc @user.', ephemeral: true });
+      await channel.permissionOverwrites.edit(id, { Connect: true, ViewChannel: true });
+      return interaction.reply({ content: `🟢 Đã cho phép <@${id}> truy cập.`, ephemeral: true });
     }
-
-    if (interaction.customId.startsWith('tempvc_modal_reject:')) {
-      const channelId = interaction.customId.split(':')[1];
+    if (interaction.customId.startsWith('vm:modal:reject:')) {
+      const channelId = interaction.customId.split(':')[3];
       const targetStr = interaction.fields.getTextInputValue('target_user')?.trim();
       const channel = interaction.guild?.channels.cache.get(channelId);
-      if (!channel) return interaction.reply({ content: '❌ Kênh thoại không còn tồn tại.', ephemeral: true });
-      const targetId = targetStr?.replace(/[<@!>]/g, '');
-      if (!targetId) return interaction.reply({ content: '❌ Vui lòng nhập ID hoặc tag thành viên hợp lệ.', ephemeral: true });
-      await channel.permissionOverwrites.edit(targetId, { Connect: false });
-      const targetMember = interaction.guild.members.cache.get(targetId);
-      if (targetMember?.voice?.channelId === channel.id) {
-        await targetMember.voice.disconnect().catch(() => null);
+      if (!channel) return interaction.reply({ content: '❌ Kênh không còn tồn tại.', ephemeral: true });
+      const id = targetStr?.replace(/[<@!>]/g, '');
+      if (!id) return interaction.reply({ content: '❌ Nhập ID hoặc @user.', ephemeral: true });
+      await channel.permissionOverwrites.edit(id, { Connect: false });
+      const m = interaction.guild.members.cache.get(id);
+      if (m?.voice?.channelId === channel.id) await m.voice.disconnect().catch(() => null);
+      return interaction.reply({ content: `🔴 Đã cấm <@${id}>.`, ephemeral: true });
+    }
+    if (interaction.customId.startsWith('vm:modal:bitrate:')) {
+      const channelId = interaction.customId.split(':')[3];
+      const brStr = interaction.fields.getTextInputValue('bitrate_value')?.trim();
+      const channel = interaction.guild?.channels.cache.get(channelId);
+      if (!channel) return interaction.reply({ content: '❌ Kênh không còn tồn tại.', ephemeral: true });
+      const kbps = parseInt(brStr, 10);
+      if (isNaN(kbps) || kbps < 8 || kbps > 384) return interaction.reply({ content: '❌ Bitrate: 8–384 kbps.', ephemeral: true });
+      const target = Math.min(kbps * 1000, interaction.guild.maximumBitrate || 96000);
+      await channel.setBitrate(target);
+      return interaction.reply({ content: `🔊 Bitrate: **${target / 1000} kbps**`, ephemeral: true });
+    }
+    if (interaction.customId.startsWith('vm:modal:kick:')) {
+      const channelId = interaction.customId.split(':')[3];
+      const targetStr = interaction.fields.getTextInputValue('target_user')?.trim();
+      const channel = interaction.guild?.channels.cache.get(channelId);
+      if (!channel) return interaction.reply({ content: '❌ Kênh không còn tồn tại.', ephemeral: true });
+      const id = targetStr?.replace(/[<@!>]/g, '');
+      if (!id) return interaction.reply({ content: '❌ Nhập ID hoặc @user.', ephemeral: true });
+      const m = interaction.guild.members.cache.get(id);
+      if (m?.voice?.channelId === channel.id) {
+        await m.voice.disconnect().catch(() => null);
+        return interaction.reply({ content: `🥾 Đã đuổi <@${id}>.`, ephemeral: true });
       }
-      return interaction.reply({ content: `🔴 Đã cấm và ngắt kết nối <@${targetId}> khỏi phòng thoại!`, ephemeral: true });
+      return interaction.reply({ content: '❌ Thành viên không ở trong phòng.', ephemeral: true });
     }
   }
 
@@ -92,104 +111,57 @@ export async function handleComponentInteraction(interaction, { client, config, 
       const { handleQuizButton } = await import('./lolQuiz.js');
       return handleQuizButton(interaction);
     }
-    if (interaction.customId.startsWith('tempvc_settings:') || interaction.customId.startsWith('tempvc_permissions:')) {
-      const [, channelId, ownerId] = interaction.customId.split(':');
+    if (interaction.customId.startsWith('vm:settings:') || interaction.customId.startsWith('vm:perms:')) {
+      const parts = interaction.customId.split(':');
+      const channelId = parts[2];
+      const ownerId = parts[3];
       const action = interaction.values[0];
       const channel = interaction.guild?.channels.cache.get(channelId);
+      if (!channel) return interaction.reply({ content: '❌ Kênh không còn tồn tại.', ephemeral: true });
 
-      if (!channel) {
-        return interaction.reply({ content: '❌ Kênh thoại tạm không còn tồn tại.', ephemeral: true });
-      }
-
+      // Direct actions
       if (action === 'lock') {
         await channel.permissionOverwrites.edit(interaction.guild.roles.everyone, { Connect: false });
-        return interaction.reply({ content: '🔒 Đã khóa kênh thoại! Người ngoài sẽ không thể tham gia.', ephemeral: true });
+        return interaction.reply({ content: '🔒 Đã khóa kênh.', ephemeral: true });
       }
       if (action === 'unlock') {
         await channel.permissionOverwrites.edit(interaction.guild.roles.everyone, { Connect: true });
-        return interaction.reply({ content: '🔓 Đã mở khóa kênh thoại!', ephemeral: true });
-      }
-      if (action === 'rename') {
-        const modal = new ModalBuilder()
-          .setCustomId(`tempvc_modal_rename:${channelId}`)
-          .setTitle('✏️ Rename Temporary Voice Channel')
-          .addComponents(
-            new ActionRowBuilder().addComponents(
-              new TextInputBuilder()
-                .setCustomId('room_name')
-                .setLabel('New Channel Name')
-                .setStyle(TextInputStyle.Short)
-                .setValue(channel.name.replace(/^🔊\s*/, ''))
-                .setPlaceholder('Enter new channel name...')
-                .setRequired(true)
-            )
-          );
-        return interaction.showModal(modal);
-      }
-      if (action === 'limit') {
-        const modal = new ModalBuilder()
-          .setCustomId(`tempvc_modal_limit:${channelId}`)
-          .setTitle('👥 Set User Limit')
-          .addComponents(
-            new ActionRowBuilder().addComponents(
-              new TextInputBuilder()
-                .setCustomId('user_limit')
-                .setLabel('Max Users (0 - 99)')
-                .setStyle(TextInputStyle.Short)
-                .setPlaceholder('Enter 0 for unlimited, or 1 to 99')
-                .setRequired(true)
-            )
-          );
-        return interaction.showModal(modal);
+        return interaction.reply({ content: '🔓 Đã mở khóa kênh.', ephemeral: true });
       }
       if (action === 'hide') {
         await channel.permissionOverwrites.edit(interaction.guild.roles.everyone, { ViewChannel: false });
-        return interaction.reply({ content: '👁️ Đã ẩn kênh thoại khỏi danh sách kênh chung!', ephemeral: true });
+        return interaction.reply({ content: '👁️ Đã ẩn kênh.', ephemeral: true });
       }
       if (action === 'unhide') {
         await channel.permissionOverwrites.edit(interaction.guild.roles.everyone, { ViewChannel: true });
-        return interaction.reply({ content: '👁️‍🗨️ Đã hiện kênh thoại cho mọi người!', ephemeral: true });
-      }
-      if (action === 'permit') {
-        const modal = new ModalBuilder()
-          .setCustomId(`tempvc_modal_permit:${channelId}`)
-          .setTitle('🟢 Permit Member Access')
-          .addComponents(
-            new ActionRowBuilder().addComponents(
-              new TextInputBuilder()
-                .setCustomId('target_user')
-                .setLabel('User Tag or ID')
-                .setStyle(TextInputStyle.Short)
-                .setPlaceholder('Enter @username or Discord User ID')
-                .setRequired(true)
-            )
-          );
-        return interaction.showModal(modal);
-      }
-      if (action === 'reject') {
-        const modal = new ModalBuilder()
-          .setCustomId(`tempvc_modal_reject:${channelId}`)
-          .setTitle('🔴 Reject / Kick Member')
-          .addComponents(
-            new ActionRowBuilder().addComponents(
-              new TextInputBuilder()
-                .setCustomId('target_user')
-                .setLabel('User Tag or ID')
-                .setStyle(TextInputStyle.Short)
-                .setPlaceholder('Enter @username or Discord User ID')
-                .setRequired(true)
-            )
-          );
-        return interaction.showModal(modal);
+        return interaction.reply({ content: '👁️‍🗨️ Đã hiện kênh.', ephemeral: true });
       }
       if (action === 'claim') {
         if (channel.members.has(ownerId)) {
-          return interaction.reply({ content: '👑 Chủ phòng vẫn còn ở trong kênh thoại.', ephemeral: true });
+          return interaction.reply({ content: '👑 Chủ phòng vẫn còn ở trong kênh.', ephemeral: true });
         }
-        await channel.permissionOverwrites.edit(interaction.user.id, {
-          Connect: true, Speak: true, ManageChannels: true, MoveMembers: true
-        });
-        return interaction.reply({ content: `👑 <@${interaction.user.id}> đã trở thành chủ phòng mới!`, ephemeral: false });
+        await channel.permissionOverwrites.edit(interaction.user.id, { Connect: true, Speak: true, ManageChannels: true, MoveMembers: true });
+        return interaction.reply({ content: `👑 <@${interaction.user.id}> đã trở thành chủ phòng mới!` });
+      }
+
+      // Modal actions
+      const modalMap = {
+        rename: { id: `vm:modal:rename:${channelId}`, title: '✏️ Rename Channel', inputId: 'room_name', label: 'New Name', placeholder: 'Enter new channel name...', value: channel.name.replace(/^🔊\s*/, '') },
+        limit: { id: `vm:modal:limit:${channelId}`, title: '👥 Set User Limit', inputId: 'user_limit', label: 'Max Users (0–99)', placeholder: '0 = unlimited' },
+        bitrate: { id: `vm:modal:bitrate:${channelId}`, title: '🔊 Set Bitrate', inputId: 'bitrate_value', label: 'Bitrate (8–384 kbps)', placeholder: '64' },
+        permit: { id: `vm:modal:permit:${channelId}`, title: '🟢 Permit Member', inputId: 'target_user', label: 'User ID or @tag', placeholder: 'Enter Discord User ID' },
+        reject: { id: `vm:modal:reject:${channelId}`, title: '🔴 Reject Member', inputId: 'target_user', label: 'User ID or @tag', placeholder: 'Enter Discord User ID' },
+        kick_member: { id: `vm:modal:kick:${channelId}`, title: '🥾 Kick Member', inputId: 'target_user', label: 'User ID or @tag', placeholder: 'Enter Discord User ID' },
+      };
+      const cfg = modalMap[action];
+      if (cfg) {
+        const modal = new ModalBuilder().setCustomId(cfg.id).setTitle(cfg.title).addComponents(
+          new ActionRowBuilder().addComponents(
+            new TextInputBuilder().setCustomId(cfg.inputId).setLabel(cfg.label).setStyle(TextInputStyle.Short).setPlaceholder(cfg.placeholder).setRequired(true)
+          )
+        );
+        if (cfg.value) modal.components[0].components[0].setValue(cfg.value);
+        return interaction.showModal(modal);
       }
       return;
     }
@@ -229,12 +201,14 @@ export async function handleComponentInteraction(interaction, { client, config, 
     return handleDuolingoButton(interaction);
   }
 
-  if (interaction.customId.startsWith('tempvc_refresh:')) {
-    const [, channelId, ownerId] = interaction.customId.split(':');
+  if (interaction.customId.startsWith('vm:refresh:')) {
+    const parts = interaction.customId.split(':');
+    const channelId = parts[2];
+    const ownerId = parts[3];
     const channel = interaction.guild?.channels.cache.get(channelId);
-    if (!channel) return interaction.reply({ content: '❌ Kênh thoại không còn tồn tại.', ephemeral: true });
-    const { buildTempVcControlPanel } = await import('./tempVoice.js');
-    const panel = buildTempVcControlPanel(channel, ownerId);
+    if (!channel) return interaction.reply({ content: '❌ Kênh không còn tồn tại.', ephemeral: true });
+    const { buildControlPanel } = await import('./tempVoice.js');
+    const panel = buildControlPanel(channelId, ownerId);
     await interaction.update(panel);
     return;
   }
