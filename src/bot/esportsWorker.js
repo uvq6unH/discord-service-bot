@@ -58,11 +58,14 @@ async function processEsportsWorkerCycle(client, configStore, redis) {
       const configuredDailyTime = config.esportsDailyTime || '08:00';
       if (currentHHMM === configuredDailyTime) {
         const dailyKey = `guild:${guild.id}:esports_daily:${todayYMD}`;
-        const alreadyPosted = redis
-          ? await redis.get(dailyKey).catch(() => null)
-          : _postedDailyCache.has(dailyKey);
+        const alreadyPosted = _postedDailyCache.has(dailyKey) || (redis ? await redis.get(dailyKey).catch(() => null) : false);
 
         if (!alreadyPosted) {
+          _postedDailyCache.add(dailyKey);
+          if (redis) {
+            await redis.set(dailyKey, '1', 'EX', 172800).catch(() => null);
+          }
+
           const dailyData = await getDailyMatchesForLeagues(targetLeagues, todayYMD);
           if (dailyData && dailyData.length > 0) {
             const embeds = dailyData.map((group, idx) => {
@@ -100,13 +103,6 @@ async function processEsportsWorkerCycle(client, configStore, redis) {
               .setFooter({ text: 'Riot LoL Esports Pipeline' })
               .setTimestamp();
             await channel.send({ embeds: [noMatchEmbed] }).catch((err) => console.error('[esportsWorker] Send no-match daily error:', err.message));
-          }
-
-          // Mark as posted for today (both cases)
-          if (redis) {
-            await redis.set(dailyKey, '1', { ex: 86400 * 2 }).catch(() => null);
-          } else {
-            _postedDailyCache.add(dailyKey);
           }
         }
       }
@@ -152,11 +148,14 @@ async function processEsportsWorkerCycle(client, configStore, redis) {
 
             const preKey = `guild:${guild.id}:esports_alert:${stage}:${matchId}`;
 
-            const alreadyAlerted = redis
-              ? await redis.get(preKey).catch(() => null)
-              : _postedPre15Cache.has(preKey);
+            const alreadyAlerted = _postedPre15Cache.has(preKey) || (redis ? await redis.get(preKey).catch(() => null) : false);
 
             if (!alreadyAlerted) {
+              _postedPre15Cache.add(preKey);
+              if (redis) {
+                await redis.set(preKey, '1', 'EX', 172800).catch(() => null);
+              }
+
               const unixSec = Math.floor(matchTime / 1000);
 
               const alertEmbed = new EmbedBuilder()
@@ -179,12 +178,6 @@ async function processEsportsWorkerCycle(client, configStore, redis) {
                 content: `🚨 **[ESPORTS LIVE ALERT - ${stageLabel}]** ${pingText}`.trim(),
                 embeds: [alertEmbed]
               }).catch((err) => console.error('[esportsWorker] Send pre-match alert error:', err.message));
-
-              if (redis) {
-                await redis.set(preKey, '1', { ex: 86400 * 2 }).catch(() => null);
-              } else {
-                _postedPre15Cache.add(preKey);
-              }
             }
           }
         }
