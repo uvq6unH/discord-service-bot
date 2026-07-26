@@ -316,8 +316,8 @@ export default function ModerationPage() {
 
         {/* 3. Workspace Zone */}
         <div className="grid-12">
-          {/* Column 1: AutoMod Engine & Word Filter */}
-          <div className="col-span-6" style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-5)' }}>
+          {/* Panel 1: AutoMod Global Settings */}
+          <div className="col-span-6">
             <Panel title={t("AUTO-MODERATION ENGINE")} accent className={highlight === 'automod' ? 'flash-target' : ''}>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
@@ -425,8 +425,8 @@ export default function ModerationPage() {
               </div>
             </Panel>
 
-            <Panel title={t("WORD FILTER DICTIONARY")} accent className={highlight === 'wordfilter' ? 'flash-target' : ''} style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
-              <div className="form-group" style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+            <Panel title={t("WORD FILTER DICTIONARY")} style={{ marginTop: 'var(--space-5)' }} className={highlight === 'wordfilter' ? 'flash-target' : ''}>
+              <div className="form-group">
                 <label className="form-label">{t("Forbidden Words Registry")}</label>
                 <BadWordsEditor
                   words={config.badWords ?? []}
@@ -436,9 +436,9 @@ export default function ModerationPage() {
             </Panel>
           </div>
 
-          {/* Column 2: Ticket Console & Self-Role Assignment */}
-          <div className="col-span-6" style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-5)' }}>
-            <Panel title={t("TICKET CONSOLE SYSTEM")} accent className={highlight === 'tickets' ? 'flash-target' : ''}>
+          {/* Panel 2: Ticket and Self Role */}
+          <div className="col-span-6">
+            <Panel title={t("TICKET CONSOLE SYSTEM")} className={highlight === 'tickets' ? 'flash-target' : ''}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 'var(--space-4)', paddingBottom: 'var(--space-3)', borderBottom: '1px solid var(--border)' }}>
                 <span style={{ fontFamily: 'var(--font-mono)', fontSize: '12px', fontWeight: 'bold', color: 'var(--text-1)' }}>
                   {t("ENABLE TICKET SYSTEM")}
@@ -502,7 +502,7 @@ export default function ModerationPage() {
               </div>
             </Panel>
 
-            <Panel title={t("SELF-ROLE ASSIGNMENT")} accent className={highlight === 'selfroles' ? 'flash-target' : ''} style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+            <Panel title={t("SELF-ROLE ASSIGNMENT")} style={{ marginTop: 'var(--space-5)' }} className={highlight === 'selfroles' ? 'flash-target' : ''}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 'var(--space-4)', paddingBottom: 'var(--space-3)', borderBottom: '1px solid var(--border)' }}>
                 <span style={{ fontFamily: 'var(--font-mono)', fontSize: '12px', fontWeight: 'bold', color: 'var(--text-1)' }}>
                   {t("ENABLE SELF-ROLE SYSTEM")}
@@ -544,7 +544,7 @@ export default function ModerationPage() {
                 />
               </div>
 
-              <div className="form-group" style={{ flex: 1 }}>
+              <div className="form-group">
                 <label className="form-label">{t("Custom Role Options Buttons")}</label>
                 <SelfRoleEditor
                   roles={config.selfRoles ?? []}
