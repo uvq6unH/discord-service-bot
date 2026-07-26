@@ -59,7 +59,7 @@ export default function MembersPage() {
       {/* 3. Workspace Zone */}
       <div className="grid-12">
         <div className="col-span-12">
-          <Panel title={t("REGISTRY DATABASE SEARCH")} accent>
+          <Panel title={t("REGISTRY DATABASE SEARCH")} accent className={highlight === 'members' || highlight === 'roles' ? 'flash-target' : ''}>
             {/* Search Input Box */}
             <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', border: '1px solid var(--border)', padding: 'var(--space-2-5) var(--space-3-5)', backgroundColor: 'var(--surface-1)' }}>
               <Search size={16} style={{ color: 'var(--text-3)' }} />

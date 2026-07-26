@@ -1,4 +1,5 @@
 import React from 'react';
+import { useLocation } from 'react-router-dom';
 import Workspace, { HeaderZone, StatusZone, KpiTile } from '../../../shared/layouts/Workspace.jsx';
 import Panel from '../../../shared/primitives/Panel.jsx';
 import DataSlab from '../../../shared/primitives/DataSlab.jsx';
@@ -90,6 +91,8 @@ function HeatmapRow({ data }) {
 }
 
 export default function AnalyticsPage() {
+  const location = useLocation();
+  const highlight = location.state?.highlight;
   const { selectedGuild } = useGuild();
   const {
     range,
@@ -197,7 +200,7 @@ export default function AnalyticsPage() {
       <div className="grid-12">
         {/* Core Command Load Chart */}
         <div className="col-span-8">
-          <Panel title={t("HISTORICAL COMMAND LOAD DISTRIBUTION")} accent>
+          <Panel title={t("HISTORICAL COMMAND LOAD DISTRIBUTION")} accent className={highlight === 'metrics' ? 'flash-target' : ''}>
             <div style={{ padding: 'var(--space-4) 0' }}>
               <BarChart data={commandsChart} />
             </div>
@@ -223,7 +226,7 @@ export default function AnalyticsPage() {
 
         {/* Heatmap active hours */}
         <div className="col-span-12">
-          <Panel title={t("DAILY ENGAGEMENT PROFILE LOGS")} accent>
+          <Panel title={t("DAILY ENGAGEMENT PROFILE LOGS")} accent className={highlight === 'traffic' ? 'flash-target' : ''}>
             <HeatmapRow data={activeHours} />
             {/* Heatmap hours label */}
             <div style={{ display: 'flex', justifyContent: 'space-between', fontFamily: 'var(--font-mono)', fontSize: '9px', color: 'var(--text-3)' }}>

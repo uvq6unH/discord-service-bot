@@ -1,4 +1,5 @@
 import React from 'react';
+import { useLocation } from 'react-router-dom';
 import Workspace, { HeaderZone, StatusZone, KpiTile } from '../../../shared/layouts/Workspace.jsx';
 import Panel from '../../../shared/primitives/Panel.jsx';
 import DataSlab from '../../../shared/primitives/DataSlab.jsx';
@@ -12,6 +13,8 @@ import UptimeRobotStatus from '../components/UptimeRobotStatus.jsx';
 import { systemService } from '../services/system.service.js';
 
 export default function SystemPage() {
+  const location = useLocation();
+  const highlight = location.state?.highlight;
   const { config, selectedGuild } = useGuild();
   const { status, loading, refetch } = useSystem(45000); // Poll every 45s
   const { t } = useLanguage();
@@ -129,7 +132,7 @@ export default function SystemPage() {
       <div className="grid-12">
         {/* Discord Bot Engine telemetry */}
         <div className="col-span-6">
-          <Panel title={t("DISCORD PROCESS BLUEPRINT [BOT_SERVICE]")} accent={botOnline}>
+          <Panel title={t("DISCORD PROCESS BLUEPRINT [BOT_SERVICE]")} accent={botOnline} className={highlight === 'runtime' ? 'flash-target' : ''}>
             <DataSlab 
               label={t("Bot Session Status")} 
               value={botOnline ? t('ACTIVE // RUNNING') : t('OFFLINE // TERMINATED')} 
@@ -182,7 +185,7 @@ export default function SystemPage() {
         </div>
 
         {/* Upstash Cloud Redis Metrics */}
-        <div className="col-span-12">
+        <div className={`col-span-12 ${highlight === 'database' ? 'flash-target' : ''}`}>
           <UpstashMetrics upstash={status.upstash} redisConnected={status.redisConnected} commandsToday={status.stats?.commandsToday ?? 0} />
         </div>
 
