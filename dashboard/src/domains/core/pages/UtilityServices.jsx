@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import Workspace, { HeaderZone, StatusZone, KpiTile } from '../../../shared/layouts/Workspace.jsx';
 import Panel from '../../../shared/primitives/Panel.jsx';
 import DataSlab from '../../../shared/primitives/DataSlab.jsx';
+import MasonryGrid from '../../../shared/primitives/MasonryGrid.jsx';
 import { useCommands } from '../hooks/useCommands.js';
 import { useGuild } from '../../../shared/hooks/useGuild.js';
 import { useLanguage } from '../../../shared/context/LanguageContext.jsx';
@@ -365,53 +366,91 @@ export default function UtilityServicesPage() {
         />
       </StatusZone>
 
-      <div className="grid-12">
+      {/* Feature Panels Masonry Grid */}
+      <MasonryGrid minWidth={350} gap={20}>
         {/* Mention React Panel */}
-        <div className="col-span-12">
-          <Panel title={t("BOT MENTION REACT ENGINE")} accent className={highlight === 'mentionreact' ? 'flash-target' : ''}>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <div>
-                  <div style={{ fontFamily: 'var(--font-mono)', fontWeight: 'bold', fontSize: '13px', color: 'var(--text-1)' }}>
-                    {t("Auto React When Mentioned")}
-                  </div>
-                  <div style={{ fontSize: '11px', color: 'var(--text-3)', marginTop: 'var(--space-1)' }}>
-                    {t("Automatically react with an emoji when the bot or its role is mentioned in chat")}
-                  </div>
+        <Panel title={t("BOT MENTION REACT ENGINE")} accent className={highlight === 'mentionreact' ? 'flash-target' : ''}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div>
+                <div style={{ fontFamily: 'var(--font-mono)', fontWeight: 'bold', fontSize: '13px', color: 'var(--text-1)' }}>
+                  {t("Auto React When Mentioned")}
                 </div>
-                <label className="toggle-switch">
-                  <input
-                    type="checkbox"
-                    className="toggle-switch__input"
-                    checked={Boolean(config.mentionReactEnabled)}
-                    onChange={(e) => updateConfig({ mentionReactEnabled: e.target.checked })}
-                  />
-                  <div className="toggle-switch__track">
-                    <div className="toggle-switch__thumb" />
-                  </div>
-                </label>
+                <div style={{ fontSize: '11px', color: 'var(--text-3)', marginTop: 'var(--space-1)' }}>
+                  {t("Automatically react with an emoji when the bot or its role is mentioned in chat")}
+                </div>
               </div>
-
-              {config.mentionReactEnabled && (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
-                  <label className="form-label" style={{ fontSize: '11px', fontFamily: 'var(--font-mono)' }}>
-                    {t("Reaction Emoji")}
-                  </label>
-                  <input
-                    className="form-input"
-                    style={{ fontSize: '14px', width: '120px', fontFamily: 'var(--font-mono)' }}
-                    value={config.mentionReactEmoji || '👋'}
-                    onChange={(e) => updateConfig({ mentionReactEmoji: e.target.value })}
-                    placeholder="👋"
-                  />
+              <label className="toggle-switch">
+                <input
+                  type="checkbox"
+                  className="toggle-switch__input"
+                  checked={Boolean(config.mentionReactEnabled)}
+                  onChange={(e) => updateConfig({ mentionReactEnabled: e.target.checked })}
+                />
+                <div className="toggle-switch__track">
+                  <div className="toggle-switch__thumb" />
                 </div>
-              )}
+              </label>
             </div>
-          </Panel>
-        </div>
 
-        {/* Utility Commands Routing Panel */}
-        <div className="col-span-12" style={{ marginTop: 'var(--space-6)' }}>
+            {config.mentionReactEnabled && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
+                <label className="form-label" style={{ fontSize: '11px', fontFamily: 'var(--font-mono)' }}>
+                  {t("Reaction Emoji")}
+                </label>
+                <input
+                  className="form-input"
+                  style={{ fontSize: '14px', width: '120px', fontFamily: 'var(--font-mono)' }}
+                  value={config.mentionReactEmoji || '👋'}
+                  onChange={(e) => updateConfig({ mentionReactEmoji: e.target.value })}
+                  placeholder="👋"
+                />
+              </div>
+            )}
+          </div>
+        </Panel>
+
+        {/* Custom Commands Panels */}
+        <Panel title={t("CUSTOM RESPONSE OPERATORS")} accent className={highlight === 'customcmds' ? 'flash-target' : ''}>
+          <CustomCommandEditor
+            commands={config.core?.commands ?? []}
+            onChange={v => updateConfig({ core: { commands: v } })}
+          />
+        </Panel>
+
+        {/* Auto Reply Panels */}
+        <Panel title={t("KEYWORD AUTO-RESPONDERS")} accent className={highlight === 'autoreplies' ? 'flash-target' : ''}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 'var(--space-4)', paddingBottom: 'var(--space-3)', borderBottom: '1px solid var(--border)' }}>
+            <div>
+              <span style={{ fontFamily: 'var(--font-mono)', fontSize: '12px', fontWeight: 'bold', color: 'var(--text-1)' }}>
+                {t("ENABLE AUTO-RESPONDERS")}
+              </span>
+              <div style={{ fontSize: '11px', color: 'var(--text-3)', marginTop: '2px' }}>
+                {t("Master switch for keyword triggered auto replies")}
+              </div>
+            </div>
+            <label className="toggle-switch">
+              <input
+                type="checkbox"
+                className="toggle-switch__input"
+                checked={config.autoReplyEnabled ?? true}
+                onChange={e => updateConfig({ autoReplyEnabled: e.target.checked })}
+              />
+              <div className="toggle-switch__track">
+                <div className="toggle-switch__thumb" />
+              </div>
+            </label>
+          </div>
+          <AutoReplyEditor
+            replies={config.autoReplies ?? []}
+            onChange={v => updateConfig({ autoReplies: v })}
+          />
+        </Panel>
+      </MasonryGrid>
+
+      {/* Utility Commands Routing Panel (Full Width) */}
+      <div className="grid-12" style={{ marginTop: 'var(--space-6)' }}>
+        <div className="col-span-12">
           <Panel title={t("UTILITY COMMANDS ROUTING")} accent className={highlight === 'utilitycmds' ? 'flash-target' : ''}>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
               {utilityCmds.map(c => (
@@ -432,48 +471,6 @@ export default function UtilityServicesPage() {
             </div>
           </Panel>
         </div>
-
-        {/* Custom Commands Panels */}
-        <div className="col-span-6" style={{ marginTop: 'var(--space-6)' }}>
-          <Panel title={t("CUSTOM RESPONSE OPERATORS")} accent className={highlight === 'customcmds' ? 'flash-target' : ''}>
-            <CustomCommandEditor
-              commands={config.core?.commands ?? []}
-              onChange={v => updateConfig({ core: { commands: v } })}
-            />
-          </Panel>
-        </div>
-
-        {/* Auto Reply Panels */}
-        <div className="col-span-6" style={{ marginTop: 'var(--space-6)' }}>
-          <Panel title={t("KEYWORD AUTO-RESPONDERS")} accent className={highlight === 'autoreplies' ? 'flash-target' : ''}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 'var(--space-4)', paddingBottom: 'var(--space-3)', borderBottom: '1px solid var(--border)' }}>
-              <div>
-                <span style={{ fontFamily: 'var(--font-mono)', fontSize: '12px', fontWeight: 'bold', color: 'var(--text-1)' }}>
-                  {t("ENABLE AUTO-RESPONDERS")}
-                </span>
-                <div style={{ fontSize: '11px', color: 'var(--text-3)', marginTop: '2px' }}>
-                  {t("Master switch for keyword triggered auto replies")}
-                </div>
-              </div>
-              <label className="toggle-switch">
-                <input
-                  type="checkbox"
-                  className="toggle-switch__input"
-                  checked={config.autoReplyEnabled ?? true}
-                  onChange={e => updateConfig({ autoReplyEnabled: e.target.checked })}
-                />
-                <div className="toggle-switch__track">
-                  <div className="toggle-switch__thumb" />
-                </div>
-              </label>
-            </div>
-            <AutoReplyEditor
-              replies={config.autoReplies ?? []}
-              onChange={v => updateConfig({ autoReplies: v })}
-            />
-          </Panel>
-        </div>
-
       </div>
     </Workspace>
   );
