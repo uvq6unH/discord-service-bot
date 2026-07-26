@@ -12,6 +12,12 @@ import './design/index.css';
 
 import { getQueryClient } from './app/services/queryClient.js';
 
+// Auto-reload on Vite dynamic import chunk 404 error (occurs after new deployment)
+window.addEventListener('vite:preloadError', (event) => {
+  console.warn('[Vite] Dynamic import chunk failed to load (new deployment detected). Reloading page...', event);
+  window.location.reload();
+});
+
 const queryClient = getQueryClient();
 
 createRoot(document.getElementById('root')).render(
