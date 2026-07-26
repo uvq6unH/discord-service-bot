@@ -3,6 +3,7 @@ import { useLocation } from 'react-router-dom';
 import Workspace, { HeaderZone, StatusZone, KpiTile } from '../../../shared/layouts/Workspace.jsx';
 import Panel from '../../../shared/primitives/Panel.jsx';
 import DataSlab from '../../../shared/primitives/DataSlab.jsx';
+import MasonryGrid from '../../../shared/primitives/MasonryGrid.jsx';
 import { useGuild } from '../hooks/useGuild.js';
 import { useAnalytics } from '../hooks/useAnalytics.js';
 import { RefreshCw, TrendingUp, TrendingDown, Minus } from 'lucide-react';
@@ -197,46 +198,40 @@ export default function AnalyticsPage() {
       </StatusZone>
 
       {/* 3. Workspace Zone */}
-      <div className="grid-12">
+      <MasonryGrid cols={2} gap={20}>
         {/* Core Command Load Chart */}
-        <div className="col-span-8">
-          <Panel title={t("HISTORICAL COMMAND LOAD DISTRIBUTION")} accent className={highlight === 'metrics' ? 'flash-target' : ''}>
-            <div style={{ padding: 'var(--space-4) 0' }}>
-              <BarChart data={commandsChart} />
-            </div>
-          </Panel>
-        </div>
+        <Panel title={t("HISTORICAL COMMAND LOAD DISTRIBUTION")} accent className={highlight === 'metrics' ? 'flash-target' : ''}>
+          <div style={{ padding: 'var(--space-4) 0' }}>
+            <BarChart data={commandsChart} />
+          </div>
+        </Panel>
 
         {/* Top Commands list */}
-        <div className="col-span-4">
-          <Panel title={t("TOP COMMAND SIGNALS")} accent>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
-              {topCommands.map((cmd, i) => (
-                <DataSlab
-                  key={cmd.name}
-                  label={cmd.name}
-                  value={`${cmd.count} EXEC`}
-                  sub={`RANK_#0${i + 1}`}
-                  highlight={i === 0}
-                />
-              ))}
-            </div>
-          </Panel>
-        </div>
+        <Panel title={t("TOP COMMAND SIGNALS")} accent>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
+            {topCommands.map((cmd, i) => (
+              <DataSlab
+                key={cmd.name}
+                label={cmd.name}
+                value={`${cmd.count} EXEC`}
+                sub={`RANK_#0${i + 1}`}
+                highlight={i === 0}
+              />
+            ))}
+          </div>
+        </Panel>
 
         {/* Heatmap active hours */}
-        <div className="col-span-12">
-          <Panel title={t("DAILY ENGAGEMENT PROFILE LOGS")} accent className={highlight === 'traffic' ? 'flash-target' : ''}>
-            <HeatmapRow data={activeHours} />
-            {/* Heatmap hours label */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontFamily: 'var(--font-mono)', fontSize: '9px', color: 'var(--text-3)' }}>
-              {activeHours.filter((_, i) => i % 3 === 0).map(h => (
-                <span key={h.hour}>{h.hour}</span>
-              ))}
-            </div>
-          </Panel>
-        </div>
-      </div>
+        <Panel title={t("DAILY ENGAGEMENT PROFILE LOGS")} accent className={highlight === 'traffic' ? 'flash-target' : ''}>
+          <HeatmapRow data={activeHours} />
+          {/* Heatmap hours label */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', fontFamily: 'var(--font-mono)', fontSize: '9px', color: 'var(--text-3)' }}>
+            {activeHours.filter((_, i) => i % 3 === 0).map(h => (
+              <span key={h.hour}>{h.hour}</span>
+            ))}
+          </div>
+        </Panel>
+      </MasonryGrid>
     </Workspace>
   );
 }

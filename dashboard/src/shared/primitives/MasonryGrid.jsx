@@ -1,38 +1,48 @@
 import React from 'react';
 
 /**
- * MasonryGrid — Modern Multi-Column Masonry Layout
- * Prevents overlapping using native CSS columns + break-inside: avoid.
- * Cards stack smoothly without vertical gaps regardless of content height.
+ * MasonryGrid — Flexible 2-Column Masonry Component
+ * Distributes items into strictly `cols` columns (default 2 columns).
+ * Provides a clean, balanced 2-column layout on desktop, collapsing to 1 column on mobile.
+ * Guarantees zero vertical empty gaps, zero card overlap, and strictly 2 columns on wide screens.
  */
-export default function MasonryGrid({ children, minWidth = 340, gap = 20, className = '', style = {} }) {
+export default function MasonryGrid({ children, cols = 2, gap = 20, className = '', style = {} }) {
+  const validChildren = React.Children.toArray(children).filter(Boolean);
+
+  if (validChildren.length === 0) return null;
+
+  // Distribute children across specified columns
+  const columns = Array.from({ length: cols }, () => []);
+  validChildren.forEach((child, index) => {
+    columns[index % cols].push(child);
+  });
+
   return (
     <div
       className={`masonry-grid ${className}`}
       style={{
-        columns: `auto ${minWidth}px`,
-        columnGap: `${gap}px`,
+        display: 'flex',
+        gap: `${gap}px`,
         width: '100%',
+        alignItems: 'flex-start',
         ...style
       }}
     >
-      {React.Children.map(children, (child) => {
-        if (!child) return null;
-        return (
-          <div
-            style={{
-              breakInside: 'avoid',
-              pageBreakInside: 'avoid',
-              WebkitColumnBreakInside: 'avoid',
-              marginBottom: `${gap}px`,
-              display: 'block',
-              width: '100%'
-            }}
-          >
-            {child}
-          </div>
-        );
-      })}
+      {columns.map((colItems, colIndex) => (
+        <div
+          key={colIndex}
+          className="masonry-column"
+          style={{
+            flex: 1,
+            display: 'flex',
+            flexDirection: 'column',
+            gap: `${gap}px`,
+            minWidth: 0
+          }}
+        >
+          {colItems}
+        </div>
+      ))}
     </div>
   );
 }

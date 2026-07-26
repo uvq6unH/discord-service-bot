@@ -867,4 +867,9 @@ a {
     margin-left: 48px;
     margin-top: -2px;
   }
+
+  /* Masonry Grid Mobile Collapse */
+  .masonry-grid {
+    flex-direction: column !important;
+  }
 }
