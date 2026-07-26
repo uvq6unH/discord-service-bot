@@ -94,8 +94,9 @@ export default function OverviewPage() {
         />
       </StatusZone>
 
-      {/* 3. Dynamic Mission Control Masonry Grid */}
+      {/* 3. Dynamic Mission Control Masonry Grid (Core Operations Modules Only) */}
       <MasonryGrid minWidth={350} gap={20}>
+        {/* Module 1: Moderation */}
         <Panel title={t("AUTOMATED MODERATION CONTROL")} accent>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
             <DataSlab 
@@ -128,6 +129,7 @@ export default function OverviewPage() {
           </div>
         </Panel>
 
+        {/* Module 2: Utility Services */}
         <Panel title={t("UTILITY SERVICES")} accent>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
             <DataSlab 
@@ -159,6 +161,7 @@ export default function OverviewPage() {
           </div>
         </Panel>
 
+        {/* Module 3: Economy & Levels */}
         <Panel title={t("FINANCIAL LEDGER OPERATIONS")} accent>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
             <DataSlab 
@@ -184,7 +187,44 @@ export default function OverviewPage() {
           </div>
         </Panel>
 
-        <Panel title={t("SYSTEM MONITOR & TELEMETRY")} accent>
+        {/* Module 4: Members Registry */}
+        <Panel title={t("MEMBERS REGISTRY")} accent>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
+            <DataSlab 
+              label={t("Guild Member Directory")} 
+              value={t('VIEW_ROSTER')} 
+              sub={t("Member list, roles & moderation actions")}
+              onClick={() => navigate('/members', { state: { highlight: 'members' } })}
+            />
+            <DataSlab 
+              label={t("Role Hierarchy & Permissions")} 
+              value={t('ROLES')} 
+              sub={t("Server role assignments & administrative permissions")}
+              onClick={() => navigate('/members', { state: { highlight: 'roles' } })}
+            />
+          </div>
+        </Panel>
+
+        {/* Module 5: Analytics */}
+        <Panel title={t("OPERATIONAL TELEMETRY LOGS")} accent>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
+            <DataSlab 
+              label={t("Command Usage Analytics")} 
+              value={t('VIEW_METRICS')} 
+              sub={t("Command usage charts & activity load")}
+              onClick={() => navigate('/analytics', { state: { highlight: 'metrics' } })}
+            />
+            <DataSlab 
+              label={t("Hourly Traffic & Activity Load")} 
+              value={t('REALTIME')} 
+              sub={t("System load distribution & latency telemetry")}
+              onClick={() => navigate('/analytics', { state: { highlight: 'traffic' } })}
+            />
+          </div>
+        </Panel>
+
+        {/* Module 6: System Runtime Monitor */}
+        <Panel title={t("SYSTEM RUNTIME MONITOR")} accent>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
             <DataSlab 
               label={t("System Runtime Health")} 
@@ -194,40 +234,16 @@ export default function OverviewPage() {
               onClick={() => navigate('/system', { state: { highlight: 'runtime' } })}
             />
             <DataSlab 
-              label={t("Operational Telemetry Logs")} 
-              value={t('VIEW_METRICS')} 
-              sub={t("Command usage charts & activity load")}
-              onClick={() => navigate('/analytics', { state: { highlight: 'metrics' } })}
-            />
-            <DataSlab 
-              label={t("Guild Member Directory")} 
-              value={t('VIEW_ROSTER')} 
-              sub={t("Member list, roles & moderation actions")}
-              onClick={() => navigate('/members', { state: { highlight: 'members' } })}
+              label={t("Database & Cache Connections")} 
+              value={t('CONNECTED')} 
+              sub={t("Upstash Redis connection & persistence state")}
+              onClick={() => navigate('/system', { state: { highlight: 'database' } })}
             />
           </div>
         </Panel>
 
-        <Panel title={t("AUDIO & VOICE SERVICES")} accent>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
-            <DataSlab 
-              label={t("Lavalink Audio Stream Console")} 
-              value={config?.musicEnabled !== false ? t('ACTIVE') : t('STANDBY')} 
-              sub={t("Lavalink music player & queue management")}
-              highlight={config?.musicEnabled !== false}
-              onClick={() => navigate('/music')}
-            />
-            <DataSlab 
-              label={t("VoiceMaster Temp VC Engine")} 
-              value={config?.tempVcEnabled ? t('ACTIVE') : t('STANDBY')} 
-              sub={t("Join-to-create temporary voice channels")}
-              highlight={config?.tempVcEnabled}
-              onClick={() => navigate('/voice')}
-            />
-          </div>
-        </Panel>
-
-        <Panel title={t("COMMAND GATEWAY")} accent>
+        {/* Module 7: Command Gateway Routing */}
+        <Panel title={t("COMMAND GATEWAY ROUTING")} accent>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
             <DataSlab 
               label={t("Core System Commands")} 
@@ -244,6 +260,7 @@ export default function OverviewPage() {
           </div>
         </Panel>
 
+        {/* Module 8: Audit Logs */}
         <Panel title={t("AUDIT LOGS & SECURITY")} accent>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
             <DataSlab 
@@ -258,43 +275,6 @@ export default function OverviewPage() {
               value={t('READY')} 
               sub={t("Historical configuration logs")}
               onClick={() => navigate('/audit-logs', { state: { highlight: 'activity' } })}
-            />
-          </div>
-        </Panel>
-
-        <Panel title={t("RIOT & ESPORTS")} accent>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
-            <DataSlab 
-              label={t("Riot Games Telemetry")} 
-              value={config?.lolEnabled ? t('ACTIVE') : t('STANDBY')} 
-              sub={t("League of Legends & TFT tracking")}
-              highlight={config?.lolEnabled}
-              onClick={() => navigate('/riot')}
-            />
-            <DataSlab 
-              label={t("Esports Live Matches")} 
-              value={config?.esportsNotifyEnabled ? t('ACTIVE') : t('STANDBY')} 
-              sub={t("Match alerts & schedule broadcasts")}
-              highlight={config?.esportsNotifyEnabled}
-              onClick={() => navigate('/esports')}
-            />
-          </div>
-        </Panel>
-
-        <Panel title={t("AUTOMATION & AI")} accent>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
-            <DataSlab 
-              label={t("Scheduled Reminders")} 
-              value={config?.remindersEnabled ? t('ACTIVE') : t('STANDBY')} 
-              sub={t("Cron tasks & alert notifications")}
-              highlight={config?.remindersEnabled}
-              onClick={() => navigate('/reminders')}
-            />
-            <DataSlab 
-              label={t("Neural AI Agent")} 
-              value={t('GPT-4O-MINI')} 
-              sub={t("LLM chat & response parsing")}
-              onClick={() => navigate('/ai')}
             />
           </div>
         </Panel>
