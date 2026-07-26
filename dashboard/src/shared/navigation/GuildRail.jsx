@@ -1,5 +1,5 @@
 import React from 'react';
-import { Bot, LogOut, Plus, RefreshCw } from 'lucide-react';
+import { Bot, LogOut, Plus } from 'lucide-react';
 
 export default function GuildRail({ guilds, selectedGuild, user, selectGuild, onInviteRequest, onRefreshGuilds, refreshingGuilds }) {
   const present = guilds.filter(g => g.botPresent);
@@ -11,35 +11,24 @@ export default function GuildRail({ guilds, selectedGuild, user, selectGuild, on
 
   return (
     <nav className="guild-rail" aria-label="Servers">
-      {/* Top Logo */}
+      {/* Top Logo (Click to refresh server list) */}
       <div 
-        style={{ color: 'var(--text-1)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', height: '40px', width: '40px', border: '1px solid var(--border)' }}
-        title="Mission Control Console"
-      >
-        <Bot size={20} />
-      </div>
-
-      {/* Refresh Servers Button */}
-      <button
         onClick={onRefreshGuilds}
-        disabled={refreshingGuilds}
         style={{
-          width: '40px',
-          height: '40px',
-          border: '1px solid var(--border)',
-          background: 'var(--surface-0)',
-          color: refreshingGuilds ? 'var(--accent)' : 'var(--text-2)',
+          color: refreshingGuilds ? 'var(--accent)' : 'var(--text-1)',
           cursor: 'pointer',
           display: 'flex',
           alignItems: 'center',
           justify: 'center',
-          marginTop: 'var(--space-2)'
+          height: '40px',
+          width: '40px',
+          border: '1px solid var(--border)',
+          transition: 'border-color 0.15s ease'
         }}
-        title="Làm mới danh sách server từ Discord"
-        aria-label="Refresh Servers"
+        title="Mission Control Console (Click để làm mới danh sách server)"
       >
-        <RefreshCw size={16} className={refreshingGuilds ? 'spin' : ''} />
-      </button>
+        <Bot size={20} className={refreshingGuilds ? 'spin' : ''} />
+      </div>
 
       <div style={{ width: '24px', height: '1px', backgroundColor: 'var(--border)', margin: 'var(--space-1) 0' }} />
 
