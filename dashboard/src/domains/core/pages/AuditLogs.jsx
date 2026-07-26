@@ -162,6 +162,9 @@ function AuditLogRow({ log }) {
         border: '1px solid var(--border)',
         borderRadius: 'var(--r2, 4px)',
         gap: '16px',
+        minWidth: 0,
+        maxWidth: '100%',
+        overflow: 'hidden',
         transition: 'border-color var(--motion-fast)'
       }}
     >

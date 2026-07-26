@@ -258,11 +258,11 @@ a {
   gap: 20px;
 }
 
-.col-span-12 { grid-column: span 12; }
-.col-span-8  { grid-column: span 8; }
-.col-span-6  { grid-column: span 6; }
-.col-span-4  { grid-column: span 4; }
-.col-span-3  { grid-column: span 3; }
+.col-span-12 { grid-column: span 12; min-width: 0; }
+.col-span-8  { grid-column: span 8; min-width: 0; }
+.col-span-6  { grid-column: span 6; min-width: 0; }
+.col-span-4  { grid-column: span 4; min-width: 0; }
+.col-span-3  { grid-column: span 3; min-width: 0; }
 
 /* ── UI Panel Component (Brutalist panel) ────────────────────────────────── */
 .panel {
@@ -273,6 +273,9 @@ a {
   display: flex;
   flex-direction: column;
   gap: 16px;
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
 }
 
 .panel--accent {
@@ -285,6 +288,7 @@ a {
   justify-content: space-between;
   border-bottom: 1px solid var(--border);
   padding-bottom: 12px;
+  min-width: 0;
 }
 
 .panel__title {
@@ -293,6 +297,8 @@ a {
   font-weight: 700;
   letter-spacing: 0.05em;
   color: var(--text-1);
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 /* DataSlab - monospaced telemetry row */
@@ -306,6 +312,11 @@ a {
   font-family: var(--font-mono);
   font-size: 12px;
   color: var(--text-2);
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .data-slab--highlight {
