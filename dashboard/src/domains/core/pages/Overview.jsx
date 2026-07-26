@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import Workspace, { HeaderZone, StatusZone, KpiTile } from '../../../shared/layouts/Workspace.jsx';
 import Panel from '../../../shared/primitives/Panel.jsx';
 import DataSlab from '../../../shared/primitives/DataSlab.jsx';
+import MasonryGrid from '../../../shared/primitives/MasonryGrid.jsx';
 import { useGuild } from '../hooks/useGuild.js';
 import { useSystem } from '../hooks/useSystem.js';
 import { useLanguage } from '../../../shared/context/LanguageContext.jsx';
@@ -93,234 +94,211 @@ export default function OverviewPage() {
         />
       </StatusZone>
 
-      {/* 3. Dynamic Flexible Grid-12 Layout */}
-      <div className="grid-12">
+      {/* 3. Dynamic Mission Control Masonry Grid */}
+      <MasonryGrid minWidth={350} gap={20}>
+        <Panel title={t("AUTOMATED MODERATION CONTROL")} accent>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
+            <DataSlab 
+              label={t("Auto Moderation Shields")} 
+              value={config?.moderation?.enabled ? t('ACTIVE') : t('STANDBY')} 
+              sub={t("AutoMod, Anti-Spam, Anti-Link & Anti-Raid shields")}
+              highlight={config?.moderation?.enabled}
+              onClick={() => navigate('/moderation', { state: { highlight: 'automod' } })}
+            />
+            <DataSlab 
+              label={t("Forbidden Words Dictionary")} 
+              value={`${badWordsCount} ${t('WORDS')}`} 
+              sub={t("Banned word filter & message deletion rules")}
+              onClick={() => navigate('/moderation', { state: { highlight: 'wordfilter' } })}
+            />
+            <DataSlab 
+              label={t("Support Ticket System")} 
+              value={config?.ticketsEnabled ? t('ACTIVE') : t('STANDBY')} 
+              sub={t("Interactive support category & transcript logging")}
+              highlight={config?.ticketsEnabled}
+              onClick={() => navigate('/moderation', { state: { highlight: 'tickets' } })}
+            />
+            <DataSlab 
+              label={t("Self-Roles & Auto-Role")} 
+              value={config?.rolesEnabled ? t('ACTIVE') : t('STANDBY')} 
+              sub={t("Member join role & reaction assignment panels")}
+              highlight={config?.rolesEnabled}
+              onClick={() => navigate('/moderation', { state: { highlight: 'selfroles' } })}
+            />
+          </div>
+        </Panel>
 
-        {/* Row 1: Core Feature-Rich Modules (4 Items Each) */}
-        <div className="col-span-6" style={{ display: 'flex', flexDirection: 'column' }}>
-          <Panel title={t("AUTOMATED MODERATION CONTROL")} accent style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)', flex: 1, justifyContent: 'space-between' }}>
-              <DataSlab 
-                label={t("Auto Moderation Shields")} 
-                value={config?.moderation?.enabled ? t('ACTIVE') : t('STANDBY')} 
-                sub={t("AutoMod, Anti-Spam, Anti-Link & Anti-Raid shields")}
-                highlight={config?.moderation?.enabled}
-                onClick={() => navigate('/moderation', { state: { highlight: 'automod' } })}
-              />
-              <DataSlab 
-                label={t("Forbidden Words Dictionary")} 
-                value={`${badWordsCount} ${t('WORDS')}`} 
-                sub={t("Banned word filter & message deletion rules")}
-                onClick={() => navigate('/moderation', { state: { highlight: 'wordfilter' } })}
-              />
-              <DataSlab 
-                label={t("Support Ticket System")} 
-                value={config?.ticketsEnabled ? t('ACTIVE') : t('STANDBY')} 
-                sub={t("Interactive support category & transcript logging")}
-                highlight={config?.ticketsEnabled}
-                onClick={() => navigate('/moderation', { state: { highlight: 'tickets' } })}
-              />
-              <DataSlab 
-                label={t("Self-Roles & Auto-Role")} 
-                value={config?.rolesEnabled ? t('ACTIVE') : t('STANDBY')} 
-                sub={t("Member join role & reaction assignment panels")}
-                highlight={config?.rolesEnabled}
-                onClick={() => navigate('/moderation', { state: { highlight: 'selfroles' } })}
-              />
-            </div>
-          </Panel>
-        </div>
+        <Panel title={t("UTILITY SERVICES")} accent>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
+            <DataSlab 
+              label={t("Bot Mention React Engine")} 
+              value={config?.mentionReactEnabled ? t('ACTIVE') : t('STANDBY')} 
+              sub={t("Auto emoji reaction when bot or role is tagged")}
+              highlight={config?.mentionReactEnabled}
+              onClick={() => navigate('/utilities', { state: { highlight: 'mentionreact' } })}
+            />
+            <DataSlab 
+              label={t("Translation & Duolingo")} 
+              value={t('CONFIGURE')} 
+              sub={t("Multi-language text translation & gamified learning")}
+              onClick={() => navigate('/utilities', { state: { highlight: 'utilitycmds' } })}
+            />
+            <DataSlab 
+              label={t("Custom Response Operators")} 
+              value={`${customsCount} ${t('COMMANDS')}`} 
+              sub={t("Custom slash command creation & responses")}
+              onClick={() => navigate('/utilities', { state: { highlight: 'customcmds' } })}
+            />
+            <DataSlab 
+              label={t("Keyword Auto-Responders")} 
+              value={config?.autoReplyEnabled ? t('ACTIVE') : t('STANDBY')} 
+              sub={t("Keyword trigger listeners & automated replies")}
+              highlight={config?.autoReplyEnabled}
+              onClick={() => navigate('/utilities', { state: { highlight: 'autoreplies' } })}
+            />
+          </div>
+        </Panel>
 
-        <div className="col-span-6" style={{ display: 'flex', flexDirection: 'column' }}>
-          <Panel title={t("UTILITY SERVICES")} accent style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)', flex: 1, justifyContent: 'space-between' }}>
-              <DataSlab 
-                label={t("Bot Mention React Engine")} 
-                value={config?.mentionReactEnabled ? t('ACTIVE') : t('STANDBY')} 
-                sub={t("Auto emoji reaction when bot or role is tagged")}
-                highlight={config?.mentionReactEnabled}
-                onClick={() => navigate('/utilities', { state: { highlight: 'mentionreact' } })}
-              />
-              <DataSlab 
-                label={t("Translation & Duolingo")} 
-                value={t('CONFIGURE')} 
-                sub={t("Multi-language text translation & gamified learning")}
-                onClick={() => navigate('/utilities', { state: { highlight: 'utilitycmds' } })}
-              />
-              <DataSlab 
-                label={t("Custom Response Operators")} 
-                value={`${customsCount} ${t('COMMANDS')}`} 
-                sub={t("Custom slash command creation & responses")}
-                onClick={() => navigate('/utilities', { state: { highlight: 'customcmds' } })}
-              />
-              <DataSlab 
-                label={t("Keyword Auto-Responders")} 
-                value={config?.autoReplyEnabled ? t('ACTIVE') : t('STANDBY')} 
-                sub={t("Keyword trigger listeners & automated replies")}
-                highlight={config?.autoReplyEnabled}
-                onClick={() => navigate('/utilities', { state: { highlight: 'autoreplies' } })}
-              />
-            </div>
-          </Panel>
-        </div>
+        <Panel title={t("FINANCIAL LEDGER OPERATIONS")} accent>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
+            <DataSlab 
+              label={t("Virtual Currency Ledger")} 
+              value={config?.economyEnabled ? t('ACTIVE') : t('STANDBY')} 
+              sub={t("Bạc, Vàng, Kim Cương daily rewards")}
+              highlight={config?.economyEnabled}
+              onClick={() => navigate('/economy', { state: { highlight: 'ledger' } })}
+            />
+            <DataSlab 
+              label={t("XP Leveling Pipeline")} 
+              value={config?.levelsEnabled ? t('ACTIVE') : t('STANDBY')} 
+              sub={t("Chat activity rank XP & level up alerts")}
+              highlight={config?.levelsEnabled}
+              onClick={() => navigate('/economy', { state: { highlight: 'ledger' } })}
+            />
+            <DataSlab 
+              label={t("Mini-Games Betting Suite")} 
+              value={t('5 GAMES')} 
+              sub={t("Blackjack, Poker, Coinflip, Dice, Slots")}
+              onClick={() => navigate('/economy', { state: { highlight: 'games' } })}
+            />
+          </div>
+        </Panel>
 
-        {/* Row 2: Medium Modules (3 and 2 Items) */}
-        <div className="col-span-4" style={{ marginTop: 'var(--space-6)', display: 'flex', flexDirection: 'column' }}>
-          <Panel title={t("FINANCIAL LEDGER OPERATIONS")} accent style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)', flex: 1, justifyContent: 'space-between' }}>
-              <DataSlab 
-                label={t("Virtual Currency Ledger")} 
-                value={config?.economyEnabled ? t('ACTIVE') : t('STANDBY')} 
-                sub={t("Bạc, Vàng, Kim Cương daily rewards")}
-                highlight={config?.economyEnabled}
-                onClick={() => navigate('/economy', { state: { highlight: 'ledger' } })}
-              />
-              <DataSlab 
-                label={t("XP Leveling Pipeline")} 
-                value={config?.levelsEnabled ? t('ACTIVE') : t('STANDBY')} 
-                sub={t("Chat activity rank XP & level up alerts")}
-                highlight={config?.levelsEnabled}
-                onClick={() => navigate('/economy', { state: { highlight: 'ledger' } })}
-              />
-              <DataSlab 
-                label={t("Mini-Games Betting Suite")} 
-                value={t('5 GAMES')} 
-                sub={t("Blackjack, Poker, Coinflip, Dice, Slots")}
-                onClick={() => navigate('/economy', { state: { highlight: 'games' } })}
-              />
-            </div>
-          </Panel>
-        </div>
+        <Panel title={t("SYSTEM MONITOR & TELEMETRY")} accent>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
+            <DataSlab 
+              label={t("System Runtime Health")} 
+              value={online ? t('ONLINE') : t('OFFLINE')} 
+              sub={t("Process load, memory & node environment")}
+              highlight={online}
+              onClick={() => navigate('/system', { state: { highlight: 'runtime' } })}
+            />
+            <DataSlab 
+              label={t("Operational Telemetry Logs")} 
+              value={t('VIEW_METRICS')} 
+              sub={t("Command usage charts & activity load")}
+              onClick={() => navigate('/analytics', { state: { highlight: 'metrics' } })}
+            />
+            <DataSlab 
+              label={t("Guild Member Directory")} 
+              value={t('VIEW_ROSTER')} 
+              sub={t("Member list, roles & moderation actions")}
+              onClick={() => navigate('/members', { state: { highlight: 'members' } })}
+            />
+          </div>
+        </Panel>
 
-        <div className="col-span-4" style={{ marginTop: 'var(--space-6)', display: 'flex', flexDirection: 'column' }}>
-          <Panel title={t("SYSTEM MONITOR & TELEMETRY")} accent style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)', flex: 1, justifyContent: 'space-between' }}>
-              <DataSlab 
-                label={t("System Runtime Health")} 
-                value={online ? t('ONLINE') : t('OFFLINE')} 
-                sub={t("Process load, memory & node environment")}
-                highlight={online}
-                onClick={() => navigate('/system', { state: { highlight: 'runtime' } })}
-              />
-              <DataSlab 
-                label={t("Operational Telemetry Logs")} 
-                value={t('VIEW_METRICS')} 
-                sub={t("Command usage charts & activity load")}
-                onClick={() => navigate('/analytics', { state: { highlight: 'metrics' } })}
-              />
-              <DataSlab 
-                label={t("Guild Member Directory")} 
-                value={t('VIEW_ROSTER')} 
-                sub={t("Member list, roles & moderation actions")}
-                onClick={() => navigate('/members', { state: { highlight: 'members' } })}
-              />
-            </div>
-          </Panel>
-        </div>
+        <Panel title={t("AUDIO & VOICE SERVICES")} accent>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
+            <DataSlab 
+              label={t("Lavalink Audio Stream Console")} 
+              value={config?.musicEnabled !== false ? t('ACTIVE') : t('STANDBY')} 
+              sub={t("Lavalink music player & queue management")}
+              highlight={config?.musicEnabled !== false}
+              onClick={() => navigate('/music')}
+            />
+            <DataSlab 
+              label={t("VoiceMaster Temp VC Engine")} 
+              value={config?.tempVcEnabled ? t('ACTIVE') : t('STANDBY')} 
+              sub={t("Join-to-create temporary voice channels")}
+              highlight={config?.tempVcEnabled}
+              onClick={() => navigate('/voice')}
+            />
+          </div>
+        </Panel>
 
-        <div className="col-span-4" style={{ marginTop: 'var(--space-6)', display: 'flex', flexDirection: 'column' }}>
-          <Panel title={t("AUDIO & VOICE SERVICES")} accent style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)', flex: 1, justifyContent: 'space-between' }}>
-              <DataSlab 
-                label={t("Lavalink Audio Stream Console")} 
-                value={config?.musicEnabled !== false ? t('ACTIVE') : t('STANDBY')} 
-                sub={t("Lavalink music player & queue management")}
-                highlight={config?.musicEnabled !== false}
-                onClick={() => navigate('/music')}
-              />
-              <DataSlab 
-                label={t("VoiceMaster Temp VC Engine")} 
-                value={config?.tempVcEnabled ? t('ACTIVE') : t('STANDBY')} 
-                sub={t("Join-to-create temporary voice channels")}
-                highlight={config?.tempVcEnabled}
-                onClick={() => navigate('/voice')}
-              />
-            </div>
-          </Panel>
-        </div>
+        <Panel title={t("COMMAND GATEWAY")} accent>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
+            <DataSlab 
+              label={t("Core System Commands")} 
+              value={t('8 COMMANDS')} 
+              sub={t("Console system command permissions")}
+              onClick={() => navigate('/commands', { state: { highlight: 'commands' } })}
+            />
+            <DataSlab 
+              label={t("Text Invocation Prefix")} 
+              value={config?.prefix ? `"${config.prefix}"` : '"!"'} 
+              sub={t("Legacy command prefix")}
+              onClick={() => navigate('/commands', { state: { highlight: 'commands' } })}
+            />
+          </div>
+        </Panel>
 
-        {/* Row 3: Compact Modules (2 Items Each) */}
-        <div className="col-span-3" style={{ marginTop: 'var(--space-6)', display: 'flex', flexDirection: 'column' }}>
-          <Panel title={t("COMMAND GATEWAY")} accent style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)', flex: 1, justifyContent: 'space-between' }}>
-              <DataSlab 
-                label={t("Core System Commands")} 
-                value={t('8 COMMANDS')} 
-                sub={t("Console system command permissions")}
-                onClick={() => navigate('/commands', { state: { highlight: 'commands' } })}
-              />
-              <DataSlab 
-                label={t("Text Invocation Prefix")} 
-                value={config?.prefix ? `"${config.prefix}"` : '"!"'} 
-                sub={t("Legacy command prefix")}
-                onClick={() => navigate('/commands', { state: { highlight: 'commands' } })}
-              />
-            </div>
-          </Panel>
-        </div>
+        <Panel title={t("AUDIT LOGS & SECURITY")} accent>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
+            <DataSlab 
+              label={t("Security Logging Channel")} 
+              value={config?.logChannelId ? t('INTEGRATED') : t('UNSET')} 
+              sub={t("Target security event channel")}
+              highlight={!!config?.logChannelId}
+              onClick={() => navigate('/audit-logs', { state: { highlight: 'logchannel' } })}
+            />
+            <DataSlab 
+              label={t("Administrative Audit Trail")} 
+              value={t('READY')} 
+              sub={t("Historical configuration logs")}
+              onClick={() => navigate('/audit-logs', { state: { highlight: 'activity' } })}
+            />
+          </div>
+        </Panel>
 
-        <div className="col-span-3" style={{ marginTop: 'var(--space-6)', display: 'flex', flexDirection: 'column' }}>
-          <Panel title={t("AUDIT LOGS & SECURITY")} accent style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)', flex: 1, justifyContent: 'space-between' }}>
-              <DataSlab 
-                label={t("Security Logging Channel")} 
-                value={config?.logChannelId ? t('INTEGRATED') : t('UNSET')} 
-                sub={t("Target security event channel")}
-                highlight={!!config?.logChannelId}
-                onClick={() => navigate('/audit-logs', { state: { highlight: 'logchannel' } })}
-              />
-              <DataSlab 
-                label={t("Administrative Audit Trail")} 
-                value={t('READY')} 
-                sub={t("Historical configuration logs")}
-                onClick={() => navigate('/audit-logs', { state: { highlight: 'activity' } })}
-              />
-            </div>
-          </Panel>
-        </div>
+        <Panel title={t("RIOT & ESPORTS")} accent>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
+            <DataSlab 
+              label={t("Riot Games Telemetry")} 
+              value={config?.lolEnabled ? t('ACTIVE') : t('STANDBY')} 
+              sub={t("League of Legends & TFT tracking")}
+              highlight={config?.lolEnabled}
+              onClick={() => navigate('/riot')}
+            />
+            <DataSlab 
+              label={t("Esports Live Matches")} 
+              value={config?.esportsNotifyEnabled ? t('ACTIVE') : t('STANDBY')} 
+              sub={t("Match alerts & schedule broadcasts")}
+              highlight={config?.esportsNotifyEnabled}
+              onClick={() => navigate('/esports')}
+            />
+          </div>
+        </Panel>
 
-        <div className="col-span-3" style={{ marginTop: 'var(--space-6)', display: 'flex', flexDirection: 'column' }}>
-          <Panel title={t("RIOT & ESPORTS")} accent style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)', flex: 1, justifyContent: 'space-between' }}>
-              <DataSlab 
-                label={t("Riot Games Telemetry")} 
-                value={config?.lolEnabled ? t('ACTIVE') : t('STANDBY')} 
-                sub={t("League of Legends & TFT tracking")}
-                highlight={config?.lolEnabled}
-                onClick={() => navigate('/riot')}
-              />
-              <DataSlab 
-                label={t("Esports Live Matches")} 
-                value={config?.esportsNotifyEnabled ? t('ACTIVE') : t('STANDBY')} 
-                sub={t("Match alerts & schedule broadcasts")}
-                highlight={config?.esportsNotifyEnabled}
-                onClick={() => navigate('/esports')}
-              />
-            </div>
-          </Panel>
-        </div>
-
-        <div className="col-span-3" style={{ marginTop: 'var(--space-6)', display: 'flex', flexDirection: 'column' }}>
-          <Panel title={t("AUTOMATION & AI")} accent style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)', flex: 1, justifyContent: 'space-between' }}>
-              <DataSlab 
-                label={t("Scheduled Reminders")} 
-                value={config?.remindersEnabled ? t('ACTIVE') : t('STANDBY')} 
-                sub={t("Cron tasks & alert notifications")}
-                highlight={config?.remindersEnabled}
-                onClick={() => navigate('/reminders')}
-              />
-              <DataSlab 
-                label={t("Neural AI Agent")} 
-                value={t('GPT-4O-MINI')} 
-                sub={t("LLM chat & response parsing")}
-                onClick={() => navigate('/ai')}
-              />
-            </div>
-          </Panel>
-        </div>
-
-      </div>
+        <Panel title={t("AUTOMATION & AI")} accent>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
+            <DataSlab 
+              label={t("Scheduled Reminders")} 
+              value={config?.remindersEnabled ? t('ACTIVE') : t('STANDBY')} 
+              sub={t("Cron tasks & alert notifications")}
+              highlight={config?.remindersEnabled}
+              onClick={() => navigate('/reminders')}
+            />
+            <DataSlab 
+              label={t("Neural AI Agent")} 
+              value={t('GPT-4O-MINI')} 
+              sub={t("LLM chat & response parsing")}
+              onClick={() => navigate('/ai')}
+            />
+          </div>
+        </Panel>
+      </MasonryGrid>
     </Workspace>
   );
 }
