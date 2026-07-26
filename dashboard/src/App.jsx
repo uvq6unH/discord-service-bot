@@ -1,5 +1,6 @@
 import React from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { toast } from 'sonner';
 import { useAuth } from './app/providers/AuthProvider.jsx';
 import { useGuild } from './shared/hooks/useGuild.js';
 import { api } from './app/services/api/index.js';
@@ -26,6 +27,8 @@ function TerminalLoader({ message }) {
 
 export default function App() {
   const { user, loading: authLoading } = useAuth();
+  const queryClient = useQueryClient();
+  const [refreshingGuilds, setRefreshingGuilds] = React.useState(false);
   const {
     selectedGuild,
     selectGuild,
@@ -48,6 +51,19 @@ export default function App() {
       return false;
     }
   });
+
+  const handleRefreshGuilds = React.useCallback(async () => {
+    setRefreshingGuilds(true);
+    try {
+      const data = await api.guilds(true);
+      queryClient.setQueryData(['guilds'], data);
+      toast.success('Đã làm mới danh sách server từ Discord!');
+    } catch (err) {
+      toast.error('Không thể làm mới danh sách server.');
+    } finally {
+      setRefreshingGuilds(false);
+    }
+  }, [queryClient]);
 
   const guilds = guildsPayload?.guilds ?? [];
   const status = guildsPayload?.status ?? 'ready';
@@ -99,6 +115,8 @@ export default function App() {
       selectedGuild={selectedGuild}
       user={user}
       selectGuild={selectGuild}
+      onRefreshGuilds={handleRefreshGuilds}
+      refreshingGuilds={refreshingGuilds}
       onInviteRequest={(guild) => {
         api.inviteUrl(guild.id).then(({ url }) => {
           window.open(url, '_blank', 'noopener,noreferrer');

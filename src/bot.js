@@ -296,7 +296,25 @@ export function createBot(configStore, stateStore, redis = null) {
   // ── Guild cache: refresh on join / update ───────────────────────────────────
   client.on(Events.GuildCreate, async (guild) => {
     console.log(`[bot] Joined guild: ${guild.name} (${guild.id})`);
-    if (redis) await writeGuildCache(guild, redis);
+    if (redis) {
+      await writeGuildCache(guild, redis).catch(err => console.error(`[bot] Error caching new guild ${guild.id}:`, err.message));
+    }
+    
+    // Auto-initialize config for new guild
+    try {
+      await configStore.getGuildConfig(guild.id);
+    } catch (err) {
+      console.error(`[bot] Error initializing config for guild ${guild.id}:`, err.message);
+    }
+
+    // Auto-register slash commands for newly joined server
+    try {
+      const res = await registerGuildCommands(guild);
+      console.log(`[bot] Registered ${res.count} slash commands for new guild "${guild.name}" (${guild.id})`);
+    } catch (err) {
+      console.error(`[bot] Error syncing commands for new guild "${guild.name}":`, err.message);
+    }
+
     _updatePresence(client);
   });
   client.on(Events.GuildDelete, async (guild) => {
@@ -304,7 +322,7 @@ export function createBot(configStore, stateStore, redis = null) {
     _updatePresence(client);
   });
   client.on(Events.GuildUpdate, async (_old, newGuild) => {
-    if (redis) await writeGuildCache(newGuild, redis);
+    if (redis) await writeGuildCache(newGuild, redis).catch(err => console.error(`[bot] Error updating guild cache:`, err.message));
   });
 
   // ── Member auto-role + welcome ──────────────────────────────────────────────

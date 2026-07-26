@@ -12,6 +12,8 @@ export default function AppShell({
   user,
   selectGuild,
   onInviteRequest,
+  onRefreshGuilds,
+  refreshingGuilds,
   saveConfig,
   saveStatus,
   dirty,
@@ -73,6 +75,8 @@ export default function AppShell({
         user={user}
         selectGuild={selectGuild}
         onInviteRequest={onInviteRequest}
+        onRefreshGuilds={onRefreshGuilds}
+        refreshingGuilds={refreshingGuilds}
       />
 
       {/* 2. Second Domain Rail */}

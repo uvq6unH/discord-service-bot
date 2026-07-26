@@ -94,8 +94,8 @@ export const api = {
   /** Lấy thông tin user đang đăng nhập */
   me: () => apiFetch('/auth/me').then(r => r.json()),
 
-  /** Lấy danh sách guild của user */
-  guilds: () => apiFetch('/api/guilds').then(r => r.json()),
+  /** Lấy danh sách guild của user (hỗ trợ refresh=true để xóa cache) */
+  guilds: (refresh = false) => apiFetch(refresh ? '/api/guilds?refresh=1' : '/api/guilds').then(r => r.json()),
 
   /** Lấy config của một guild */
   config: (guildId) =>

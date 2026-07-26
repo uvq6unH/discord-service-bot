@@ -1,7 +1,7 @@
 import React from 'react';
-import { Bot, LogOut, Plus } from 'lucide-react';
+import { Bot, LogOut, Plus, RefreshCw } from 'lucide-react';
 
-export default function GuildRail({ guilds, selectedGuild, user, selectGuild, onInviteRequest }) {
+export default function GuildRail({ guilds, selectedGuild, user, selectGuild, onInviteRequest, onRefreshGuilds, refreshingGuilds }) {
   const present = guilds.filter(g => g.botPresent);
   const notPresent = guilds.filter(g => !g.botPresent);
 
@@ -18,6 +18,28 @@ export default function GuildRail({ guilds, selectedGuild, user, selectGuild, on
       >
         <Bot size={20} />
       </div>
+
+      {/* Refresh Servers Button */}
+      <button
+        onClick={onRefreshGuilds}
+        disabled={refreshingGuilds}
+        style={{
+          width: '40px',
+          height: '40px',
+          border: '1px solid var(--border)',
+          background: 'var(--surface-0)',
+          color: refreshingGuilds ? 'var(--accent)' : 'var(--text-2)',
+          cursor: 'pointer',
+          display: 'flex',
+          alignItems: 'center',
+          justify: 'center',
+          marginTop: 'var(--space-2)'
+        }}
+        title="Làm mới danh sách server từ Discord"
+        aria-label="Refresh Servers"
+      >
+        <RefreshCw size={16} className={refreshingGuilds ? 'spin' : ''} />
+      </button>
 
       <div style={{ width: '24px', height: '1px', backgroundColor: 'var(--border)', margin: 'var(--space-1) 0' }} />
 

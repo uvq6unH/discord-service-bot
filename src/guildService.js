@@ -322,9 +322,23 @@ export function createGuildService(redis) {
     }
   }
 
+  async function invalidateUserGuildsCache(userId) {
+    if (!userId) return;
+    _guildCacheMem.delete(userId);
+    _rateLimitMem.delete(userId);
+    if (redis) {
+      try {
+        await redis.del(`user_guilds:${userId}`);
+      } catch (err) {
+        console.warn(`[guildService] Invalidate cache failed for ${userId}:`, err.message);
+      }
+    }
+  }
+
   return {
     getCachedGuilds,
     setCachedGuilds,
     fetchAndCacheUserGuilds,
+    invalidateUserGuildsCache,
   };
 }

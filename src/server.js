@@ -1119,6 +1119,11 @@ export function createServer({ configStore, stateStore, botClient, redis = null 
     const isDev = Boolean(req.session?.user?.dev);
     const userId = req.session.user?.id;
     const accessToken = req.session.user?.accessToken;
+    const forceRefresh = req.query.refresh === '1' || req.query.refresh === 'true';
+
+    if (forceRefresh && userId) {
+      await guildService.invalidateUserGuildsCache(userId);
+    }
 
     if (isDev) {
       const configuredGuildIds = await configStore.listGuildIds();
