@@ -1,77 +1,98 @@
 import React from 'react';
-import { Bot, CheckCircle2 } from 'lucide-react';
+import { Bot, CheckCircle2, ShieldCheck, Cpu, Activity, Terminal } from 'lucide-react';
 
 export default function SystemBootLoader({ progress = 0, currentStep = 'INITIATING SYSTEM BOOT...', telemetryLogs = [], fadingOut = false }) {
   const roundedProgress = Math.min(100, Math.max(0, Math.round(progress)));
 
   return (
     <div
-      className="boot-loader-bg"
       style={{
         position: 'fixed',
         top: 0,
         left: 0,
-        right: 0,
-        bottom: 0,
-        zIndex: 99999,
+        width: '100vw',
+        height: '100vh',
+        backgroundColor: '#0A0A0A',
+        backgroundImage: 'linear-gradient(rgba(255, 255, 255, 0.02) 1px, transparent 1px), linear-gradient(90deg, rgba(255, 255, 255, 0.02) 1px, transparent 1px)',
+        backgroundSize: '32px 32px',
+        zIndex: 999999,
         display: 'flex',
         flexDirection: 'column',
-        alignItems: 'center',
-        justify: 'center',
-        padding: 'var(--space-6)',
+        justifyContent: 'space-between',
+        padding: '0',
         color: 'var(--text-1)',
         fontFamily: 'var(--font-mono)',
         opacity: fadingOut ? 0 : 1,
-        transition: 'opacity 0.4s ease-in-out',
-        pointerEvents: fadingOut ? 'none' : 'auto'
+        transition: 'opacity 0.3s ease-out',
+        boxSizing: 'border-box',
+        overflow: 'hidden'
       }}
     >
       <div className="scanline-overlay" />
 
-      {/* Main Brutalist Container */}
-      <div
+      {/* 1. Top Status Header */}
+      <header
         style={{
+          height: '56px',
           width: '100%',
-          maxWidth: '540px',
           backgroundColor: 'var(--surface-0)',
-          border: '1px solid var(--border-strong)',
-          boxShadow: '0 20px 50px rgba(0, 0, 0, 0.8)',
-          position: 'relative',
-          overflow: 'hidden'
+          borderBottom: '1px solid var(--border)',
+          display: 'flex',
+          alignItems: 'center',
+          justify: 'space-between',
+          padding: '0 32px',
+          boxSizing: 'border-box',
+          fontSize: '11px',
+          letterSpacing: '0.05em'
         }}
       >
-        {/* Header Bar */}
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            justify: 'space-between',
-            padding: '12px 16px',
-            backgroundColor: 'var(--surface-1)',
-            borderBottom: '1px solid var(--border)',
-            fontSize: '11px',
-            letterSpacing: '0.05em'
-          }}
-        >
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <div className="pulse-led" />
-            <span style={{ fontWeight: 'bold', color: 'var(--text-1)' }}>
-              MISSION CONTROL // SYSTEM BOOT
-            </span>
-          </div>
-          <span style={{ color: 'var(--text-3)' }}>v4.0.0</span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <div className="pulse-led" />
+          <span style={{ fontWeight: 'bold', color: 'var(--text-1)' }}>
+            MISSION CONTROL // BOOT TELEMETRY
+          </span>
+          <span style={{ color: 'var(--text-3)' }}>|</span>
+          <span style={{ color: 'var(--text-3)' }}>SECURE INITIALIZATION PROTOCOL</span>
         </div>
 
-        {/* Inner Content */}
-        <div style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
-          
-          {/* Logo & Status Badge */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '20px', color: 'var(--text-3)' }}>
+          <span>NODE: PROD_CLUSTER_01</span>
+          <span>SYS_REV: v4.0.0</span>
+        </div>
+      </header>
+
+      {/* 2. Main Center Console */}
+      <main
+        style={{
+          flex: 1,
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justify: 'center',
+          padding: '40px 24px',
+          boxSizing: 'border-box'
+        }}
+      >
+        <div
+          style={{
+            width: '100%',
+            maxWidth: '680px',
+            backgroundColor: 'var(--surface-0)',
+            border: '1px solid var(--border-strong)',
+            padding: '36px',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '28px',
+            boxShadow: '0 30px 60px rgba(0, 0, 0, 0.9)'
+          }}
+        >
+          {/* Brand & Large Percentage */}
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
               <div
                 style={{
-                  width: '44px',
-                  height: '44px',
+                  width: '52px',
+                  height: '52px',
                   border: '1px solid var(--accent)',
                   backgroundColor: 'rgba(255, 255, 255, 0.03)',
                   display: 'flex',
@@ -80,24 +101,23 @@ export default function SystemBootLoader({ progress = 0, currentStep = 'INITIATI
                   color: 'var(--accent)'
                 }}
               >
-                <Bot size={24} />
+                <Bot size={28} />
               </div>
               <div>
-                <h1 style={{ fontFamily: 'var(--font-display)', fontSize: '20px', letterSpacing: '0.08em', margin: 0 }}>
+                <h1 style={{ fontFamily: 'var(--font-display)', fontSize: '26px', letterSpacing: '0.08em', margin: 0, lineHeight: 1 }}>
                   DISCORD SERVICE BOT
                 </h1>
-                <p style={{ fontSize: '10px', color: 'var(--text-3)', margin: '2px 0 0 0' }}>
-                  AUTOMATED COMMUNITY OPERATIONS ENGINE
+                <p style={{ fontSize: '11px', color: 'var(--text-3)', margin: '4px 0 0 0', fontFamily: 'var(--font-mono)' }}>
+                  COMMUNITY OPERATIONS & TELEMETRY ENGINE
                 </p>
               </div>
             </div>
 
-            {/* Percentage Display */}
             <div style={{ textAlign: 'right' }}>
               <span
                 style={{
                   fontFamily: 'var(--font-display)',
-                  fontSize: '32px',
+                  fontSize: '48px',
                   fontWeight: 'bold',
                   color: 'var(--accent)',
                   lineHeight: 1
@@ -108,17 +128,16 @@ export default function SystemBootLoader({ progress = 0, currentStep = 'INITIATI
             </div>
           </div>
 
-          {/* Cyberpunk Segmented Progress Bar */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+          {/* Segmented Progress Bar */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
             <div
               style={{
                 width: '100%',
-                height: '14px',
+                height: '16px',
                 backgroundColor: 'var(--surface-2)',
                 border: '1px solid var(--border)',
                 padding: '2px',
-                boxSizing: 'border-box',
-                position: 'relative'
+                boxSizing: 'border-box'
               }}
             >
               <div
@@ -131,9 +150,9 @@ export default function SystemBootLoader({ progress = 0, currentStep = 'INITIATI
               />
             </div>
 
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '10px', color: 'var(--text-3)' }}>
-              <span>[STATE: TELEMETRY_WARMUP]</span>
-              <span>{currentStep}</span>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: 'var(--text-3)' }}>
+              <span style={{ color: 'var(--text-2)' }}>STATUS: {currentStep}</span>
+              <span>{roundedProgress === 100 ? 'READY' : 'WARMING UP...'}</span>
             </div>
           </div>
 
@@ -142,11 +161,10 @@ export default function SystemBootLoader({ progress = 0, currentStep = 'INITIATI
             style={{
               backgroundColor: 'var(--surface-1)',
               border: '1px solid var(--border)',
-              padding: '12px 14px',
+              padding: '16px',
               display: 'flex',
               flexDirection: 'column',
-              gap: '6px',
-              minHeight: '110px'
+              gap: '10px'
             }}
           >
             {telemetryLogs.map((log, index) => (
@@ -156,29 +174,32 @@ export default function SystemBootLoader({ progress = 0, currentStep = 'INITIATI
                   display: 'flex',
                   alignItems: 'center',
                   justify: 'space-between',
-                  fontSize: '11px',
+                  fontSize: '12px',
                   color: log.done ? 'var(--text-1)' : 'var(--text-3)'
                 }}
               >
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                   {log.done ? (
-                    <CheckCircle2 size={12} style={{ color: 'var(--green)' }} />
+                    <CheckCircle2 size={14} style={{ color: 'var(--green)' }} />
                   ) : (
                     <div
                       style={{
                         width: '6px',
                         height: '6px',
                         backgroundColor: 'var(--text-3)',
-                        borderRadius: '50%'
+                        borderRadius: '50%',
+                        marginLeft: '4px',
+                        marginRight: '4px'
                       }}
                     />
                   )}
-                  <span>{log.label}</span>
+                  <span style={{ fontWeight: log.done ? 'bold' : 'normal' }}>{log.label}</span>
                 </div>
                 <span
                   style={{
-                    fontSize: '10px',
+                    fontSize: '11px',
                     fontWeight: 'bold',
+                    fontFamily: 'var(--font-mono)',
                     color: log.done ? 'var(--green)' : 'var(--text-3)'
                   }}
                 >
@@ -189,25 +210,28 @@ export default function SystemBootLoader({ progress = 0, currentStep = 'INITIATI
           </div>
 
         </div>
+      </main>
 
-        {/* Footer Hardware Info */}
-        <div
-          style={{
-            padding: '8px 16px',
-            backgroundColor: 'var(--surface-1)',
-            borderTop: '1px solid var(--border)',
-            display: 'flex',
-            alignItems: 'center',
-            justify: 'space-between',
-            fontSize: '9px',
-            color: 'var(--text-3)'
-          }}
-        >
-          <span>HOST: RENDER_CLUSTER_PROD</span>
-          <span>MEMORY: 128MB / 512MB</span>
-          <span>SECURE PROTOCOL TLS 1.3</span>
-        </div>
-      </div>
+      {/* 3. Bottom Footer Status Bar */}
+      <footer
+        style={{
+          height: '40px',
+          width: '100%',
+          backgroundColor: 'var(--surface-0)',
+          borderTop: '1px solid var(--border)',
+          display: 'flex',
+          alignItems: 'center',
+          justify: 'space-between',
+          padding: '0 32px',
+          boxSizing: 'border-box',
+          fontSize: '10px',
+          color: 'var(--text-3)'
+        }}
+      >
+        <span>HOST: RENDER_CLUSTER_PROD</span>
+        <span>SECURITY: ENCRYPTED TLS 1.3</span>
+        <span>AUTHENTICATED DISCORD SESSION</span>
+      </footer>
     </div>
   );
 }

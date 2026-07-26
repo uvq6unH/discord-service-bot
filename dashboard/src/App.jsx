@@ -100,7 +100,7 @@ export default function App() {
 
   // ── Resource Loading State & Telemetry Progression ───────────────────────
   const [fontsLoaded, setFontsLoaded] = useState(false);
-  const [bootProgress, setBootProgress] = useState(0);
+  const [bootProgress, setBootProgress] = useState(15);
   const [bootFinished, setBootFinished] = useState(false);
   const [fadingOut, setFadingOut] = useState(false);
 
@@ -125,10 +125,18 @@ export default function App() {
   ], [isAuthReady, isGuildsReady, isConfigReady, fontsLoaded]);
 
   const targetProgress = useMemo(() => {
-    if (!isAuthReady) return 20;
-    if (!isGuildsReady) return 45;
-    if (!isConfigReady) return 70;
-    if (!fontsLoaded) return 90;
+    let count = 0;
+    if (isAuthReady) count++;
+    if (isGuildsReady) count++;
+    if (isConfigReady) count++;
+    if (isConfigReady && isGuildsReady) count++;
+    if (fontsLoaded) count++;
+
+    if (count === 0) return 20;
+    if (count === 1) return 40;
+    if (count === 2) return 60;
+    if (count === 3) return 80;
+    if (count === 4) return 92;
     return 100;
   }, [isAuthReady, isGuildsReady, isConfigReady, fontsLoaded]);
 
@@ -137,11 +145,11 @@ export default function App() {
     const timer = setInterval(() => {
       setBootProgress(prev => {
         if (prev < targetProgress) {
-          return Math.min(prev + 5, targetProgress);
+          return Math.min(prev + 10, targetProgress);
         }
         return prev;
       });
-    }, 40);
+    }, 25);
     return () => clearInterval(timer);
   }, [targetProgress]);
 
@@ -151,57 +159,58 @@ export default function App() {
       setFadingOut(true);
       const timer = setTimeout(() => {
         setBootFinished(true);
-      }, 400);
+      }, 300);
       return () => clearTimeout(timer);
     }
   }, [bootProgress, isAuthReady, isGuildsReady, isConfigReady, fontsLoaded]);
 
-  // If user is not authenticated and auth check finished, render Landing Page
+  // 1. Unauthenticated users see Landing Page directly
   if (isAuthReady && !user) {
     return <LandingPage />;
   }
 
-  const currentStepText = telemetryLogs.find(l => !l.done)?.label ?? '[05/05] MISSION CONTROL OPERATIONAL';
+  // 2. Loading state: ONLY render SystemBootLoader until bootFinished is true
+  if (!bootFinished) {
+    const currentStepText = telemetryLogs.find(l => !l.done)?.label ?? '[05/05] MISSION CONTROL OPERATIONAL';
+    return (
+      <SystemBootLoader
+        progress={bootProgress}
+        currentStep={currentStepText}
+        telemetryLogs={telemetryLogs}
+        fadingOut={fadingOut}
+      />
+    );
+  }
 
+  // 3. Authenticated & fully loaded: render full Dashboard UI
   return (
-    <>
-      {!bootFinished && (
-        <SystemBootLoader
-          progress={bootProgress}
-          currentStep={currentStepText}
-          telemetryLogs={telemetryLogs}
-          fadingOut={fadingOut}
-        />
-      )}
-
-      <AppShell
-        guilds={sortedGuilds}
-        selectedGuild={selectedGuild}
-        user={user}
-        selectGuild={selectGuild}
-        onRefreshGuilds={handleRefreshGuilds}
-        refreshingGuilds={refreshingGuilds}
-        onInviteRequest={(guild) => {
-          api.inviteUrl(guild.id).then(({ url }) => {
-            window.open(url, '_blank', 'noopener,noreferrer');
-          }).catch(() => {
-            const clientId = window.__BOT_CLIENT_ID__ ?? '';
-            const url = `https://discord.com/oauth2/authorize?client_id=${clientId}&scope=bot%20applications.commands&permissions=8&guild_id=${guild.id}`;
-            window.open(url, '_blank', 'noopener,noreferrer');
-          });
-        }}
-        saveConfig={saveConfig}
-        saveStatus={saveStatus}
-        dirty={dirty}
-      >
-        <React.Suspense fallback={
-          <div style={{ padding: 'var(--space-10)', textAlign: 'center', fontFamily: 'var(--font-mono)', color: 'var(--text-3)', fontSize: '12px' }}>
-            &gt;&gt;&gt; SYSLOAD // CACHING MODULE CHUNKS...
-          </div>
-        }>
-          <AppRoutes />
-        </React.Suspense>
-      </AppShell>
-    </>
+    <AppShell
+      guilds={sortedGuilds}
+      selectedGuild={selectedGuild}
+      user={user}
+      selectGuild={selectGuild}
+      onRefreshGuilds={handleRefreshGuilds}
+      refreshingGuilds={refreshingGuilds}
+      onInviteRequest={(guild) => {
+        api.inviteUrl(guild.id).then(({ url }) => {
+          window.open(url, '_blank', 'noopener,noreferrer');
+        }).catch(() => {
+          const clientId = window.__BOT_CLIENT_ID__ ?? '';
+          const url = `https://discord.com/oauth2/authorize?client_id=${clientId}&scope=bot%20applications.commands&permissions=8&guild_id=${guild.id}`;
+          window.open(url, '_blank', 'noopener,noreferrer');
+        });
+      }}
+      saveConfig={saveConfig}
+      saveStatus={saveStatus}
+      dirty={dirty}
+    >
+      <React.Suspense fallback={
+        <div style={{ padding: 'var(--space-10)', textAlign: 'center', fontFamily: 'var(--font-mono)', color: 'var(--text-3)', fontSize: '12px' }}>
+          &gt;&gt;&gt; SYSLOAD // CACHING MODULE CHUNKS...
+        </div>
+      }>
+        <AppRoutes />
+      </React.Suspense>
+    </AppShell>
   );
 }
