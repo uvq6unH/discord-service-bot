@@ -41,6 +41,8 @@ createRoot(document.getElementById('root')).render(
         position="bottom-right"
         richColors
         offset={24}
+        visibleToasts={3}
+        duration={3000}
         toastOptions={{
           style: {
             zIndex: 9999,

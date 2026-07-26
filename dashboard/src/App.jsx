@@ -52,18 +52,29 @@ export default function App() {
     }
   });
 
+  const lastRefreshTimeRef = React.useRef(0);
+
   const handleRefreshGuilds = React.useCallback(async () => {
+    if (refreshingGuilds) return;
+
+    const now = Date.now();
+    if (now - lastRefreshTimeRef.current < 2500) {
+      toast.info('Vui lòng đợi 3s giữa các lần làm mới', { id: 'refresh-guilds' });
+      return;
+    }
+    lastRefreshTimeRef.current = now;
+
     setRefreshingGuilds(true);
     try {
       const data = await api.guilds(true);
       queryClient.setQueryData(['guilds'], data);
-      toast.success('Đã làm mới danh sách server từ Discord!');
+      toast.success('Đã làm mới danh sách server từ Discord!', { id: 'refresh-guilds' });
     } catch (err) {
-      toast.error('Không thể làm mới danh sách server.');
+      toast.error('Không thể làm mới danh sách server.', { id: 'refresh-guilds' });
     } finally {
       setRefreshingGuilds(false);
     }
-  }, [queryClient]);
+  }, [queryClient, refreshingGuilds]);
 
   const guilds = guildsPayload?.guilds ?? [];
   const status = guildsPayload?.status ?? 'ready';
