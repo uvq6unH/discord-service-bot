@@ -1021,89 +1021,61 @@ export function createServer({ configStore, stateStore, botClient, redis = null 
 
     const ADMINISTRATOR = 0x8n;
     const MANAGE_GUILD = 0x20n;
-    const manageableIds = new Set(
-      (userGuilds ?? [])
-        .filter(g => {
-          if (g.owner) return true;
-          const p = BigInt(g.permissions ?? 0);
-          return (p & ADMINISTRATOR) === ADMINISTRATOR || (p & MANAGE_GUILD) === MANAGE_GUILD;
-        })
-        .map(g => g.id)
-    );
 
-    const botGuildIds = new Set();
-    if (botClient?.guilds?.cache?.size) {
-      for (const id of botClient.guilds.cache.keys()) botGuildIds.add(id);
-    } else if (redis) {
-      try {
-        const keys = await redis.keys('guild_cache:*');
-        for (const key of (keys ?? [])) {
-          const parts = key.split(':');
-          if (parts.length === 2) botGuildIds.add(parts[1]);
-        }
-      } catch { /* ignore */ }
+    // User's manageable guilds from Discord OAuth
+    const userManageableMap = new Map();
+    for (const g of (userGuilds ?? [])) {
+      const p = BigInt(g.permissions ?? 0);
+      const canManage = g.owner || (p & ADMINISTRATOR) === ADMINISTRATOR || (p & MANAGE_GUILD) === MANAGE_GUILD;
+      if (canManage) {
+        userManageableMap.set(g.id, g);
+      }
     }
 
-    for (const guildId of configuredGuildIds) {
-      botGuildIds.add(guildId);
-    }
-
-    for (const id of botGuildIds) {
-      const canManage = isDev || manageableIds.has(id);
-      if (!canManage) continue;
-
-      const oauthMeta = (userGuilds ?? []).find(g => g.id === id);
+    // Determine bot presence for each manageable guild
+    for (const [id, oauthMeta] of userManageableMap.entries()) {
       const oauthIcon = oauthMeta?.icon
         ? `https://cdn.discordapp.com/icons/${id}/${oauthMeta.icon}.png?size=64`
         : null;
 
-      const botGuild = botClient?.guilds?.cache?.get(id);
-      if (botGuild) {
-        guildsById.set(id, { id, name: botGuild.name, icon: botGuild.iconURL({ size: 64 }), configured: configuredGuildIds.includes(id), botPresent: true });
+      let isBotPresent = false;
+      let guildName = oauthMeta.name;
+      let iconUrl = oauthIcon;
+
+      if (botClient?.guilds?.cache) {
+        const botGuild = botClient.guilds.cache.get(id);
+        if (botGuild) {
+          isBotPresent = true;
+          guildName = botGuild.name;
+          iconUrl = botGuild.iconURL({ size: 64 }) || oauthIcon;
+        }
       } else if (redis) {
         try {
           const raw = await redis.get(`guild_cache:${id}`);
-          const meta = raw ? (typeof raw === 'string' ? JSON.parse(raw) : raw) : null;
-          guildsById.set(id, {
-            id,
-            name: meta?.name ?? oauthMeta?.name ?? `Server ${id}`,
-            icon: meta?.iconURL ?? oauthIcon,
-            configured: configuredGuildIds.includes(id),
-            botPresent: true,
-          });
-        } catch {
-          guildsById.set(id, {
-            id,
-            name: oauthMeta?.name ?? `Server ${id}`,
-            icon: oauthIcon,
-            configured: configuredGuildIds.includes(id),
-            botPresent: true,
-          });
-        }
-      } else {
-        guildsById.set(id, {
-          id,
-          name: oauthMeta?.name ?? `Server ${id}`,
-          icon: oauthIcon,
-          configured: configuredGuildIds.includes(id),
-          botPresent: true,
-        });
+          if (raw) {
+            const meta = typeof raw === 'string' ? JSON.parse(raw) : raw;
+            isBotPresent = true;
+            guildName = meta?.name ?? oauthMeta.name;
+            iconUrl = meta?.iconURL ?? oauthIcon;
+          }
+        } catch { /* ignore */ }
       }
+
+      guildsById.set(id, {
+        id,
+        name: guildName,
+        icon: iconUrl,
+        configured: configuredGuildIds.includes(id),
+        botPresent: isBotPresent
+      });
     }
 
-    for (const g of (userGuilds ?? [])) {
-      if (guildsById.has(g.id)) continue;
-      const p = BigInt(g.permissions ?? 0);
-      const canManage = g.owner || (p & ADMINISTRATOR) === ADMINISTRATOR || (p & MANAGE_GUILD) === MANAGE_GUILD;
-      if (canManage) {
-        guildsById.set(g.id, { id: g.id, name: g.name, icon: g.icon ? `https://cdn.discordapp.com/icons/${g.id}/${g.icon}.png?size=64` : null, configured: false, botPresent: false });
-      }
-    }
-
-    if (isDev) {
+    // Fallback in dev mode when user has no OAuth guilds
+    if (isDev && userManageableMap.size === 0) {
       for (const guildId of configuredGuildIds) {
         if (!guildsById.has(guildId)) {
-          guildsById.set(guildId, { id: guildId, name: `Server ${guildId}`, icon: null, configured: true, botPresent: true });
+          const isBotPresent = botClient?.guilds?.cache ? botClient.guilds.cache.has(guildId) : true;
+          guildsById.set(guildId, { id: guildId, name: `Server ${guildId}`, icon: null, configured: true, botPresent: isBotPresent });
         }
       }
     }

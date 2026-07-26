@@ -12,25 +12,30 @@ export default function GuildRail({ guilds, selectedGuild, user, selectGuild, on
   return (
     <nav className="guild-rail" aria-label="Servers">
       {/* Top Logo (Click to refresh server list) */}
-      <div 
+      <button 
         onClick={onRefreshGuilds}
+        disabled={refreshingGuilds}
         style={{
           color: refreshingGuilds ? 'var(--accent)' : 'var(--text-1)',
           cursor: 'pointer',
           display: 'flex',
           alignItems: 'center',
-          justify: 'center',
+          justifyContent: 'center',
           height: '40px',
           width: '40px',
           border: '1px solid var(--border)',
+          background: 'transparent',
+          padding: 0,
+          boxSizing: 'border-box',
+          flexShrink: 0,
           transition: 'border-color 0.15s ease'
         }}
         title="Mission Control Console (Click để làm mới danh sách server)"
       >
         <Bot size={20} className={refreshingGuilds ? 'spin' : ''} />
-      </div>
+      </button>
 
-      <div style={{ width: '24px', height: '1px', backgroundColor: 'var(--border)', margin: 'var(--space-1) 0' }} />
+      <div style={{ width: '24px', height: '1px', backgroundColor: 'var(--border)', margin: 'var(--space-1) 0', flexShrink: 0 }} />
 
       {/* Guild Switcher List */}
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 'var(--space-2)', width: '100%', alignItems: 'center' }}>
@@ -55,7 +60,10 @@ export default function GuildRail({ guilds, selectedGuild, user, selectGuild, on
                 fontSize: '14px',
                 fontWeight: 'bold',
                 position: 'relative',
-                overflow: 'hidden'
+                overflow: 'hidden',
+                padding: 0,
+                boxSizing: 'border-box',
+                flexShrink: 0
               }}
               title={guild.name}
             >
@@ -74,7 +82,7 @@ export default function GuildRail({ guilds, selectedGuild, user, selectGuild, on
 
         {notPresent.length > 0 && (
           <>
-            <div style={{ width: '20px', height: '1px', backgroundColor: 'var(--border)', margin: 'var(--space-1) 0' }} />
+            <div style={{ width: '20px', height: '1px', backgroundColor: 'var(--border)', margin: 'var(--space-1) 0', flexShrink: 0 }} />
             {/* Inviteable servers */}
             {notPresent.map(guild => (
               <button
@@ -93,7 +101,10 @@ export default function GuildRail({ guilds, selectedGuild, user, selectGuild, on
                   fontFamily: 'var(--font-mono)',
                   fontSize: '12px',
                   position: 'relative',
-                  overflow: 'hidden'
+                  overflow: 'hidden',
+                  padding: 0,
+                  boxSizing: 'border-box',
+                  flexShrink: 0
                 }}
                 title={`${guild.name} (Chưa cài bot)`}
               >
@@ -116,12 +127,12 @@ export default function GuildRail({ guilds, selectedGuild, user, selectGuild, on
       </div>
 
       {/* Bottom Profile and Logout */}
-      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 'var(--space-3)', width: '100%' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 'var(--space-3)', width: '100%', flexShrink: 0 }}>
         {user?.avatar && (
           <img
             src={`https://cdn.discordapp.com/avatars/${user.id}/${user.avatar}.png?size=64`}
             alt=""
-            style={{ width: '32px', height: '32px', border: '1px solid var(--border)' }}
+            style={{ width: '32px', height: '32px', border: '1px solid var(--border)', boxSizing: 'border-box' }}
             title={`${user.username}`}
           />
         )}

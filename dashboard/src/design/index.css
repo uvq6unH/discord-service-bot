@@ -170,7 +170,7 @@ a {
 .guild-rail {
   width: var(--rail-guild-w);
   min-width: 64px;
-  max-width: 80px;
+  max-width: 64px;
   background-color: var(--bg);
   border-right: 1px solid var(--border);
   display: flex;
@@ -179,6 +179,12 @@ a {
   padding: 16px 0;
   gap: 12px;
   overflow-y: auto;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.guild-rail::-webkit-scrollbar {
+  display: none;
 }
 
 /* Left Domain Navigation Rail */

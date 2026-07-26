@@ -318,7 +318,11 @@ export function createBot(configStore, stateStore, redis = null) {
     _updatePresence(client);
   });
   client.on(Events.GuildDelete, async (guild) => {
-    console.log(`[bot] Left guild: ${guild.name} (${guild.id})`);
+    console.log(`[bot] Left or deleted guild: ${guild.name} (${guild.id})`);
+    if (redis) {
+      await redis.del(`guild_cache:${guild.id}`).catch(() => null);
+      await redis.del(`guild_cache:${guild.id}:members`).catch(() => null);
+    }
     _updatePresence(client);
   });
   client.on(Events.GuildUpdate, async (_old, newGuild) => {
