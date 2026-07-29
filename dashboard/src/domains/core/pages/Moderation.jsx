@@ -785,11 +785,8 @@ export default function ModerationPage() {
               />
             </div>
           </Panel>
-        </MasonryGrid>
 
-        {/* 4. Tier 2 Full Width Hero Management Console for Self-Role */}
-        <div style={{ marginTop: 'var(--space-5)' }}>
-          <Panel title={t("SELF-ROLE ASSIGNMENT & DISPATCH ENGINE")} className={highlight === 'selfroles' ? 'flash-target' : ''}>
+          <Panel title={t("SELF-ROLE ASSIGNMENT")} className={highlight === 'selfroles' ? 'flash-target' : ''}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 'var(--space-4)', paddingBottom: 'var(--space-3)', borderBottom: '1px solid var(--border)' }}>
               <span style={{ fontFamily: 'var(--font-mono)', fontSize: '12px', fontWeight: 'bold', color: 'var(--text-1)' }}>
                 {t("ENABLE SELF-ROLE SYSTEM")}
@@ -833,7 +830,7 @@ export default function ModerationPage() {
               />
             </div>
           </Panel>
-        </div>
+        </MasonryGrid>
 
         {/* Moderation Commands Panel */}
         <div className="grid-12" style={{ marginTop: 'var(--space-5)' }}>
