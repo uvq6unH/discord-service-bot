@@ -11,6 +11,7 @@ import PermissionGuard from '../components/PermissionGuard.jsx';
 import { useModeration } from '../hooks/useModeration.js';
 import { useGuild } from '../../../shared/hooks/useGuild.js';
 import { useLanguage } from '../../../shared/context/LanguageContext.jsx';
+import { useNotify } from '../../../shared/context/NotificationContext.jsx';
 
 function CommandConfigRow({ cmd, roles, onUpdate, displayPrefix = '/' }) {
   const [expanded, setExpanded] = useState(false);
@@ -266,11 +267,11 @@ function SelfRolePanelsManager({ panels = [], legacyRoles = [], allRoles = [], c
     setActivePanelIdx(nextPanels.length - 1);
   };
 
-  const [postStatus, setPostStatus] = useState(null);
+  const notify = useNotify();
 
   const removeActivePanel = () => {
     if (currentPanels.length <= 1) {
-      setPostStatus({ type: 'error', text: 'Cần giữ ít nhất 1 nhóm Self-Role Panel!' });
+      notify.error('Cần giữ ít nhất 1 nhóm Self-Role Panel!');
       return;
     }
     const nextPanels = currentPanels.filter((_, idx) => idx !== safeIdx);
@@ -280,26 +281,25 @@ function SelfRolePanelsManager({ panels = [], legacyRoles = [], allRoles = [], c
 
   const handlePostPanel = async () => {
     if (!activePanel.channelId) {
-      setPostStatus({ type: 'error', text: 'Vui lòng chọn Kênh Discord trước khi đăng Panel!' });
+      notify.error('Vui lòng chọn Kênh Discord trước khi đăng Panel!');
       return;
     }
     if (!activePanel.roles || activePanel.roles.length === 0) {
-      setPostStatus({ type: 'error', text: 'Vui lòng thêm ít nhất 1 Role vào nhóm Panel này!' });
+      notify.error('Vui lòng thêm ít nhất 1 Role vào nhóm Panel này!');
       return;
     }
 
     setPosting(true);
-    setPostStatus(null);
     try {
       const res = await api.postSelfRolePanel(selectedGuildId, activePanel.id);
       if (res.error) {
-        setPostStatus({ type: 'error', text: res.error });
+        notify.error(res.error);
       } else {
         const targetChan = textChannels.find(c => c.id === activePanel.channelId);
-        setPostStatus({ type: 'success', text: `🚀 Đã đăng thành công Panel "${activePanel.title}" vào kênh #${targetChan?.name ?? 'Discord'}!` });
+        notify.success(`🚀 Đã đăng thành công Panel "${activePanel.title}" vào kênh #${targetChan?.name ?? 'Discord'}!`);
       }
     } catch (err) {
-      setPostStatus({ type: 'error', text: `Lỗi đăng Panel: ${err.message}` });
+      notify.error(`Lỗi đăng Panel: ${err.message}`);
     } finally {
       setPosting(false);
     }
@@ -528,7 +528,7 @@ function SelfRolePanelsManager({ panels = [], legacyRoles = [], allRoles = [], c
         </div>
 
         {/* POST PANEL DIRECTLY TO DISCORD BUTTON */}
-        <div style={{ borderTop: '1px solid var(--border)', paddingTop: 'var(--space-4)', display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 'var(--space-2)' }}>
+        <div style={{ borderTop: '1px solid var(--border)', paddingTop: 'var(--space-4)', display: 'flex', justifyContent: 'flex-end' }}>
           <button
             type="button"
             className="btn btn--primary"
@@ -538,20 +538,6 @@ function SelfRolePanelsManager({ panels = [], legacyRoles = [], allRoles = [], c
           >
             🚀 {posting ? t("POSTING TO DISCORD...") : t("POST PANEL TO DISCORD CHANNEL")}
           </button>
-
-          {postStatus && (
-            <div style={{
-              fontSize: '11px',
-              fontFamily: 'var(--font-mono)',
-              color: postStatus.type === 'error' ? 'var(--red)' : 'var(--green)',
-              backgroundColor: postStatus.type === 'error' ? 'var(--red-dim)' : 'rgba(87, 242, 135, 0.1)',
-              border: `1px solid ${postStatus.type === 'error' ? 'var(--red)' : 'var(--green)'}`,
-              padding: 'var(--space-2) var(--space-3)',
-              marginTop: 'var(--space-1)'
-            }}>
-              {postStatus.text}
-            </div>
-          )}
         </div>
 
       </div>

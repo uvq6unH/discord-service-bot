@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from './app/providers/AuthProvider.jsx';
 import { useGuild } from './shared/hooks/useGuild.js';
+import { useNotify } from './shared/context/NotificationContext.jsx';
 import { api } from './app/services/api/index.js';
 import AppShell from './shared/layouts/AppShell.jsx';
 import AppRoutes from './app/router/router.jsx';
@@ -10,6 +11,7 @@ import LandingPage from './shared/pages/LandingPage.jsx';
 
 export default function App() {
   const { user, loading: authLoading } = useAuth();
+  const notify = useNotify();
   const queryClient = useQueryClient();
   const [refreshingGuilds, setRefreshingGuilds] = useState(false);
   const {
@@ -44,6 +46,7 @@ export default function App() {
 
     const now = Date.now();
     if (now - lastRefreshTimeRef.current < 2500) {
+      notify.info('Vui lòng đợi 3s giữa các lần làm mới');
       return;
     }
     lastRefreshTimeRef.current = now;
@@ -52,12 +55,13 @@ export default function App() {
     try {
       const data = await api.guilds(true);
       queryClient.setQueryData(['guilds'], data);
+      notify.success('Đã làm mới danh sách server từ Discord!');
     } catch (err) {
-      console.error('[guilds] Refresh error:', err.message);
+      notify.error('Không thể làm mới danh sách server.');
     } finally {
       setRefreshingGuilds(false);
     }
-  }, [queryClient, refreshingGuilds]);
+  }, [queryClient, refreshingGuilds, notify]);
 
   const guilds = guildsPayload?.guilds ?? [];
   const status = guildsPayload?.status ?? 'ready';

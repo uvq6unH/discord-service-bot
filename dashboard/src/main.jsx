@@ -7,6 +7,7 @@ import Login from './domains/core/pages/Login.jsx';
 import { AuthProvider } from './app/providers/AuthProvider.jsx';
 import { GuildProvider } from './app/providers/GuildProvider.jsx';
 import { LanguageProvider } from './shared/context/LanguageContext.jsx';
+import { NotificationProvider } from './shared/context/NotificationContext.jsx';
 import './design/index.css';
 
 import { getQueryClient } from './app/services/queryClient.js';
@@ -23,18 +24,20 @@ createRoot(document.getElementById('root')).render(
   <React.StrictMode>
     <QueryClientProvider client={queryClient}>
       <LanguageProvider>
-        <BrowserRouter>
-          <Routes>
-            <Route path="/login" element={<Login />} />
-            <Route path="/*" element={
-              <AuthProvider>
-                <GuildProvider>
-                  <App />
-                </GuildProvider>
-              </AuthProvider>
-            } />
-          </Routes>
-        </BrowserRouter>
+        <NotificationProvider>
+          <BrowserRouter>
+            <Routes>
+              <Route path="/login" element={<Login />} />
+              <Route path="/*" element={
+                <AuthProvider>
+                  <GuildProvider>
+                    <App />
+                  </GuildProvider>
+                </AuthProvider>
+              } />
+            </Routes>
+          </BrowserRouter>
+        </NotificationProvider>
       </LanguageProvider>
     </QueryClientProvider>
   </React.StrictMode>
