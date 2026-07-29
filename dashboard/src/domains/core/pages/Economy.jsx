@@ -358,11 +358,14 @@ export default function EconomyPage() {
           const colHeights = [0, 0];
           const positions = {};
           orderedItems.forEach(({ key, idx }) => {
+            const isCurrency = key === 'currency' || key.includes('currency');
+            const isBetting = key === 'betting' || key.includes('betting');
+
             let targetCol = 0;
             if (isLeveling) {
-              targetCol = (key === 'currency' || key === 'betting') ? 1 : 0;
+              targetCol = (isCurrency || isBetting) ? 1 : 0;
             } else {
-              targetCol = key === 'betting' ? 1 : 0;
+              targetCol = isBetting ? 1 : 0;
             }
             const measuredH = getMeasuredHeight(key, idx);
             const leftPx = targetCol * (itemWidthPx + gap);

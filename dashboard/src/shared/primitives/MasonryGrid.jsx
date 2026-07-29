@@ -32,7 +32,10 @@ const resolveItemKey = (child, idx, itemKeyFn) => {
   }
 
   if (child.props?.id) return String(child.props.id);
-  if (child.key) return String(child.key);
+  if (child.key) {
+    const k = String(child.key);
+    return k.startsWith('.$') ? k.slice(2) : k;
+  }
 
   if (process.env.NODE_ENV !== 'production' && typeof console !== 'undefined') {
     console.warn(
