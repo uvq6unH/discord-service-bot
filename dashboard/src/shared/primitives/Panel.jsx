@@ -1,6 +1,6 @@
 import React from 'react';
 
-export default function Panel({ title, actions, accent = false, children, style, className = '' }) {
+export default function Panel({ title, actions, accent = true, children, style, className = '' }) {
   return (
     <section 
       className={`panel ${accent ? 'panel--accent' : ''} ${className}`}

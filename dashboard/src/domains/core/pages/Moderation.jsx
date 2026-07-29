@@ -735,7 +735,7 @@ export default function ModerationPage() {
             </div>
           </Panel>
 
-          <Panel title={t("TICKET CONSOLE SYSTEM")} className={highlight === 'tickets' ? 'flash-target' : ''}>
+          <Panel title={t("TICKET CONSOLE SYSTEM")} accent className={highlight === 'tickets' ? 'flash-target' : ''}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 'var(--space-4)', paddingBottom: 'var(--space-3)', borderBottom: '1px solid var(--border)' }}>
               <span style={{ fontFamily: 'var(--font-mono)', fontSize: '12px', fontWeight: 'bold', color: 'var(--text-1)' }}>
                 {t("ENABLE TICKET SYSTEM")}
@@ -799,7 +799,7 @@ export default function ModerationPage() {
             </div>
           </Panel>
 
-          <Panel key="selfroles" id="selfroles" title={t("SELF-ROLE ASSIGNMENT")} className={highlight === 'selfroles' ? 'flash-target' : ''}>
+          <Panel key="selfroles" id="selfroles" title={t("SELF-ROLE ASSIGNMENT")} accent className={highlight === 'selfroles' ? 'flash-target' : ''}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 'var(--space-4)', paddingBottom: 'var(--space-3)', borderBottom: '1px solid var(--border)' }}>
               <span style={{ fontFamily: 'var(--font-mono)', fontSize: '12px', fontWeight: 'bold', color: 'var(--text-1)' }}>
                 {t("ENABLE SELF-ROLE SYSTEM")}
@@ -844,7 +844,7 @@ export default function ModerationPage() {
             </div>
           </Panel>
 
-          <Panel key="wordfilter" id="wordfilter" title={t("WORD FILTER DICTIONARY")} className={highlight === 'wordfilter' ? 'flash-target' : ''}>
+          <Panel key="wordfilter" id="wordfilter" title={t("WORD FILTER DICTIONARY")} accent className={highlight === 'wordfilter' ? 'flash-target' : ''}>
             <div className="form-group">
               <label className="form-label">{t("Forbidden Words Registry")}</label>
               <BadWordsEditor

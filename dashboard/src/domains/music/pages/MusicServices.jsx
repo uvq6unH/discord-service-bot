@@ -238,7 +238,7 @@ export default function MusicServicesPage() {
             </div>
           </Panel>
 
-          <Panel title={t("LAVALINK AUDIO NODE POOL")} style={{ marginTop: 'var(--space-5)' }}>
+          <Panel title={t("LAVALINK AUDIO NODE POOL")} accent style={{ marginTop: 'var(--space-5)' }}>
             <DataSlab 
               label="NODE // US_EAST_PRIMARY" 
               value={isMusicEnabled ? t('ONLINE') : t('OFFLINE')} 
