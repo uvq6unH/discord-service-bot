@@ -712,6 +712,51 @@ export default function ModerationPage() {
             </div>
           </Panel>
 
+          <Panel title={t("SELF-ROLE ASSIGNMENT")} className={highlight === 'selfroles' ? 'flash-target' : ''}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 'var(--space-4)', paddingBottom: 'var(--space-3)', borderBottom: '1px solid var(--border)' }}>
+              <span style={{ fontFamily: 'var(--font-mono)', fontSize: '12px', fontWeight: 'bold', color: 'var(--text-1)' }}>
+                {t("ENABLE SELF-ROLE SYSTEM")}
+              </span>
+              <label className="toggle-switch">
+                <input
+                  type="checkbox"
+                  className="toggle-switch__input"
+                  checked={config.rolesEnabled ?? false}
+                  onChange={e => updateConfig({ rolesEnabled: e.target.checked })}
+                />
+                <div className="toggle-switch__track">
+                  <div className="toggle-switch__thumb" />
+                </div>
+              </label>
+            </div>
+
+            <div className="form-group">
+              <label className="form-label">{t("Auto-Gained Role on Join")}</label>
+              <select
+                className="form-select"
+                value={config.autoRoleId ?? ''}
+                onChange={e => updateConfig({ autoRoleId: e.target.value })}
+              >
+                <option value="">-- None --</option>
+                {roles.filter(r => r.name !== '@everyone').map(r => (
+                  <option key={r.id} value={r.id}>{r.name}</option>
+                ))}
+              </select>
+            </div>
+
+            <div className="form-group">
+              <label className="form-label">{t("Self-Role Panel Groups Config & Direct Discord Dispatcher")}</label>
+              <SelfRolePanelsManager
+                panels={config.selfRolePanels ?? []}
+                legacyRoles={config.selfRoles ?? []}
+                allRoles={roles}
+                channels={channels}
+                selectedGuildId={selectedGuild?.id}
+                onUpdatePanels={newPanels => updateConfig({ selfRolePanels: newPanels })}
+              />
+            </div>
+          </Panel>
+
           <Panel title={t("TICKET CONSOLE SYSTEM")} className={highlight === 'tickets' ? 'flash-target' : ''}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 'var(--space-4)', paddingBottom: 'var(--space-3)', borderBottom: '1px solid var(--border)' }}>
               <span style={{ fontFamily: 'var(--font-mono)', fontSize: '12px', fontWeight: 'bold', color: 'var(--text-1)' }}>
@@ -782,51 +827,6 @@ export default function ModerationPage() {
               <BadWordsEditor
                 words={config.badWords ?? []}
                 onChange={v => updateConfig({ badWords: v })}
-              />
-            </div>
-          </Panel>
-
-          <Panel title={t("SELF-ROLE ASSIGNMENT")} className={highlight === 'selfroles' ? 'flash-target' : ''}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 'var(--space-4)', paddingBottom: 'var(--space-3)', borderBottom: '1px solid var(--border)' }}>
-              <span style={{ fontFamily: 'var(--font-mono)', fontSize: '12px', fontWeight: 'bold', color: 'var(--text-1)' }}>
-                {t("ENABLE SELF-ROLE SYSTEM")}
-              </span>
-              <label className="toggle-switch">
-                <input
-                  type="checkbox"
-                  className="toggle-switch__input"
-                  checked={config.rolesEnabled ?? false}
-                  onChange={e => updateConfig({ rolesEnabled: e.target.checked })}
-                />
-                <div className="toggle-switch__track">
-                  <div className="toggle-switch__thumb" />
-                </div>
-              </label>
-            </div>
-
-            <div className="form-group">
-              <label className="form-label">{t("Auto-Gained Role on Join")}</label>
-              <select
-                className="form-select"
-                value={config.autoRoleId ?? ''}
-                onChange={e => updateConfig({ autoRoleId: e.target.value })}
-              >
-                <option value="">-- None --</option>
-                {roles.filter(r => r.name !== '@everyone').map(r => (
-                  <option key={r.id} value={r.id}>{r.name}</option>
-                ))}
-              </select>
-            </div>
-
-            <div className="form-group">
-              <label className="form-label">{t("Self-Role Panel Groups Config & Direct Discord Dispatcher")}</label>
-              <SelfRolePanelsManager
-                panels={config.selfRolePanels ?? []}
-                legacyRoles={config.selfRoles ?? []}
-                allRoles={roles}
-                channels={channels}
-                selectedGuildId={selectedGuild?.id}
-                onUpdatePanels={newPanels => updateConfig({ selfRolePanels: newPanels })}
               />
             </div>
           </Panel>

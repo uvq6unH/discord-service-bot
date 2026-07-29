@@ -130,7 +130,7 @@ export default function SystemPage() {
         />
       </StatusZone>
 
-      {/* 3. Workspace Zone */}
+      {/* 3. Top Process Blueprint Masonry Grid */}
       <MasonryGrid cols={2} gap={20}>
         {/* Discord Bot Engine telemetry */}
         <Panel title={t("DISCORD PROCESS BLUEPRINT [BOT_SERVICE]")} accent={botOnline} className={highlight === 'runtime' ? 'flash-target' : ''}>
@@ -181,39 +181,49 @@ export default function SystemPage() {
             sub="REDIS_UPSTASH_STATUS"
           />
         </Panel>
+      </MasonryGrid>
 
+      {/* 4. Full Width Telemetry & Config Panels */}
+      <div className="grid-12" style={{ marginTop: 'var(--space-6)' }}>
         {/* Upstash Cloud Redis Metrics */}
-        <UpstashMetrics upstash={status.upstash} redisConnected={status.redisConnected} commandsToday={status.stats?.commandsToday ?? 0} />
+        <div className={`col-span-12 ${highlight === 'database' ? 'flash-target' : ''}`}>
+          <UpstashMetrics upstash={status.upstash} redisConnected={status.redisConnected} commandsToday={status.stats?.commandsToday ?? 0} />
+        </div>
 
         {/* UptimeRobot 24/7 Keep-Alive Monitors */}
-        <UptimeRobotStatus uptimeRobot={status.uptimeRobot} botOnline={status.bot?.online ?? status.botReady} />
+        <div className="col-span-12" style={{ marginTop: 'var(--space-6)' }}>
+          <UptimeRobotStatus uptimeRobot={status.uptimeRobot} botOnline={status.bot?.online ?? status.botReady} />
+        </div>
 
         {/* External integrations telemetry */}
-        <Panel title={t("INTEGRATIONS & ADAPTERS HEALTH")} accent>
-          <div className="grid-12" style={{ gap: 'var(--space-3)' }}>
-            <div className="col-span-4" style={{ background: 'var(--surface-0)', border: '1px solid var(--border)', borderRadius: 'var(--r2)', padding: 'var(--space-4)' }}>
-              <span style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--text-3)' }}>{t("RIOT API CONNECTIVITY")}</span>
-              <div style={{ fontSize: '14px', fontWeight: 'bold', marginTop: 'var(--space-2)', color: config?.riotApiKeyConfigured ? 'var(--green)' : 'var(--text-3)' }}>
-                &gt;&gt;&gt; {t(config?.riotApiKeyConfigured ? 'KEY_NOMINAL' : 'NO_KEY_PROVIDED')}
+        <div className="col-span-12" style={{ marginTop: 'var(--space-6)' }}>
+          <Panel title={t("INTEGRATIONS & ADAPTERS HEALTH")} accent>
+            <div className="grid-12" style={{ gap: 'var(--space-3)' }}>
+              <div className="col-span-4" style={{ background: 'var(--surface-0)', border: '1px solid var(--border)', borderRadius: 'var(--r2)', padding: 'var(--space-4)' }}>
+                <span style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--text-3)' }}>{t("RIOT API CONNECTIVITY")}</span>
+                <div style={{ fontSize: '14px', fontWeight: 'bold', marginTop: 'var(--space-2)', color: config?.riotApiKeyConfigured ? 'var(--green)' : 'var(--text-3)' }}>
+                  &gt;&gt;&gt; {t(config?.riotApiKeyConfigured ? 'KEY_NOMINAL' : 'NO_KEY_PROVIDED')}
+                </div>
+              </div>
+              <div className="col-span-4" style={{ background: 'var(--surface-0)', border: '1px solid var(--border)', borderRadius: 'var(--r2)', padding: 'var(--space-4)' }}>
+                <span style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--text-3)' }}>{t("TFT CONFIG STATUS")}</span>
+                <div style={{ fontSize: '14px', fontWeight: 'bold', marginTop: 'var(--space-2)', color: config?.tftApiKeyConfigured ? 'var(--green)' : 'var(--text-3)' }}>
+                  &gt;&gt;&gt; {t(config?.tftApiKeyConfigured ? 'KEY_NOMINAL' : 'NO_KEY_PROVIDED')}
+                </div>
+              </div>
+              <div className="col-span-4" style={{ background: 'var(--surface-0)', border: '1px solid var(--border)', borderRadius: 'var(--r2)', padding: 'var(--space-4)' }}>
+                <span style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--text-3)' }}>{t("LAVALINK NODES ONLINE")}</span>
+                <div style={{ fontSize: '14px', fontWeight: 'bold', marginTop: 'var(--space-2)', color: config?.musicEnabled ? 'var(--yellow)' : 'var(--text-3)' }}>
+                  &gt;&gt;&gt; {t(config?.musicEnabled ? 'MODULE_STANDBY' : 'MODULE_DISABLED')}
+                </div>
               </div>
             </div>
-            <div className="col-span-4" style={{ background: 'var(--surface-0)', border: '1px solid var(--border)', borderRadius: 'var(--r2)', padding: 'var(--space-4)' }}>
-              <span style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--text-3)' }}>{t("TFT CONFIG STATUS")}</span>
-              <div style={{ fontSize: '14px', fontWeight: 'bold', marginTop: 'var(--space-2)', color: config?.tftApiKeyConfigured ? 'var(--green)' : 'var(--text-3)' }}>
-                &gt;&gt;&gt; {t(config?.tftApiKeyConfigured ? 'KEY_NOMINAL' : 'NO_KEY_PROVIDED')}
-              </div>
-            </div>
-            <div className="col-span-4" style={{ background: 'var(--surface-0)', border: '1px solid var(--border)', borderRadius: 'var(--r2)', padding: 'var(--space-4)' }}>
-              <span style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--text-3)' }}>{t("LAVALINK NODES ONLINE")}</span>
-              <div style={{ fontSize: '14px', fontWeight: 'bold', marginTop: 'var(--space-2)', color: config?.musicEnabled ? 'var(--yellow)' : 'var(--text-3)' }}>
-                &gt;&gt;&gt; {t(config?.musicEnabled ? 'MODULE_STANDBY' : 'MODULE_DISABLED')}
-              </div>
-            </div>
-          </div>
-        </Panel>
+          </Panel>
+        </div>
 
         {/* Bot Status Configuration */}
-        <Panel title={t("BOT ACTIVITY STATUS CONFIGURATION")} accent>
+        <div className="col-span-12" style={{ marginTop: 'var(--space-6)' }}>
+          <Panel title={t("BOT ACTIVITY STATUS CONFIGURATION")} accent>
             <form onSubmit={handleSavePresence} style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
               <div className="grid-12" style={{ gap: 'var(--space-4)' }}>
                 <div className="col-span-6">
@@ -284,8 +294,13 @@ export default function SystemPage() {
               </div>
             </form>
           </Panel>
-        <LiveConsole />
-      </MasonryGrid>
+        </div>
+
+        {/* Live Engine Console Terminal */}
+        <div className="col-span-12" style={{ marginTop: 'var(--space-6)' }}>
+          <LiveConsole />
+        </div>
+      </div>
     </Workspace>
   );
 }
