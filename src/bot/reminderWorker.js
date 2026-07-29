@@ -19,20 +19,11 @@ const REPEAT_INTERVALS_MS = {
   weekly: 7 * 24 * 60 * 60 * 1_000,
 };
 
-const REPEAT_LABELS = {
-  hourly: ' 🔄 *(Hàng giờ)*',
-  daily: ' 🔄 *(Hàng ngày)*',
-  weekly: ' 🔄 *(Hàng tuần)*',
-};
-
 /**
  * Xử lý một reminder đến hạn: gửi tin, reschedule / xoá.
  * @returns {object|null} Reminder mới (nếu reschedule), hoặc null (nếu đã xoá)
  */
 async function processOneReminder(reminder, guild) {
-  const repeat = reminder.repeat ?? 'none';
-  const repeatLabel = REPEAT_LABELS[repeat] ?? '';
-
   const channel = await guild.channels.fetch(reminder.channelId).catch(() => null);
   if (channel?.isTextBased()) {
     const ids = Array.isArray(reminder.userIds) && reminder.userIds.length
@@ -45,10 +36,11 @@ async function processOneReminder(reminder, guild) {
 
     const mentions = [userMentions, roleMentions].filter(Boolean).join(' ');
     const resolvedMsg = resolveEmojiNames(reminder.message, guild);
-    const finalText = mentions ? `${mentions} ${resolvedMsg}${repeatLabel}` : `${resolvedMsg}${repeatLabel}`;
+    const finalText = mentions ? `${mentions} ${resolvedMsg}` : resolvedMsg;
     await channel.send(finalText).catch((err) => console.error(`[reminder] Failed to send message to channel ${reminder.channelId}:`, err.message));
   }
 
+  const repeat = reminder.repeat ?? 'none';
   const ms = REPEAT_INTERVALS_MS[repeat];
   if (!ms) return null; // one-shot — consume
 
