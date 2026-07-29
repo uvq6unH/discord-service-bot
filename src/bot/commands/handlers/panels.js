@@ -56,48 +56,44 @@ export async function handlePanels(ctx) {
         : 'No self-roles configured. Add roles in the dashboard first.');
     }
 
-    const styleMap = {
-      Primary: ButtonStyle.Primary,
-      Secondary: ButtonStyle.Secondary,
-      Success: ButtonStyle.Success,
-      Danger: ButtonStyle.Danger,
-    };
-
     if (isInteraction) {
       await source.reply({ content: 'Role panel(s) posted.', ephemeral: true });
     }
 
     const targetPanels = panels.length > 0 ? panels : [{
-      title: config.selfRolePanelTitle || 'Choose roles',
-      description: config.selfRolePanelMessage || 'Click a button to toggle a role.',
+      title: config.selfRolePanelTitle || 'REACT FOR ROLES',
+      description: config.selfRolePanelMessage || 'Thả cảm xúc bên dưới để nhận Role tương ứng:',
       color: '#5865F2',
       roles: legacyRoles
     }];
 
     for (const panel of targetPanels) {
       const colorInt = Number.parseInt((panel.color || '#5865F2').replace('#', ''), 16) || 0x5865F2;
+
+      const rolesListText = (panel.roles ?? []).map(r => {
+        const emojiStr = r.emoji ? `${r.emoji} ` : '🔹 ';
+        const roleMention = r.roleId ? `<@&${r.roleId}>` : r.label;
+        const labelStr = r.label && r.label !== r.roleId ? ` — **${r.label}**` : '';
+        return `${emojiStr}${roleMention}${labelStr}`;
+      }).join('\n');
+
+      const fullDescription = `${panel.description || 'Thả cảm xúc bên dưới để nhận Role tương ứng:'}\n\n${rolesListText}`;
+
       const embed = new EmbedBuilder()
-        .setTitle(panel.title || 'Choose roles')
-        .setDescription(panel.description || 'Click a button to toggle a role.')
+        .setTitle(panel.title || 'REACT FOR ROLES')
+        .setDescription(fullDescription)
         .setColor(colorInt);
 
-      const buttons = (panel.roles ?? []).slice(0, 25).map((r) => {
-        const btn = new ButtonBuilder()
-          .setCustomId(`selfrole:${r.roleId}`)
-          .setLabel(r.label || r.roleId)
-          .setStyle(styleMap[r.style] ?? ButtonStyle.Secondary);
-        if (r.emoji) {
-          btn.setEmoji(r.emoji);
+      try {
+        const msg = await channel.send({ embeds: [embed] });
+        for (const r of (panel.roles ?? [])) {
+          if (r.emoji && r.emoji.trim()) {
+            await msg.react(r.emoji.trim()).catch(err => console.warn(`[rolepanel] Failed to react ${r.emoji}:`, err.message));
+          }
         }
-        return btn;
-      });
-
-      const rows = [];
-      for (let i = 0; i < buttons.length; i += 5) {
-        rows.push(new ActionRowBuilder().addComponents(buttons.slice(i, i + 5)));
+      } catch (err) {
+        console.error('[rolepanel] Error posting panel:', err.message);
       }
-
-      await channel.send({ embeds: [embed], components: rows });
     }
   }
 }

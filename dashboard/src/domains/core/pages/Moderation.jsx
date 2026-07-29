@@ -438,7 +438,7 @@ function SelfRolePanelsManager({ panels = [], legacyRoles = [], allRoles = [], c
 
         {/* Role Buttons Config List */}
         <div style={{ borderTop: '1px solid var(--border)', paddingTop: 'var(--space-3)' }}>
-          <label className="form-label" style={{ fontSize: '10px', marginBottom: 'var(--space-2)' }}>{t("Role Buttons Config")}</label>
+          <label className="form-label" style={{ fontSize: '10px', marginBottom: 'var(--space-2)' }}>{t("Reaction Roles Config")}</label>
           
           <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
             {(activePanel.roles ?? []).map((r, roleIdx) => (
@@ -447,25 +447,17 @@ function SelfRolePanelsManager({ panels = [], legacyRoles = [], allRoles = [], c
                 {/* Emoji */}
                 <input
                   className="form-input"
-                  style={{ width: '50px', fontSize: '12px', textAlign: 'center' }}
+                  style={{ width: '60px', fontSize: '14px', textAlign: 'center' }}
                   placeholder="🎯"
                   value={r.emoji ?? ''}
                   onChange={e => updateRoleInPanel(roleIdx, { emoji: e.target.value })}
-                />
-
-                {/* Label */}
-                <IMEInput
-                  className="form-input"
-                  style={{ flex: 1, minWidth: '120px', fontSize: '12px' }}
-                  placeholder={t("Button Label")}
-                  value={r.label}
-                  onChange={e => updateRoleInPanel(roleIdx, { label: e.target.value })}
+                  title={t("Reaction Emoji (e.g. 🎯, ⚔️, 🔔)")}
                 />
 
                 {/* Role select */}
                 <select
                   className="form-select"
-                  style={{ width: '150px', fontSize: '12px' }}
+                  style={{ flex: 1, minWidth: '160px', fontSize: '12px' }}
                   value={r.roleId}
                   onChange={e => updateRoleInPanel(roleIdx, { roleId: e.target.value })}
                 >
@@ -473,18 +465,14 @@ function SelfRolePanelsManager({ panels = [], legacyRoles = [], allRoles = [], c
                   {visibleRoles.map(role => <option key={role.id} value={role.id}>{role.name}</option>)}
                 </select>
 
-                {/* Style select */}
-                <select
-                  className="form-select"
-                  style={{ width: '110px', fontSize: '11px', fontFamily: 'var(--font-mono)' }}
-                  value={r.style ?? 'Secondary'}
-                  onChange={e => updateRoleInPanel(roleIdx, { style: e.target.value })}
-                >
-                  <option value="Primary">BLURPLE</option>
-                  <option value="Secondary">GREY</option>
-                  <option value="Success">GREEN</option>
-                  <option value="Danger">RED</option>
-                </select>
+                {/* Optional Note / Custom Display Label */}
+                <IMEInput
+                  className="form-input"
+                  style={{ width: '150px', fontSize: '12px' }}
+                  placeholder={t("Display Label (Optional)")}
+                  value={r.label}
+                  onChange={e => updateRoleInPanel(roleIdx, { label: e.target.value })}
+                />
 
                 {/* Delete button */}
                 <button

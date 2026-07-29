@@ -132,11 +132,76 @@ export function createBot(configStore, stateStore, redis = null) {
       GatewayIntentBits.GuildMembers,
       GatewayIntentBits.GuildVoiceStates,
       GatewayIntentBits.MessageContent,
+      GatewayIntentBits.GuildMessageReactions,
     ],
-    partials: [Partials.Channel],
+    partials: [
+      Partials.Channel,
+      Partials.Message,
+      Partials.Reaction,
+      Partials.User
+    ],
   });
   client.stateStore = stateStore;
   client.configStore = configStore;
+
+  // ── Reaction Roles (Add & Remove) ──────────────────────────────────────────────
+  const handleReactionRoleToggle = async (reaction, user, isAdd) => {
+    if (user.bot) return;
+    try {
+      if (reaction.partial) await reaction.fetch();
+      if (reaction.message.partial) await reaction.message.fetch();
+
+      const guildId = reaction.message.guildId;
+      if (!guildId) return;
+
+      const config = await configStore.getGuildConfig(guildId).catch(() => null);
+      if (!config || !config.rolesEnabled) return;
+
+      const panels = config.selfRolePanels ?? [];
+      const legacyRoles = config.selfRoles ?? [];
+      const allRoles = panels.flatMap(p => p.roles ?? []).concat(legacyRoles);
+
+      const emojiName = reaction.emoji.name;
+      const emojiId = reaction.emoji.id;
+
+      const matchedRole = allRoles.find(r => {
+        if (!r.roleId) return false;
+        if (!r.emoji) return false;
+        const clean = r.emoji.trim();
+        if (clean === emojiName) return true;
+        if (clean.includes(':')) {
+          const parts = clean.split(':');
+          const lastPart = parts[parts.length - 1].replace('>', '');
+          if (lastPart === emojiId || lastPart === emojiName) return true;
+        }
+        return false;
+      });
+
+      if (!matchedRole) return;
+
+      const guild = reaction.message.guild;
+      if (!guild) return;
+      if (!guild.members.me?.permissions.has(PermissionFlagsBits.ManageRoles)) return;
+
+      const member = await guild.members.fetch(user.id).catch(() => null);
+      if (!member) return;
+
+      if (isAdd) {
+        if (!member.roles.cache.has(matchedRole.roleId)) {
+          await member.roles.add(matchedRole.roleId).catch(err => console.error(`[reaction-role] Error adding role ${matchedRole.roleId}:`, err.message));
+        }
+      } else {
+        if (member.roles.cache.has(matchedRole.roleId)) {
+          await member.roles.remove(matchedRole.roleId).catch(err => console.error(`[reaction-role] Error removing role ${matchedRole.roleId}:`, err.message));
+        }
+      }
+    } catch (err) {
+      console.error('[reaction-role] Error handling reaction toggle:', err.message);
+    }
+  };
+
+  client.on(Events.MessageReactionAdd, (reaction, user) => handleReactionRoleToggle(reaction, user, true));
+  client.on(Events.MessageReactionRemove, (reaction, user) => handleReactionRoleToggle(reaction, user, false));
 
   // ── ClientReady ─────────────────────────────────────────────────────────────
   client.once(Events.ClientReady, (readyClient) => {
@@ -666,40 +731,37 @@ function _startEventQueueWorker(client, configStore, redis) {
       const channel = guild.channels.cache.get(panel.channelId) || await guild.channels.fetch(panel.channelId).catch(() => null);
       if (!channel || !channel.isTextBased()) return;
 
-      const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = await import('discord.js');
+      const { EmbedBuilder } = await import('discord.js');
       const colorInt = Number.parseInt((panel.color || '#5865F2').replace('#', ''), 16) || 0x5865F2;
 
+      // Build role list text
+      const rolesListText = panel.roles.map(r => {
+        const emojiStr = r.emoji ? `${r.emoji} ` : '🔹 ';
+        const roleMention = r.roleId ? `<@&${r.roleId}>` : r.label;
+        const labelStr = r.label && r.label !== r.roleId ? ` — **${r.label}**` : '';
+        return `${emojiStr}${roleMention}${labelStr}`;
+      }).join('\n');
+
+      const fullDescription = `${panel.description || 'Thả cảm xúc bên dưới để nhận Role tương ứng:'}\n\n${rolesListText}`;
+
       const embed = new EmbedBuilder()
-        .setTitle(panel.title || 'Choose roles')
-        .setDescription(panel.description || 'Click a button to toggle a role.')
+        .setTitle(panel.title || 'REACT FOR ROLES')
+        .setDescription(fullDescription)
         .setColor(colorInt);
 
-      const styleMap = {
-        Primary: ButtonStyle.Primary,
-        Secondary: ButtonStyle.Secondary,
-        Success: ButtonStyle.Success,
-        Danger: ButtonStyle.Danger,
-      };
+      try {
+        const msg = await channel.send({ embeds: [embed] });
+        console.log(`[event-queue] Posted reaction self-role panel "${panel.title}" to ${panel.channelId}`);
 
-      const buttons = panel.roles.slice(0, 25).map((r) => {
-        const btn = new ButtonBuilder()
-          .setCustomId(`selfrole:${r.roleId}`)
-          .setLabel(r.label || r.roleId)
-          .setStyle(styleMap[r.style] ?? ButtonStyle.Secondary);
-        if (r.emoji) {
-          btn.setEmoji(r.emoji);
+        // React with each configured emoji
+        for (const r of panel.roles) {
+          if (r.emoji && r.emoji.trim()) {
+            await msg.react(r.emoji.trim()).catch(err => console.warn(`[reaction-role] Failed to react ${r.emoji}:`, err.message));
+          }
         }
-        return btn;
-      });
-
-      const rows = [];
-      for (let i = 0; i < buttons.length; i += 5) {
-        rows.push(new ActionRowBuilder().addComponents(buttons.slice(i, i + 5)));
+      } catch (err) {
+        console.error('[event-queue] Error posting reaction selfrole panel:', err.message);
       }
-
-      await channel.send({ embeds: [embed], components: rows })
-        .then(() => console.log(`[event-queue] Posted self-role panel "${panel.title}" to ${panel.channelId}`))
-        .catch((err) => console.error('[event-queue] Error posting selfrole panel:', err.message));
     }
   };
 

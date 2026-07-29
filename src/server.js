@@ -948,39 +948,32 @@ export function createServer({ configStore, stateStore, botClient, redis = null 
           return res.status(400).json({ error: 'Không thể tìm thấy kênh Discord textchannel tương ứng hoặc bot không có quyền đọc kênh.' });
         }
 
-        const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = await import('discord.js');
+        const { EmbedBuilder } = await import('discord.js');
 
         const colorInt = Number.parseInt((panel.color || '#5865F2').replace('#', ''), 16) || 0x5865F2;
 
+        const rolesListText = panel.roles.map(r => {
+          const emojiStr = r.emoji ? `${r.emoji} ` : '🔹 ';
+          const roleMention = r.roleId ? `<@&${r.roleId}>` : r.label;
+          const labelStr = r.label && r.label !== r.roleId ? ` — **${r.label}**` : '';
+          return `${emojiStr}${roleMention}${labelStr}`;
+        }).join('\n');
+
+        const fullDescription = `${panel.description || 'Thả cảm xúc bên dưới để nhận Role tương ứng:'}\n\n${rolesListText}`;
+
         const embed = new EmbedBuilder()
-          .setTitle(panel.title || 'Choose roles')
-          .setDescription(panel.description || 'Click a button to toggle a role.')
+          .setTitle(panel.title || 'REACT FOR ROLES')
+          .setDescription(fullDescription)
           .setColor(colorInt);
 
-        const styleMap = {
-          Primary: ButtonStyle.Primary,
-          Secondary: ButtonStyle.Secondary,
-          Success: ButtonStyle.Success,
-          Danger: ButtonStyle.Danger,
-        };
+        const msg = await channel.send({ embeds: [embed] });
 
-        const buttons = panel.roles.slice(0, 25).map((r) => {
-          const btn = new ButtonBuilder()
-            .setCustomId(`selfrole:${r.roleId}`)
-            .setLabel(r.label || r.roleId)
-            .setStyle(styleMap[r.style] ?? ButtonStyle.Secondary);
-          if (r.emoji) {
-            btn.setEmoji(r.emoji);
+        // Auto react all emojis
+        for (const r of panel.roles) {
+          if (r.emoji && r.emoji.trim()) {
+            await msg.react(r.emoji.trim()).catch(err => console.warn(`[reaction-role] Failed to react ${r.emoji}:`, err.message));
           }
-          return btn;
-        });
-
-        const rows = [];
-        for (let i = 0; i < buttons.length; i += 5) {
-          rows.push(new ActionRowBuilder().addComponents(buttons.slice(i, i + 5)));
         }
-
-        const msg = await channel.send({ embeds: [embed], components: rows });
 
         if (redis) {
           addAuditLog(redis, req.guildId, {
