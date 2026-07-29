@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import Workspace, { HeaderZone, StatusZone, KpiTile } from '../../../shared/layouts/Workspace.jsx';
 import Panel from '../../../shared/primitives/Panel.jsx';
+import MasonryGrid from '../../../shared/primitives/MasonryGrid.jsx';
 import { useGuild } from '../../../shared/hooks/useGuild.js';
 import { useLanguage } from '../../../shared/context/LanguageContext.jsx';
 import { useLocation } from 'react-router-dom';
@@ -281,32 +282,29 @@ export default function AuditLogsPage() {
       </StatusZone>
 
       {/* 3. Workspace Zone */}
-      <div className="grid-12">
+      <MasonryGrid cols={1} gap={20}>
         {/* Logging Integration Panel */}
-        <div className="col-span-12">
-          <Panel title={t("SECURITY LOGGING CHANNEL INTEGRATION")} accent className={highlight === 'logchannel' ? 'flash-target' : ''}>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
-              <label className="form-label" style={{ fontSize: '11px', fontFamily: 'var(--font-mono)', fontWeight: 'bold' }}>
-                {t("Security & Audit Events Logging Target Channel")}
-              </label>
-              <select
-                className="form-select"
-                value={config?.logChannelId || ''}
-                onChange={(e) => updateConfig && updateConfig({ logChannelId: e.target.value })}
-              >
-                <option value="">-- {t("Select Log Channel")} --</option>
-                {textChannels.map(c => <option key={c.id} value={c.id}>#{c.name}</option>)}
-              </select>
-              <span style={{ fontSize: '10px', color: 'var(--text-3)', fontFamily: 'var(--font-mono)' }}>
-                {t("Automated audit notifications, moderation actions, and guild security logs target channel.")}
-              </span>
-            </div>
-          </Panel>
-        </div>
+        <Panel title={t("SECURITY LOGGING CHANNEL INTEGRATION")} accent className={highlight === 'logchannel' ? 'flash-target' : ''}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
+            <label className="form-label" style={{ fontSize: '11px', fontFamily: 'var(--font-mono)', fontWeight: 'bold' }}>
+              {t("Security & Audit Events Logging Target Channel")}
+            </label>
+            <select
+              className="form-select"
+              value={config?.logChannelId || ''}
+              onChange={(e) => updateConfig && updateConfig({ logChannelId: e.target.value })}
+            >
+              <option value="">-- {t("Select Log Channel")} --</option>
+              {textChannels.map(c => <option key={c.id} value={c.id}>#{c.name}</option>)}
+            </select>
+            <span style={{ fontSize: '10px', color: 'var(--text-3)', fontFamily: 'var(--font-mono)' }}>
+              {t("Automated audit notifications, moderation actions, and guild security logs target channel.")}
+            </span>
+          </div>
+        </Panel>
 
         {/* Administrative Activity Logs Panel */}
-        <div className="col-span-12" style={{ marginTop: 'var(--space-6)' }}>
-          <Panel title={t("ADMINISTRATIVE ACTIVITY LOGS")} accent className={highlight === 'activity' ? 'flash-target' : ''}>
+        <Panel title={t("ADMINISTRATIVE ACTIVITY LOGS")} accent className={highlight === 'activity' ? 'flash-target' : ''}>
             {/* Filter & Search Bar */}
             <div style={{ display: 'flex', gap: '12px', alignItems: 'center', marginBottom: 'var(--space-4)', flexWrap: 'wrap' }}>
               <div style={{ position: 'relative', flex: 1, minWidth: '200px' }}>
@@ -369,8 +367,7 @@ export default function AuditLogsPage() {
               </div>
             )}
           </Panel>
-        </div>
-      </div>
+      </MasonryGrid>
     </Workspace>
   );
 }

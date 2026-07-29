@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import Workspace, { HeaderZone, StatusZone, KpiTile } from '../../../shared/layouts/Workspace.jsx';
 import Panel from '../../../shared/primitives/Panel.jsx';
+import MasonryGrid from '../../../shared/primitives/MasonryGrid.jsx';
 import DataSlab from '../../../shared/primitives/DataSlab.jsx';
 import { useCommands } from '../hooks/useCommands.js';
 import { useGuild } from '../../../shared/hooks/useGuild.js';
@@ -353,33 +354,31 @@ export default function CommandsPage() {
       </StatusZone>
 
       {/* 3. Workspace Zone */}
-      <div className="grid-12">
+      <MasonryGrid cols={1} gap={20}>
         {/* Core System Commands Panel */}
-        <div className="col-span-12">
-          <Panel title={t("CORE OPERATIONS SYSTEM COMMANDS")} accent className={highlight === 'commands' ? 'flash-target' : ''}>
-            {/* List core commands */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
-              {builtInCommands.map(c => {
-                return (
-                  <CommandConfigRow
-                    key={c.type}
-                    cmd={c}
-                    roles={roles}
-                    onUpdate={updatedCmd => {
-                      const currentList = config.core?.commands ?? [];
-                      const updatedList = currentList.map(x => {
-                        const isMatch = (x.type && c.type && x.type === c.type) || (x.name && c.name && x.name === c.name);
-                        return isMatch ? updatedCmd : x;
-                      });
-                      updateConfig({ core: { commands: updatedList } });
-                    }}
-                  />
-                );
-              })}
-            </div>
-          </Panel>
-        </div>
-      </div>
+        <Panel title={t("CORE OPERATIONS SYSTEM COMMANDS")} accent className={highlight === 'commands' ? 'flash-target' : ''}>
+          {/* List core commands */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
+            {builtInCommands.map(c => {
+              return (
+                <CommandConfigRow
+                  key={c.type}
+                  cmd={c}
+                  roles={roles}
+                  onUpdate={updatedCmd => {
+                    const currentList = config.core?.commands ?? [];
+                    const updatedList = currentList.map(x => {
+                      const isMatch = (x.type && c.type && x.type === c.type) || (x.name && c.name && x.name === c.name);
+                      return isMatch ? updatedCmd : x;
+                    });
+                    updateConfig({ core: { commands: updatedList } });
+                  }}
+                />
+              );
+            })}
+          </div>
+        </Panel>
+      </MasonryGrid>
     </Workspace>
   );
 }

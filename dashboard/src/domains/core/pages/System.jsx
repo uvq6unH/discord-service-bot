@@ -3,6 +3,7 @@ import { useLocation } from 'react-router-dom';
 import Workspace, { HeaderZone, StatusZone, KpiTile } from '../../../shared/layouts/Workspace.jsx';
 import Panel from '../../../shared/primitives/Panel.jsx';
 import DataSlab from '../../../shared/primitives/DataSlab.jsx';
+import MasonryGrid from '../../../shared/primitives/MasonryGrid.jsx';
 import IMEInput from '../../../shared/primitives/IMEInput.jsx';
 import { useSystem } from '../hooks/useSystem.js';
 import { useGuild } from '../../../shared/hooks/useGuild.js';
@@ -130,100 +131,89 @@ export default function SystemPage() {
       </StatusZone>
 
       {/* 3. Workspace Zone */}
-      <div className="grid-12">
+      <MasonryGrid cols={2} gap={20}>
         {/* Discord Bot Engine telemetry */}
-        <div className="col-span-6">
-          <Panel title={t("DISCORD PROCESS BLUEPRINT [BOT_SERVICE]")} accent={botOnline} className={highlight === 'runtime' ? 'flash-target' : ''}>
-            <DataSlab 
-              label={t("Bot Session Status")} 
-              value={botOnline ? t('ACTIVE // RUNNING') : t('OFFLINE // TERMINATED')} 
-              sub="STATUS_CODE"
-              highlight={botOnline}
-            />
-            <DataSlab 
-              label={t("Process Uptime")} 
-              value={bot?.uptime ? fmtUptime(bot.uptime) : '—'} 
-              sub="ACTIVE_PROCESS_UPTIME"
-            />
-            <DataSlab 
-              label={t("Command Load (Today)")} 
-              value={`${stats?.commandsToday ?? 0} EXEC`} 
-              sub="DISPATCHED_SIGNALS"
-            />
-            <DataSlab 
-              label={t("Task Scheduler Queue")} 
-              value={`${stats?.slashQueueLength ?? 0} JOBS`} 
-              sub="REMAINING_BUFFER_JOBS"
-            />
-          </Panel>
-        </div>
+        <Panel title={t("DISCORD PROCESS BLUEPRINT [BOT_SERVICE]")} accent={botOnline} className={highlight === 'runtime' ? 'flash-target' : ''}>
+          <DataSlab 
+            label={t("Bot Session Status")} 
+            value={botOnline ? t('ACTIVE // RUNNING') : t('OFFLINE // TERMINATED')} 
+            sub="STATUS_CODE"
+            highlight={botOnline}
+          />
+          <DataSlab 
+            label={t("Process Uptime")} 
+            value={bot?.uptime ? fmtUptime(bot.uptime) : '—'} 
+            sub="ACTIVE_PROCESS_UPTIME"
+          />
+          <DataSlab 
+            label={t("Command Load (Today)")} 
+            value={`${stats?.commandsToday ?? 0} EXEC`} 
+            sub="DISPATCHED_SIGNALS"
+          />
+          <DataSlab 
+            label={t("Task Scheduler Queue")} 
+            value={`${stats?.slashQueueLength ?? 0} JOBS`} 
+            sub="REMAINING_BUFFER_JOBS"
+          />
+        </Panel>
 
         {/* Dashboard node server details */}
-        <div className="col-span-6">
-          <Panel title={t("WEB INTERFACE PROCESS [DASH_SERVICE]")} accent>
-            <DataSlab 
-              label={t("Node Server Uptime")} 
-              value={dash?.uptime ? fmtUptime(dash.uptime) : '—'} 
-              sub="SERVER_UPTIME_COUNTER"
-              highlight
-            />
-            <DataSlab 
-              label={t("Node Memory (RSS)")} 
-              value={dash?.memory ? getMemString(dash.memory) : '—'} 
-              sub="MEM_RAM_ALLOCATION"
-            />
-            <DataSlab 
-              label={t("Node CPU load")} 
-              value={dash?.cpu != null ? `${dash.cpu.toFixed(1)}%` : '0.0%'} 
-              sub="CPU_PROCESS_LOAD"
-            />
-            <DataSlab 
-              label={t("Redis Cache Link")} 
-              value={status.redisConnected ? t('NOMINAL') : t('LINK_FAILURE')} 
-              sub="REDIS_UPSTASH_STATUS"
-            />
-          </Panel>
-        </div>
+        <Panel title={t("WEB INTERFACE PROCESS [DASH_SERVICE]")} accent>
+          <DataSlab 
+            label={t("Node Server Uptime")} 
+            value={dash?.uptime ? fmtUptime(dash.uptime) : '—'} 
+            sub="SERVER_UPTIME_COUNTER"
+            highlight
+          />
+          <DataSlab 
+            label={t("Node Memory (RSS)")} 
+            value={dash?.memory ? getMemString(dash.memory) : '—'} 
+            sub="MEM_RAM_ALLOCATION"
+          />
+          <DataSlab 
+            label={t("Node CPU load")} 
+            value={dash?.cpu != null ? `${dash.cpu.toFixed(1)}%` : '0.0%'} 
+            sub="CPU_PROCESS_LOAD"
+          />
+          <DataSlab 
+            label={t("Redis Cache Link")} 
+            value={status.redisConnected ? t('NOMINAL') : t('LINK_FAILURE')} 
+            sub="REDIS_UPSTASH_STATUS"
+          />
+        </Panel>
 
         {/* Upstash Cloud Redis Metrics */}
-        <div className={`col-span-12 ${highlight === 'database' ? 'flash-target' : ''}`}>
-          <UpstashMetrics upstash={status.upstash} redisConnected={status.redisConnected} commandsToday={status.stats?.commandsToday ?? 0} />
-        </div>
+        <UpstashMetrics upstash={status.upstash} redisConnected={status.redisConnected} commandsToday={status.stats?.commandsToday ?? 0} />
 
         {/* UptimeRobot 24/7 Keep-Alive Monitors */}
-        <div className="col-span-12">
-          <UptimeRobotStatus uptimeRobot={status.uptimeRobot} botOnline={status.bot?.online ?? status.botReady} />
-        </div>
+        <UptimeRobotStatus uptimeRobot={status.uptimeRobot} botOnline={status.bot?.online ?? status.botReady} />
 
         {/* External integrations telemetry */}
-        <div className="col-span-12">
-          <Panel title={t("INTEGRATIONS & ADAPTERS HEALTH")} accent>
-            <div className="grid-12" style={{ gap: 'var(--space-3)' }}>
-              <div className="col-span-4" style={{ background: 'var(--surface-0)', border: '1px solid var(--border)', borderRadius: 'var(--r2)', padding: 'var(--space-4)' }}>
-                <span style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--text-3)' }}>{t("RIOT API CONNECTIVITY")}</span>
-                <div style={{ fontSize: '14px', fontWeight: 'bold', marginTop: 'var(--space-2)', color: config?.riotApiKeyConfigured ? 'var(--green)' : 'var(--text-3)' }}>
-                  &gt;&gt;&gt; {t(config?.riotApiKeyConfigured ? 'KEY_NOMINAL' : 'NO_KEY_PROVIDED')}
-                </div>
-              </div>
-              <div className="col-span-4" style={{ background: 'var(--surface-0)', border: '1px solid var(--border)', borderRadius: 'var(--r2)', padding: 'var(--space-4)' }}>
-                <span style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--text-3)' }}>{t("TFT CONFIG STATUS")}</span>
-                <div style={{ fontSize: '14px', fontWeight: 'bold', marginTop: 'var(--space-2)', color: config?.tftApiKeyConfigured ? 'var(--green)' : 'var(--text-3)' }}>
-                  &gt;&gt;&gt; {t(config?.tftApiKeyConfigured ? 'KEY_NOMINAL' : 'NO_KEY_PROVIDED')}
-                </div>
-              </div>
-              <div className="col-span-4" style={{ background: 'var(--surface-0)', border: '1px solid var(--border)', borderRadius: 'var(--r2)', padding: 'var(--space-4)' }}>
-                <span style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--text-3)' }}>{t("LAVALINK NODES ONLINE")}</span>
-                <div style={{ fontSize: '14px', fontWeight: 'bold', marginTop: 'var(--space-2)', color: config?.musicEnabled ? 'var(--yellow)' : 'var(--text-3)' }}>
-                  &gt;&gt;&gt; {t(config?.musicEnabled ? 'MODULE_STANDBY' : 'MODULE_DISABLED')}
-                </div>
+        <Panel title={t("INTEGRATIONS & ADAPTERS HEALTH")} accent>
+          <div className="grid-12" style={{ gap: 'var(--space-3)' }}>
+            <div className="col-span-4" style={{ background: 'var(--surface-0)', border: '1px solid var(--border)', borderRadius: 'var(--r2)', padding: 'var(--space-4)' }}>
+              <span style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--text-3)' }}>{t("RIOT API CONNECTIVITY")}</span>
+              <div style={{ fontSize: '14px', fontWeight: 'bold', marginTop: 'var(--space-2)', color: config?.riotApiKeyConfigured ? 'var(--green)' : 'var(--text-3)' }}>
+                &gt;&gt;&gt; {t(config?.riotApiKeyConfigured ? 'KEY_NOMINAL' : 'NO_KEY_PROVIDED')}
               </div>
             </div>
-          </Panel>
-        </div>
+            <div className="col-span-4" style={{ background: 'var(--surface-0)', border: '1px solid var(--border)', borderRadius: 'var(--r2)', padding: 'var(--space-4)' }}>
+              <span style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--text-3)' }}>{t("TFT CONFIG STATUS")}</span>
+              <div style={{ fontSize: '14px', fontWeight: 'bold', marginTop: 'var(--space-2)', color: config?.tftApiKeyConfigured ? 'var(--green)' : 'var(--text-3)' }}>
+                &gt;&gt;&gt; {t(config?.tftApiKeyConfigured ? 'KEY_NOMINAL' : 'NO_KEY_PROVIDED')}
+              </div>
+            </div>
+            <div className="col-span-4" style={{ background: 'var(--surface-0)', border: '1px solid var(--border)', borderRadius: 'var(--r2)', padding: 'var(--space-4)' }}>
+              <span style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--text-3)' }}>{t("LAVALINK NODES ONLINE")}</span>
+              <div style={{ fontSize: '14px', fontWeight: 'bold', marginTop: 'var(--space-2)', color: config?.musicEnabled ? 'var(--yellow)' : 'var(--text-3)' }}>
+                &gt;&gt;&gt; {t(config?.musicEnabled ? 'MODULE_STANDBY' : 'MODULE_DISABLED')}
+              </div>
+            </div>
+          </div>
+        </Panel>
 
         {/* Bot Status Configuration */}
-        <div className="col-span-12">
-          <Panel title={t("BOT ACTIVITY STATUS CONFIGURATION")} accent>
+        <Panel title={t("BOT ACTIVITY STATUS CONFIGURATION")} accent>
             <form onSubmit={handleSavePresence} style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
               <div className="grid-12" style={{ gap: 'var(--space-4)' }}>
                 <div className="col-span-6">
@@ -294,13 +284,8 @@ export default function SystemPage() {
               </div>
             </form>
           </Panel>
-        </div>
-
-        {/* Live Engine Console Terminal */}
-        <div className="col-span-12">
-          <LiveConsole />
-        </div>
-      </div>
+        <LiveConsole />
+      </MasonryGrid>
     </Workspace>
   );
 }

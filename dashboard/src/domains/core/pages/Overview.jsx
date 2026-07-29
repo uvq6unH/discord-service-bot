@@ -95,7 +95,7 @@ export default function OverviewPage() {
       </StatusZone>
 
       {/* 3. Dynamic Mission Control Masonry Grid (Core Operations Modules Only) */}
-      <MasonryGrid minWidth={350} gap={20}>
+      <MasonryGrid cols={2} gap={20}>
         {/* Module 1: Moderation */}
         <Panel title={t("AUTOMATED MODERATION CONTROL")} accent>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>

@@ -1,6 +1,7 @@
 import React from 'react';
 import Workspace, { HeaderZone, StatusZone, KpiTile } from '../../../shared/layouts/Workspace.jsx';
 import Panel from '../../../shared/primitives/Panel.jsx';
+import MasonryGrid from '../../../shared/primitives/MasonryGrid.jsx';
 import { useGuild } from '../hooks/useGuild.js';
 import { useMembers } from '../hooks/useMembers.js';
 import { Search } from 'lucide-react';
@@ -57,9 +58,8 @@ export default function MembersPage() {
       </StatusZone>
 
       {/* 3. Workspace Zone */}
-      <div className="grid-12">
-        <div className="col-span-12">
-          <Panel title={t("REGISTRY DATABASE SEARCH")} accent className={highlight === 'members' || highlight === 'roles' ? 'flash-target' : ''}>
+      <MasonryGrid cols={1} gap={20}>
+        <Panel title={t("REGISTRY DATABASE SEARCH")} accent className={highlight === 'members' || highlight === 'roles' ? 'flash-target' : ''}>
             {/* Search Input Box */}
             <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', border: '1px solid var(--border)', padding: 'var(--space-2-5) var(--space-3-5)', backgroundColor: 'var(--surface-1)' }}>
               <Search size={16} style={{ color: 'var(--text-3)' }} />
@@ -159,8 +159,7 @@ export default function MembersPage() {
               </div>
             )}
           </Panel>
-        </div>
-      </div>
+      </MasonryGrid>
     </Workspace>
   );
 }
