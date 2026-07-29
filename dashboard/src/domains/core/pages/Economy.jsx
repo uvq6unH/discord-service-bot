@@ -297,8 +297,18 @@ export default function EconomyPage() {
   const [localLevelsEnabled, setLocalLevelsEnabled] = useState(null);
 
   const isEnabled = config?.economyEnabled ?? false;
-  const isLeveling = localLevelsEnabled !== null ? localLevelsEnabled : (config?.levelsEnabled ?? false);
+  const isLeveling = localLevelsEnabled !== null 
+    ? localLevelsEnabled 
+    : (config?.levelsEnabled ?? config?.levels?.enabled ?? false);
   const serverName = selectedGuild?.name ? selectedGuild.name.toUpperCase() : '';
+
+  const handleToggleLevels = useCallback((checked) => {
+    setLocalLevelsEnabled(checked);
+    updateConfig({ 
+      levelsEnabled: checked,
+      levels: { ...(config?.levels ?? {}), enabled: checked }
+    });
+  }, [updateConfig, config?.levels]);
 
   const customEconomyPlacement = useCallback((orderedItems, ctx) => {
     const { activeCols, itemWidthPx, gap, getMeasuredHeight, ruleContext } = ctx;
@@ -318,7 +328,17 @@ export default function EconomyPage() {
     const colHeights = [0, 0];
     const positions = {};
 
-    orderedItems.forEach(({ key, idx }) => {
+    // Sort items so that when isLevelingActive is true, currency is placed FIRST in Col 1
+    const itemsToPlace = [...orderedItems];
+    if (isLevelingActive) {
+      itemsToPlace.sort((a, b) => {
+        if (a.key === 'currency') return -1;
+        if (b.key === 'currency') return 1;
+        return a.idx - b.idx;
+      });
+    }
+
+    itemsToPlace.forEach(({ key, idx }) => {
       const isBetting = key === 'betting' || String(key).includes('betting');
       const isCurrency = key === 'currency' || String(key).includes('currency');
 
@@ -424,11 +444,7 @@ export default function EconomyPage() {
                 type="checkbox"
                 className="toggle-switch__input"
                 disabled={!isEnabled}
-                checked={isLeveling}
-                onChange={e => {
-                  setLocalLevelsEnabled(e.target.checked);
-                  updateConfig({ levelsEnabled: e.target.checked });
-                }}
+                onChange={e => handleToggleLevels(e.target.checked)}
               />
               <div className="toggle-switch__track">
                 <div className="toggle-switch__thumb" />
