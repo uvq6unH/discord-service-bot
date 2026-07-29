@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import { useLocation } from 'react-router-dom';
-import { toast } from 'sonner';
 import { Trash2 } from 'lucide-react';
 import Workspace, { HeaderZone, StatusZone, KpiTile } from '../../../shared/layouts/Workspace.jsx';
 import Panel from '../../../shared/primitives/Panel.jsx';
@@ -267,9 +266,11 @@ function SelfRolePanelsManager({ panels = [], legacyRoles = [], allRoles = [], c
     setActivePanelIdx(nextPanels.length - 1);
   };
 
+  const [postStatus, setPostStatus] = useState(null);
+
   const removeActivePanel = () => {
     if (currentPanels.length <= 1) {
-      toast.error('Cần giữ ít nhất 1 nhóm Self-Role Panel!');
+      setPostStatus({ type: 'error', text: 'Cần giữ ít nhất 1 nhóm Self-Role Panel!' });
       return;
     }
     const nextPanels = currentPanels.filter((_, idx) => idx !== safeIdx);
@@ -279,25 +280,26 @@ function SelfRolePanelsManager({ panels = [], legacyRoles = [], allRoles = [], c
 
   const handlePostPanel = async () => {
     if (!activePanel.channelId) {
-      toast.error('Vui lòng chọn Kênh Discord trước khi đăng Panel!');
+      setPostStatus({ type: 'error', text: 'Vui lòng chọn Kênh Discord trước khi đăng Panel!' });
       return;
     }
     if (!activePanel.roles || activePanel.roles.length === 0) {
-      toast.error('Vui lòng thêm ít nhất 1 Role vào nhóm Panel này!');
+      setPostStatus({ type: 'error', text: 'Vui lòng thêm ít nhất 1 Role vào nhóm Panel này!' });
       return;
     }
 
     setPosting(true);
+    setPostStatus(null);
     try {
       const res = await api.postSelfRolePanel(selectedGuildId, activePanel.id);
       if (res.error) {
-        toast.error(res.error);
+        setPostStatus({ type: 'error', text: res.error });
       } else {
         const targetChan = textChannels.find(c => c.id === activePanel.channelId);
-        toast.success(`🚀 Đã đăng thành công Panel "${activePanel.title}" vào kênh #${targetChan?.name ?? 'Discord'}!`);
+        setPostStatus({ type: 'success', text: `🚀 Đã đăng thành công Panel "${activePanel.title}" vào kênh #${targetChan?.name ?? 'Discord'}!` });
       }
     } catch (err) {
-      toast.error(`Lỗi đăng Panel: ${err.message}`);
+      setPostStatus({ type: 'error', text: `Lỗi đăng Panel: ${err.message}` });
     } finally {
       setPosting(false);
     }
@@ -513,7 +515,7 @@ function SelfRolePanelsManager({ panels = [], legacyRoles = [], allRoles = [], c
         </div>
 
         {/* POST PANEL DIRECTLY TO DISCORD BUTTON */}
-        <div style={{ borderTop: '1px solid var(--border)', paddingTop: 'var(--space-4)', display: 'flex', justifyContent: 'flex-end' }}>
+        <div style={{ borderTop: '1px solid var(--border)', paddingTop: 'var(--space-4)', display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 'var(--space-2)' }}>
           <button
             type="button"
             className="btn btn--primary"
@@ -523,6 +525,20 @@ function SelfRolePanelsManager({ panels = [], legacyRoles = [], allRoles = [], c
           >
             🚀 {posting ? t("POSTING TO DISCORD...") : t("POST PANEL TO DISCORD CHANNEL")}
           </button>
+
+          {postStatus && (
+            <div style={{
+              fontSize: '11px',
+              fontFamily: 'var(--font-mono)',
+              color: postStatus.type === 'error' ? 'var(--red)' : 'var(--green)',
+              backgroundColor: postStatus.type === 'error' ? 'var(--red-dim)' : 'rgba(87, 242, 135, 0.1)',
+              border: `1px solid ${postStatus.type === 'error' ? 'var(--red)' : 'var(--green)'}`,
+              padding: 'var(--space-2) var(--space-3)',
+              marginTop: 'var(--space-1)'
+            }}>
+              {postStatus.text}
+            </div>
+          )}
         </div>
 
       </div>

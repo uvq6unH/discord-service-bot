@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { toast } from 'sonner';
 import { useAuth } from './app/providers/AuthProvider.jsx';
 import { useGuild } from './shared/hooks/useGuild.js';
 import { api } from './app/services/api/index.js';
@@ -45,7 +44,6 @@ export default function App() {
 
     const now = Date.now();
     if (now - lastRefreshTimeRef.current < 2500) {
-      toast.info('Vui lòng đợi 3s giữa các lần làm mới', { id: 'refresh-guilds' });
       return;
     }
     lastRefreshTimeRef.current = now;
@@ -54,9 +52,8 @@ export default function App() {
     try {
       const data = await api.guilds(true);
       queryClient.setQueryData(['guilds'], data);
-      toast.success('Đã làm mới danh sách server từ Discord!', { id: 'refresh-guilds' });
     } catch (err) {
-      toast.error('Không thể làm mới danh sách server.', { id: 'refresh-guilds' });
+      console.error('[guilds] Refresh error:', err.message);
     } finally {
       setRefreshingGuilds(false);
     }
