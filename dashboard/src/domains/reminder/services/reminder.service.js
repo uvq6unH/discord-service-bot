@@ -16,7 +16,7 @@ export const reminderService = {
       ...reminder,
       userIds: Array.isArray(reminder.userIds) ? reminder.userIds : [],
       roleIds: Array.isArray(reminder.roleIds) ? reminder.roleIds : [],
-      message: (reminder.message || '').trim().slice(0, 500),
+      message: String(reminder.message ?? '').slice(0, 500),
     };
   }
 };

@@ -5,6 +5,6 @@ export const moderationService = {
     return Math.max(0, Math.min(num, 100));
   },
   validateSelfRoleLabel: (label) => {
-    return (label || '').trim().slice(0, 32);
+    return String(label ?? '').slice(0, 32);
   }
 };

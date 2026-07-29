@@ -5,6 +5,6 @@ export const musicService = {
     return Math.max(0, Math.min(num, 100));
   },
   validatePrefix: (prefix) => {
-    return (prefix || '').trim().slice(0, 5);
+    return String(prefix ?? '').slice(0, 5);
   }
 };
