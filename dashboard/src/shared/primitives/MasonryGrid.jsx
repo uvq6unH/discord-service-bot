@@ -379,13 +379,21 @@ const MasonryGrid = forwardRef(function MasonryGrid(
     engineVersion: MASONRY_ENGINE_VERSION
   }));
 
-  const serializedRuleContext = useMemo(() => {
-    try {
-      return JSON.stringify(ruleContext || {});
-    } catch {
-      return '';
-    }
-  }, [ruleContext]);
+const safeSerialize = (obj) => {
+  if (!obj || typeof obj !== 'object') return String(obj);
+  try {
+    return Object.keys(obj).sort().map(k => {
+      const val = obj[k];
+      if (typeof val === 'function') return `${k}:fn`;
+      if (val && typeof val === 'object') return `${k}:obj`;
+      return `${k}:${val}`;
+    }).join('|');
+  } catch {
+    return 'fallback';
+  }
+};
+
+  const serializedRuleContext = useMemo(() => safeSerialize(ruleContext), [ruleContext]);
 
   useIsomorphicLayoutEffect(() => {
     calculateLayout();
