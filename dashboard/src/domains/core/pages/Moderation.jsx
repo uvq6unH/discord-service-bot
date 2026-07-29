@@ -603,128 +603,38 @@ export default function ModerationPage() {
           />
         </StatusZone>
 
-        {/* 3. Workspace Zone — Direct Visual 2-Column Stack */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(340px, 1fr))', gap: 'var(--space-5)', alignItems: 'start' }}>
-          {/* Left Column Stack (AutoMod -> Tickets -> Word Filter) */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-5)' }}>
-            <Panel title={t("AUTO-MODERATION ENGINE")} accent className={highlight === 'automod' ? 'flash-target' : ''}>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <span style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--text-2)' }}>
-                    {t("GLOBAL AUTOMOD POWER")}
-                  </span>
-                  <label className="toggle-switch">
-                    <input
-                      type="checkbox"
-                      className="toggle-switch__input"
-                      checked={mod.enabled ?? false}
-                      onChange={e => updateConfig({ moderation: { ...mod, enabled: e.target.checked } })}
-                    />
-                    <div className="toggle-switch__track">
-                      <div className="toggle-switch__thumb" />
-                    </div>
-                  </label>
-                </div>
-
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', opacity: mod.enabled ? 1 : 0.4 }}>
-                  <span style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--text-2)' }}>
-                    {t("ANTI SPAM SHIELD")}
-                  </span>
-                  <label className="toggle-switch">
-                    <input
-                      type="checkbox"
-                      className="toggle-switch__input"
-                      disabled={!mod.enabled}
-                      checked={mod.antiSpam ?? false}
-                      onChange={e => updateConfig({ moderation: { ...mod, antiSpam: e.target.checked } })}
-                    />
-                    <div className="toggle-switch__track">
-                      <div className="toggle-switch__thumb" />
-                    </div>
-                  </label>
-                </div>
-
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', opacity: mod.enabled ? 1 : 0.4 }}>
-                  <span style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--text-2)' }}>
-                    {t("ANTI LINK PROTOCOL")}
-                  </span>
-                  <label className="toggle-switch">
-                    <input
-                      type="checkbox"
-                      className="toggle-switch__input"
-                      disabled={!mod.enabled}
-                      checked={mod.antiLink ?? false}
-                      onChange={e => updateConfig({ moderation: { ...mod, antiLink: e.target.checked } })}
-                    />
-                    <div className="toggle-switch__track">
-                      <div className="toggle-switch__thumb" />
-                    </div>
-                  </label>
-                </div>
-
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', opacity: mod.enabled ? 1 : 0.4 }}>
-                  <span style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--text-2)' }}>
-                    {t("ANTI RAID EMERGENCY PROTOCOL")}
-                  </span>
-                  <label className="toggle-switch">
-                    <input
-                      type="checkbox"
-                      className="toggle-switch__input"
-                      disabled={!mod.enabled}
-                      checked={mod.antiRaid ?? false}
-                      onChange={e => updateConfig({ moderation: { ...mod, antiRaid: e.target.checked } })}
-                    />
-                    <div className="toggle-switch__track">
-                      <div className="toggle-switch__thumb" />
-                    </div>
-                  </label>
-                </div>
-
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', opacity: mod.enabled ? 1 : 0.4 }}>
-                  <span style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--text-2)' }}>
-                    {t("AUTO-DELETE BLOCKED MESSAGES")}
-                  </span>
-                  <label className="toggle-switch">
-                    <input
-                      type="checkbox"
-                      className="toggle-switch__input"
-                      disabled={!mod.enabled}
-                      checked={config.deleteBlockedMessages ?? true}
-                      onChange={e => updateConfig({ deleteBlockedMessages: e.target.checked })}
-                    />
-                    <div className="toggle-switch__track">
-                      <div className="toggle-switch__thumb" />
-                    </div>
-                  </label>
-                </div>
-
-                <div className="form-group" style={{ opacity: mod.enabled ? 1 : 0.4 }}>
-                  <label className="form-label">{t("Auto-Warn Threshold")}</label>
+        {/* 3. Workspace Zone — Native CSS Multi-Column Masonry */}
+        <MasonryGrid cols={2} gap={20}>
+          <Panel title={t("AUTO-MODERATION ENGINE")} accent className={highlight === 'automod' ? 'flash-target' : ''}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <span style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--text-2)' }}>
+                  {t("GLOBAL AUTOMOD POWER")}
+                </span>
+                <label className="toggle-switch">
                   <input
-                    type="number"
-                    className="form-input"
+                    type="checkbox"
+                    className="toggle-switch__input"
+                    checked={mod.enabled ?? false}
+                    onChange={e => updateConfig({ moderation: { ...mod, enabled: e.target.checked } })}
+                  />
+                  <div className="toggle-switch__track">
+                    <div className="toggle-switch__thumb" />
+                  </div>
+                </label>
+              </div>
+
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', opacity: mod.enabled ? 1 : 0.4 }}>
+                <span style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--text-2)' }}>
+                  {t("ANTI SPAM SHIELD")}
+                </span>
+                <label className="toggle-switch">
+                  <input
+                    type="checkbox"
+                    className="toggle-switch__input"
                     disabled={!mod.enabled}
-                    value={mod.warnThreshold ?? 3}
-                    onChange={e => handleThresholdChange('warnThreshold', e.target.value)}
-                  />
-                  <span style={{ fontSize: '11px', color: 'var(--text-3)', fontFamily: 'var(--font-mono)' }}>
-                    {t("Warns required before automated ban.")}
-                  </span>
-                </div>
-              </div>
-            </Panel>
-
-            <Panel title={t("TICKET CONSOLE SYSTEM")} className={highlight === 'tickets' ? 'flash-target' : ''}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 'var(--space-4)', paddingBottom: 'var(--space-3)', borderBottom: '1px solid var(--border)' }}>
-                <span style={{ fontFamily: 'var(--font-mono)', fontSize: '12px', fontWeight: 'bold', color: 'var(--text-1)' }}>
-                  {t("ENABLE TICKET SYSTEM")}
-                </span>
-                <label className="toggle-switch">
-                  <input
-                    type="checkbox"
-                    className="toggle-switch__input"
-                    checked={config.ticketsEnabled ?? false}
-                    onChange={e => updateConfig({ ticketsEnabled: e.target.checked })}
+                    checked={mod.antiSpam ?? false}
+                    onChange={e => updateConfig({ moderation: { ...mod, antiSpam: e.target.checked } })}
                   />
                   <div className="toggle-switch__track">
                     <div className="toggle-switch__thumb" />
@@ -732,111 +642,195 @@ export default function ModerationPage() {
                 </label>
               </div>
 
-              <div className="form-group">
-                <label className="form-label">{t("Ticket Category Target")}</label>
-                <select
-                  className="form-select"
-                  value={config.ticketCategoryId ?? ''}
-                  onChange={e => updateConfig({ ticketCategoryId: e.target.value })}
-                >
-                  <option value="">-- None --</option>
-                  {categoryChannels.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                </select>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', opacity: mod.enabled ? 1 : 0.4 }}>
+                <span style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--text-2)' }}>
+                  {t("ANTI LINK PROTOCOL")}
+                </span>
+                <label className="toggle-switch">
+                  <input
+                    type="checkbox"
+                    className="toggle-switch__input"
+                    disabled={!mod.enabled}
+                    checked={mod.antiLink ?? false}
+                    onChange={e => updateConfig({ moderation: { ...mod, antiLink: e.target.checked } })}
+                  />
+                  <div className="toggle-switch__track">
+                    <div className="toggle-switch__thumb" />
+                  </div>
+                </label>
               </div>
 
-              <div className="form-group">
-                <label className="form-label">{t("Ticket Logging Target Channel")}</label>
-                <select
-                  className="form-select"
-                  value={config.ticketLogChannelId ?? ''}
-                  onChange={e => updateConfig({ ticketLogChannelId: e.target.value })}
-                >
-                  <option value="">-- None --</option>
-                  {textChannels.map(c => <option key={c.id} value={c.id}>#{c.name}</option>)}
-                </select>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', opacity: mod.enabled ? 1 : 0.4 }}>
+                <span style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--text-2)' }}>
+                  {t("ANTI RAID EMERGENCY PROTOCOL")}
+                </span>
+                <label className="toggle-switch">
+                  <input
+                    type="checkbox"
+                    className="toggle-switch__input"
+                    disabled={!mod.enabled}
+                    checked={mod.antiRaid ?? false}
+                    onChange={e => updateConfig({ moderation: { ...mod, antiRaid: e.target.checked } })}
+                  />
+                  <div className="toggle-switch__track">
+                    <div className="toggle-switch__thumb" />
+                  </div>
+                </label>
               </div>
 
-              <div className="form-group">
-                <label className="form-label">{t("Console panel Title")}</label>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', opacity: mod.enabled ? 1 : 0.4 }}>
+                <span style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--text-2)' }}>
+                  {t("AUTO-DELETE BLOCKED MESSAGES")}
+                </span>
+                <label className="toggle-switch">
+                  <input
+                    type="checkbox"
+                    className="toggle-switch__input"
+                    disabled={!mod.enabled}
+                    checked={config.deleteBlockedMessages ?? true}
+                    onChange={e => updateConfig({ deleteBlockedMessages: e.target.checked })}
+                  />
+                  <div className="toggle-switch__track">
+                    <div className="toggle-switch__thumb" />
+                  </div>
+                </label>
+              </div>
+
+              <div className="form-group" style={{ opacity: mod.enabled ? 1 : 0.4 }}>
+                <label className="form-label">{t("Auto-Warn Threshold")}</label>
                 <input
+                  type="number"
                   className="form-input"
-                  value={config.ticketPanelTitle ?? ''}
-                  onChange={e => updateConfig({ ticketPanelTitle: e.target.value })}
-                  placeholder="SUPPORT TICKETS"
+                  disabled={!mod.enabled}
+                  value={mod.warnThreshold ?? 3}
+                  onChange={e => handleThresholdChange('warnThreshold', e.target.value)}
                 />
-              </div>
-
-              <div className="form-group">
-                <label className="form-label">{t("Console Panel Message Body")}</label>
-                <textarea
-                  className="form-input"
-                  rows={2}
-                  value={config.ticketPanelMessage ?? ''}
-                  onChange={e => updateConfig({ ticketPanelMessage: e.target.value })}
-                  placeholder="Need assistance? Open a ticket."
-                />
-              </div>
-            </Panel>
-
-            <Panel title={t("WORD FILTER DICTIONARY")} className={highlight === 'wordfilter' ? 'flash-target' : ''}>
-              <div className="form-group">
-                <label className="form-label">{t("Forbidden Words Registry")}</label>
-                <BadWordsEditor
-                  words={config.badWords ?? []}
-                  onChange={v => updateConfig({ badWords: v })}
-                />
-              </div>
-            </Panel>
-          </div>
-
-          {/* Right Column Stack (Self-Role Hero Panel) */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-5)' }}>
-            <Panel title={t("SELF-ROLE ASSIGNMENT")} className={highlight === 'selfroles' ? 'flash-target' : ''}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 'var(--space-4)', paddingBottom: 'var(--space-3)', borderBottom: '1px solid var(--border)' }}>
-                <span style={{ fontFamily: 'var(--font-mono)', fontSize: '12px', fontWeight: 'bold', color: 'var(--text-1)' }}>
-                  {t("ENABLE SELF-ROLE SYSTEM")}
+                <span style={{ fontSize: '11px', color: 'var(--text-3)', fontFamily: 'var(--font-mono)' }}>
+                  {t("Warns required before automated ban.")}
                 </span>
-                <label className="toggle-switch">
-                  <input
-                    type="checkbox"
-                    className="toggle-switch__input"
-                    checked={config.rolesEnabled ?? false}
-                    onChange={e => updateConfig({ rolesEnabled: e.target.checked })}
-                  />
-                  <div className="toggle-switch__track">
-                    <div className="toggle-switch__thumb" />
-                  </div>
-                </label>
               </div>
+            </div>
+          </Panel>
 
-              <div className="form-group">
-                <label className="form-label">{t("Auto-Gained Role on Join")}</label>
-                <select
-                  className="form-select"
-                  value={config.autoRoleId ?? ''}
-                  onChange={e => updateConfig({ autoRoleId: e.target.value })}
-                >
-                  <option value="">-- None --</option>
-                  {roles.filter(r => r.name !== '@everyone').map(r => (
-                    <option key={r.id} value={r.id}>{r.name}</option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="form-group">
-                <label className="form-label">{t("Self-Role Panel Groups Config & Direct Discord Dispatcher")}</label>
-                <SelfRolePanelsManager
-                  panels={config.selfRolePanels ?? []}
-                  legacyRoles={config.selfRoles ?? []}
-                  allRoles={roles}
-                  channels={channels}
-                  selectedGuildId={selectedGuild?.id}
-                  onUpdatePanels={newPanels => updateConfig({ selfRolePanels: newPanels })}
+          <Panel title={t("TICKET CONSOLE SYSTEM")} className={highlight === 'tickets' ? 'flash-target' : ''}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 'var(--space-4)', paddingBottom: 'var(--space-3)', borderBottom: '1px solid var(--border)' }}>
+              <span style={{ fontFamily: 'var(--font-mono)', fontSize: '12px', fontWeight: 'bold', color: 'var(--text-1)' }}>
+                {t("ENABLE TICKET SYSTEM")}
+              </span>
+              <label className="toggle-switch">
+                <input
+                  type="checkbox"
+                  className="toggle-switch__input"
+                  checked={config.ticketsEnabled ?? false}
+                  onChange={e => updateConfig({ ticketsEnabled: e.target.checked })}
                 />
-              </div>
-            </Panel>
-          </div>
-        </div>
+                <div className="toggle-switch__track">
+                  <div className="toggle-switch__thumb" />
+                </div>
+              </label>
+            </div>
+
+            <div className="form-group">
+              <label className="form-label">{t("Ticket Category Target")}</label>
+              <select
+                className="form-select"
+                value={config.ticketCategoryId ?? ''}
+                onChange={e => updateConfig({ ticketCategoryId: e.target.value })}
+              >
+                <option value="">-- None --</option>
+                {categoryChannels.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+              </select>
+            </div>
+
+            <div className="form-group">
+              <label className="form-label">{t("Ticket Logging Target Channel")}</label>
+              <select
+                className="form-select"
+                value={config.ticketLogChannelId ?? ''}
+                onChange={e => updateConfig({ ticketLogChannelId: e.target.value })}
+              >
+                <option value="">-- None --</option>
+                {textChannels.map(c => <option key={c.id} value={c.id}>#{c.name}</option>)}
+              </select>
+            </div>
+
+            <div className="form-group">
+              <label className="form-label">{t("Console panel Title")}</label>
+              <input
+                className="form-input"
+                value={config.ticketPanelTitle ?? ''}
+                onChange={e => updateConfig({ ticketPanelTitle: e.target.value })}
+                placeholder="SUPPORT TICKETS"
+              />
+            </div>
+
+            <div className="form-group">
+              <label className="form-label">{t("Console Panel Message Body")}</label>
+              <textarea
+                className="form-input"
+                rows={2}
+                value={config.ticketPanelMessage ?? ''}
+                onChange={e => updateConfig({ ticketPanelMessage: e.target.value })}
+                placeholder="Need assistance? Open a ticket."
+              />
+            </div>
+          </Panel>
+
+          <Panel title={t("WORD FILTER DICTIONARY")} className={highlight === 'wordfilter' ? 'flash-target' : ''}>
+            <div className="form-group">
+              <label className="form-label">{t("Forbidden Words Registry")}</label>
+              <BadWordsEditor
+                words={config.badWords ?? []}
+                onChange={v => updateConfig({ badWords: v })}
+              />
+            </div>
+          </Panel>
+
+          <Panel title={t("SELF-ROLE ASSIGNMENT")} className={highlight === 'selfroles' ? 'flash-target' : ''}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 'var(--space-4)', paddingBottom: 'var(--space-3)', borderBottom: '1px solid var(--border)' }}>
+              <span style={{ fontFamily: 'var(--font-mono)', fontSize: '12px', fontWeight: 'bold', color: 'var(--text-1)' }}>
+                {t("ENABLE SELF-ROLE SYSTEM")}
+              </span>
+              <label className="toggle-switch">
+                <input
+                  type="checkbox"
+                  className="toggle-switch__input"
+                  checked={config.rolesEnabled ?? false}
+                  onChange={e => updateConfig({ rolesEnabled: e.target.checked })}
+                />
+                <div className="toggle-switch__track">
+                  <div className="toggle-switch__thumb" />
+                </div>
+              </label>
+            </div>
+
+            <div className="form-group">
+              <label className="form-label">{t("Auto-Gained Role on Join")}</label>
+              <select
+                className="form-select"
+                value={config.autoRoleId ?? ''}
+                onChange={e => updateConfig({ autoRoleId: e.target.value })}
+              >
+                <option value="">-- None --</option>
+                {roles.filter(r => r.name !== '@everyone').map(r => (
+                  <option key={r.id} value={r.id}>{r.name}</option>
+                ))}
+              </select>
+            </div>
+
+            <div className="form-group">
+              <label className="form-label">{t("Self-Role Panel Groups Config & Direct Discord Dispatcher")}</label>
+              <SelfRolePanelsManager
+                panels={config.selfRolePanels ?? []}
+                legacyRoles={config.selfRoles ?? []}
+                allRoles={roles}
+                channels={channels}
+                selectedGuildId={selectedGuild?.id}
+                onUpdatePanels={newPanels => updateConfig({ selfRolePanels: newPanels })}
+              />
+            </div>
+          </Panel>
+        </MasonryGrid>
 
         {/* Moderation Commands Panel */}
         <div className="grid-12" style={{ marginTop: 'var(--space-5)' }}>
