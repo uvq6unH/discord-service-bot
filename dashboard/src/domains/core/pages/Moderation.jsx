@@ -228,8 +228,8 @@ function SelfRolePanelsManager({ panels = [], legacyRoles = [], allRoles = [], c
   const textChannels = channels.filter(c => c.type === 0 || c.type === 5);
   const visibleRoles = allRoles.filter(r => r.name !== '@everyone');
 
-  // Fallback if panels is empty but legacyRoles exist
-  const currentPanels = panels.length > 0 ? panels : [
+  // Current panels (allow empty array if user deleted all groups)
+  const currentPanels = panels ?? (legacyRoles.length > 0 ? [
     {
       id: 'panel_default',
       title: '🎮 CLAIM YOUR ROLES',
@@ -238,7 +238,7 @@ function SelfRolePanelsManager({ panels = [], legacyRoles = [], allRoles = [], c
       color: '#5865F2',
       roles: legacyRoles
     }
-  ];
+  ] : []);
 
   const safeIdx = Math.min(activePanelIdx, Math.max(0, currentPanels.length - 1));
   const activePanel = currentPanels[safeIdx] ?? currentPanels[0];
@@ -270,13 +270,10 @@ function SelfRolePanelsManager({ panels = [], legacyRoles = [], allRoles = [], c
   const notify = useNotify();
 
   const removeActivePanel = () => {
-    if (currentPanels.length <= 1) {
-      notify.error('Cần giữ ít nhất 1 nhóm Self-Role Panel!');
-      return;
-    }
     const nextPanels = currentPanels.filter((_, idx) => idx !== safeIdx);
     onUpdatePanels(nextPanels);
     setActivePanelIdx(Math.max(0, safeIdx - 1));
+    notify.success(t("Đã xóa nhóm Self-Role Panel thành công!"));
   };
 
   const handlePostPanel = async () => {
@@ -324,6 +321,32 @@ function SelfRolePanelsManager({ panels = [], legacyRoles = [], allRoles = [], c
   };
 
   const presetColors = ['#5865F2', '#ED4245', '#57F287', '#FEE75C', '#EB459E', '#202225'];
+
+  if (currentPanels.length === 0) {
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 'var(--space-2)', borderBottom: '1px solid var(--border)', paddingBottom: 'var(--space-3)' }}>
+          <button
+            type="button"
+            className="btn btn--primary"
+            style={{ fontSize: '11px', fontFamily: 'var(--font-mono)', padding: 'var(--space-1-5) var(--space-3)' }}
+            onClick={addPanel}
+          >
+            + {t("NEW GROUP")}
+          </button>
+        </div>
+
+        <div style={{ background: 'var(--surface-1)', border: '1px solid var(--border)', padding: 'var(--space-6)', textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 'var(--space-3)' }}>
+          <span style={{ fontSize: '12px', color: 'var(--text-3)', fontFamily: 'var(--font-mono)' }}>
+            {t("Chưa có nhóm Self-Role Panel nào configured.")}
+          </span>
+          <button type="button" className="btn btn--primary" onClick={addPanel}>
+            + {t("Tạo Nhóm Self-Role Panel Mới")}
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
