@@ -307,6 +307,39 @@ export default function EconomyPage() {
   const isLeveling = config.levelsEnabled ?? false;
   const serverName = selectedGuild?.name ? selectedGuild.name.toUpperCase() : '';
 
+  const customEconomyPlacement = useCallback((orderedItems, ctx) => {
+    const { activeCols, itemWidthPx, gap, getMeasuredHeight } = ctx;
+    if (activeCols < 2) {
+      const colHeights = [0];
+      const positions = {};
+      orderedItems.forEach(({ key, idx }) => {
+        const measuredH = getMeasuredHeight(key, idx);
+        positions[key] = { leftPx: 0, topPx: colHeights[0], widthPx: itemWidthPx };
+        colHeights[0] += measuredH + gap;
+      });
+      return { positions, containerHeight: Math.max(...colHeights, 0) };
+    }
+    const colHeights = [0, 0];
+    const positions = {};
+    orderedItems.forEach(({ key, idx }) => {
+      const isCurrency = key === 'currency' || key.includes('currency');
+      const isBetting = key === 'betting' || key.includes('betting');
+
+      let targetCol = 0;
+      if (isLeveling) {
+        targetCol = (isCurrency || isBetting) ? 1 : 0;
+      } else {
+        targetCol = isBetting ? 1 : 0;
+      }
+      const measuredH = getMeasuredHeight(key, idx);
+      const leftPx = targetCol * (itemWidthPx + gap);
+      const topPx = colHeights[targetCol];
+      positions[key] = { leftPx, topPx, widthPx: itemWidthPx };
+      colHeights[targetCol] += measuredH + gap;
+    });
+    return { positions, containerHeight: Math.max(...colHeights, 0) };
+  }, [isLeveling]);
+
   return (
     <Workspace>
       {/* 1. Header Zone */}
@@ -343,38 +376,7 @@ export default function EconomyPage() {
       <MasonryGrid
         cols={2}
         gap={20}
-        placementEngine={(orderedItems, ctx) => {
-          const { activeCols, itemWidthPx, gap, getMeasuredHeight } = ctx;
-          if (activeCols < 2) {
-            const colHeights = [0];
-            const positions = {};
-            orderedItems.forEach(({ key, idx }) => {
-              const measuredH = getMeasuredHeight(key, idx);
-              positions[key] = { leftPx: 0, topPx: colHeights[0], widthPx: itemWidthPx };
-              colHeights[0] += measuredH + gap;
-            });
-            return { positions, containerHeight: Math.max(...colHeights, 0) };
-          }
-          const colHeights = [0, 0];
-          const positions = {};
-          orderedItems.forEach(({ key, idx }) => {
-            const isCurrency = key === 'currency' || key.includes('currency');
-            const isBetting = key === 'betting' || key.includes('betting');
-
-            let targetCol = 0;
-            if (isLeveling) {
-              targetCol = (isCurrency || isBetting) ? 1 : 0;
-            } else {
-              targetCol = isBetting ? 1 : 0;
-            }
-            const measuredH = getMeasuredHeight(key, idx);
-            const leftPx = targetCol * (itemWidthPx + gap);
-            const topPx = colHeights[targetCol];
-            positions[key] = { leftPx, topPx, widthPx: itemWidthPx };
-            colHeights[targetCol] += measuredH + gap;
-          });
-          return { positions, containerHeight: Math.max(...colHeights, 0) };
-        }}
+        placementEngine={customEconomyPlacement}
       >
         {/* Panel 1: Core Toggles & Currencies */}
         <Panel key="ledger" id="ledger" title={t("LEDGER STATE CONTROL")} accent className={highlight === 'ledger' ? 'flash-target' : ''}>
