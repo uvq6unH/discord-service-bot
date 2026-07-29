@@ -297,6 +297,9 @@ export default function EconomyPage() {
   const [localLevelsEnabled, setLocalLevelsEnabled] = useState(null);
 
   const isEnabled = config?.economyEnabled ?? false;
+  const isLeveling = localLevelsEnabled !== null ? localLevelsEnabled : (config?.levelsEnabled ?? false);
+  const serverName = selectedGuild?.name ? selectedGuild.name.toUpperCase() : '';
+
   const customEconomyPlacement = useCallback((orderedItems, ctx) => {
     const { activeCols, itemWidthPx, gap, getMeasuredHeight } = ctx;
     if (activeCols < 2) {
