@@ -1550,23 +1550,29 @@ export function createServer({ configStore, stateStore, botClient, redis = null 
   app.post('/api/guilds/:guildId/temp-vc-setup', auth.requireAuth, writeRateLimit, requireGuildId, auth.requireGuildAccess, async (req, res) => {
     try {
       const botClient = req.app.get('botClient');
-      if (!botClient) {
-        return res.status(503).json({ error: 'Bot Client hiện chưa kết nối.' });
+      if (botClient && (botClient.isReady?.() || botClient.user)) {
+        const guild = botClient.guilds.cache.get(req.guildId) || await botClient.guilds.fetch(req.guildId).catch(() => null);
+        if (guild) {
+          const { executeSetupDefault } = await import('./bot/commands/handlers/tempVcSetup.js');
+          const result = await executeSetupDefault(guild, configStore);
+
+          return res.json({
+            success: true,
+            message: 'Đã khởi tạo hệ thống VoiceMaster trên Discord Server thành công!',
+            categoryName: result.category.name,
+            masterChannelName: result.masterChannel.name
+          });
+        }
       }
 
-      const guild = botClient.guilds.cache.get(req.guildId) || await botClient.guilds.fetch(req.guildId).catch(() => null);
-      if (!guild) {
-        return res.status(404).json({ error: 'Không tìm thấy Server Discord trong hệ thống Bot.' });
-      }
-
-      const { executeSetupDefault } = await import('./bot/commands/handlers/tempVcSetup.js');
-      const result = await executeSetupDefault(guild, configStore);
+      // Fallback: Nếu bot process đang offline hoặc chưa kết nối Discord Gateway, tự động bật tempVcEnabled trong database
+      await configStore.updateGuildConfig(req.guildId, {
+        tempVcEnabled: true
+      });
 
       return res.json({
         success: true,
-        message: 'Đã khởi tạo hệ thống VoiceMaster thành công!',
-        categoryName: result.category.name,
-        masterChannelName: result.masterChannel.name
+        message: 'Đã kích hoạt cấu hình VoiceMaster thành công! Bạn có thể gõ hb setup hoặc /setup trên Discord để khởi tạo kênh tự động.'
       });
     } catch (err) {
       console.error('[server] temp-vc-setup error:', err);
