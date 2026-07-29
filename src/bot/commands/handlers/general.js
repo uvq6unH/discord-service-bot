@@ -1,4 +1,4 @@
-import { PermissionFlagsBits } from 'discord.js';
+import { PermissionFlagsBits, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } from 'discord.js';
 import { buildServerEmbed, buildUserEmbed, buildAvatarEmbed, resolveMentionedUser } from '../../embeds.js';
 import { renderCommandResponse } from '../../responses.js';
 import { sanitizeAnnouncementText } from '../../../commandAccess.js';
@@ -12,8 +12,66 @@ export async function handleGeneral(ctx) {
   const _general = new Set(['custom', 'ping', 'config', 'server', 'user', 'avatar', 'say', 'announce']);
   if (!_general.has(command.type)) return;
 
-  if (['custom', 'ping', 'config'].includes(command.type)) {
+  if (['custom', 'ping'].includes(command.type)) {
     return reply(renderCommandResponse(command.response, { client, context, config, args }));
+  }
+
+  if (command.type === 'config') {
+    const totalCommands = config.commands?.filter(c => c.enabled)?.length ?? 0;
+    const customCommands = config.commands?.filter(c => c.enabled && c.isCustom)?.length ?? 0;
+    const riotStatus = config.riotApiKey ? '🟢 Đã cấu hình API' : '🔴 Chưa cấu hình';
+    const tftStatus = config.tftApiKey ? '🟢 API riêng' : (config.riotApiKey ? '♻️ Dùng chung LoL API' : '🔴 Chưa cấu hình');
+    const selfRoleStatus = config.rolesEnabled ? '🟢 Đã bật' : '🔴 Đã tắt';
+    const autoReplyStatus = config.autoReplyEnabled ? '🟢 Đã bật' : '🔴 Đã tắt';
+    const welcomeStatus = config.welcomeEnabled ? '🟢 Đã bật' : '🔴 Đã tắt';
+    const esportsStatus = config.esportsNotifyEnabled ? '🟢 Đã bật Broadcast' : '🔴 Đã tắt';
+
+    const embed = new EmbedBuilder()
+      .setTitle(`⚙️ ║ HỆ THỐNG CẤU HÌNH SERVER — ${(guild?.name || 'DISCORD').toUpperCase()}`)
+      .setDescription(`> 🛡️ *Bảng tổng quan trạng thái cấu hình của Bot trong máy chủ ${guild?.name || 'Discord'}.*`)
+      .addFields(
+        {
+          name: '🌐 **CẤU HÌNH HỆ THỐNG & CƠ BẢN**',
+          value:
+            `> 📌 **Tiền tố (Prefix):** \`${config.prefix || '/'}\`\n` +
+            `> 🎭 **Tự nhận Role (Self-Role):** ${selfRoleStatus}\n` +
+            `> 💬 **Tự động phản hồi:** ${autoReplyStatus}\n` +
+            `> 👋 **Thông báo Chào mừng:** ${welcomeStatus}`,
+          inline: false
+        },
+        {
+          name: '📊 **THỐNG KÊ LỆNH SLASH & CUSTOM**',
+          value:
+            `> ⚡ **Tổng số lệnh khả dụng:** \`${totalCommands}\` lệnh\n` +
+            `> 🛠️ **Lệnh Custom tùy chỉnh:** \`${customCommands}\` lệnh`,
+          inline: false
+        },
+        {
+          name: '⚔️ **RIOT GAMES & ESPORTS TOURNAMENTS**',
+          value:
+            `> 🎮 **LoL Riot API Key:** ${riotStatus}\n` +
+            `> 🥊 **ĐTCL (TFT) API Key:** ${tftStatus}\n` +
+            `> 🏆 **Esports Match Broadcast:** ${esportsStatus}`,
+          inline: false
+        }
+      )
+      .setColor(0x5865F2)
+      .setThumbnail(guild?.iconURL({ size: 256 }) ?? client.user.displayAvatarURL())
+      .setFooter({ text: '💡 Quản trị viên có thể tùy chỉnh chi tiết tại Dashboard Web • XeNon Bot' })
+      .setTimestamp();
+
+    const row = new ActionRowBuilder().addComponents(
+      new ButtonBuilder()
+        .setLabel('🌐 Mở Dashboard Web')
+        .setStyle(ButtonStyle.Link)
+        .setURL('http://localhost:3000'),
+      new ButtonBuilder()
+        .setCustomId(`config:help`)
+        .setLabel('❓ Xem Hướng Dẫn')
+        .setStyle(ButtonStyle.Secondary)
+    );
+
+    return reply({ embeds: [embed], components: [row] });
   }
 
   if (command.type === 'server') {

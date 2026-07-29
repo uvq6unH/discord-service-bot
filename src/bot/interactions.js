@@ -183,6 +183,12 @@ export async function handleComponentInteraction(interaction, { client, config, 
 
   if (!interaction.isButton()) return;
 
+  if (interaction.customId === 'config:help') {
+    const { buildHelpPayload } = await import('./help.js');
+    const payload = await buildHelpPayload(client, config, interaction.guild, interaction.user.id, null);
+    return interaction.reply({ ...payload, ephemeral: true });
+  }
+
   if (interaction.customId.startsWith('bj:')) {
     return handleBlackjackButton(interaction, { client, config });
   }

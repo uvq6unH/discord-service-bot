@@ -22,12 +22,13 @@ function buildSlashOptions(command) {
         type: ApplicationCommandOptionType.String,
         required: false,
         choices: [
-          { name: '⚙️ Lệnh Chung & Custom', value: 'general' },
-          { name: '👤 Thành Viên & Cấp Độ', value: 'user' },
-          { name: '🖥️ Máy Chủ & Phát Thanh', value: 'server' },
-          { name: '🛡️ Kiểm Duyệt & Bảo Mật', value: 'moderation' },
-          { name: '🔔 Tương Tác & Nút Bấm', value: 'interactions' },
-          { name: '⚔️ League of Legends & TFT', value: 'lol' },
+          { name: '⚙️ Hệ Thống & Tiện Ích', value: 'core' },
+          { name: '🛡️ Quản Lý & Kiểm Duyệt', value: 'moderation' },
+          { name: '👤 Thành Viên & Cấp Độ', value: 'levels' },
+          { name: '💰 Kinh Tế & Trò Chơi', value: 'economy' },
+          { name: '⚔️ League of Legends & Esports', value: 'riot' },
+          { name: '🎶 Âm Nhạc & Kênh Thoại', value: 'music' },
+          { name: '⏰ Nhắc Nhở & Trí Tuệ AI', value: 'services' },
         ]
       }
     ];

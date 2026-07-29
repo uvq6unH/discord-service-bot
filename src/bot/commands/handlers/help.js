@@ -14,18 +14,20 @@ export async function handleHelp(ctx) {
       selectedGroup = source.options.getString('group');
     } else {
       const lowerArgs = args?.trim().toLowerCase();
-      if (['chung', 'general', 'custom', 'lệnh chung'].includes(lowerArgs)) {
-        selectedGroup = 'general';
-      } else if (['thành viên', 'user', 'member', 'levels', 'xp', 'rank', 'cấp độ'].includes(lowerArgs)) {
-        selectedGroup = 'user';
-      } else if (['máy chủ', 'server', 'broadcast', 'phát thanh', 'announcement'].includes(lowerArgs)) {
-        selectedGroup = 'server';
-      } else if (['kiểm duyệt', 'moderation', 'mod', 'security', 'bảo mật'].includes(lowerArgs)) {
+      if (['core', 'chung', 'general', 'custom', 'hệ thống', 'tiện ích'].includes(lowerArgs)) {
+        selectedGroup = 'core';
+      } else if (['mod', 'moderation', 'kiểm duyệt', 'quản lý', 'security', 'bảo mật'].includes(lowerArgs)) {
         selectedGroup = 'moderation';
-      } else if (['tương tác', 'interactions', 'role', 'ticket', 'nút bấm'].includes(lowerArgs)) {
-        selectedGroup = 'interactions';
-      } else if (['lol', 'league', 'liên minh', 'lsd', 'tướng', 'tft', 'teamfight', 'tactics', 'tftlsd', 'đấu trường'].includes(lowerArgs)) {
-        selectedGroup = 'lol';
+      } else if (['user', 'levels', 'member', 'rank', 'thành viên', 'cấp độ', 'xp'].includes(lowerArgs)) {
+        selectedGroup = 'levels';
+      } else if (['economy', 'eco', 'game', 'games', 'kinh tế', 'trò chơi', 'money'].includes(lowerArgs)) {
+        selectedGroup = 'economy';
+      } else if (['riot', 'lol', 'tft', 'esports', 'liên minh', 'lck', 'lcp'].includes(lowerArgs)) {
+        selectedGroup = 'riot';
+      } else if (['music', 'voice', 'audio', 'nhạc', 'âm nhạc', 'kênh thoại'].includes(lowerArgs)) {
+        selectedGroup = 'music';
+      } else if (['services', 'remind', 'ai', 'nhắc nhở', 'trí tuệ nhân tạo'].includes(lowerArgs)) {
+        selectedGroup = 'services';
       }
     }
 
