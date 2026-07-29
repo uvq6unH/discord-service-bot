@@ -1,52 +1,55 @@
-import React, { useState, useEffect, useRef, useLayoutEffect } from 'react';
+import React, { useState, useEffect, useRef, useLayoutEffect, useImperativeHandle, forwardRef } from 'react';
 
 /**
- * MasonryGrid — 10/10 Enterprise-Grade Container-Responsive GPU Layout Engine
+ * MasonryGrid — Open-Source Grade Container-Responsive GPU Layout Engine
  * 
- * Enterprise Highlights:
- * 1. Container Query Responsiveness: Evaluates `containerRef.current.clientWidth`.
- * 2. Direct DOM VRAM Management: Sets `el.style.willChange = 'transform'` directly without React state re-renders.
- * 3. Priority & Pinned Widget Support: Supports `child.props.priority`, `child.props.fixed`, `child.props.pinned`.
- * 4. Memoized Layout State: Skips state updates if positions haven't changed.
- * 5. Full Container Observation: Single `ResizeObserver` observes container & item elements.
- * 6. Stale Ref Cleanup: Prevents memory leaks when cards are unmounted.
+ * Production Features:
+ * 1. Fixed & Pinned Sorting: Correctly pins `fixed={true}` / `pinned={true}` cards to top.
+ * 2. Layout Strategy Support: `"shortest-first"` | `"preserve-order"` | `"priority"`.
+ * 3. Event-Driven VRAM Cleanup: Uses `transitionend` event instead of setTimeouts.
+ * 4. Callbacks API: `onLayout`, `onColumnChange`.
+ * 5. Imperative API: `ref.current.recalculate()`, `ref.current.invalidate()`.
  */
-export default function MasonryGrid({
-  children,
-  cols = 2,
-  gap = 20,
-  minColWidth = 340,
-  className = '',
-  style = {}
-}) {
+const MasonryGrid = forwardRef(function MasonryGrid(
+  {
+    children,
+    cols = 2,
+    gap = 20,
+    minColWidth = 340,
+    layoutStrategy = 'preserve-order',
+    onLayout,
+    onColumnChange,
+    className = '',
+    style = {}
+  },
+  ref
+) {
   const validChildren = React.Children.toArray(children).filter(Boolean);
   const containerRef = useRef(null);
   const itemRefs = useRef({});
   const heightsRef = useRef({});
   const rafRef = useRef(null);
-  const willChangeTimeoutsRef = useRef({});
+  const activeColsRef = useRef(cols);
 
   const [layoutState, setLayoutState] = useState(() => ({
-    positions: [], // Array of { leftPx, topPx, widthPx }
+    positions: [],
     containerHeight: 0
   }));
 
-  // Direct DOM VRAM management without React re-renders
-  const triggerGPUWillChange = (idx) => {
-    const el = itemRefs.current[idx];
+  // Event-driven GPU VRAM management using native transitionend
+  const triggerGPUWillChange = (el) => {
     if (!el) return;
-
     el.style.willChange = 'transform';
 
-    if (willChangeTimeoutsRef.current[idx]) {
-      clearTimeout(willChangeTimeoutsRef.current[idx]);
-    }
-
-    willChangeTimeoutsRef.current[idx] = setTimeout(() => {
-      if (itemRefs.current[idx]) {
-        itemRefs.current[idx].style.willChange = 'auto';
+    const handleTransitionEnd = (e) => {
+      if (e.target === el && (e.propertyName === 'transform' || !e.propertyName)) {
+        el.style.willChange = 'auto';
+        el.removeEventListener('transitionend', handleTransitionEnd);
       }
-    }, 380);
+    };
+
+    el.removeEventListener('transitionend', handleTransitionEnd);
+    el.addEventListener('transitionend', handleTransitionEnd, { once: true });
   };
 
   const calculateLayout = () => {
@@ -54,15 +57,20 @@ export default function MasonryGrid({
 
     const containerWidth = containerRef.current.clientWidth || 800;
 
-    // Container-relative responsiveness
     let activeCols = Math.max(1, Math.floor((containerWidth + gap) / (minColWidth + gap)));
     if (cols && activeCols > cols) activeCols = cols;
+
+    if (activeColsRef.current !== activeCols) {
+      activeColsRef.current = activeCols;
+      if (typeof onColumnChange === 'function') {
+        onColumnChange(activeCols);
+      }
+    }
 
     const itemWidthPx = Math.max(0, (containerWidth - (activeCols - 1) * gap) / activeCols);
     const colHeights = new Array(activeCols).fill(0);
     const newPositions = [];
 
-    // Sort or group by priority/pinned props if specified
     const indexedChildren = validChildren.map((child, idx) => ({
       child,
       idx,
@@ -70,15 +78,24 @@ export default function MasonryGrid({
       fixed: child.props?.fixed ?? child.props?.pinned ?? false
     }));
 
-    // Fixed / high priority items placed first
-    indexedChildren.sort((a, b) => b.priority - a.priority);
+    // Sorting according to strategy & fixed status
+    if (layoutStrategy === 'priority') {
+      indexedChildren.sort((a, b) => {
+        if (a.fixed !== b.fixed) return a.fixed ? -1 : 1;
+        return b.priority - a.priority;
+      });
+    } else if (layoutStrategy === 'preserve-order') {
+      indexedChildren.sort((a, b) => {
+        if (a.fixed !== b.fixed) return a.fixed ? -1 : 1;
+        return a.idx - b.idx;
+      });
+    }
 
     indexedChildren.forEach(({ idx }) => {
       const el = itemRefs.current[idx];
       const measuredH = el ? el.getBoundingClientRect().height : (heightsRef.current[idx] || 300);
       heightsRef.current[idx] = measuredH;
 
-      // Find column with minimum height (Shortest Column First)
       let shortestCol = 0;
       for (let c = 1; c < activeCols; c++) {
         if (colHeights[c] < colHeights[shortestCol]) {
@@ -96,12 +113,11 @@ export default function MasonryGrid({
       };
 
       colHeights[shortestCol] += measuredH + gap;
-      triggerGPUWillChange(idx);
+      triggerGPUWillChange(el);
     });
 
     const maxContainerH = Math.max(...colHeights, 0);
 
-    // Equality check to skip redundant state renders
     setLayoutState((prev) => {
       const isHeightSame = Math.abs(prev.containerHeight - maxContainerH) < 1;
       const isPosSame =
@@ -115,10 +131,16 @@ export default function MasonryGrid({
 
       if (isHeightSame && isPosSame) return prev;
 
-      return {
+      const nextState = {
         positions: newPositions,
         containerHeight: maxContainerH
       };
+
+      if (typeof onLayout === 'function') {
+        onLayout(nextState);
+      }
+
+      return nextState;
     });
   };
 
@@ -129,14 +151,24 @@ export default function MasonryGrid({
     });
   };
 
+  // Expose Imperative API
+  useImperativeHandle(ref, () => ({
+    recalculate: debouncedCalculateLayout,
+    invalidate: () => {
+      heightsRef.current = {};
+      debouncedCalculateLayout();
+    },
+    getContainerHeight: () => layoutState.containerHeight,
+    getActiveColumns: () => activeColsRef.current
+  }));
+
   useLayoutEffect(() => {
     calculateLayout();
-  }, [validChildren.length, cols, gap, minColWidth]);
+  }, [validChildren.length, cols, gap, minColWidth, layoutStrategy]);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
 
-    // Clean up stale refs on children count/structure change
     const activeIndices = new Set(validChildren.map((_, i) => i));
     Object.keys(itemRefs.current).forEach((k) => {
       if (!activeIndices.has(Number(k))) {
@@ -145,7 +177,6 @@ export default function MasonryGrid({
       }
     });
 
-    // Single ResizeObserver watches both container and child cards
     const observer = new ResizeObserver((entries) => {
       let shouldUpdate = false;
       entries.forEach((entry) => {
@@ -179,7 +210,6 @@ export default function MasonryGrid({
     return () => {
       observer.disconnect();
       if (rafRef.current) cancelAnimationFrame(rafRef.current);
-      Object.values(willChangeTimeoutsRef.current).forEach(clearTimeout);
     };
   }, [validChildren.length, cols, gap, minColWidth]);
 
@@ -222,4 +252,6 @@ export default function MasonryGrid({
       })}
     </div>
   );
-}
+});
+
+export default MasonryGrid;
