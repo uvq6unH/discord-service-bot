@@ -376,7 +376,7 @@ const MasonryGrid = forwardRef(function MasonryGrid(
 
   useIsomorphicLayoutEffect(() => {
     calculateLayout();
-  }, [validChildren.length, cols, gap, minColWidth, layoutStrategy, placementEngine]);
+  }, [validChildren.length, cols, gap, minColWidth, layoutStrategy, placementEngine, rules, ruleContext, JSON.stringify(ruleContext)]);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
