@@ -263,10 +263,6 @@ export function createBot(configStore, stateStore, redis = null) {
       startEsportsWorker(readyClient, configStore, redis);
       _startEventQueueWorker(readyClient, configStore, redis);
 
-      // Auto sync global slash commands to Discord Application
-      await client.syncGlobalCommands().catch((err) => {
-        console.error('[bot] Error syncing global commands:', err.message);
-      });
     })().catch((err) => console.error('[bot] Startup error:', err));
   });
 
@@ -298,15 +294,20 @@ export function createBot(configStore, stateStore, redis = null) {
   });
 
   // ── Slash command sync helper ───────────────────────────────────────────────
-  client.syncGlobalCommands = async () => {
-    const allCommands = [
-      ...(defaultConfig.core?.commands || []),
-      ...(defaultConfig.moderation?.commands || []),
-      ...(defaultConfig.levels?.commands || []),
-      ...(defaultConfig.economy?.commands || []),
-      ...(defaultConfig.riot?.commands || [])
-    ].map(cmd => ({ ...cmd, enabled: true }));
+  const builtInCommandsMap = new Map();
+  const builtInSources = [
+    ...(defaultConfig.core?.commands || []),
+    ...(defaultConfig.moderation?.commands || []),
+    ...(defaultConfig.levels?.commands || []),
+    ...(defaultConfig.economy?.commands || []),
+    ...(defaultConfig.riot?.commands || [])
+  ];
+  for (const cmd of builtInSources) {
+    if (cmd.name) builtInCommandsMap.set(cmd.name, { ...cmd, enabled: true });
+  }
 
+  client.syncGlobalCommands = async () => {
+    const allCommands = [...builtInCommandsMap.values()];
     const commands = buildSlashCommands({ commands: allCommands });
     const validCommands = commands.filter((cmd) => {
       if (!cmd.name || cmd.name.length > 32) {
@@ -327,35 +328,28 @@ export function createBot(configStore, stateStore, redis = null) {
     const guild = await client.guilds.fetch(guildId).catch(() => null);
     if (!guild) return { synced: false, reason: 'guild_not_found' };
 
-    // Merge defaults + guild custom, deduplicate by name (custom overrides default)
-    const cmdMap = new Map();
-    const sources = [
-      ...(defaultConfig.core?.commands || []),
-      ...(defaultConfig.moderation?.commands || []),
-      ...(defaultConfig.levels?.commands || []),
-      ...(defaultConfig.economy?.commands || []),
-      ...(defaultConfig.riot?.commands || []),
-      ...(config?.commands || [])
-    ];
-    for (const cmd of sources) {
-      cmdMap.set(cmd.name, { ...cmd, enabled: true });
+    // Guild-specific commands ONLY for custom commands not already registered globally
+    const customCommands = (config?.commands || []).filter(cmd => cmd.enabled && cmd.name && !builtInCommandsMap.has(cmd.name));
+
+    if (customCommands.length > 0) {
+      const commands = buildSlashCommands({ commands: customCommands });
+      const validCommands = commands.filter((cmd) => {
+        if (!cmd.name || cmd.name.length > 32) {
+          console.warn(`[sync-guild] Skipping invalid custom command name: "${cmd.name}"`);
+          return false;
+        }
+        if (!cmd.description || cmd.description.length > 100) {
+          cmd.description = (cmd.description ?? cmd.name).slice(0, 100);
+        }
+        return true;
+      });
+      await guild.commands.set(validCommands);
+      return { synced: true, count: validCommands.length };
+    } else {
+      // Clear all guild-level duplicate commands so Discord ONLY displays Global commands!
+      await guild.commands.set([]);
+      return { synced: true, count: 0 };
     }
-    const allCommands = [...cmdMap.values()];
-
-    const commands = buildSlashCommands({ commands: allCommands });
-    const validCommands = commands.filter((cmd) => {
-      if (!cmd.name || cmd.name.length > 32) {
-        console.warn(`[sync] Skipping invalid command name: "${cmd.name}"`);
-        return false;
-      }
-      if (!cmd.description || cmd.description.length > 100) {
-        cmd.description = (cmd.description ?? cmd.name).slice(0, 100);
-      }
-      return true;
-    });
-
-    await guild.commands.set(validCommands);
-    return { synced: true, count: validCommands.length };
   };
 
   // ── Guild cache: refresh on join / update ───────────────────────────────────
