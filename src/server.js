@@ -941,62 +941,78 @@ export function createServer({ configStore, stateStore, botClient, redis = null 
       return res.status(400).json({ error: 'Nhóm Panel này chưa có Role nào.' });
     }
 
-    if (!botClient?.user) {
-      return res.status(503).json({ error: 'Bot Discord hiện chưa online hoặc không khả dụng.' });
-    }
-
-    try {
-      const channel = await botClient.channels.fetch(panel.channelId).catch(() => null);
-      if (!channel || !channel.isTextBased()) {
-        return res.status(400).json({ error: 'Không thể tìm thấy kênh Discord textchannel tương ứng hoặc bot không có quyền đọc kênh.' });
-      }
-
-      const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = await import('discord.js');
-
-      const colorInt = Number.parseInt((panel.color || '#5865F2').replace('#', ''), 16) || 0x5865F2;
-
-      const embed = new EmbedBuilder()
-        .setTitle(panel.title || 'Choose roles')
-        .setDescription(panel.description || 'Click a button to toggle a role.')
-        .setColor(colorInt);
-
-      const styleMap = {
-        Primary: ButtonStyle.Primary,
-        Secondary: ButtonStyle.Secondary,
-        Success: ButtonStyle.Success,
-        Danger: ButtonStyle.Danger,
-      };
-
-      const buttons = panel.roles.slice(0, 25).map((r) => {
-        const btn = new ButtonBuilder()
-          .setCustomId(`selfrole:${r.roleId}`)
-          .setLabel(r.label || r.roleId)
-          .setStyle(styleMap[r.style] ?? ButtonStyle.Secondary);
-        if (r.emoji) {
-          btn.setEmoji(r.emoji);
+    if (botClient && botClient.user) {
+      try {
+        const channel = await botClient.channels.fetch(panel.channelId).catch(() => null);
+        if (!channel || !channel.isTextBased()) {
+          return res.status(400).json({ error: 'Không thể tìm thấy kênh Discord textchannel tương ứng hoặc bot không có quyền đọc kênh.' });
         }
-        return btn;
+
+        const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = await import('discord.js');
+
+        const colorInt = Number.parseInt((panel.color || '#5865F2').replace('#', ''), 16) || 0x5865F2;
+
+        const embed = new EmbedBuilder()
+          .setTitle(panel.title || 'Choose roles')
+          .setDescription(panel.description || 'Click a button to toggle a role.')
+          .setColor(colorInt);
+
+        const styleMap = {
+          Primary: ButtonStyle.Primary,
+          Secondary: ButtonStyle.Secondary,
+          Success: ButtonStyle.Success,
+          Danger: ButtonStyle.Danger,
+        };
+
+        const buttons = panel.roles.slice(0, 25).map((r) => {
+          const btn = new ButtonBuilder()
+            .setCustomId(`selfrole:${r.roleId}`)
+            .setLabel(r.label || r.roleId)
+            .setStyle(styleMap[r.style] ?? ButtonStyle.Secondary);
+          if (r.emoji) {
+            btn.setEmoji(r.emoji);
+          }
+          return btn;
+        });
+
+        const rows = [];
+        for (let i = 0; i < buttons.length; i += 5) {
+          rows.push(new ActionRowBuilder().addComponents(buttons.slice(i, i + 5)));
+        }
+
+        const msg = await channel.send({ embeds: [embed], components: rows });
+
+        if (redis) {
+          addAuditLog(redis, req.guildId, {
+            user: req.session?.user?.username ?? 'Admin',
+            action: 'POST_SELFROLE_PANEL',
+            details: { panelId: panel.id, channelId: panel.channelId, messageId: msg.id }
+          });
+        }
+
+        return res.json({ success: true, messageId: msg.id, channelId: channel.id });
+      } catch (err) {
+        console.error('[server] Error posting selfrole panel directly:', err);
+        return res.status(500).json({ error: `Lỗi đăng panel sang Discord: ${err.message}` });
+      }
+    } else if (redis) {
+      // Split mode: Push to event_queue for bot worker
+      await redis.rpush('event_queue', JSON.stringify({
+        type: 'post_selfrole_panel',
+        guildId: req.guildId,
+        panelId: panel.id,
+        requestedAt: new Date().toISOString()
+      }));
+
+      addAuditLog(redis, req.guildId, {
+        user: req.session?.user?.username ?? 'Admin',
+        action: 'QUEUED_POST_SELFROLE_PANEL',
+        details: { panelId: panel.id, channelId: panel.channelId }
       });
 
-      const rows = [];
-      for (let i = 0; i < buttons.length; i += 5) {
-        rows.push(new ActionRowBuilder().addComponents(buttons.slice(i, i + 5)));
-      }
-
-      const msg = await channel.send({ embeds: [embed], components: rows });
-
-      if (redis) {
-        addAuditLog(redis, req.guildId, {
-          user: req.session?.user?.username ?? 'Admin',
-          action: 'POST_SELFROLE_PANEL',
-          details: { panelId: panel.id, channelId: panel.channelId, messageId: msg.id }
-        });
-      }
-
-      return res.json({ success: true, messageId: msg.id, channelId: channel.id });
-    } catch (err) {
-      console.error('[server] Error posting selfrole panel:', err);
-      return res.status(500).json({ error: `Lỗi đăng panel sang Discord: ${err.message}` });
+      return res.json({ success: true, queued: true, message: 'Đã gửi yêu cầu đăng Panel tới Discord Bot.' });
+    } else {
+      return res.status(503).json({ error: 'Bot Discord hiện chưa online hoặc không khả dụng.' });
     }
   });
 

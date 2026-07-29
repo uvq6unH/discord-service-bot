@@ -653,6 +653,53 @@ function _startEventQueueWorker(client, configStore, redis) {
         content: '🧪 **[TEST ESPORTS NOTIFICATION]**',
         embeds: [embed1, embed2]
       }).catch((err) => console.error('[esportsTest] Error sending test alert:', err.message));
+    } else if (type === 'post_selfrole_panel') {
+      if (!guildId || !job.panelId) return;
+      const config = await configStore.getGuildConfig(guildId).catch(() => null);
+      if (!config) return;
+      const panels = config.selfRolePanels ?? [];
+      const panel = panels.find(p => p.id === job.panelId);
+      if (!panel || !panel.channelId || !panel.roles || panel.roles.length === 0) return;
+
+      const guild = client.guilds.cache.get(guildId) || await client.guilds.fetch(guildId).catch(() => null);
+      if (!guild) return;
+      const channel = guild.channels.cache.get(panel.channelId) || await guild.channels.fetch(panel.channelId).catch(() => null);
+      if (!channel || !channel.isTextBased()) return;
+
+      const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = await import('discord.js');
+      const colorInt = Number.parseInt((panel.color || '#5865F2').replace('#', ''), 16) || 0x5865F2;
+
+      const embed = new EmbedBuilder()
+        .setTitle(panel.title || 'Choose roles')
+        .setDescription(panel.description || 'Click a button to toggle a role.')
+        .setColor(colorInt);
+
+      const styleMap = {
+        Primary: ButtonStyle.Primary,
+        Secondary: ButtonStyle.Secondary,
+        Success: ButtonStyle.Success,
+        Danger: ButtonStyle.Danger,
+      };
+
+      const buttons = panel.roles.slice(0, 25).map((r) => {
+        const btn = new ButtonBuilder()
+          .setCustomId(`selfrole:${r.roleId}`)
+          .setLabel(r.label || r.roleId)
+          .setStyle(styleMap[r.style] ?? ButtonStyle.Secondary);
+        if (r.emoji) {
+          btn.setEmoji(r.emoji);
+        }
+        return btn;
+      });
+
+      const rows = [];
+      for (let i = 0; i < buttons.length; i += 5) {
+        rows.push(new ActionRowBuilder().addComponents(buttons.slice(i, i + 5)));
+      }
+
+      await channel.send({ embeds: [embed], components: rows })
+        .then(() => console.log(`[event-queue] Posted self-role panel "${panel.title}" to ${panel.channelId}`))
+        .catch((err) => console.error('[event-queue] Error posting selfrole panel:', err.message));
     }
   };
 
