@@ -1,47 +1,70 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 
 export default function IMEInput({
   value = '',
   onChange,
   onBlur,
+  onFocus,
   placeholder,
   className = 'form-input',
   style,
   type = 'text',
+  multiline = false,
+  rows = 3,
   ...props
 }) {
   const [localValue, setLocalValue] = useState(value ?? '');
-  const isComposingRef = useRef(false);
+  const isFocusedRef = useRef(false);
+  const debounceTimerRef = useRef(null);
 
-  // Sync external value when not currently composing
+  // Sync external value ONLY when user is not actively focused/editing
   useEffect(() => {
-    if (!isComposingRef.current) {
+    if (!isFocusedRef.current) {
       setLocalValue(value ?? '');
     }
   }, [value]);
 
+  const flushParentChange = useCallback((val, originalTarget) => {
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current);
+      debounceTimerRef.current = null;
+    }
+    if (onChange) {
+      const syntheticEvt = {
+        target: {
+          name: originalTarget?.name,
+          value: val,
+        }
+      };
+      onChange(syntheticEvt);
+    }
+  }, [onChange]);
+
   const handleChange = (e) => {
     const newVal = e.target.value;
     setLocalValue(newVal);
-    if (!isComposingRef.current && onChange) {
-      onChange(e);
+
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current);
     }
+
+    const targetInfo = { name: e.target.name };
+    debounceTimerRef.current = setTimeout(() => {
+      flushParentChange(newVal, targetInfo);
+    }, 250);
   };
 
-  const handleCompositionStart = () => {
-    isComposingRef.current = true;
-  };
-
-  const handleCompositionEnd = (e) => {
-    isComposingRef.current = false;
-    if (onChange) {
-      onChange(e);
-    }
+  const handleFocus = (e) => {
+    isFocusedRef.current = true;
+    if (onFocus) onFocus(e);
   };
 
   const handleBlur = (e) => {
-    if (isComposingRef.current) {
-      isComposingRef.current = false;
+    isFocusedRef.current = false;
+    // Flush any pending change immediately on blur
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current);
+      debounceTimerRef.current = null;
     }
     if (onChange) {
       onChange(e);
@@ -50,6 +73,30 @@ export default function IMEInput({
       onBlur(e);
     }
   };
+
+  useEffect(() => {
+    return () => {
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current);
+      }
+    };
+  }, []);
+
+  if (multiline) {
+    return (
+      <textarea
+        {...props}
+        rows={rows}
+        className={className}
+        style={style}
+        value={localValue}
+        placeholder={placeholder}
+        onChange={handleChange}
+        onFocus={handleFocus}
+        onBlur={handleBlur}
+      />
+    );
+  }
 
   return (
     <input
@@ -60,8 +107,7 @@ export default function IMEInput({
       value={localValue}
       placeholder={placeholder}
       onChange={handleChange}
-      onCompositionStart={handleCompositionStart}
-      onCompositionEnd={handleCompositionEnd}
+      onFocus={handleFocus}
       onBlur={handleBlur}
     />
   );

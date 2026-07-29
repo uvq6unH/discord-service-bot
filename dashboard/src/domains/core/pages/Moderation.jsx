@@ -424,9 +424,10 @@ function SelfRolePanelsManager({ panels = [], legacyRoles = [], allRoles = [], c
 
           <div>
             <label className="form-label" style={{ fontSize: '10px' }}>{t("Embed Description Message")}</label>
-            <textarea
-              className="form-input"
+            <IMEInput
+              multiline
               rows={2}
+              className="form-input"
               style={{ fontSize: '12px', resize: 'vertical', fontFamily: 'var(--font-body)' }}
               value={activePanel.description}
               placeholder="Click a button below to toggle your role..."

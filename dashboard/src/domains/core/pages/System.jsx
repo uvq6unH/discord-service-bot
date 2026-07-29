@@ -3,6 +3,7 @@ import { useLocation } from 'react-router-dom';
 import Workspace, { HeaderZone, StatusZone, KpiTile } from '../../../shared/layouts/Workspace.jsx';
 import Panel from '../../../shared/primitives/Panel.jsx';
 import DataSlab from '../../../shared/primitives/DataSlab.jsx';
+import IMEInput from '../../../shared/primitives/IMEInput.jsx';
 import { useSystem } from '../hooks/useSystem.js';
 import { useGuild } from '../../../shared/hooks/useGuild.js';
 import { RefreshCw } from 'lucide-react';
@@ -229,7 +230,7 @@ export default function SystemPage() {
                   <label style={{ display: 'block', fontSize: '11px', fontFamily: 'var(--font-mono)', color: 'var(--text-3)', fontWeight: 'bold', marginBottom: 'var(--space-2)' }}>
                     {t("STATUS TEXT")}
                   </label>
-                  <input 
+                  <IMEInput 
                     type="text"
                     value={presenceText}
                     onChange={(e) => setPresenceText(e.target.value)}
