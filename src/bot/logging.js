@@ -66,7 +66,6 @@ export async function pushLiveLog(redis, { type = 'INFO', message = '', metadata
   if (redis) {
     try {
       await redis.rpush('telemetry:live_logs', JSON.stringify(item)).catch(() => null);
-      await redis._request(['LTRIM', 'telemetry:live_logs', '-100', '-1']).catch(() => null);
     } catch {}
   }
 

@@ -784,15 +784,7 @@ function _startEventQueueWorker(client, configStore, redis) {
   const loop = async () => {
     while (isRunning) {
       try {
-        let raw = null;
-        try {
-          const res = await redis.blpop(EVENT_QUEUE, 1);
-          if (res) {
-            raw = Array.isArray(res) ? res[1] : res;
-          }
-        } catch {
-          raw = await redis.lpop(EVENT_QUEUE).catch(() => null);
-        }
+        let raw = await redis.lpop(EVENT_QUEUE).catch(() => null);
 
         if (!raw) {
           raw = await redis.lpop(LEGACY_SLASH_SYNC_QUEUE).catch(() => null);
@@ -810,12 +802,12 @@ function _startEventQueueWorker(client, configStore, redis) {
           }
           await new Promise(resolve => setImmediate(resolve));
         } else {
-          // Adaptive idle sleep 8s — tối ưu hạn ngạch 500k requests/tháng của Upstash Free Tier (chỉ chiếm ~288k reqs/tháng)
-          await new Promise(resolve => setTimeout(resolve, 8000));
+          // Optimized idle sleep 15s — reduces Upstash REST requests down to ~5,700/day
+          await new Promise(resolve => setTimeout(resolve, 15000));
         }
       } catch (err) {
         console.error('[event-queue] Worker error:', err.message);
-        await new Promise(resolve => setTimeout(resolve, 5000));
+        await new Promise(resolve => setTimeout(resolve, 10000));
       }
     }
   };
