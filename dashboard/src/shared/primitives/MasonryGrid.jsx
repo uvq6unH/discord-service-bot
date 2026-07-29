@@ -7,13 +7,22 @@ import React, { useState, useEffect, useRef, useLayoutEffect, useImperativeHandl
  * 1. SSR Compatibility: `useIsomorphicLayoutEffect` (0% Next.js / Remix SSR warnings)
  * 2. Pure `computeLayout`: Decoupled pure layout calculator for 100% Vitest unit testing
  * 3. Stable Key Resolution: `child.props.id ?? child.key ?? itemKey(child)` with Dev Warnings
- * 4. API Versioning Metadata: `MASONRY_ENGINE_VERSION = '2.2.0'`
+ * 4. DevTools & Debug Mode: Integrated `window.__MASONRY_DEVTOOLS__` & `debug={true}` Cyberpunk Overlay
  */
 
 export const MASONRY_ENGINE_VERSION = '2.2.0';
 
 // Isomorphic Layout Effect for SSR compatibility
 const useIsomorphicLayoutEffect = typeof window !== 'undefined' ? useLayoutEffect : useEffect;
+
+// DevTools Instance Registry
+const globalInstances = new Map();
+if (typeof window !== 'undefined') {
+  window.__MASONRY_DEVTOOLS__ = {
+    version: MASONRY_ENGINE_VERSION,
+    getInstances: () => Array.from(globalInstances.values())
+  };
+}
 
 // Key Resolution helper
 const resolveItemKey = (child, idx, itemKeyFn) => {
@@ -84,7 +93,8 @@ export const defaultShortestColumnPlacement = (orderedItems, ctx) => {
 
   return {
     positions,
-    containerHeight: Math.max(...colHeights, 0)
+    containerHeight: Math.max(...colHeights, 0),
+    colHeights
   };
 };
 
@@ -102,6 +112,8 @@ export const computeLayout = ({
   getMeasuredHeight,
   itemKeyFn
 }) => {
+  const startTime = typeof performance !== 'undefined' ? performance.now() : 0;
+
   let activeCols = Math.max(1, Math.floor((containerWidth + gap) / (minColWidth + gap)));
   if (cols && activeCols > cols) activeCols = cols;
 
@@ -138,11 +150,16 @@ export const computeLayout = ({
   const placementRunner = typeof placementEngine === 'function' ? placementEngine : defaultShortestColumnPlacement;
   const placementResult = placementRunner(orderedItems, ctxMeta);
 
+  const endTime = typeof performance !== 'undefined' ? performance.now() : 0;
+  const layoutDurationMs = Math.round((endTime - startTime) * 100) / 100;
+
   return {
     activeCols,
     itemWidthPx,
     positions: placementResult.positions,
-    containerHeight: placementResult.containerHeight
+    containerHeight: placementResult.containerHeight,
+    colHeights: placementResult.colHeights || [],
+    layoutDurationMs
   };
 };
 
@@ -157,6 +174,7 @@ const MasonryGrid = forwardRef(function MasonryGrid(
     itemKey: itemKeyFn,
     onLayout,
     onColumnChange,
+    debug = false,
     className = '',
     style = {}
   },
@@ -168,10 +186,13 @@ const MasonryGrid = forwardRef(function MasonryGrid(
   const heightsRef = useRef({});
   const rafRef = useRef(null);
   const activeColsRef = useRef(cols);
+  const instanceIdRef = useRef(`masonry-${Math.random().toString(36).substring(2, 9)}`);
 
   const [layoutState, setLayoutState] = useState(() => ({
     positions: {},
-    containerHeight: 0
+    containerHeight: 0,
+    colHeights: [],
+    layoutDurationMs: 0
   }));
 
   // Safe side-effect-free onLayout invocation
@@ -180,6 +201,20 @@ const MasonryGrid = forwardRef(function MasonryGrid(
       onLayout(layoutState);
     }
   }, [layoutState, onLayout]);
+
+  // DevTools Registry Registration
+  useEffect(() => {
+    globalInstances.set(instanceIdRef.current, {
+      id: instanceIdRef.current,
+      itemCount: validChildren.length,
+      activeCols: activeColsRef.current,
+      layoutState
+    });
+
+    return () => {
+      globalInstances.delete(instanceIdRef.current);
+    };
+  }, [validChildren.length, layoutState]);
 
   const triggerSelectiveGPUWillChange = (el) => {
     if (!el) return;
@@ -259,7 +294,9 @@ const MasonryGrid = forwardRef(function MasonryGrid(
 
       return {
         positions: computed.positions,
-        containerHeight: computed.containerHeight
+        containerHeight: computed.containerHeight,
+        colHeights: computed.colHeights,
+        layoutDurationMs: computed.layoutDurationMs
       };
     });
   };
@@ -347,6 +384,34 @@ const MasonryGrid = forwardRef(function MasonryGrid(
         ...style
       }}
     >
+      {/* Optional Debug Inspector Overlay */}
+      {debug && (
+        <div
+          style={{
+            position: 'absolute',
+            top: 8,
+            right: 8,
+            zIndex: 99999,
+            background: 'rgba(10, 10, 15, 0.92)',
+            border: '1px solid var(--accent-cyan, #00f0ff)',
+            borderRadius: '6px',
+            padding: '8px 12px',
+            fontFamily: 'monospace',
+            fontSize: '11px',
+            color: 'var(--text-1, #e0e0e0)',
+            boxShadow: '0 4px 16px rgba(0, 240, 255, 0.2)',
+            pointerEvents: 'none'
+          }}
+        >
+          <div style={{ fontWeight: 'bold', color: 'var(--accent-cyan, #00f0ff)', marginBottom: '4px' }}>
+            ⚡ MASONRY ENGINE v{MASONRY_ENGINE_VERSION} DEBUG
+          </div>
+          <div>Items: {validChildren.length} | Active Cols: {activeColsRef.current}</div>
+          <div>Layout Time: {layoutState.layoutDurationMs}ms</div>
+          <div>Container Height: {Math.round(layoutState.containerHeight)}px</div>
+        </div>
+      )}
+
       {validChildren.map((child, idx) => {
         const key = resolveItemKey(child, idx, itemKeyFn);
         const pos = layoutState.positions[key] || { leftPx: 0, topPx: 0, widthPx: 0 };
