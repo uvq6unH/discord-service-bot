@@ -358,7 +358,12 @@ export default function EconomyPage() {
           const colHeights = [0, 0];
           const positions = {};
           orderedItems.forEach(({ key, idx }) => {
-            const targetCol = key === 'betting' ? 1 : 0;
+            let targetCol = 0;
+            if (isLeveling) {
+              targetCol = (key === 'currency' || key === 'betting') ? 1 : 0;
+            } else {
+              targetCol = key === 'betting' ? 1 : 0;
+            }
             const measuredH = getMeasuredHeight(key, idx);
             const leftPx = targetCol * (itemWidthPx + gap);
             const topPx = colHeights[targetCol];
@@ -505,34 +510,7 @@ export default function EconomyPage() {
           )}
         </Panel>
 
-        {/* Panel 2: Currency Registry */}
-        <Panel key="currency" id="currency" title={t("CURRENCY REGISTRY DATABASE")} className={highlight === 'currency' ? 'flash-target' : ''}>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
-            <CurrencyRow 
-              prefix="currencySilver" 
-              defaultName="Silver" 
-              defaultIcon="🥈" 
-              config={config} 
-              updateConfig={updateConfig} 
-            />
-            <CurrencyRow 
-              prefix="currencyGold" 
-              defaultName="Gold" 
-              defaultIcon="🥇" 
-              config={config} 
-              updateConfig={updateConfig} 
-            />
-            <CurrencyRow 
-              prefix="currencyDiamond" 
-              defaultName="Diamond" 
-              defaultIcon="💎" 
-              config={config} 
-              updateConfig={updateConfig} 
-            />
-          </div>
-        </Panel>
-
-        {/* Panel 3: Rewards Claims & Betting Limits */}
+        {/* Panel 2: Rewards Claims & Betting Limits */}
         <Panel key="daily" id="daily" title={t("DAILY REWARDS DISTRIBUTOR")} accent className={highlight === 'daily' ? 'flash-target' : ''} style={{ opacity: isEnabled ? 1 : 0.4 }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <span style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--text-2)' }}>
@@ -611,6 +589,33 @@ export default function EconomyPage() {
                 {UTC_OFFSETS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
               </select>
             </div>
+          </div>
+        </Panel>
+
+        {/* Panel 3: Currency Registry */}
+        <Panel key="currency" id="currency" title={t("CURRENCY REGISTRY DATABASE")} accent className={highlight === 'currency' ? 'flash-target' : ''}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
+            <CurrencyRow 
+              prefix="currencySilver" 
+              defaultName="Silver" 
+              defaultIcon="🥈" 
+              config={config} 
+              updateConfig={updateConfig} 
+            />
+            <CurrencyRow 
+              prefix="currencyGold" 
+              defaultName="Gold" 
+              defaultIcon="🥇" 
+              config={config} 
+              updateConfig={updateConfig} 
+            />
+            <CurrencyRow 
+              prefix="currencyDiamond" 
+              defaultName="Diamond" 
+              defaultIcon="💎" 
+              config={config} 
+              updateConfig={updateConfig} 
+            />
           </div>
         </Panel>
 
