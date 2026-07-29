@@ -702,21 +702,22 @@ function _startEventQueueWorker(client, configStore, redis) {
         .setThumbnail('http://static.lolesports.com/leagues/lck-color-on-black.png')
         .setColor(0xFF4655);
 
-      const embed2 = new EmbedBuilder()
-        .setTitle('🌏 LCP PACIFIC 2026 — TRẬN 2')
+      const embedResult = new EmbedBuilder()
+        .setTitle('🏆 KẾT QUẢ THI ĐẤU — 🇰🇷 LCK KOREA')
         .setDescription(
-          `⚔️ **GAM Esports** 🆚 **Vikings Esports**\n\n` +
-          `⏰ **Thời gian:** ${match2Time} (${match2Rel})\n` +
-          `🎮 **Thể thức:** \`BO5\` | 📅 **SẮP BẮT ĐẦU**`
+          `### 🇰🇷 **T1** [ **2** ] 🆚 [ **1** ] **Gen.G Esports**\n\n` +
+          `> 🏆 **CHIẾN THẮNG:** **T1**\n` +
+          `> ⏰ **Thời gian:** ${match1Time}\n` +
+          `> 🎮 **Thể thức:** \`BO3\` | 🏁 **KẾT THÚC**`
         )
-        .setThumbnail('http://static.lolesports.com/leagues/1733468139601_lcp-color-golden.png')
+        .setThumbnail('http://static.lolesports.com/leagues/lck-color-on-black.png')
         .setColor(0x00FF88)
-        .setFooter({ text: 'Riot Games LoL Esports Pipeline • Real-time Test' })
+        .setFooter({ text: 'Riot Games LoL Esports Pipeline • Real-time Test Result' })
         .setTimestamp();
 
       await channel.send({
-        content: '🧪 **[TEST ESPORTS NOTIFICATION]**',
-        embeds: [embed1, embed2]
+        content: '🧪 **[TEST ESPORTS NOTIFICATION & MATCH RESULT]**',
+        embeds: [embed1, embedResult]
       }).catch((err) => console.error('[esportsTest] Error sending test alert:', err.message));
     } else if (type === 'post_selfrole_panel') {
       if (!guildId || !job.panelId) return;

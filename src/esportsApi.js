@@ -99,6 +99,10 @@ export async function getEsportsSchedule(leagueKey = 'lck') {
       const state = evt.state || 'unstarted';
       const startTime = evt.startTime || new Date().toISOString();
       const blockName = evt.blockName || league.name;
+      const score1 = teams[0]?.result?.gameWins ?? (teams[0]?.result?.outcome === 'win' ? 'W' : (teams[0]?.result?.outcome === 'loss' ? 'L' : null));
+      const score2 = teams[1]?.result?.gameWins ?? (teams[1]?.result?.outcome === 'win' ? 'W' : (teams[1]?.result?.outcome === 'loss' ? 'L' : null));
+      const winnerName = teams[0]?.result?.outcome === 'win' ? team1 : (teams[1]?.result?.outcome === 'win' ? team2 : null);
+      const winnerCode = teams[0]?.result?.outcome === 'win' ? code1 : (teams[1]?.result?.outcome === 'win' ? code2 : null);
 
       return {
         id: evt.id,
@@ -111,6 +115,10 @@ export async function getEsportsSchedule(leagueKey = 'lck') {
         code2,
         logo1,
         logo2,
+        score1,
+        score2,
+        winnerName,
+        winnerCode,
         state,
         startTime,
         strategy: evt.match?.strategy?.type ? `${evt.match.strategy.type.toUpperCase()} ${evt.match.strategy.count || ''}` : 'BO3'
@@ -170,6 +178,11 @@ export async function getDailyMatchesForLeagues(leagueKeys = ['lck', 'lcp', 'lpl
         const team2 = teams[1]?.name || 'TBD';
         const code1 = teams[0]?.code || team1;
         const code2 = teams[1]?.code || team2;
+        const score1 = teams[0]?.result?.gameWins ?? (teams[0]?.result?.outcome === 'win' ? 'W' : (teams[0]?.result?.outcome === 'loss' ? 'L' : null));
+        const score2 = teams[1]?.result?.gameWins ?? (teams[1]?.result?.outcome === 'win' ? 'W' : (teams[1]?.result?.outcome === 'loss' ? 'L' : null));
+        const winnerName = teams[0]?.result?.outcome === 'win' ? team1 : (teams[1]?.result?.outcome === 'win' ? team2 : null);
+        const winnerCode = teams[0]?.result?.outcome === 'win' ? code1 : (teams[1]?.result?.outcome === 'win' ? code2 : null);
+
         return {
           id: evt.id,
           team1,
@@ -178,6 +191,10 @@ export async function getDailyMatchesForLeagues(leagueKeys = ['lck', 'lcp', 'lpl
           code2,
           logo1: teams[0]?.image || '',
           logo2: teams[1]?.image || '',
+          score1,
+          score2,
+          winnerName,
+          winnerCode,
           state: evt.state || 'unstarted',
           startTime: evt.startTime,
           blockName: evt.blockName || league.name,

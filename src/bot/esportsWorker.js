@@ -3,9 +3,10 @@ import { getDailyMatchesForLeagues, getEsportsSchedule } from '../esportsApi.js'
 
 const _postedDailyCache = new Set();
 const _postedPre15Cache = new Set();
+const _postedResultCache = new Set();
 
 export function startEsportsWorker(client, configStore, redis) {
-  console.log('[esportsWorker] Starting Automated Esports Daily Broadcast & 15-Min Pre-Match Alert Worker...');
+  console.log('[esportsWorker] Starting Automated Esports Daily Broadcast, Live Alerts & Match Results Worker...');
 
   // Check every 60 seconds
   setInterval(async () => {
@@ -73,9 +74,21 @@ async function processEsportsWorkerCycle(client, configStore, redis) {
                 const unixSec = Math.floor(new Date(m.startTime).getTime() / 1000);
                 const timeTag = `<t:${unixSec}:t>`;
                 const relativeTag = `<t:${unixSec}:R>`;
-                const stateBadge = m.state === 'inProgress' ? '🔴 **ĐANG THI ĐẤU**' : (m.state === 'completed' ? '✅ **ĐÃ KẾT THÚC**' : '📅 **SẮP BẮT ĐẦU**');
+
+                let vsStr = `**${m.team1}** 🆚 **${m.team2}**`;
+                let stateBadge = '📅 **SẮP BẮT ĐẦU**';
+
+                if (m.state === 'inProgress') {
+                  stateBadge = '🔴 **ĐANG THI ĐẤU**';
+                } else if (m.state === 'completed') {
+                  const scorePart = (m.score1 !== null && m.score2 !== null) ? `[ **${m.score1}** ] 🆚 [ **${m.score2}** ]` : '🆚';
+                  vsStr = `**${m.team1}** ${scorePart} **${m.team2}**`;
+                  const winnerTag = m.winnerName ? ` 🏆 **${m.winnerName}**` : '';
+                  stateBadge = `✅ **ĐÃ KẾT THÚC**${winnerTag}`;
+                }
+
                 return (
-                  `⚔️ **${m.team1}** 🆚 **${m.team2}**\n` +
+                  `⚔️ ${vsStr}\n` +
                   `⏰ **Thời gian:** ${timeTag} (${relativeTag}) | 🎮 **Thể thức:** \`${m.strategy || 'BO3'}\` | ${stateBadge}\n`
                 );
               }).join('\n');
@@ -95,7 +108,6 @@ async function processEsportsWorkerCycle(client, configStore, redis) {
 
             await channel.send({ content: `📅 **[LỊCH THI ĐẤU HÀNG NGÀY - ${todayYMD}]**`, embeds }).catch((err) => console.error('[esportsWorker] Send daily error:', err.message));
           } else {
-            // Không có trận đấu — vẫn gửi thông báo để user biết bot hoạt động
             const noMatchEmbed = new EmbedBuilder()
               .setTitle('📅 Lịch thi đấu hôm nay')
               .setDescription(`Hôm nay (**${todayYMD}**) không có trận đấu nào trong các giải đang theo dõi.\n\n🔍 Các giải: ${targetLeagues.map(l => `\`${l.toUpperCase()}\``).join(', ')}`)
@@ -119,7 +131,6 @@ async function processEsportsWorkerCycle(client, configStore, redis) {
             const matchTime = new Date(match.startTime).getTime();
             const diffMinutes = (matchTime - Date.now()) / (60 * 1000);
 
-            // Calculate alert milestone: 15m (14-15.9m), 10m (9-10.9m), 5m (4-5.9m)
             let stage = null;
             let stageLabel = '';
             let stageColor = 0xFF0055;
@@ -140,7 +151,6 @@ async function processEsportsWorkerCycle(client, configStore, redis) {
 
             if (!stage) continue;
 
-            // Normalize match ID to prevent false key misses
             const cleanTeam1 = (match.team1 || '').toLowerCase().replace(/[^a-z0-9]/g, '');
             const cleanTeam2 = (match.team2 || '').toLowerCase().replace(/[^a-z0-9]/g, '');
             const matchMin = Math.floor(matchTime / 60000);
@@ -178,6 +188,58 @@ async function processEsportsWorkerCycle(client, configStore, redis) {
                 content: `🚨 **[ESPORTS LIVE ALERT - ${stageLabel}]** ${pingText}`.trim(),
                 embeds: [alertEmbed]
               }).catch((err) => console.error('[esportsWorker] Send pre-match alert error:', err.message));
+            }
+          }
+        }
+      }
+
+      // ── Job 3: Automated Match Results Broadcast ───────────────────────────
+      if (config.esportsMatchResultAlert !== false) {
+        for (const leagueKey of targetLeagues) {
+          const scheduleData = await getEsportsSchedule(leagueKey).catch(() => null);
+          const matches = scheduleData?.matches || [];
+
+          for (const match of matches) {
+            if (match.state !== 'completed') continue;
+
+            const cleanTeam1 = (match.team1 || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+            const cleanTeam2 = (match.team2 || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+            const matchTimeMin = Math.floor(new Date(match.startTime).getTime() / 60000);
+            const matchId = match.id || `${leagueKey}_${cleanTeam1}_${cleanTeam2}_${matchTimeMin}`;
+
+            const resultKey = `guild:${guild.id}:esports_result:${matchId}`;
+            const alreadyPostedResult = _postedResultCache.has(resultKey) || (redis ? await redis.get(resultKey).catch(() => null) : false);
+
+            if (!alreadyPostedResult) {
+              _postedResultCache.add(resultKey);
+              if (redis) {
+                await redis.set(resultKey, '1', 'EX', 172800).catch(() => null);
+              }
+
+              const unixSec = Math.floor(new Date(match.startTime).getTime() / 1000);
+              const scoreStr = (match.score1 !== null && match.score2 !== null) ? `[ **${match.score1}** ] 🆚 [ **${match.score2}** ]` : '🆚';
+              const winnerStr = match.winnerName ? `🏆 **CHIẾN THẮNG:** **${match.winnerName}**` : '🏁 **HOÀN THÀNH**';
+
+              const resultEmbed = new EmbedBuilder()
+                .setTitle(`🏆 KẾT QUẢ THI ĐẤU — ${scheduleData.league.name.toUpperCase()}`)
+                .setDescription(
+                  `### ${scheduleData.league.icon} **${match.team1}** ${scoreStr} **${match.team2}**\n\n` +
+                  `> ${winnerStr}\n` +
+                  `> ⏰ **Thời gian:** <t:${unixSec}:f>\n` +
+                  `> 🎮 **Thể thức:** \`${match.strategy || 'BO3'}\` | 🏁 **KẾT THÚC**`
+                )
+                .setColor(0x00FF88)
+                .setTimestamp();
+
+              if (scheduleData?.league?.logoUrl) resultEmbed.setThumbnail(scheduleData.league.logoUrl);
+
+              const leagueRole = config.esportsLeagueRoles?.[leagueKey.toLowerCase()];
+              const pingText = leagueRole ? `<@&${leagueRole}>` : '';
+
+              await channel.send({
+                content: `📊 **[ESPORTS MATCH RESULT]** ${pingText}`.trim(),
+                embeds: [resultEmbed]
+              }).catch((err) => console.error('[esportsWorker] Send match result error:', err.message));
             }
           }
         }

@@ -22,9 +22,19 @@ export async function handleEsports(ctx) {
     embed.addFields({ name: '📭 Thông báo', value: 'Hiện chưa có lịch thi đấu mới cho giải đấu này.' });
   } else {
     matches.slice(0, 6).forEach(m => {
-      const statusIcon = m.state === 'inProgress' ? '🔴 **ĐANG DIỄN RA**' : m.state === 'completed' ? '✅ **ĐÃ KẾT THÚC**' : '⏰ **SẮP DIỄN RA**';
+      let statusIcon = m.state === 'inProgress' ? '🔴 **ĐANG DIỄN RA**' : (m.state === 'completed' ? '✅ **ĐÃ KẾT THÚC**' : '⏰ **SẮP DIỄN RA**');
       const timeStr = `<t:${Math.floor(new Date(m.startTime).getTime() / 1000)}:R>`;
-      const matchText = `⚔️ **${m.team1}** vs **${m.team2}** (${m.strategy})\nTrạng thái: ${statusIcon} • ${timeStr}`;
+
+      let vsStr = `**${m.team1}** vs **${m.team2}**`;
+      if (m.state === 'completed') {
+        const scorePart = (m.score1 !== null && m.score2 !== null) ? `[ **${m.score1}** ] 🆚 [ **${m.score2}** ]` : 'vs';
+        vsStr = `**${m.team1}** ${scorePart} **${m.team2}**`;
+        if (m.winnerName) {
+          statusIcon += ` • 🏆 **${m.winnerName} WIN**`;
+        }
+      }
+
+      const matchText = `⚔️ ${vsStr} (${m.strategy})\nTrạng thái: ${statusIcon} • ${timeStr}`;
       embed.addFields({ name: `🏆 ${m.blockName}`, value: matchText, inline: false });
     });
   }

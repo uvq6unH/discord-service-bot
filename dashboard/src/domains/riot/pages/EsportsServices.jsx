@@ -51,6 +51,7 @@ export default function EsportsServicesPage() {
     : ['lck', 'lcp', 'worlds', 'msi', 'lpl', 'lec', 'lcs'];
   const dailyTime = config.esportsDailyTime || '08:00';
   const preMatchAlert = config.esportsPreMatchAlert !== false;
+  const matchResultAlert = config.esportsMatchResultAlert !== false;
   const leagueRoles = config.esportsLeagueRoles || {};
 
   const handleLeagueToggle = (leagueKey) => {
@@ -302,6 +303,46 @@ export default function EsportsServicesPage() {
                     className="toggle-switch__input"
                     checked={preMatchAlert}
                     onChange={(e) => updateConfig({ esportsPreMatchAlert: e.target.checked })}
+                  />
+                  <div className="toggle-switch__track">
+                    <div className="toggle-switch__thumb" />
+                  </div>
+                </label>
+              </div>
+
+              {/* Automated Match Results Broadcast */}
+              <div style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                padding: 'var(--space-4)',
+                background: 'var(--surface-1)',
+                border: '1px solid var(--border)'
+              }}>
+                <div>
+                  <div style={{
+                    fontFamily: 'var(--font-mono)',
+                    fontWeight: 'bold',
+                    fontSize: '13px',
+                    color: 'var(--text-1)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 'var(--space-2)'
+                  }}>
+                    <Trophy size={16} color="var(--green)" />
+                    {t("Automated Match Results Broadcast")}
+                  </div>
+                  <div style={{ fontSize: '11px', color: 'var(--text-3)', marginTop: 'var(--space-1)' }}>
+                    {t("Automatically post official match scores and winner alerts as soon as matches complete")}
+                  </div>
+                </div>
+
+                <label className="toggle-switch">
+                  <input
+                    type="checkbox"
+                    className="toggle-switch__input"
+                    checked={matchResultAlert}
+                    onChange={(e) => updateConfig({ esportsMatchResultAlert: e.target.checked })}
                   />
                   <div className="toggle-switch__track">
                     <div className="toggle-switch__thumb" />
