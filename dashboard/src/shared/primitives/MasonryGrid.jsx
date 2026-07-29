@@ -358,10 +358,13 @@ const MasonryGrid = forwardRef(function MasonryGrid(
     });
   };
 
+  const calculateLayoutRef = useRef();
+  calculateLayoutRef.current = calculateLayout;
+
   const debouncedCalculateLayout = () => {
     if (rafRef.current) cancelAnimationFrame(rafRef.current);
     rafRef.current = requestAnimationFrame(() => {
-      calculateLayout();
+      calculateLayoutRef.current?.();
     });
   };
 
