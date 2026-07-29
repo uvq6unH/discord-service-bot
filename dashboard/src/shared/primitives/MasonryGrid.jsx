@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useLayoutEffect, useImperativeHandle, forwardRef } from 'react';
+import React, { useState, useEffect, useRef, useLayoutEffect, useImperativeHandle, forwardRef, useMemo } from 'react';
 
 /**
  * MasonryGrid — Open-Source v2.2 Isomorphic Enterprise GPU Layout Engine
