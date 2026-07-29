@@ -1,37 +1,48 @@
 import React, { useState, useEffect, useRef, useLayoutEffect } from 'react';
 
 /**
- * MasonryGrid — Ultimate Single-Render GPU-Accelerated Animated Layout Engine
+ * MasonryGrid — Enterprise-Grade Container-Responsive GPU Layout Engine
  * 
- * Architecture Highlights:
- * 1. Single-Pass DOM Render: Eliminates offscreen measurement layer (50% DOM reduction).
- * 2. GPU-Accelerated Hardware Motion: Uses `transform: translate3d(x, y, 0)` with `willChange: transform`.
- * 3. Exact Height Measurement: Uses `getBoundingClientRect().height` for precision under scale/transforms.
- * 4. rAF Observer Debouncing: Batches layout calculation with `requestAnimationFrame`.
- * 5. Stable React Keys & State: Preserves internal form, chart & terminal states.
+ * Enterprise Highlights:
+ * 1. Container Query Responsiveness: Evaluates `containerRef.current.clientWidth` instead of `window.innerWidth`.
+ * 2. Full Container Observation: `ResizeObserver` observes both `containerRef` (sidebar toggles) and all items.
+ * 3. GPU VRAM Management: Dynamic `willChange` (active during transitions, auto when stationary).
+ * 4. Reflow Optimization: Instant width updates, smooth GPU-accelerated `transform` slide animations.
+ * 5. Height Cache & Single-Pass Render: 0% DOM bloat, O(N * cols) layout complexity.
  */
-export default function MasonryGrid({ children, cols = 2, gap = 20, className = '', style = {} }) {
+export default function MasonryGrid({ children, cols = 2, gap = 20, minColWidth = 340, className = '', style = {} }) {
   const validChildren = React.Children.toArray(children).filter(Boolean);
   const containerRef = useRef(null);
   const itemRefs = useRef({});
   const heightsRef = useRef({});
   const rafRef = useRef(null);
+  const isMovingTimeoutRef = useRef(null);
 
-  // Store numerical position layouts per item
+  const [isMoving, setIsMoving] = useState(false);
   const [layoutState, setLayoutState] = useState(() => ({
     positions: [], // Array of { leftPx, topPx, widthPx }
     containerHeight: 0
   }));
 
+  const triggerMovingState = () => {
+    setIsMoving(true);
+    if (isMovingTimeoutRef.current) clearTimeout(isMovingTimeoutRef.current);
+    isMovingTimeoutRef.current = setTimeout(() => {
+      setIsMoving(false);
+    }, 380); // Clear will-change after transition completes (350ms + 30ms margin)
+  };
+
   const calculateLayout = () => {
     if (validChildren.length === 0 || !containerRef.current) return;
 
     const containerWidth = containerRef.current.clientWidth || 800;
-    const isMobile = typeof window !== 'undefined' && window.innerWidth < 768;
-    const activeCols = isMobile ? 1 : cols;
+    
+    // Container-relative responsiveness: determine active columns dynamically
+    let activeCols = Math.max(1, Math.floor((containerWidth + gap) / (minColWidth + gap)));
+    if (cols && activeCols > cols) activeCols = cols;
 
     // Calculate column width & positions
-    const itemWidthPx = (containerWidth - (activeCols - 1) * gap) / activeCols;
+    const itemWidthPx = Math.max(0, (containerWidth - (activeCols - 1) * gap) / activeCols);
     const colHeights = new Array(activeCols).fill(0);
     const newPositions = [];
 
@@ -62,6 +73,7 @@ export default function MasonryGrid({ children, cols = 2, gap = 20, className = 
 
     const maxContainerH = Math.max(...colHeights, 0);
 
+    triggerMovingState();
     setLayoutState({
       positions: newPositions,
       containerHeight: maxContainerH
@@ -77,21 +89,25 @@ export default function MasonryGrid({ children, cols = 2, gap = 20, className = 
 
   useLayoutEffect(() => {
     calculateLayout();
-  }, [validChildren.length, cols, gap]);
+  }, [validChildren.length, cols, gap, minColWidth]);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
 
-    // Realtime Height Observer with rAF Debouncing
+    // Observe both container (sidebar toggles) and item elements
     const observer = new ResizeObserver((entries) => {
       let shouldUpdate = false;
       entries.forEach((entry) => {
-        const targetIdx = entry.target.dataset.index;
-        if (targetIdx !== undefined) {
-          const newH = entry.target.getBoundingClientRect().height;
-          if (Math.abs((heightsRef.current[targetIdx] || 0) - newH) > 1) {
-            heightsRef.current[targetIdx] = newH;
-            shouldUpdate = true;
+        if (entry.target === containerRef.current) {
+          shouldUpdate = true;
+        } else {
+          const targetIdx = entry.target.dataset.index;
+          if (targetIdx !== undefined) {
+            const newH = entry.target.getBoundingClientRect().height;
+            if (Math.abs((heightsRef.current[targetIdx] || 0) - newH) > 1) {
+              heightsRef.current[targetIdx] = newH;
+              shouldUpdate = true;
+            }
           }
         }
       });
@@ -100,6 +116,10 @@ export default function MasonryGrid({ children, cols = 2, gap = 20, className = 
         debouncedCalculateLayout();
       }
     });
+
+    if (containerRef.current) {
+      observer.observe(containerRef.current);
+    }
 
     Object.values(itemRefs.current).forEach((el) => {
       if (el) observer.observe(el);
@@ -110,9 +130,10 @@ export default function MasonryGrid({ children, cols = 2, gap = 20, className = 
     return () => {
       observer.disconnect();
       if (rafRef.current) cancelAnimationFrame(rafRef.current);
+      if (isMovingTimeoutRef.current) clearTimeout(isMovingTimeoutRef.current);
       window.removeEventListener('resize', debouncedCalculateLayout);
     };
-  }, [validChildren.length, cols, gap]);
+  }, [validChildren.length, cols, gap, minColWidth]);
 
   if (validChildren.length === 0) return null;
 
@@ -143,8 +164,8 @@ export default function MasonryGrid({ children, cols = 2, gap = 20, className = 
               left: 0,
               width: pos.widthPx ? `${pos.widthPx}px` : '100%',
               transform: `translate3d(${pos.leftPx}px, ${pos.topPx}px, 0)`,
-              transition: 'transform 0.35s cubic-bezier(0.4, 0, 0.2, 1), width 0.35s cubic-bezier(0.4, 0, 0.2, 1)',
-              willChange: 'transform'
+              transition: 'transform 0.35s cubic-bezier(0.4, 0, 0.2, 1)',
+              willChange: isMoving ? 'transform' : 'auto'
             }}
           >
             {child}
