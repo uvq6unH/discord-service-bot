@@ -19,11 +19,20 @@ const REPEAT_INTERVALS_MS = {
   weekly: 7 * 24 * 60 * 60 * 1_000,
 };
 
+const REPEAT_LABELS = {
+  hourly: ' 🔄 *(Hàng giờ)*',
+  daily: ' 🔄 *(Hàng ngày)*',
+  weekly: ' 🔄 *(Hàng tuần)*',
+};
+
 /**
  * Xử lý một reminder đến hạn: gửi tin, reschedule / xoá.
  * @returns {object|null} Reminder mới (nếu reschedule), hoặc null (nếu đã xoá)
  */
 async function processOneReminder(reminder, guild) {
+  const repeat = reminder.repeat ?? 'none';
+  const repeatLabel = REPEAT_LABELS[repeat] ?? '';
+
   const channel = await guild.channels.fetch(reminder.channelId).catch(() => null);
   if (channel?.isTextBased()) {
     const ids = Array.isArray(reminder.userIds) && reminder.userIds.length
@@ -37,10 +46,9 @@ async function processOneReminder(reminder, guild) {
     const mentions = [userMentions, roleMentions].filter(Boolean).join(' ');
     const resolvedMsg = resolveEmojiNames(reminder.message, guild);
     const finalText = mentions ? `${mentions} ${resolvedMsg}${repeatLabel}` : `${resolvedMsg}${repeatLabel}`;
-    await channel.send(finalText).catch(() => null);
+    await channel.send(finalText).catch((err) => console.error(`[reminder] Failed to send message to channel ${reminder.channelId}:`, err.message));
   }
 
-  const repeat = reminder.repeat ?? 'none';
   const ms = REPEAT_INTERVALS_MS[repeat];
   if (!ms) return null; // one-shot — consume
 
@@ -74,9 +82,9 @@ async function reminderTick(discordClient, configStore) {
         if (!isNaN(time) && time <= now) {
           modified = true;
 
-          // Skip reminders that are too stale (e.g. bot was restarted after the reminder time)
+          // Skip reminders that are too stale (e.g. bot was down for more than 1 hour)
           const staleMs = now.getTime() - time.getTime();
-          const STALE_THRESHOLD_MS = 2 * 60 * 1000; // 2 minutes
+          const STALE_THRESHOLD_MS = 60 * 60 * 1000; // 60 minutes (1 hour)
 
           if (staleMs > STALE_THRESHOLD_MS) {
             // Stale reminder — don't fire the message
@@ -120,6 +128,9 @@ async function reminderTick(discordClient, configStore) {
  * @returns {NodeJS.Timeout}
  */
 export function startReminderWorker(discordClient, configStore) {
+  // Execute first tick immediately on startup
+  reminderTick(discordClient, configStore).catch(err => console.error('[reminder] Initial tick error:', err.message));
+
   const handle = setInterval(() => reminderTick(discordClient, configStore), 60_000);
   handle.unref();
   console.log('[reminder] Worker started — polling every 60 s');

@@ -103,7 +103,7 @@ function normalizeReminders(reminders) {
         repeat: ['none', 'hourly', 'daily', 'weekly'].includes(item?.repeat) ? item.repeat : 'none',
       };
     })
-    .filter((item) => item.id && (item.userIds.length || item.roleIds.length) && item.channelId && item.message && item.time)
+    .filter((item) => item.id && item.channelId && item.message && item.time)
     .slice(0, 50);
 }
 
