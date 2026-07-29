@@ -183,8 +183,8 @@ export default function VoiceServicesPage() {
         method: 'POST'
       });
       const data = await res.json();
+      updateConfig({ tempVcEnabled: true });
       setSetupStatus({ success: true, message: data.message || 'Đã khởi tạo hệ thống VoiceMaster thành công!' });
-      setTimeout(() => window.location.reload(), 1200);
     } catch (err) {
       setSetupStatus({ success: false, message: err.message || 'Lỗi hệ thống khi khởi tạo VoiceMaster' });
     } finally {
@@ -202,8 +202,13 @@ export default function VoiceServicesPage() {
         method: 'POST'
       });
       const data = await res.json();
+      updateConfig({
+        tempVcEnabled: false,
+        tempVcMasterChannelId: '',
+        tempVcCategoryId: '',
+        tempVcControlChannelId: ''
+      });
       setSetupStatus({ success: true, message: data.message || 'Đã reset VoiceMaster!' });
-      setTimeout(() => window.location.reload(), 1200);
     } catch (err) {
       setSetupStatus({ success: false, message: err.message || 'Lỗi hệ thống khi reset VoiceMaster' });
     } finally {
