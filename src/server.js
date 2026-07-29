@@ -58,7 +58,7 @@ async function mapWithConcurrency(items, limit, mapper) {
 }
 
 function requireGuildId(req, res, next) {
-  const guildId = String(req.query.guildId ?? req.body.guildId ?? '').trim();
+  const guildId = String(req.params.guildId ?? req.query.guildId ?? req.body?.guildId ?? '').trim();
   if (!guildId) {
     res.status(400).json({ error: 'guildId is required' });
     return;
