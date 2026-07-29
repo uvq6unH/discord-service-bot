@@ -1154,6 +1154,7 @@ export function createServer({ configStore, stateStore, botClient, redis = null 
       let guildName = oauthMeta.name;
       let iconUrl = oauthIcon;
 
+      // 1. Check in-memory botClient
       if (botClient?.guilds?.cache) {
         const botGuild = botClient.guilds.cache.get(id);
         if (botGuild) {
@@ -1161,7 +1162,10 @@ export function createServer({ configStore, stateStore, botClient, redis = null 
           guildName = botGuild.name;
           iconUrl = botGuild.iconURL({ size: 64 }) || oauthIcon;
         }
-      } else if (redis) {
+      }
+
+      // 2. Check Redis cache if not found in memory
+      if (!isBotPresent && redis) {
         try {
           const raw = await redis.get(`guild_cache:${id}`);
           if (raw) {
@@ -1171,6 +1175,11 @@ export function createServer({ configStore, stateStore, botClient, redis = null 
             iconUrl = meta?.iconURL ?? oauthIcon;
           }
         } catch { /* ignore */ }
+      }
+
+      // 3. Fallback to configStore check
+      if (!isBotPresent && configuredGuildIds.includes(id)) {
+        isBotPresent = true;
       }
 
       guildsById.set(id, {

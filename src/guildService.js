@@ -1,7 +1,7 @@
 import crypto from 'crypto';
 
 const DISCORD_API = 'https://discord.com/api/v10';
-const SOFT_TTL_MS = 5 * 60 * 1000;      // 5 minutes
+const SOFT_TTL_MS = 30 * 1000;          // 30 seconds (Quick refresh for newly created servers)
 const HARD_TTL_SEC = 7 * 24 * 60 * 60;   // 7 days in Redis
 const REVALIDATE_LEASE_SEC = 60;         // 60 seconds
 const MUTEX_LEASE_SEC = 30;              // 30 seconds
