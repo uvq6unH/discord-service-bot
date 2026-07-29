@@ -294,6 +294,7 @@ export default function EconomyPage() {
   const { config, loading, updateConfig, handleBetChange } = useEconomy();
   const { guildData, selectedGuild } = useGuild();
   const { t } = useLanguage();
+  const [localLevelsEnabled, setLocalLevelsEnabled] = useState(null);
 
   if (loading || !config) {
     return (
@@ -304,7 +305,7 @@ export default function EconomyPage() {
   }
 
   const isEnabled = config.economyEnabled ?? false;
-  const isLeveling = config.levelsEnabled ?? false;
+  const isLeveling = localLevelsEnabled !== null ? localLevelsEnabled : (config.levelsEnabled ?? false);
   const serverName = selectedGuild?.name ? selectedGuild.name.toUpperCase() : '';
 
   const customEconomyPlacement = useCallback((orderedItems, ctx) => {
@@ -407,7 +408,10 @@ export default function EconomyPage() {
                 className="toggle-switch__input"
                 disabled={!isEnabled}
                 checked={isLeveling}
-                onChange={e => updateConfig({ levelsEnabled: e.target.checked })}
+                onChange={e => {
+                  setLocalLevelsEnabled(e.target.checked);
+                  updateConfig({ levelsEnabled: e.target.checked });
+                }}
               />
               <div className="toggle-switch__track">
                 <div className="toggle-switch__thumb" />
