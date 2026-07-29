@@ -302,6 +302,12 @@ export default function EconomyPage() {
     : (config?.levelsEnabled ?? config?.levels?.enabled ?? false);
   const serverName = selectedGuild?.name ? selectedGuild.name.toUpperCase() : '';
 
+  useEffect(() => {
+    if (config && localLevelsEnabled === null) {
+      setLocalLevelsEnabled(config.levelsEnabled ?? config.levels?.enabled ?? false);
+    }
+  }, [config, localLevelsEnabled]);
+
   const handleToggleLevels = useCallback((checked) => {
     setLocalLevelsEnabled(checked);
     updateConfig({ 
@@ -328,34 +334,34 @@ export default function EconomyPage() {
     const colHeights = [0, 0];
     const positions = {};
 
-    // Sort items so that when isLevelingActive is true, currency is placed FIRST in Col 1
-    const itemsToPlace = [...orderedItems];
-    if (isLevelingActive) {
-      itemsToPlace.sort((a, b) => {
-        if (a.key === 'currency') return -1;
-        if (b.key === 'currency') return 1;
-        return a.idx - b.idx;
-      });
-    }
-
-    itemsToPlace.forEach(({ key, idx }) => {
+    orderedItems.forEach(({ key, idx }) => {
+      const measuredH = getMeasuredHeight(key, idx);
       const isBetting = key === 'betting' || String(key).includes('betting');
       const isCurrency = key === 'currency' || String(key).includes('currency');
 
       let targetCol = 0;
       if (isBetting) {
         targetCol = 1;
-      } else if (isCurrency && isLevelingActive) {
-        targetCol = 1;
+      } else if (isCurrency) {
+        targetCol = isLevelingActive ? 1 : 0;
       } else {
         targetCol = 0;
       }
 
-      const measuredH = getMeasuredHeight(key, idx);
-      const leftPx = targetCol * (itemWidthPx + gap);
-      const topPx = colHeights[targetCol];
+      let leftPx = targetCol * (itemWidthPx + gap);
+      let topPx = colHeights[targetCol];
+
+      if (isLevelingActive && isCurrency) {
+        // Force currency to top of Column 1
+        topPx = 0;
+      } else if (isLevelingActive && isBetting) {
+        // Force betting below currency in Column 1
+        const currencyH = getMeasuredHeight('currency', 2) || 240;
+        topPx = currencyH + gap;
+      }
+
       positions[key] = { leftPx, topPx, widthPx: itemWidthPx };
-      colHeights[targetCol] += measuredH + gap;
+      colHeights[targetCol] = Math.max(colHeights[targetCol], topPx + measuredH + gap);
     });
 
     return { positions, containerHeight: Math.max(...colHeights, 0) };
@@ -444,6 +450,7 @@ export default function EconomyPage() {
                 type="checkbox"
                 className="toggle-switch__input"
                 disabled={!isEnabled}
+                checked={Boolean(isLeveling)}
                 onChange={e => handleToggleLevels(e.target.checked)}
               />
               <div className="toggle-switch__track">
