@@ -1,6 +1,7 @@
 import React from 'react';
 import Workspace, { HeaderZone, StatusZone, KpiTile } from '../../../shared/layouts/Workspace.jsx';
 import Panel from '../../../shared/primitives/Panel.jsx';
+import IMEInput from '../../../shared/primitives/IMEInput.jsx';
 import { useReminders } from '../hooks/useReminders.js';
 import { useGuild } from '../../../shared/hooks/useGuild.js';
 import { Trash2, Plus } from 'lucide-react';
@@ -50,7 +51,7 @@ function ReminderItemRow({ reminder, channels, members, roles, onUpdate, onRemov
           {/* Message Input */}
           <div className="form-group">
             <label className="form-label" style={{ fontSize: '10px' }}>{t("Alert Message Payload")}</label>
-            <input
+            <IMEInput
               className="form-input"
               style={{ fontSize: '12px' }}
               value={reminder.message}
