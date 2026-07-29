@@ -379,9 +379,17 @@ const MasonryGrid = forwardRef(function MasonryGrid(
     engineVersion: MASONRY_ENGINE_VERSION
   }));
 
+  const serializedRuleContext = useMemo(() => {
+    try {
+      return JSON.stringify(ruleContext || {});
+    } catch {
+      return '';
+    }
+  }, [ruleContext]);
+
   useIsomorphicLayoutEffect(() => {
     calculateLayout();
-  }, [validChildren.length, cols, gap, minColWidth, layoutStrategy, placementEngine, rules, ruleContext, JSON.stringify(ruleContext)]);
+  }, [validChildren.length, cols, gap, minColWidth, layoutStrategy, placementEngine, serializedRuleContext]);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;

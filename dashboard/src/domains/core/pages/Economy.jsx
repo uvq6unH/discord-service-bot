@@ -288,6 +288,14 @@ function CasinoGameRow({ title, prefix, config, handleBetChange, updateConfig, e
   );
 }
 
+const ECONOMY_RULES = [
+  {
+    when: (ctx) => ctx.isLeveling,
+    move: 'currency',
+    before: 'betting'
+  }
+];
+
 export default function EconomyPage() {
   const location = useLocation();
   const highlight = location.state?.highlight;
@@ -412,13 +420,7 @@ export default function EconomyPage() {
         cols={2}
         gap={20}
         minColWidth={250}
-        rules={[
-          {
-            when: (ctx) => ctx.isLeveling,
-            move: 'currency',
-            before: 'betting'
-          }
-        ]}
+        rules={ECONOMY_RULES}
         ruleContext={{ isLeveling }}
         placementEngine={customEconomyPlacement}
       >
