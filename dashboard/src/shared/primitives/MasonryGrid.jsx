@@ -1,14 +1,18 @@
 import React, { useState, useEffect, useRef, useLayoutEffect, useImperativeHandle, forwardRef } from 'react';
 
 /**
- * MasonryGrid — Open-Source v2.0 Modular 4-Pipeline GPU Layout Engine
+ * MasonryGrid — Open-Source v2.1 Enterprise Key-Based GPU Layout Engine
  * 
- * Pipeline Architecture:
- * Stage 1: MEASURE (getBoundingClientRect + height cache)
- * Stage 2: STRATEGY (Ordering handlers: preserve-order, priority, shortest-column, or custom strategy)
- * Stage 3: PLACEMENT (Placement engine: shortest-column-first, bin-packing, or custom placement plugin)
- * Stage 4: ANIMATE & RENDER (Selective GPU willChange + translate3d hardware motion)
+ * Key-Based Pipeline Architecture:
+ * 1. Key-Based Measure & Position Mapping (Map<key, HTMLElement> & Record<key, Position>)
+ * 2. 100% Insertion/Deletion Stability (Re-ordering, filtering, or insertions leave active refs intact)
+ * 3. Stage 1: MEASURE (getBoundingClientRect by key)
+ * 4. Stage 2: STRATEGY (Ordering by key)
+ * 5. Stage 3: PLACEMENT (Positioning by key)
+ * 6. Stage 4: ANIMATE & RENDER (Selective GPU willChange + translate3d hardware motion)
  */
+
+const getItemKey = (child, idx) => String(child.key ?? child.props?.title ?? idx);
 
 // Stage 2: Ordering Strategy Registry
 const defaultStrategyHandlers = {
@@ -33,10 +37,10 @@ const defaultStrategyHandlers = {
 const defaultShortestColumnPlacement = (orderedItems, ctx) => {
   const { activeCols, itemWidthPx, gap, getMeasuredHeight } = ctx;
   const colHeights = new Array(activeCols).fill(0);
-  const positions = [];
+  const positions = {};
 
-  orderedItems.forEach(({ idx }) => {
-    const measuredH = getMeasuredHeight(idx);
+  orderedItems.forEach(({ key, idx }) => {
+    const measuredH = getMeasuredHeight(key, idx);
 
     let shortestCol = 0;
     for (let c = 1; c < activeCols; c++) {
@@ -48,7 +52,7 @@ const defaultShortestColumnPlacement = (orderedItems, ctx) => {
     const leftPx = shortestCol * (itemWidthPx + gap);
     const topPx = colHeights[shortestCol];
 
-    positions[idx] = {
+    positions[key] = {
       leftPx,
       topPx,
       widthPx: itemWidthPx
@@ -86,7 +90,7 @@ const MasonryGrid = forwardRef(function MasonryGrid(
   const activeColsRef = useRef(cols);
 
   const [layoutState, setLayoutState] = useState(() => ({
-    positions: [],
+    positions: {}, // Map<key, Position>
     containerHeight: 0
   }));
 
@@ -131,20 +135,24 @@ const MasonryGrid = forwardRef(function MasonryGrid(
 
     const itemWidthPx = Math.max(0, (containerWidth - (activeCols - 1) * gap) / activeCols);
 
-    const getMeasuredHeight = (idx) => {
-      const el = itemRefs.current[idx];
-      const measuredH = el ? el.getBoundingClientRect().height : (heightsRef.current[idx] || 300);
-      heightsRef.current[idx] = measuredH;
+    const getMeasuredHeight = (key, idx) => {
+      const el = itemRefs.current[key];
+      const measuredH = el ? el.getBoundingClientRect().height : (heightsRef.current[key] || 300);
+      heightsRef.current[key] = measuredH;
       return measuredH;
     };
 
     // Stage 2: STRATEGY (Ordering)
-    const indexedChildren = validChildren.map((child, idx) => ({
-      child,
-      idx,
-      priority: child.props?.priority ?? 0,
-      fixed: child.props?.fixed ?? child.props?.pinned ?? false
-    }));
+    const indexedChildren = validChildren.map((child, idx) => {
+      const key = getItemKey(child, idx);
+      return {
+        child,
+        key,
+        idx,
+        priority: child.props?.priority ?? 0,
+        fixed: child.props?.fixed ?? child.props?.pinned ?? false
+      };
+    });
 
     let orderedItems = indexedChildren;
     if (typeof layoutStrategy === 'function') {
@@ -167,21 +175,29 @@ const MasonryGrid = forwardRef(function MasonryGrid(
     // Stage 4: ANIMATE & RENDER (Selective GPU willChange + translate3d)
     setLayoutState((prev) => {
       const isHeightSame = Math.abs(prev.containerHeight - maxContainerH) < 1;
+      const prevKeys = Object.keys(prev.positions);
+      const newKeys = Object.keys(newPositions);
+
       const isPosSame =
-        prev.positions.length === newPositions.length &&
-        prev.positions.every((p, i) =>
-          p && newPositions[i] &&
-          Math.abs(p.leftPx - newPositions[i].leftPx) < 1 &&
-          Math.abs(p.topPx - newPositions[i].topPx) < 1 &&
-          Math.abs(p.widthPx - newPositions[i].widthPx) < 1
-        );
+        prevKeys.length === newKeys.length &&
+        newKeys.every((key) => {
+          const p1 = prev.positions[key];
+          const p2 = newPositions[key];
+          return (
+            p1 && p2 &&
+            Math.abs(p1.leftPx - p2.leftPx) < 1 &&
+            Math.abs(p1.topPx - p2.topPx) < 1 &&
+            Math.abs(p1.widthPx - p2.widthPx) < 1
+          );
+        });
 
       if (isHeightSame && isPosSame) return prev;
 
       // Selectively trigger GPU willChange ONLY on elements that actually moved
-      newPositions.forEach((newP, i) => {
-        const prevP = prev.positions[i];
-        const el = itemRefs.current[i];
+      newKeys.forEach((key) => {
+        const prevP = prev.positions[key];
+        const newP = newPositions[key];
+        const el = itemRefs.current[key];
         if (el && (!prevP || Math.abs(prevP.leftPx - newP.leftPx) > 1 || Math.abs(prevP.topPx - newP.topPx) > 1)) {
           triggerSelectiveGPUWillChange(el);
         }
@@ -219,9 +235,10 @@ const MasonryGrid = forwardRef(function MasonryGrid(
   useEffect(() => {
     if (typeof window === 'undefined') return;
 
-    const activeIndices = new Set(validChildren.map((_, i) => i));
+    // Clean up stale refs on children count/structure change
+    const activeKeys = new Set(validChildren.map((child, idx) => getItemKey(child, idx)));
     Object.keys(itemRefs.current).forEach((k) => {
-      if (!activeIndices.has(Number(k))) {
+      if (!activeKeys.has(k)) {
         delete itemRefs.current[k];
         delete heightsRef.current[k];
       }
@@ -233,11 +250,11 @@ const MasonryGrid = forwardRef(function MasonryGrid(
         if (entry.target === containerRef.current) {
           shouldUpdate = true;
         } else {
-          const targetIdx = entry.target.dataset.index;
-          if (targetIdx !== undefined) {
+          const targetKey = entry.target.dataset.key;
+          if (targetKey !== undefined) {
             const newH = entry.target.getBoundingClientRect().height;
-            if (Math.abs((heightsRef.current[targetIdx] || 0) - newH) > 1) {
-              heightsRef.current[targetIdx] = newH;
+            if (Math.abs((heightsRef.current[targetKey] || 0) - newH) > 1) {
+              heightsRef.current[targetKey] = newH;
               shouldUpdate = true;
             }
           }
@@ -278,14 +295,14 @@ const MasonryGrid = forwardRef(function MasonryGrid(
       }}
     >
       {validChildren.map((child, idx) => {
-        const pos = layoutState.positions[idx] || { leftPx: 0, topPx: 0, widthPx: 0 };
-        const key = child.key ?? child.props?.title ?? idx;
+        const key = getItemKey(child, idx);
+        const pos = layoutState.positions[key] || { leftPx: 0, topPx: 0, widthPx: 0 };
 
         return (
           <div
             key={key}
-            data-index={idx}
-            ref={(el) => (itemRefs.current[idx] = el)}
+            data-key={key}
+            ref={(el) => (itemRefs.current[key] = el)}
             style={{
               position: 'absolute',
               top: 0,
