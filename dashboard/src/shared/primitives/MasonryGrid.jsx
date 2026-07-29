@@ -189,7 +189,9 @@ export const computeLayout = ({
     itemWidthPx,
     gap,
     minColWidth,
-    getMeasuredHeight
+    getMeasuredHeight,
+    ruleContext,
+    rules
   };
 
   if (typeof layoutStrategy === 'function') {

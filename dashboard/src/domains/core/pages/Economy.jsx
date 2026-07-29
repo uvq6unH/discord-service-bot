@@ -301,7 +301,9 @@ export default function EconomyPage() {
   const serverName = selectedGuild?.name ? selectedGuild.name.toUpperCase() : '';
 
   const customEconomyPlacement = useCallback((orderedItems, ctx) => {
-    const { activeCols, itemWidthPx, gap, getMeasuredHeight } = ctx;
+    const { activeCols, itemWidthPx, gap, getMeasuredHeight, ruleContext } = ctx;
+    const isLevelingActive = ruleContext?.isLeveling ?? isLeveling;
+
     if (activeCols < 2) {
       const colHeights = [0];
       const positions = {};
@@ -323,7 +325,7 @@ export default function EconomyPage() {
       let targetCol = 0;
       if (isBetting) {
         targetCol = 1;
-      } else if (isCurrency && isLeveling) {
+      } else if (isCurrency && isLevelingActive) {
         targetCol = 1;
       } else {
         targetCol = 0;
