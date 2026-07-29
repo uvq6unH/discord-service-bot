@@ -296,16 +296,8 @@ export default function EconomyPage() {
   const { t } = useLanguage();
   const [localLevelsEnabled, setLocalLevelsEnabled] = useState(null);
 
-  if (loading || !config) {
-    return (
-      <div style={{ padding: 'var(--space-10)', textAlign: 'center', fontFamily: 'var(--font-mono)' }}>
-        {t("LOADING FINANCIAL MODULES...")}
-      </div>
-    );
-  }
-
-  const isEnabled = config.economyEnabled ?? false;
-  const isLeveling = localLevelsEnabled !== null ? localLevelsEnabled : (config.levelsEnabled ?? false);
+  const isEnabled = config?.economyEnabled ?? false;
+  const isLeveling = localLevelsEnabled !== null ? localLevelsEnabled : (config?.levelsEnabled ?? false);
   const serverName = selectedGuild?.name ? selectedGuild.name.toUpperCase() : '';
 
   const customEconomyPlacement = useCallback((orderedItems, ctx) => {
@@ -340,6 +332,14 @@ export default function EconomyPage() {
     });
     return { positions, containerHeight: Math.max(...colHeights, 0) };
   }, [isLeveling]);
+
+  if (loading || !config) {
+    return (
+      <div style={{ padding: 'var(--space-10)', textAlign: 'center', fontFamily: 'var(--font-mono)' }}>
+        {t("LOADING FINANCIAL MODULES...")}
+      </div>
+    );
+  }
 
   return (
     <Workspace>
