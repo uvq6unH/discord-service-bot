@@ -3,7 +3,7 @@ import Workspace, { HeaderZone, StatusZone, KpiTile } from '../../../shared/layo
 import Panel from '../../../shared/primitives/Panel.jsx';
 import DataSlab from '../../../shared/primitives/DataSlab.jsx';
 import MasonryGrid from '../../../shared/primitives/MasonryGrid.jsx';
-import { useCommands } from '../hooks/useCommands.js';
+import { useCommands } from '../../core/hooks/useCommands.js';
 import { useGuild } from '../../../shared/hooks/useGuild.js';
 import { useLanguage } from '../../../shared/context/LanguageContext.jsx';
 import { Wrench, Mic, Languages, BellRing } from 'lucide-react';

@@ -33,7 +33,6 @@ const OverviewPage = safeLazy(() => import('../../domains/core/pages/Overview.js
 const MembersPage = safeLazy(() => import('../../domains/core/pages/Members.jsx'));
 const ModerationPage = safeLazy(() => import('../../domains/core/pages/Moderation.jsx'));
 const CommandsPage = safeLazy(() => import('../../domains/core/pages/Commands.jsx'));
-const UtilityServicesPage = safeLazy(() => import('../../domains/core/pages/UtilityServices.jsx'));
 const EconomyPage = safeLazy(() => import('../../domains/core/pages/Economy.jsx'));
 const AnalyticsPage = safeLazy(() => import('../../domains/core/pages/Analytics.jsx'));
 const SystemPage = safeLazy(() => import('../../domains/core/pages/System.jsx'));
@@ -47,8 +46,9 @@ const EsportsServicesPage = safeLazy(() => import('../../domains/riot/pages/Espo
 const MusicServicesPage = safeLazy(() => import('../../domains/music/pages/MusicServices.jsx'));
 const VoiceServicesPage = safeLazy(() => import('../../domains/music/pages/VoiceServices.jsx'));
 
-// Reminder
-const ReminderServicesPage = safeLazy(() => import('../../domains/reminder/pages/ReminderServices.jsx'));
+// Utility & Reminders Domain
+const UtilityServicesPage = safeLazy(() => import('../../domains/utility/pages/UtilityServices.jsx'));
+const ReminderServicesPage = safeLazy(() => import('../../domains/utility/pages/ReminderServices.jsx'));
 
 // AI
 const AiServicesPage = safeLazy(() => import('../../domains/ai/pages/AiServices.jsx'));

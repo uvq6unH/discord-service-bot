@@ -6,20 +6,24 @@ import {
 } from 'discord.js';
 
 export const groupMap = {
-  // Core & Utility Domain
+  // Core Domain
   ping: 'core',
   help: 'core',
   config: 'core',
   system: 'core',
-  info: 'core',
-  server: 'core',
-  user: 'core',
-  avatar: 'core',
-  say: 'core',
-  announce: 'core',
-  embed: 'core',
-  poll: 'core',
-  custom: 'core',
+
+  // Utility & Reminders Domain
+  info: 'utility',
+  server: 'utility',
+  user: 'utility',
+  avatar: 'utility',
+  say: 'utility',
+  announce: 'utility',
+  embed: 'utility',
+  poll: 'utility',
+  custom: 'utility',
+  remind: 'utility',
+  reminders: 'utility',
 
   // Moderation Domain
   warn: 'moderation',
@@ -88,18 +92,20 @@ export const groupMap = {
   resume: 'music',
   tempvc: 'music',
 
-  // Reminders & AI Services Domain
-  remind: 'services',
-  reminders: 'services',
-  ask: 'services',
-  ai: 'services',
-  draw: 'services'
+  // AI Domain
+  ask: 'ai',
+  ai: 'ai',
+  draw: 'ai'
 };
 
 const groupMetadata = {
   core: {
-    title: '⚙️ ║ HỆ THỐNG & TIỆN ÍCH',
-    description: 'Các lệnh cấu hình hệ thống, kiểm tra bot, hiển thị thông tin máy chủ và công cụ tiện ích.'
+    title: '⚙️ ║ HỆ THỐNG BOT & CƠ BẢN',
+    description: 'Các lệnh kiểm tra cấu hình hệ thống, độ trễ ping và trạng thái máy chủ.'
+  },
+  utility: {
+    title: '🛠️ ║ TIỆN ÍCH & NHẮC NHỞ',
+    description: 'Các lệnh công cụ máy chủ, gửi thông báo, tạo Embed, thông tin thành viên và đặt hẹn giờ nhắc nhở tự động.'
   },
   moderation: {
     title: '🛡️ ║ QUẢN LÝ & KIỂM DUYỆT',
@@ -121,9 +127,9 @@ const groupMetadata = {
     title: '🎶 ║ ÂM NHẠC & KÊNH THOẠI',
     description: 'Các lệnh phát nhạc trực tiếp (YouTube, Spotify, Soundcloud) và tạo kênh voice tự động VoiceMaster.'
   },
-  services: {
-    title: '⏰ ║ NHẮC NHỞ & TRÍ TUỆ AI',
-    description: 'Các lệnh đặt lịch hẹn giờ nhắc nhở tự động và trò chuyện trợ lý ảo trí tuệ nhân tạo (AI).'
+  ai: {
+    title: '🤖 ║ TRỢ LÝ TRÍ TUỆ AI',
+    description: 'Các lệnh trò chuyện với trí tuệ nhân tạo Gemini AI và tạo hình ảnh tự động.'
   }
 };
 
@@ -141,11 +147,17 @@ export async function buildHelpPayload(client, config, guild, userId, selectedGr
     .setPlaceholder('Chọn danh mục câu lệnh...')
     .addOptions(
       new StringSelectMenuOptionBuilder()
-        .setLabel('Hệ Thống & Tiện Ích')
+        .setLabel('Hệ Thống Bot & Cơ Bản')
         .setValue('help_group:core')
-        .setDescription('Lệnh cấu hình, thông tin server, tiện ích')
+        .setDescription('Lệnh cấu hình, ping, trạng thái bot')
         .setEmoji('⚙️')
         .setDefault(selectedGroup === 'core'),
+      new StringSelectMenuOptionBuilder()
+        .setLabel('Tiện Ích & Nhắc Nhở')
+        .setValue('help_group:utility')
+        .setDescription('Lệnh thông báo, Embed, hẹn giờ nhắc nhở')
+        .setEmoji('🛠️')
+        .setDefault(selectedGroup === 'utility'),
       new StringSelectMenuOptionBuilder()
         .setLabel('Quản Lý & Kiểm Duyệt')
         .setValue('help_group:moderation')
@@ -177,11 +189,11 @@ export async function buildHelpPayload(client, config, guild, userId, selectedGr
         .setEmoji('🎶')
         .setDefault(selectedGroup === 'music'),
       new StringSelectMenuOptionBuilder()
-        .setLabel('Nhắc Nhở & Trí Tuệ AI')
-        .setValue('help_group:services')
-        .setDescription('Hẹn giờ nhắc nhở, trợ lý trí tuệ nhân tạo AI')
-        .setEmoji('⏰')
-        .setDefault(selectedGroup === 'services')
+        .setLabel('Trợ Lý Trí Tuệ AI')
+        .setValue('help_group:ai')
+        .setDescription('Trò chuyện AI Gemini, tạo hình ảnh')
+        .setEmoji('🤖')
+        .setDefault(selectedGroup === 'ai')
     );
 
   const row = new ActionRowBuilder().addComponents(selectMenu);
@@ -196,13 +208,14 @@ export async function buildHelpPayload(client, config, guild, userId, selectedGr
         `> 📜 *Chào mừng bạn đến với bảng hướng dẫn! Tiền tố mặc định của máy chủ là \`${prefix}\`.*\n\n` +
         `✦ ───────────────────────────── ✦\n` +
         `### 📌 **DANH MỤC CÂU LỆNH HỆ THỐNG:**\n` +
-        `• ⚙️ **Hệ Thống & Tiện Ích**: Các lệnh cấu hình, thông tin máy chủ, công cụ.\n` +
+        `• ⚙️ **Hệ Thống Bot & Cơ Bản**: Cấu hình, ping, độ trễ hệ thống.\n` +
+        `• 🛠️ **Tiện Ích & Nhắc Nhở**: Thông báo, Embed, đặt lịch hẹn giờ.\n` +
         `• 🛡️ **Quản Lý & Kiểm Duyệt**: Ban, kick, dọn tin nhắn, cảnh cáo, self-role.\n` +
         `• 👤 **Thành Viên & Cấp Độ**: Thẻ cá nhân, bảng xếp hạng XP, danh sách vai trò.\n` +
         `• 💰 **Kinh Tế & Trò Chơi**: Ví tiền, điểm danh, Blackjack, Poker, Slots.\n` +
         `• ⚔️ **League of Legends & Esports**: Tra cứu LoL/ĐTCL, lịch đấu LCK, LCP, Worlds.\n` +
         `• 🎶 **Âm Nhạc & Kênh Thoại**: Phát nhạc YouTube/Spotify, kênh voice tự động.\n` +
-        `• ⏰ **Nhắc Nhở & Trí Tuệ AI**: Đặt hẹn giờ nhắc nhở, trò chuyện trợ lý AI.\n` +
+        `• 🤖 **Trợ Lý Trí Tuệ AI**: Trò chuyện Gemini AI, vẽ hình ảnh.\n` +
         `✦ ───────────────────────────── ✦`
       )
       .setFooter({ text: '💡 Vui lòng sử dụng trình đơn Select Menu bên dưới để chọn nhóm câu lệnh' })

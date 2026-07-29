@@ -22,12 +22,21 @@ export const NAVIGATION_SCHEMA: DomainConfig[] = [
       { to: "/overview", label: "OVERVIEW", icon: "Activity" },
       { to: "/members", label: "MEMBERS", icon: "Users" },
       { to: "/moderation", label: "MODERATION", icon: "Shield" },
-      { to: "/utilities", label: "UTILITY SERVICES", icon: "Wrench" },
       { to: "/commands", label: "COMMANDS", icon: "Terminal" },
       { to: "/audit-logs", label: "AUDIT LOGS", icon: "FileText" },
       { to: "/economy", label: "ECONOMY", icon: "Coins" },
       { to: "/analytics", label: "ANALYTICS", icon: "BarChart2" },
       { to: "/system", label: "SYSTEM", icon: "Server" }
+    ]
+  },
+  {
+    id: "utility",
+    label: "UTILITY SERVICES",
+    description: "Tiện ích máy chủ & Hẹn giờ",
+    accentColor: "var(--accent-reminder)", // Blue/Cyan
+    items: [
+      { to: "/utilities", label: "UTILITY SERVICES", icon: "Wrench" },
+      { to: "/reminders", label: "REMINDERS & ALERTS", icon: "Bell" }
     ]
   },
   {
@@ -49,13 +58,6 @@ export const NAVIGATION_SCHEMA: DomainConfig[] = [
       { to: "/music", label: "AUDIO CONSOLE", icon: "Music" },
       { to: "/voice", label: "VOICEMASTER VC ENGINE", icon: "Mic" }
     ]
-  },
-  {
-    id: "reminder",
-    label: "REMINDER SERVICES",
-    description: "Scheduled Jobs & Tasks",
-    accentColor: "var(--accent-reminder)", // Blue
-    items: [{ to: "/reminders", label: "REMINDERS", icon: "Bell" }]
   },
   {
     id: "ai",

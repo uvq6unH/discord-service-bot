@@ -14,8 +14,10 @@ export async function handleHelp(ctx) {
       selectedGroup = source.options.getString('group');
     } else {
       const lowerArgs = args?.trim().toLowerCase();
-      if (['core', 'chung', 'general', 'custom', 'hệ thống', 'tiện ích'].includes(lowerArgs)) {
+      if (['core', 'chung', 'general', 'hệ thống'].includes(lowerArgs)) {
         selectedGroup = 'core';
+      } else if (['utility', 'utilities', 'tiện ích', 'nhắc nhở', 'remind', 'reminders', 'tool', 'tools'].includes(lowerArgs)) {
+        selectedGroup = 'utility';
       } else if (['mod', 'moderation', 'kiểm duyệt', 'quản lý', 'security', 'bảo mật'].includes(lowerArgs)) {
         selectedGroup = 'moderation';
       } else if (['user', 'levels', 'member', 'rank', 'thành viên', 'cấp độ', 'xp'].includes(lowerArgs)) {
@@ -26,8 +28,8 @@ export async function handleHelp(ctx) {
         selectedGroup = 'riot';
       } else if (['music', 'voice', 'audio', 'nhạc', 'âm nhạc', 'kênh thoại'].includes(lowerArgs)) {
         selectedGroup = 'music';
-      } else if (['services', 'remind', 'ai', 'nhắc nhở', 'trí tuệ nhân tạo'].includes(lowerArgs)) {
-        selectedGroup = 'services';
+      } else if (['ai', 'ask', 'gemini', 'trí tuệ nhân tạo'].includes(lowerArgs)) {
+        selectedGroup = 'ai';
       }
     }
 
