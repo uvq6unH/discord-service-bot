@@ -128,10 +128,50 @@ function normalizeSelfRoles(items) {
   return items
     .map((item) => ({
       label: String(item?.label ?? '').trim().slice(0, 80),
-      roleId: normalizeSnowflakeId(item?.roleId)
+      roleId: normalizeSnowflakeId(item?.roleId),
+      emoji: String(item?.emoji ?? '').trim().slice(0, 10),
+      style: ['Primary', 'Secondary', 'Success', 'Danger'].includes(item?.style) ? item.style : 'Secondary'
     }))
     .filter((item) => item.label && item.roleId)
     .slice(0, 25);
+}
+
+function normalizeSelfRolePanels(panels, fallbackSelfRoles = [], fallbackTitle = 'Choose roles', fallbackMessage = 'Click a button to toggle a role.') {
+  if (!Array.isArray(panels) || panels.length === 0) {
+    if (Array.isArray(fallbackSelfRoles) && fallbackSelfRoles.length > 0) {
+      return [
+        {
+          id: 'panel_default',
+          title: fallbackTitle || 'Choose roles',
+          description: fallbackMessage || 'Click a button to toggle a role.',
+          channelId: '',
+          color: '#5865F2',
+          roles: normalizeSelfRoles(fallbackSelfRoles)
+        }
+      ];
+    }
+    return [];
+  }
+
+  return panels.slice(0, 10).map((panel, idx) => {
+    const roles = Array.isArray(panel?.roles)
+      ? panel.roles.map((r) => ({
+          label: String(r?.label ?? '').trim().slice(0, 80),
+          roleId: normalizeSnowflakeId(r?.roleId),
+          emoji: String(r?.emoji ?? '').trim().slice(0, 10),
+          style: ['Primary', 'Secondary', 'Success', 'Danger'].includes(r?.style) ? r.style : 'Secondary'
+        })).filter(r => r.label && r.roleId).slice(0, 25)
+      : [];
+
+    return {
+      id: String(panel?.id ?? `panel_${idx}`).trim(),
+      title: String(panel?.title ?? '').trim().slice(0, 100) || 'Choose roles',
+      description: String(panel?.description ?? '').trim().slice(0, 1000) || 'Click a button to toggle a role.',
+      channelId: normalizeSnowflakeId(panel?.channelId),
+      color: /^#[0-9A-Fa-f]{6}$/.test(String(panel?.color ?? '')) ? panel.color : '#5865F2',
+      roles
+    };
+  });
 }
 
 function normalizeCommandName(name) {
@@ -579,6 +619,7 @@ export class ConfigStore {
       ],
       badWords: normalizeStringList(stored.badWords ?? defaultConfig.badWords),
       selfRoles: normalizeSelfRoles(stored.selfRoles ?? defaultConfig.selfRoles),
+      selfRolePanels: normalizeSelfRolePanels(stored.selfRolePanels, stored.selfRoles, stored.selfRolePanelTitle, stored.selfRolePanelMessage),
       autoReplies: normalizeAutoReplies(stored.autoReplies ?? defaultConfig.autoReplies),
       reminders: normalizeReminders(stored.reminders ?? defaultConfig.reminders),
       quizScoring: normalizeQuizScoring(stored.quizScoring ?? defaultConfig.quizScoring),
@@ -715,6 +756,7 @@ export class ConfigStore {
         selfRolePanelTitle: String(patch.selfRolePanelTitle ?? current.selfRolePanelTitle ?? '').trim().slice(0, 100) || defaultConfig.selfRolePanelTitle,
         selfRolePanelMessage: String(patch.selfRolePanelMessage ?? current.selfRolePanelMessage ?? '').trim().slice(0, 1000) || defaultConfig.selfRolePanelMessage,
         selfRoles: normalizeSelfRoles(patch.selfRoles ?? current.selfRoles),
+        selfRolePanels: normalizeSelfRolePanels(patch.selfRolePanels ?? current.selfRolePanels, patch.selfRoles ?? current.selfRoles, current.selfRolePanelTitle, current.selfRolePanelMessage),
         ticketsEnabled: pickBoolean(patch, 'ticketsEnabled', current),
         ticketCategoryId: normalizeSnowflakeId(patch.ticketCategoryId ?? current.ticketCategoryId),
         ticketLogChannelId: normalizeSnowflakeId(patch.ticketLogChannelId ?? current.ticketLogChannelId),

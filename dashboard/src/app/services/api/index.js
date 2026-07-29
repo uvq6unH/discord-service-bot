@@ -145,4 +145,9 @@ export const api = {
       method: 'POST',
       body: payload
     }).then(r => r.json()),
+  postSelfRolePanel: (guildId, panelId) =>
+    apiFetch(`/api/config/post-selfrole-panel?guildId=${encodeURIComponent(guildId)}`, {
+      method: 'POST',
+      body: { panelId }
+    }).then(r => r.json()),
 };

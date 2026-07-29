@@ -122,9 +122,16 @@ function CommandConfigRow({ cmd, roles, onUpdate, displayPrefix = '/' }) {
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--space-1.5)', marginTop: 'var(--space-1)' }}>
               {roles.filter(r => r.name !== '@everyone').map(role => {
                 const active = allowedRoles.includes(role.id) || allowedRoles.includes(role.name);
+                const handleRoleToggle = (roleId) => {
+                  const nextRoles = active
+                    ? allowedRoles.filter(id => id !== roleId && id !== role.name)
+                    : [...allowedRoles, roleId];
+                  handleFieldChange('allowedRoles', nextRoles);
+                };
                 return (
                   <button
                     key={role.id}
+                    type="button"
                     className="btn"
                     onClick={() => handleRoleToggle(role.id)}
                     style={{
@@ -209,50 +216,312 @@ function BadWordsEditor({ words, onChange }) {
   );
 }
 
-function SelfRoleEditor({ roles, allRoles, onChange }) {
+function SelfRolePanelsManager({ panels = [], legacyRoles = [], allRoles = [], channels = [], onUpdatePanels, selectedGuildId }) {
   const { t } = useLanguage();
-  const visible = allRoles.filter(r => r.name !== '@everyone');
-  const add = () => onChange([...roles, { label: '', roleId: '' }]);
-  const remove = (idx) => onChange(roles.filter((_, i) => i !== idx));
-  const update = (idx, field, val) => {
-    const next = [...roles];
-    next[idx] = { ...next[idx], [field]: val };
-    onChange(next);
+  const [activePanelIdx, setActivePanelIdx] = useState(0);
+  const [posting, setPosting] = useState(false);
+
+  const textChannels = channels.filter(c => c.type === 0 || c.type === 5);
+  const visibleRoles = allRoles.filter(r => r.name !== '@everyone');
+
+  // Fallback if panels is empty but legacyRoles exist
+  const currentPanels = panels.length > 0 ? panels : [
+    {
+      id: 'panel_default',
+      title: '🎮 CLAIM YOUR ROLES',
+      description: 'Nhấp vào các nút bên dưới để nhận hoặc hủy Role:',
+      channelId: '',
+      color: '#5865F2',
+      roles: legacyRoles
+    }
+  ];
+
+  const safeIdx = Math.min(activePanelIdx, Math.max(0, currentPanels.length - 1));
+  const activePanel = currentPanels[safeIdx] ?? currentPanels[0];
+
+  const updateActivePanel = (patch) => {
+    const nextPanels = currentPanels.map((p, idx) => {
+      if (idx === safeIdx) {
+        return { ...p, ...patch };
+      }
+      return p;
+    });
+    onUpdatePanels(nextPanels);
   };
 
+  const addPanel = () => {
+    const newPanel = {
+      id: `panel_${Date.now()}`,
+      title: `Group ${currentPanels.length + 1} Roles`,
+      description: 'Click a button below to toggle your role.',
+      channelId: '',
+      color: '#5865F2',
+      roles: []
+    };
+    const nextPanels = [...currentPanels, newPanel];
+    onUpdatePanels(nextPanels);
+    setActivePanelIdx(nextPanels.length - 1);
+  };
+
+  const removeActivePanel = () => {
+    if (currentPanels.length <= 1) {
+      toast.error('Cần giữ ít nhất 1 nhóm Self-Role Panel!');
+      return;
+    }
+    const nextPanels = currentPanels.filter((_, idx) => idx !== safeIdx);
+    onUpdatePanels(nextPanels);
+    setActivePanelIdx(Math.max(0, safeIdx - 1));
+  };
+
+  const handlePostPanel = async () => {
+    if (!activePanel.channelId) {
+      toast.error('Vui lòng chọn Kênh Discord trước khi đăng Panel!');
+      return;
+    }
+    if (!activePanel.roles || activePanel.roles.length === 0) {
+      toast.error('Vui lòng thêm ít nhất 1 Role vào nhóm Panel này!');
+      return;
+    }
+
+    setPosting(true);
+    try {
+      const res = await api.postSelfRolePanel(selectedGuildId, activePanel.id);
+      if (res.error) {
+        toast.error(res.error);
+      } else {
+        const targetChan = textChannels.find(c => c.id === activePanel.channelId);
+        toast.success(`🚀 Đã đăng thành công Panel "${activePanel.title}" vào kênh #${targetChan?.name ?? 'Discord'}!`);
+      }
+    } catch (err) {
+      toast.error(`Lỗi đăng Panel: ${err.message}`);
+    } finally {
+      setPosting(false);
+    }
+  };
+
+  const addRoleToPanel = () => {
+    const currentRoles = activePanel.roles ?? [];
+    updateActivePanel({
+      roles: [...currentRoles, { label: '', roleId: '', emoji: '', style: 'Secondary' }]
+    });
+  };
+
+  const updateRoleInPanel = (roleIdx, patch) => {
+    const currentRoles = [...(activePanel.roles ?? [])];
+    currentRoles[roleIdx] = { ...currentRoles[roleIdx], ...patch };
+    updateActivePanel({ roles: currentRoles });
+  };
+
+  const removeRoleFromPanel = (roleIdx) => {
+    const currentRoles = (activePanel.roles ?? []).filter((_, idx) => idx !== roleIdx);
+    updateActivePanel({ roles: currentRoles });
+  };
+
+  const presetColors = ['#5865F2', '#ED4245', '#57F287', '#FEE75C', '#EB459E', '#202225'];
+
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
-      {roles.map((r, i) => (
-        <div key={i} className="self-role-editor-row" style={{ gap: 'var(--space-2)', alignItems: 'center' }}>
-          <input 
-            className="form-input" 
-            style={{ fontSize: '12px' }} 
-            placeholder={t("Button label...")}
-            value={r.label} 
-            onChange={e => update(i, 'label', e.target.value)} 
-          />
-          <select 
-            className="form-select" 
-            style={{ fontSize: '12px' }} 
-            value={r.roleId} 
-            onChange={e => update(i, 'roleId', e.target.value)}
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
+      {/* Panel Group Tabs */}
+      <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 'var(--space-2)', borderBottom: '1px solid var(--border)', paddingBottom: 'var(--space-3)' }}>
+        {currentPanels.map((p, idx) => (
+          <button
+            key={p.id || idx}
+            type="button"
+            className={`btn ${idx === safeIdx ? 'btn--primary' : 'btn--secondary'}`}
+            style={{ fontSize: '11px', fontFamily: 'var(--font-mono)', padding: 'var(--space-1-5) var(--space-3)' }}
+            onClick={() => setActivePanelIdx(idx)}
           >
-            <option value="">{t("-- Select Role --")}</option>
-            {visible.map(role => <option key={role.id} value={role.id}>{role.name}</option>)}
-          </select>
-          <button className="btn btn--danger" onClick={() => remove(i)} style={{ padding: 'var(--space-2) var(--space-3)' }}>
-            ×
+            {p.title || `Group ${idx + 1}`} ({p.roles?.length ?? 0})
+          </button>
+        ))}
+        <button
+          type="button"
+          className="btn btn--secondary"
+          style={{ fontSize: '11px', fontFamily: 'var(--font-mono)', padding: 'var(--space-1-5) var(--space-3)' }}
+          onClick={addPanel}
+        >
+          + {t("NEW GROUP")}
+        </button>
+      </div>
+
+      {/* Active Panel Config Box */}
+      <div style={{ background: 'var(--surface-1)', border: '1px solid var(--border)', padding: 'var(--space-4)', display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
+        
+        {/* Top Actions & Channel Target */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 'var(--space-3)' }}>
+          <div style={{ flex: 1, minWidth: '220px' }}>
+            <label className="form-label" style={{ fontSize: '10px' }}>{t("Target Discord Channel")}</label>
+            <select
+              className="form-select"
+              style={{ fontSize: '12px', fontFamily: 'var(--font-mono)' }}
+              value={activePanel.channelId ?? ''}
+              onChange={e => updateActivePanel({ channelId: e.target.value })}
+            >
+              <option value="">{t("-- Select Target Channel --")}</option>
+              {textChannels.map(c => <option key={c.id} value={c.id}>#{c.name}</option>)}
+            </select>
+          </div>
+
+          <div style={{ display: 'flex', gap: 'var(--space-2)', marginTop: '16px' }}>
+            <button
+              type="button"
+              className="btn btn--danger"
+              style={{ padding: 'var(--space-2) var(--space-3)', fontSize: '11px' }}
+              onClick={removeActivePanel}
+              title={t("Delete Panel Group")}
+            >
+              <Trash2 size={13} />
+            </button>
+          </div>
+        </div>
+
+        {/* Embed Details: Title, Color, Description */}
+        <div style={{ borderTop: '1px solid var(--border)', paddingTop: 'var(--space-3)', display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
+          <div style={{ display: 'flex', gap: 'var(--space-3)', flexWrap: 'wrap' }}>
+            <div style={{ flex: 1, minWidth: '240px' }}>
+              <label className="form-label" style={{ fontSize: '10px' }}>{t("Embed Panel Title")}</label>
+              <IMEInput
+                className="form-input"
+                style={{ fontSize: '12px' }}
+                value={activePanel.title}
+                placeholder="🎮 CLAIM YOUR ROLES"
+                onChange={e => updateActivePanel({ title: e.target.value })}
+              />
+            </div>
+
+            <div>
+              <label className="form-label" style={{ fontSize: '10px' }}>{t("Embed Accent Color")}</label>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-1-5)' }}>
+                {presetColors.map(c => (
+                  <div
+                    key={c}
+                    onClick={() => updateActivePanel({ color: c })}
+                    style={{
+                      width: '24px',
+                      height: '24px',
+                      backgroundColor: c,
+                      cursor: 'pointer',
+                      border: activePanel.color === c ? '2px solid var(--text-1)' : '1px solid var(--border)',
+                      boxSizing: 'border-box'
+                    }}
+                  />
+                ))}
+                <input
+                  type="color"
+                  value={activePanel.color || '#5865F2'}
+                  onChange={e => updateActivePanel({ color: e.target.value })}
+                  style={{ width: '28px', height: '28px', padding: 0, border: '1px solid var(--border)', cursor: 'pointer', background: 'none' }}
+                />
+              </div>
+            </div>
+          </div>
+
+          <div>
+            <label className="form-label" style={{ fontSize: '10px' }}>{t("Embed Description Message")}</label>
+            <textarea
+              className="form-input"
+              rows={2}
+              style={{ fontSize: '12px', resize: 'vertical', fontFamily: 'var(--font-body)' }}
+              value={activePanel.description}
+              placeholder="Click a button below to toggle your role..."
+              onChange={e => updateActivePanel({ description: e.target.value })}
+            />
+          </div>
+        </div>
+
+        {/* Role Buttons Config List */}
+        <div style={{ borderTop: '1px solid var(--border)', paddingTop: 'var(--space-3)' }}>
+          <label className="form-label" style={{ fontSize: '10px', marginBottom: 'var(--space-2)' }}>{t("Role Buttons Config")}</label>
+          
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
+            {(activePanel.roles ?? []).map((r, roleIdx) => (
+              <div key={roleIdx} style={{ display: 'flex', gap: 'var(--space-2)', alignItems: 'center', flexWrap: 'wrap', background: 'var(--surface-2)', padding: 'var(--space-2)', border: '1px solid var(--border)' }}>
+                
+                {/* Emoji */}
+                <input
+                  className="form-input"
+                  style={{ width: '50px', fontSize: '12px', textAlign: 'center' }}
+                  placeholder="🎯"
+                  value={r.emoji ?? ''}
+                  onChange={e => updateRoleInPanel(roleIdx, { emoji: e.target.value })}
+                />
+
+                {/* Label */}
+                <IMEInput
+                  className="form-input"
+                  style={{ flex: 1, minWidth: '120px', fontSize: '12px' }}
+                  placeholder={t("Button Label")}
+                  value={r.label}
+                  onChange={e => updateRoleInPanel(roleIdx, { label: e.target.value })}
+                />
+
+                {/* Role select */}
+                <select
+                  className="form-select"
+                  style={{ width: '150px', fontSize: '12px' }}
+                  value={r.roleId}
+                  onChange={e => updateRoleInPanel(roleIdx, { roleId: e.target.value })}
+                >
+                  <option value="">{t("-- Select Role --")}</option>
+                  {visibleRoles.map(role => <option key={role.id} value={role.id}>{role.name}</option>)}
+                </select>
+
+                {/* Style select */}
+                <select
+                  className="form-select"
+                  style={{ width: '110px', fontSize: '11px', fontFamily: 'var(--font-mono)' }}
+                  value={r.style ?? 'Secondary'}
+                  onChange={e => updateRoleInPanel(roleIdx, { style: e.target.value })}
+                >
+                  <option value="Primary">BLURPLE</option>
+                  <option value="Secondary">GREY</option>
+                  <option value="Success">GREEN</option>
+                  <option value="Danger">RED</option>
+                </select>
+
+                {/* Delete button */}
+                <button
+                  type="button"
+                  className="btn btn--danger"
+                  style={{ padding: 'var(--space-1-5) var(--space-2)' }}
+                  onClick={() => removeRoleFromPanel(roleIdx)}
+                >
+                  ×
+                </button>
+              </div>
+            ))}
+
+            {(activePanel.roles ?? []).length === 0 && (
+              <p style={{ color: 'var(--text-3)', fontSize: '11px', fontFamily: 'var(--font-mono)' }}>
+                {t("[ NO ROLES ADDED TO THIS PANEL ]")}
+              </p>
+            )}
+
+            <button
+              type="button"
+              className="btn btn--secondary"
+              style={{ alignSelf: 'flex-start', marginTop: 'var(--space-2)', fontSize: '11px' }}
+              onClick={addRoleToPanel}
+            >
+              + {t("ADD ROLE BUTTON")}
+            </button>
+          </div>
+        </div>
+
+        {/* POST PANEL DIRECTLY TO DISCORD BUTTON */}
+        <div style={{ borderTop: '1px solid var(--border)', paddingTop: 'var(--space-4)', display: 'flex', justifyContent: 'flex-end' }}>
+          <button
+            type="button"
+            className="btn btn--primary"
+            disabled={posting}
+            style={{ padding: 'var(--space-2-5) var(--space-5)', fontFamily: 'var(--font-mono)', fontSize: '12px', display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}
+            onClick={handlePostPanel}
+          >
+            🚀 {posting ? t("POSTING TO DISCORD...") : t("POST PANEL TO DISCORD CHANNEL")}
           </button>
         </div>
-      ))}
-      {roles.length === 0 && (
-        <p style={{ color: 'var(--text-3)', fontSize: '12px', fontFamily: 'var(--font-mono)' }}>
-          {t("[ NO SELF-ASSIGN ROLES REGISTERED ]")}
-        </p>
-      )}
-      <button className="btn btn--secondary" style={{ alignSelf: 'flex-start' }} onClick={add}>
-        {t("+ ADD ROLE BUTTON")}
-      </button>
+
+      </div>
     </div>
   );
 }
@@ -531,21 +800,14 @@ export default function ModerationPage() {
             </div>
 
             <div className="form-group">
-              <label className="form-label">{t("Self-Role Selector Panel Title")}</label>
-              <input
-                className="form-input"
-                value={config.selfRolePanelTitle ?? ''}
-                onChange={e => updateConfig({ selfRolePanelTitle: e.target.value })}
-                placeholder="CLAIM YOUR ROLES"
-              />
-            </div>
-
-            <div className="form-group">
-              <label className="form-label">{t("Custom Role Options Buttons")}</label>
-              <SelfRoleEditor
-                roles={config.selfRoles ?? []}
+              <label className="form-label">{t("Self-Role Panel Groups Config & Direct Discord Dispatcher")}</label>
+              <SelfRolePanelsManager
+                panels={config.selfRolePanels ?? []}
+                legacyRoles={config.selfRoles ?? []}
                 allRoles={roles}
-                onChange={v => updateConfig({ selfRoles: v })}
+                channels={channels}
+                selectedGuildId={selectedGuild?.id}
+                onUpdatePanels={newPanels => updateConfig({ selfRolePanels: newPanels })}
               />
             </div>
           </Panel>

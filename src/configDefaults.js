@@ -48,6 +48,7 @@ export const defaultConfig = {
   selfRolePanelTitle: 'Choose roles',
   selfRolePanelMessage: 'Click a button to toggle a role.',
   selfRoles: [],
+  selfRolePanels: [],
   ticketsEnabled: false,
   ticketCategoryId: '',
   ticketLogChannelId: '',

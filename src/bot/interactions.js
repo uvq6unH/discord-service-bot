@@ -370,11 +370,10 @@ export async function handleComponentInteraction(interaction, { client, config, 
       return;
     }
     const roleId = interaction.customId.slice('selfrole:'.length);
-    const roleConfig = config.selfRoles.find((role) => role.roleId === roleId);
-    if (!roleConfig) {
-      await interaction.reply({ content: 'Role is not configured anymore.', ephemeral: true });
-      return;
-    }
+    const allRoles = (config.selfRolePanels ?? []).flatMap(p => p.roles ?? []).concat(config.selfRoles ?? []);
+    const roleConfig = allRoles.find((role) => role.roleId === roleId);
+    const roleName = roleConfig?.label || interaction.guild.roles.cache.get(roleId)?.name || 'Role';
+
     const member = await interaction.guild.members.fetch(interaction.user.id);
     if (!interaction.guild.members.me?.permissions.has(PermissionFlagsBits.ManageRoles)) {
       await interaction.reply({ content: 'Bot needs Manage Roles permission.', ephemeral: true });
@@ -382,11 +381,11 @@ export async function handleComponentInteraction(interaction, { client, config, 
     }
     const hasRole = member.roles.cache.has(roleId);
     if (hasRole) {
-      await member.roles.remove(roleId);
-      await interaction.reply({ content: `Removed ${roleConfig.label}.`, ephemeral: true });
+      await member.roles.remove(roleId).catch((err) => console.error(`[selfrole] Failed to remove role ${roleId}:`, err.message));
+      await interaction.reply({ content: `Removed ${roleName}.`, ephemeral: true });
     } else {
-      await member.roles.add(roleId);
-      await interaction.reply({ content: `Added ${roleConfig.label}.`, ephemeral: true });
+      await member.roles.add(roleId).catch((err) => console.error(`[selfrole] Failed to add role ${roleId}:`, err.message));
+      await interaction.reply({ content: `Added ${roleName}.`, ephemeral: true });
     }
   }
 }

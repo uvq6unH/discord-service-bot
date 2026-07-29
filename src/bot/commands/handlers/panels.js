@@ -46,30 +46,58 @@ export async function handlePanels(ctx) {
         ? { content: 'Self-roles are disabled. Enable them in the dashboard first.', ephemeral: true }
         : 'Self-roles are disabled. Enable them in the dashboard first.');
     }
-    const roles = config.selfRoles ?? [];
-    if (roles.length === 0) {
+
+    const panels = config.selfRolePanels ?? [];
+    const legacyRoles = config.selfRoles ?? [];
+
+    if (panels.length === 0 && legacyRoles.length === 0) {
       return reply(isInteraction
         ? { content: 'No self-roles configured. Add roles in the dashboard first.', ephemeral: true }
         : 'No self-roles configured. Add roles in the dashboard first.');
     }
-    const embed = new EmbedBuilder()
-      .setTitle(config.selfRolePanelTitle)
-      .setDescription(config.selfRolePanelMessage)
-      .setColor(0x5865f2);
-    // Discord limit: max 5 buttons per row, 5 rows per message = 25 buttons
-    const buttons = roles.slice(0, 25).map((r) =>
-      new ButtonBuilder()
-        .setCustomId(`selfrole:${r.roleId}`)
-        .setLabel(r.label || r.roleId)
-        .setStyle(ButtonStyle.Secondary)
-    );
-    const rows = [];
-    for (let i = 0; i < buttons.length; i += 5) {
-      rows.push(new ActionRowBuilder().addComponents(buttons.slice(i, i + 5)));
-    }
+
+    const styleMap = {
+      Primary: ButtonStyle.Primary,
+      Secondary: ButtonStyle.Secondary,
+      Success: ButtonStyle.Success,
+      Danger: ButtonStyle.Danger,
+    };
+
     if (isInteraction) {
-      await source.reply({ content: 'Panel posted.', ephemeral: true });
+      await source.reply({ content: 'Role panel(s) posted.', ephemeral: true });
     }
-    return channel.send({ embeds: [embed], components: rows });
+
+    const targetPanels = panels.length > 0 ? panels : [{
+      title: config.selfRolePanelTitle || 'Choose roles',
+      description: config.selfRolePanelMessage || 'Click a button to toggle a role.',
+      color: '#5865F2',
+      roles: legacyRoles
+    }];
+
+    for (const panel of targetPanels) {
+      const colorInt = Number.parseInt((panel.color || '#5865F2').replace('#', ''), 16) || 0x5865F2;
+      const embed = new EmbedBuilder()
+        .setTitle(panel.title || 'Choose roles')
+        .setDescription(panel.description || 'Click a button to toggle a role.')
+        .setColor(colorInt);
+
+      const buttons = (panel.roles ?? []).slice(0, 25).map((r) => {
+        const btn = new ButtonBuilder()
+          .setCustomId(`selfrole:${r.roleId}`)
+          .setLabel(r.label || r.roleId)
+          .setStyle(styleMap[r.style] ?? ButtonStyle.Secondary);
+        if (r.emoji) {
+          btn.setEmoji(r.emoji);
+        }
+        return btn;
+      });
+
+      const rows = [];
+      for (let i = 0; i < buttons.length; i += 5) {
+        rows.push(new ActionRowBuilder().addComponents(buttons.slice(i, i + 5)));
+      }
+
+      await channel.send({ embeds: [embed], components: rows });
+    }
   }
 }
