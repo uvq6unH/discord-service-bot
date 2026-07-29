@@ -297,8 +297,44 @@ export default function EconomyPage() {
   const [localLevelsEnabled, setLocalLevelsEnabled] = useState(null);
 
   const isEnabled = config?.economyEnabled ?? false;
-  const isLeveling = localLevelsEnabled !== null ? localLevelsEnabled : (config?.levelsEnabled ?? false);
-  const serverName = selectedGuild?.name ? selectedGuild.name.toUpperCase() : '';
+  const customEconomyPlacement = useCallback((orderedItems, ctx) => {
+    const { activeCols, itemWidthPx, gap, getMeasuredHeight } = ctx;
+    if (activeCols < 2) {
+      const colHeights = [0];
+      const positions = {};
+      orderedItems.forEach(({ key, idx }) => {
+        const measuredH = getMeasuredHeight(key, idx);
+        positions[key] = { leftPx: 0, topPx: colHeights[0], widthPx: itemWidthPx };
+        colHeights[0] += measuredH + gap;
+      });
+      return { positions, containerHeight: Math.max(...colHeights, 0) };
+    }
+
+    const colHeights = [0, 0];
+    const positions = {};
+
+    orderedItems.forEach(({ key, idx }) => {
+      const isBetting = key === 'betting' || String(key).includes('betting');
+      const isCurrency = key === 'currency' || String(key).includes('currency');
+
+      let targetCol = 0;
+      if (isBetting) {
+        targetCol = 1;
+      } else if (isCurrency && isLeveling) {
+        targetCol = 1;
+      } else {
+        targetCol = 0;
+      }
+
+      const measuredH = getMeasuredHeight(key, idx);
+      const leftPx = targetCol * (itemWidthPx + gap);
+      const topPx = colHeights[targetCol];
+      positions[key] = { leftPx, topPx, widthPx: itemWidthPx };
+      colHeights[targetCol] += measuredH + gap;
+    });
+
+    return { positions, containerHeight: Math.max(...colHeights, 0) };
+  }, [isLeveling]);
 
   if (loading || !config) {
     return (
@@ -352,6 +388,7 @@ export default function EconomyPage() {
           }
         ]}
         ruleContext={{ isLeveling }}
+        placementEngine={customEconomyPlacement}
       >
         {/* Panel 1: Core Toggles & Currencies */}
         <Panel key="ledger" id="ledger" title={t("LEDGER STATE CONTROL")} accent className={highlight === 'ledger' ? 'flash-target' : ''}>
