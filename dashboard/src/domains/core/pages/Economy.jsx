@@ -300,41 +300,6 @@ export default function EconomyPage() {
   const isLeveling = localLevelsEnabled !== null ? localLevelsEnabled : (config?.levelsEnabled ?? false);
   const serverName = selectedGuild?.name ? selectedGuild.name.toUpperCase() : '';
 
-  const customEconomyPlacement = useCallback((orderedItems, ctx) => {
-    const { activeCols, itemWidthPx, gap, getMeasuredHeight } = ctx;
-    if (activeCols < 2) {
-      const colHeights = [0];
-      const positions = {};
-      orderedItems.forEach(({ key, idx }) => {
-        const measuredH = getMeasuredHeight(key, idx);
-        positions[key] = { leftPx: 0, topPx: colHeights[0], widthPx: itemWidthPx };
-        colHeights[0] += measuredH + gap;
-      });
-      return { positions, containerHeight: Math.max(...colHeights, 0) };
-    }
-    const colHeights = [0, 0];
-    const positions = {};
-    orderedItems.forEach(({ key, idx }) => {
-      // Panel 0: ledger, Panel 1: daily, Panel 2: currency, Panel 3: betting
-      const isCurrencyPanel = idx === 2 || key === 'currency' || String(key).includes('currency');
-      const isBettingPanel = idx === 3 || key === 'betting' || String(key).includes('betting');
-
-      let targetCol = 0;
-      if (isLeveling) {
-        targetCol = (isCurrencyPanel || isBettingPanel) ? 1 : 0;
-      } else {
-        targetCol = isBettingPanel ? 1 : 0;
-      }
-
-      const measuredH = getMeasuredHeight(key, idx);
-      const leftPx = targetCol * (itemWidthPx + gap);
-      const topPx = colHeights[targetCol];
-      positions[key] = { leftPx, topPx, widthPx: itemWidthPx };
-      colHeights[targetCol] += measuredH + gap;
-    });
-    return { positions, containerHeight: Math.max(...colHeights, 0) };
-  }, [isLeveling]);
-
   if (loading || !config) {
     return (
       <div style={{ padding: 'var(--space-10)', textAlign: 'center', fontFamily: 'var(--font-mono)' }}>
@@ -379,7 +344,14 @@ export default function EconomyPage() {
       <MasonryGrid
         cols={2}
         gap={20}
-        placementEngine={customEconomyPlacement}
+        rules={[
+          {
+            when: (ctx) => ctx.isLeveling,
+            move: 'currency',
+            before: 'betting'
+          }
+        ]}
+        ruleContext={{ isLeveling }}
       >
         {/* Panel 1: Core Toggles & Currencies */}
         <Panel key="ledger" id="ledger" title={t("LEDGER STATE CONTROL")} accent className={highlight === 'ledger' ? 'flash-target' : ''}>

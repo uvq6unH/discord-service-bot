@@ -10,7 +10,7 @@ import React, { useState, useEffect, useRef, useLayoutEffect, useImperativeHandl
  * 4. DevTools & Debug Mode: Integrated `window.__MASONRY_DEVTOOLS__` & `debug={true}` Cyberpunk Overlay
  */
 
-export const MASONRY_ENGINE_VERSION = '2.2.0';
+export const MASONRY_ENGINE_VERSION = '2.3.0';
 
 // Isomorphic Layout Effect for SSR compatibility
 const useIsomorphicLayoutEffect = typeof window !== 'undefined' ? useLayoutEffect : useEffect;
@@ -46,6 +46,49 @@ const resolveItemKey = (child, idx, itemKeyFn) => {
 
   return `fallback-idx-${idx}`;
 };
+
+/**
+ * Rule Resolver Engine: Evaluates business layout rules before placement stage
+ */
+export function resolveLayoutRules(items, rules = [], ruleContext = {}) {
+  if (!rules || rules.length === 0) return items;
+
+  let list = [...items];
+
+  rules.forEach(rule => {
+    const isConditionMet = typeof rule.when === 'function' 
+      ? rule.when(ruleContext) 
+      : Boolean(rule.when);
+
+    if (!isConditionMet) return;
+
+    const { move, before, after } = rule;
+    const targetIdx = list.findIndex(item => item.key === move || String(item.key).includes(move));
+    if (targetIdx === -1) return;
+
+    const [movedItem] = list.splice(targetIdx, 1);
+
+    if (before) {
+      const refIdx = list.findIndex(item => item.key === before || String(item.key).includes(before));
+      if (refIdx !== -1) {
+        list.splice(refIdx, 0, movedItem);
+        return;
+      }
+    }
+
+    if (after) {
+      const refIdx = list.findIndex(item => item.key === after || String(item.key).includes(after));
+      if (refIdx !== -1) {
+        list.splice(refIdx + 1, 0, movedItem);
+        return;
+      }
+    }
+
+    list.push(movedItem);
+  });
+
+  return list;
+}
 
 // Stage 2: Ordering Strategy Registry
 export const defaultStrategyHandlers = {
@@ -110,6 +153,8 @@ export const computeLayout = ({
   cols = 2,
   gap = 20,
   minColWidth = 340,
+  rules = [],
+  ruleContext = {},
   layoutStrategy = 'preserve-order',
   placementEngine = defaultShortestColumnPlacement,
   getMeasuredHeight,
@@ -133,7 +178,10 @@ export const computeLayout = ({
     };
   });
 
-  let orderedItems = indexedChildren;
+  // Stage 1.5: Rule Resolver Engine
+  const ruleResolvedItems = resolveLayoutRules(indexedChildren, rules, ruleContext);
+
+  let orderedItems = ruleResolvedItems;
   const ctxMeta = {
     apiVersion: MASONRY_ENGINE_VERSION,
     containerWidth,
@@ -145,9 +193,9 @@ export const computeLayout = ({
   };
 
   if (typeof layoutStrategy === 'function') {
-    orderedItems = layoutStrategy(indexedChildren, ctxMeta);
+    orderedItems = layoutStrategy(ruleResolvedItems, ctxMeta);
   } else if (defaultStrategyHandlers[layoutStrategy]) {
-    orderedItems = defaultStrategyHandlers[layoutStrategy](indexedChildren);
+    orderedItems = defaultStrategyHandlers[layoutStrategy](ruleResolvedItems);
   }
 
   const placementRunner = typeof placementEngine === 'function' ? placementEngine : defaultShortestColumnPlacement;
@@ -172,6 +220,8 @@ const MasonryGrid = forwardRef(function MasonryGrid(
     cols = 2,
     gap = 20,
     minColWidth = 340,
+    rules = [],
+    ruleContext = {},
     layoutStrategy = 'preserve-order',
     placementEngine = defaultShortestColumnPlacement,
     itemKey: itemKeyFn,
@@ -252,6 +302,8 @@ const MasonryGrid = forwardRef(function MasonryGrid(
       cols,
       gap,
       minColWidth,
+      rules,
+      ruleContext,
       layoutStrategy,
       placementEngine,
       getMeasuredHeight,

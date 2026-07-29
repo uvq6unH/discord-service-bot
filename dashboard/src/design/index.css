@@ -884,6 +884,7 @@ a {
     margin-left: 48px;
     margin-top: -2px;
   }
+}
 
 /* ── System Boot Loader & Landing Page Styling ────────────────────────────── */
 @keyframes scanline {
@@ -930,7 +931,8 @@ a {
 }
 
   /* Masonry Grid Mobile Collapse */
-  .masonry-grid {
-    flex-direction: column !important;
+  @media (max-width: 768px) {
+    .masonry-grid {
+      flex-direction: column !important;
+    }
   }
-}
