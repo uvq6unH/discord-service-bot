@@ -60,11 +60,13 @@ export async function handleGeneral(ctx) {
       .setFooter({ text: '💡 Quản trị viên có thể tùy chỉnh chi tiết tại Dashboard Web • XeNon Bot' })
       .setTimestamp();
 
+    const dashboardUrl = process.env.DASHBOARD_URL || 'https://discord-dashboard-g3xb.onrender.com';
+
     const row = new ActionRowBuilder().addComponents(
       new ButtonBuilder()
         .setLabel('🌐 Mở Dashboard Web')
         .setStyle(ButtonStyle.Link)
-        .setURL('http://localhost:3000'),
+        .setURL(dashboardUrl),
       new ButtonBuilder()
         .setCustomId(`config:help`)
         .setLabel('❓ Xem Hướng Dẫn')
