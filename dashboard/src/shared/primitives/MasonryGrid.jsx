@@ -1,71 +1,95 @@
 import React, { useState, useEffect, useRef, useLayoutEffect } from 'react';
 
 /**
- * MasonryGrid — JS-Driven Dynamic Animated Layout Engine
- * 1. Measures DOM panel heights via ResizeObserver in real-time.
- * 2. Calculates dynamic placement using the Shortest Column First algorithm.
- * 3. Renders into React columns with CSS transitions for smooth sliding/reflow animations.
+ * MasonryGrid — Ultimate Single-Render GPU-Accelerated Animated Layout Engine
+ * 
+ * Architecture Highlights:
+ * 1. Single-Pass DOM Render: Eliminates offscreen measurement layer (50% DOM reduction).
+ * 2. GPU-Accelerated Hardware Motion: Uses `transform: translate3d(x, y, 0)` with `willChange: transform`.
+ * 3. Exact Height Measurement: Uses `getBoundingClientRect().height` for precision under scale/transforms.
+ * 4. rAF Observer Debouncing: Batches layout calculation with `requestAnimationFrame`.
+ * 5. Stable React Keys & State: Preserves internal form, chart & terminal states.
  */
 export default function MasonryGrid({ children, cols = 2, gap = 20, className = '', style = {} }) {
   const validChildren = React.Children.toArray(children).filter(Boolean);
   const containerRef = useRef(null);
   const itemRefs = useRef({});
   const heightsRef = useRef({});
+  const rafRef = useRef(null);
 
-  // Store assigned column items
-  const [columns, setColumns] = useState(() => {
-    const initial = Array.from({ length: cols }, () => []);
-    validChildren.forEach((child, i) => initial[i % cols].push(child));
-    return initial;
-  });
+  // Store numerical position layouts per item
+  const [layoutState, setLayoutState] = useState(() => ({
+    positions: [], // Array of { leftPx, topPx, widthPx }
+    containerHeight: 0
+  }));
 
-  const recalculateLayout = () => {
-    if (validChildren.length === 0) return;
+  const calculateLayout = () => {
+    if (validChildren.length === 0 || !containerRef.current) return;
 
-    // Mobile fallback (< 768px): single column vertical stack
-    if (typeof window !== 'undefined' && window.innerWidth < 768) {
-      setColumns([validChildren]);
-      return;
-    }
+    const containerWidth = containerRef.current.clientWidth || 800;
+    const isMobile = typeof window !== 'undefined' && window.innerWidth < 768;
+    const activeCols = isMobile ? 1 : cols;
 
-    const colHeights = new Array(cols).fill(0);
-    const colAssignments = Array.from({ length: cols }, () => []);
+    // Calculate column width & positions
+    const itemWidthPx = (containerWidth - (activeCols - 1) * gap) / activeCols;
+    const colHeights = new Array(activeCols).fill(0);
+    const newPositions = [];
 
-    validChildren.forEach((child, idx) => {
+    validChildren.forEach((_, idx) => {
       const el = itemRefs.current[idx];
-      const height = el ? el.offsetHeight : heightsRef.current[idx] || 300;
-      heightsRef.current[idx] = height;
+      const measuredH = el ? el.getBoundingClientRect().height : (heightsRef.current[idx] || 300);
+      heightsRef.current[idx] = measuredH;
 
-      // Find column with minimum total height
+      // Find column with minimum height (Shortest Column First)
       let shortestCol = 0;
-      for (let c = 1; c < cols; c++) {
+      for (let c = 1; c < activeCols; c++) {
         if (colHeights[c] < colHeights[shortestCol]) {
           shortestCol = c;
         }
       }
 
-      colAssignments[shortestCol].push(child);
-      colHeights[shortestCol] += height + gap;
+      const leftPx = shortestCol * (itemWidthPx + gap);
+      const topPx = colHeights[shortestCol];
+
+      newPositions[idx] = {
+        leftPx,
+        topPx,
+        widthPx: itemWidthPx
+      };
+
+      colHeights[shortestCol] += measuredH + gap;
     });
 
-    setColumns(colAssignments);
+    const maxContainerH = Math.max(...colHeights, 0);
+
+    setLayoutState({
+      positions: newPositions,
+      containerHeight: maxContainerH
+    });
+  };
+
+  const debouncedCalculateLayout = () => {
+    if (rafRef.current) cancelAnimationFrame(rafRef.current);
+    rafRef.current = requestAnimationFrame(() => {
+      calculateLayout();
+    });
   };
 
   useLayoutEffect(() => {
-    recalculateLayout();
+    calculateLayout();
   }, [validChildren.length, cols, gap]);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
 
-    // ResizeObserver tracks height changes of every panel in real-time
+    // Realtime Height Observer with rAF Debouncing
     const observer = new ResizeObserver((entries) => {
       let shouldUpdate = false;
       entries.forEach((entry) => {
         const targetIdx = entry.target.dataset.index;
         if (targetIdx !== undefined) {
-          const newH = entry.target.offsetHeight;
-          if (heightsRef.current[targetIdx] !== newH) {
+          const newH = entry.target.getBoundingClientRect().height;
+          if (Math.abs((heightsRef.current[targetIdx] || 0) - newH) > 1) {
             heightsRef.current[targetIdx] = newH;
             shouldUpdate = true;
           }
@@ -73,7 +97,7 @@ export default function MasonryGrid({ children, cols = 2, gap = 20, className = 
       });
 
       if (shouldUpdate) {
-        recalculateLayout();
+        debouncedCalculateLayout();
       }
     });
 
@@ -81,11 +105,12 @@ export default function MasonryGrid({ children, cols = 2, gap = 20, className = 
       if (el) observer.observe(el);
     });
 
-    window.addEventListener('resize', recalculateLayout);
+    window.addEventListener('resize', debouncedCalculateLayout);
 
     return () => {
       observer.disconnect();
-      window.removeEventListener('resize', recalculateLayout);
+      if (rafRef.current) cancelAnimationFrame(rafRef.current);
+      window.removeEventListener('resize', debouncedCalculateLayout);
     };
   }, [validChildren.length, cols, gap]);
 
@@ -96,63 +121,36 @@ export default function MasonryGrid({ children, cols = 2, gap = 20, className = 
       ref={containerRef}
       className={`masonry-grid ${className}`}
       style={{
-        display: 'flex',
-        gap: `${gap}px`,
-        width: '100%',
-        alignItems: 'flex-start',
         position: 'relative',
+        width: '100%',
+        height: `${layoutState.containerHeight}px`,
+        transition: 'height 0.35s cubic-bezier(0.4, 0, 0.2, 1)',
         ...style
       }}
     >
-      {/* Hidden Offscreen Measurement Layer */}
-      <div
-        style={{
-          position: 'absolute',
-          top: 0,
-          left: 0,
-          width: '100%',
-          visibility: 'hidden',
-          pointerEvents: 'none',
-          zIndex: -9999,
-          display: 'grid',
-          gridTemplateColumns: `repeat(${cols}, 1fr)`,
-          gap: `${gap}px`
-        }}
-      >
-        {validChildren.map((child, idx) => (
-          <div key={child.key || idx} data-index={idx} ref={(el) => (itemRefs.current[idx] = el)}>
+      {validChildren.map((child, idx) => {
+        const pos = layoutState.positions[idx] || { leftPx: 0, topPx: 0, widthPx: 0 };
+        const key = child.key ?? child.props?.title ?? idx;
+
+        return (
+          <div
+            key={key}
+            data-index={idx}
+            ref={(el) => (itemRefs.current[idx] = el)}
+            style={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              width: pos.widthPx ? `${pos.widthPx}px` : '100%',
+              transform: `translate3d(${pos.leftPx}px, ${pos.topPx}px, 0)`,
+              transition: 'transform 0.35s cubic-bezier(0.4, 0, 0.2, 1), width 0.35s cubic-bezier(0.4, 0, 0.2, 1)',
+              willChange: 'transform'
+            }}
+          >
             {child}
           </div>
-        ))}
-      </div>
-
-      {/* Visible Columns Layer with Smooth Reflow Transitions */}
-      {columns.map((colItems, colIndex) => (
-        <div
-          key={colIndex}
-          className="masonry-column"
-          style={{
-            flex: 1,
-            display: 'flex',
-            flexDirection: 'column',
-            gap: `${gap}px`,
-            minWidth: 0,
-            transition: 'all 0.35s cubic-bezier(0.4, 0, 0.2, 1)'
-          }}
-        >
-          {colItems.map((child) => (
-            <div
-              key={child.key || child.props?.title || Math.random()}
-              style={{
-                transition: 'all 0.35s cubic-bezier(0.4, 0, 0.2, 1)',
-                width: '100%'
-              }}
-            >
-              {child}
-            </div>
-          ))}
-        </div>
-      ))}
+        );
+      })}
     </div>
   );
 }
