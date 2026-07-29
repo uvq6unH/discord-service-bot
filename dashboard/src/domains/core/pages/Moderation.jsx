@@ -603,7 +603,7 @@ export default function ModerationPage() {
           />
         </StatusZone>
 
-        {/* 3. Workspace Zone — Native CSS Multi-Column Masonry */}
+        {/* 3. Workspace Zone — Tier 1 Balanced 2-Column Masonry (AutoMod vs Tickets & Word Filter) */}
         <MasonryGrid cols={2} gap={20}>
           <Panel title={t("AUTO-MODERATION ENGINE")} accent className={highlight === 'automod' ? 'flash-target' : ''}>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
@@ -785,8 +785,11 @@ export default function ModerationPage() {
               />
             </div>
           </Panel>
+        </MasonryGrid>
 
-          <Panel title={t("SELF-ROLE ASSIGNMENT")} className={highlight === 'selfroles' ? 'flash-target' : ''}>
+        {/* 4. Tier 2 Full Width Hero Management Console for Self-Role */}
+        <div style={{ marginTop: 'var(--space-5)' }}>
+          <Panel title={t("SELF-ROLE ASSIGNMENT & DISPATCH ENGINE")} className={highlight === 'selfroles' ? 'flash-target' : ''}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 'var(--space-4)', paddingBottom: 'var(--space-3)', borderBottom: '1px solid var(--border)' }}>
               <span style={{ fontFamily: 'var(--font-mono)', fontSize: '12px', fontWeight: 'bold', color: 'var(--text-1)' }}>
                 {t("ENABLE SELF-ROLE SYSTEM")}
@@ -830,7 +833,7 @@ export default function ModerationPage() {
               />
             </div>
           </Panel>
-        </MasonryGrid>
+        </div>
 
         {/* Moderation Commands Panel */}
         <div className="grid-12" style={{ marginTop: 'var(--space-5)' }}>
