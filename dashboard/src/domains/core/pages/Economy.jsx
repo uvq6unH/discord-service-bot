@@ -315,15 +315,17 @@ export default function EconomyPage() {
     const colHeights = [0, 0];
     const positions = {};
     orderedItems.forEach(({ key, idx }) => {
-      const isCurrency = key === 'currency' || key.includes('currency');
-      const isBetting = key === 'betting' || key.includes('betting');
+      // Panel 0: ledger, Panel 1: daily, Panel 2: currency, Panel 3: betting
+      const isCurrencyPanel = idx === 2 || key === 'currency' || String(key).includes('currency');
+      const isBettingPanel = idx === 3 || key === 'betting' || String(key).includes('betting');
 
       let targetCol = 0;
       if (isLeveling) {
-        targetCol = (isCurrency || isBetting) ? 1 : 0;
+        targetCol = (isCurrencyPanel || isBettingPanel) ? 1 : 0;
       } else {
-        targetCol = isBetting ? 1 : 0;
+        targetCol = isBettingPanel ? 1 : 0;
       }
+
       const measuredH = getMeasuredHeight(key, idx);
       const leftPx = targetCol * (itemWidthPx + gap);
       const topPx = colHeights[targetCol];
