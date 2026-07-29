@@ -1,17 +1,16 @@
 import React, { useState, useEffect, useRef, useLayoutEffect, useImperativeHandle, forwardRef } from 'react';
 
 /**
- * MasonryGrid — Open-Source v1.0 Plug-in GPU Layout Engine
+ * MasonryGrid — Open-Source v2.0 Modular 4-Pipeline GPU Layout Engine
  * 
- * v1.0 Architectural Highlights:
- * 1. Custom Strategy Plugin System: Supports built-in strategies (`preserve-order`, `priority`, `shortest-first`)
- *    OR custom plugin strategy functions `(items, ctx) => sortedItems`.
- * 2. Side-Effect Free Callbacks: Invokes `onLayout` safely via `useEffect`.
- * 3. Event-Driven GPU VRAM Management: Native `transitionend` listener.
- * 4. Imperative Handle API: Exposes `recalculate`, `invalidate`, `getContainerHeight`, `getActiveColumns`.
+ * Pipeline Architecture:
+ * Stage 1: MEASURE (getBoundingClientRect + height cache)
+ * Stage 2: STRATEGY (Ordering handlers: preserve-order, priority, shortest-column, or custom strategy)
+ * Stage 3: PLACEMENT (Placement engine: shortest-column-first, bin-packing, or custom placement plugin)
+ * Stage 4: ANIMATE & RENDER (Selective GPU willChange + translate3d hardware motion)
  */
 
-// Strategy Handlers Registry
+// Stage 2: Ordering Strategy Registry
 const defaultStrategyHandlers = {
   'preserve-order': (items) =>
     [...items].sort((a, b) => {
@@ -23,11 +22,45 @@ const defaultStrategyHandlers = {
       if (a.fixed !== b.fixed) return a.fixed ? -1 : 1;
       return b.priority - a.priority;
     }),
-  'shortest-first': (items) =>
+  'shortest-column': (items) =>
     [...items].sort((a, b) => {
       if (a.fixed !== b.fixed) return a.fixed ? -1 : 1;
-      return 0; // Shortest column first algorithm handles placement dynamically
+      return 0;
     })
+};
+
+// Stage 3: Default Placement Engine (Shortest Column First)
+const defaultShortestColumnPlacement = (orderedItems, ctx) => {
+  const { activeCols, itemWidthPx, gap, getMeasuredHeight } = ctx;
+  const colHeights = new Array(activeCols).fill(0);
+  const positions = [];
+
+  orderedItems.forEach(({ idx }) => {
+    const measuredH = getMeasuredHeight(idx);
+
+    let shortestCol = 0;
+    for (let c = 1; c < activeCols; c++) {
+      if (colHeights[c] < colHeights[shortestCol]) {
+        shortestCol = c;
+      }
+    }
+
+    const leftPx = shortestCol * (itemWidthPx + gap);
+    const topPx = colHeights[shortestCol];
+
+    positions[idx] = {
+      leftPx,
+      topPx,
+      widthPx: itemWidthPx
+    };
+
+    colHeights[shortestCol] += measuredH + gap;
+  });
+
+  return {
+    positions,
+    containerHeight: Math.max(...colHeights, 0)
+  };
 };
 
 const MasonryGrid = forwardRef(function MasonryGrid(
@@ -37,6 +70,7 @@ const MasonryGrid = forwardRef(function MasonryGrid(
     gap = 20,
     minColWidth = 340,
     layoutStrategy = 'preserve-order',
+    placementEngine = defaultShortestColumnPlacement,
     onLayout,
     onColumnChange,
     className = '',
@@ -63,8 +97,8 @@ const MasonryGrid = forwardRef(function MasonryGrid(
     }
   }, [layoutState, onLayout]);
 
-  // Event-driven GPU VRAM management using native transitionend
-  const triggerGPUWillChange = (el) => {
+  // Selective Stage 4: Selective GPU VRAM management on moved elements only
+  const triggerSelectiveGPUWillChange = (el) => {
     if (!el) return;
     el.style.willChange = 'transform';
 
@@ -82,22 +116,29 @@ const MasonryGrid = forwardRef(function MasonryGrid(
   const calculateLayout = () => {
     if (validChildren.length === 0 || !containerRef.current) return;
 
+    // Stage 1: MEASURE
     const containerWidth = containerRef.current.clientWidth || 800;
-
     let activeCols = Math.max(1, Math.floor((containerWidth + gap) / (minColWidth + gap)));
     if (cols && activeCols > cols) activeCols = cols;
 
     if (activeColsRef.current !== activeCols) {
+      const prevCols = activeColsRef.current;
       activeColsRef.current = activeCols;
       if (typeof onColumnChange === 'function') {
-        onColumnChange(activeCols);
+        onColumnChange({ previous: prevCols, current: activeCols });
       }
     }
 
     const itemWidthPx = Math.max(0, (containerWidth - (activeCols - 1) * gap) / activeCols);
-    const colHeights = new Array(activeCols).fill(0);
-    const newPositions = [];
 
+    const getMeasuredHeight = (idx) => {
+      const el = itemRefs.current[idx];
+      const measuredH = el ? el.getBoundingClientRect().height : (heightsRef.current[idx] || 300);
+      heightsRef.current[idx] = measuredH;
+      return measuredH;
+    };
+
+    // Stage 2: STRATEGY (Ordering)
     const indexedChildren = validChildren.map((child, idx) => ({
       child,
       idx,
@@ -105,7 +146,6 @@ const MasonryGrid = forwardRef(function MasonryGrid(
       fixed: child.props?.fixed ?? child.props?.pinned ?? false
     }));
 
-    // Execute strategy via Handler Registry or Custom Plugin Function
     let orderedItems = indexedChildren;
     if (typeof layoutStrategy === 'function') {
       orderedItems = layoutStrategy(indexedChildren, { containerWidth, activeCols, gap, minColWidth });
@@ -113,33 +153,18 @@ const MasonryGrid = forwardRef(function MasonryGrid(
       orderedItems = defaultStrategyHandlers[layoutStrategy](indexedChildren);
     }
 
-    orderedItems.forEach(({ idx }) => {
-      const el = itemRefs.current[idx];
-      const measuredH = el ? el.getBoundingClientRect().height : (heightsRef.current[idx] || 300);
-      heightsRef.current[idx] = measuredH;
-
-      let shortestCol = 0;
-      for (let c = 1; c < activeCols; c++) {
-        if (colHeights[c] < colHeights[shortestCol]) {
-          shortestCol = c;
-        }
-      }
-
-      const leftPx = shortestCol * (itemWidthPx + gap);
-      const topPx = colHeights[shortestCol];
-
-      newPositions[idx] = {
-        leftPx,
-        topPx,
-        widthPx: itemWidthPx
-      };
-
-      colHeights[shortestCol] += measuredH + gap;
-      triggerGPUWillChange(el);
+    // Stage 3: PLACEMENT (Positioning Engine)
+    const placementRunner = typeof placementEngine === 'function' ? placementEngine : defaultShortestColumnPlacement;
+    const { positions: newPositions, containerHeight: maxContainerH } = placementRunner(orderedItems, {
+      containerWidth,
+      activeCols,
+      itemWidthPx,
+      gap,
+      minColWidth,
+      getMeasuredHeight
     });
 
-    const maxContainerH = Math.max(...colHeights, 0);
-
+    // Stage 4: ANIMATE & RENDER (Selective GPU willChange + translate3d)
     setLayoutState((prev) => {
       const isHeightSame = Math.abs(prev.containerHeight - maxContainerH) < 1;
       const isPosSame =
@@ -152,6 +177,15 @@ const MasonryGrid = forwardRef(function MasonryGrid(
         );
 
       if (isHeightSame && isPosSame) return prev;
+
+      // Selectively trigger GPU willChange ONLY on elements that actually moved
+      newPositions.forEach((newP, i) => {
+        const prevP = prev.positions[i];
+        const el = itemRefs.current[i];
+        if (el && (!prevP || Math.abs(prevP.leftPx - newP.leftPx) > 1 || Math.abs(prevP.topPx - newP.topPx) > 1)) {
+          triggerSelectiveGPUWillChange(el);
+        }
+      });
 
       return {
         positions: newPositions,
@@ -180,7 +214,7 @@ const MasonryGrid = forwardRef(function MasonryGrid(
 
   useLayoutEffect(() => {
     calculateLayout();
-  }, [validChildren.length, cols, gap, minColWidth, layoutStrategy]);
+  }, [validChildren.length, cols, gap, minColWidth, layoutStrategy, placementEngine]);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
