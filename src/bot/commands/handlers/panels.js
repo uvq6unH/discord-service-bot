@@ -71,18 +71,39 @@ export async function handlePanels(ctx) {
       const colorInt = Number.parseInt((panel.color || '#5865F2').replace('#', ''), 16) || 0x5865F2;
 
       const rolesListText = (panel.roles ?? []).map(r => {
-        const emojiStr = r.emoji ? `${r.emoji} ` : '🔹 ';
+        const emojiStr = r.emoji && r.emoji.trim() ? `${r.emoji.trim()} ` : '🔹 ';
         const roleMention = r.roleId ? `<@&${r.roleId}>` : r.label;
-        const labelStr = r.label && r.label !== r.roleId ? ` — **${r.label}**` : '';
-        return `${emojiStr}${roleMention}${labelStr}`;
+        const labelStr = r.label && r.label !== r.roleId ? `  •  \`${r.label.toUpperCase()}\`` : '';
+        return `> ${emojiStr}┊ ${roleMention}${labelStr}`;
       }).join('\n');
 
-      const fullDescription = `${panel.description || 'Thả cảm xúc bên dưới để nhận Role tương ứng:'}\n\n${rolesListText}`;
+      const divider = '✦ ───────────────────────────── ✦';
+
+      const fullDescription = [
+        panel.description ? `> 📜 *${panel.description}*` : '',
+        '',
+        divider,
+        `### 📌 **DANH SÁCH ROLE & REACTION:**`,
+        rolesListText || '> *Chưa cấu hình Role nào*',
+        divider,
+      ].filter(Boolean).join('\n');
 
       const embed = new EmbedBuilder()
-        .setTitle(panel.title || 'REACT FOR ROLES')
+        .setTitle(panel.title ? `🎮 ║ ${panel.title.toUpperCase()}` : '🎮 ║ SELF ROLE SELECTOR')
         .setDescription(fullDescription)
-        .setColor(colorInt);
+        .setColor(colorInt)
+        .setFooter({
+          text: '💡 Thả cảm xúc bên dưới để nhận Role • Gỡ cảm xúc để hủy Role',
+          iconURL: channel.guild?.iconURL({ size: 64 }) ?? undefined
+        })
+        .setTimestamp();
+
+      if (panel.thumbnailUrl) {
+        embed.setThumbnail(panel.thumbnailUrl);
+      }
+      if (panel.imageUrl) {
+        embed.setImage(panel.imageUrl);
+      }
 
       try {
         const msg = await channel.send({ embeds: [embed] });

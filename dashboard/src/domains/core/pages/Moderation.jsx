@@ -434,6 +434,30 @@ function SelfRolePanelsManager({ panels = [], legacyRoles = [], allRoles = [], c
               onChange={e => updateActivePanel({ description: e.target.value })}
             />
           </div>
+
+          <div style={{ display: 'flex', gap: 'var(--space-3)', flexWrap: 'wrap' }}>
+            <div style={{ flex: 1, minWidth: '200px' }}>
+              <label className="form-label" style={{ fontSize: '10px' }}>{t("Thumbnail Image URL (Logo)")}</label>
+              <IMEInput
+                className="form-input"
+                style={{ fontSize: '12px' }}
+                value={activePanel.thumbnailUrl ?? ''}
+                placeholder="https://i.imgur.com/logo.png"
+                onChange={e => updateActivePanel({ thumbnailUrl: e.target.value })}
+              />
+            </div>
+
+            <div style={{ flex: 1, minWidth: '200px' }}>
+              <label className="form-label" style={{ fontSize: '10px' }}>{t("Banner Header Image URL")}</label>
+              <IMEInput
+                className="form-input"
+                style={{ fontSize: '12px' }}
+                value={activePanel.imageUrl ?? ''}
+                placeholder="https://i.imgur.com/banner.png"
+                onChange={e => updateActivePanel({ imageUrl: e.target.value })}
+              />
+            </div>
+          </div>
         </div>
 
         {/* Role Buttons Config List */}
