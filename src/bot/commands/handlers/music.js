@@ -80,6 +80,18 @@ export async function handleMusicCommand({ message, subcommand, args, config }) 
   const musicPrefix = config.musicPrefix || 'hb';
   const manager     = getLavalinkManager();
 
+  if (subcommand === 'setup' || subcommand === 'voice') {
+    const { handleVoiceControl } = await import('./tempVcSetup.js');
+    return handleVoiceControl({
+      command: { name: subcommand, type: subcommand },
+      reply: (p) => message.reply(p),
+      args: args ? args.split(/\s+/) : [],
+      guild: message.guild,
+      actorMember: message.member,
+      configStore: message.client.configStore
+    });
+  }
+
   // Lavalink not yet connected — give friendly error instead of crash
   if (!manager) {
     return message.reply('⚠️ Hệ thống nhạc chưa sẵn sàng — Lavalink đang kết nối, thử lại sau vài giây.');

@@ -514,16 +514,31 @@ export function createBot(configStore, stateStore, redis = null) {
       // 2. Mention react — luôn chạy, không return sớm
       await runMentionReact(message, config, client);
 
-      // 3. Music prefix
-      if (config.musicEnabled !== false) {
+      // 3. Music & Voice Master prefix
+      if (config.musicEnabled !== false || config.tempVcEnabled !== false) {
         const mPrefix = (config.musicPrefix || 'hb').toLowerCase();
         const lc      = content.toLowerCase();
         if (lc === mPrefix || lc.startsWith(mPrefix + ' ')) {
           const musicBody = content.slice(mPrefix.length).trim();
           const [subcommand, ...musicArgParts] = musicBody.split(/\s+/);
+          const subLower = (subcommand || '').toLowerCase();
+
+          if (subLower === 'setup' || subLower === 'voice') {
+            const { handleVoiceControl } = await import('./bot/commands/handlers/tempVcSetup.js');
+            await handleVoiceControl({
+              command: { name: subLower, type: subLower },
+              reply: (p) => message.reply(p),
+              args: musicArgParts,
+              guild: message.guild,
+              actorMember: message.member,
+              configStore
+            });
+            return;
+          }
+
           await handleMusicCommand({
             message,
-            subcommand: (subcommand || '').toLowerCase(),
+            subcommand: subLower,
             args: musicArgParts.join(' '),
             config,
           });
