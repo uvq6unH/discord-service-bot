@@ -1,15 +1,35 @@
 import React, { useState, useEffect, useRef, useLayoutEffect, useImperativeHandle, forwardRef } from 'react';
 
 /**
- * MasonryGrid — Open-Source Grade Container-Responsive GPU Layout Engine
+ * MasonryGrid — Open-Source v1.0 Plug-in GPU Layout Engine
  * 
- * Production Features:
- * 1. Fixed & Pinned Sorting: Correctly pins `fixed={true}` / `pinned={true}` cards to top.
- * 2. Layout Strategy Support: `"shortest-first"` | `"preserve-order"` | `"priority"`.
- * 3. Event-Driven VRAM Cleanup: Uses `transitionend` event instead of setTimeouts.
- * 4. Callbacks API: `onLayout`, `onColumnChange`.
- * 5. Imperative API: `ref.current.recalculate()`, `ref.current.invalidate()`.
+ * v1.0 Architectural Highlights:
+ * 1. Custom Strategy Plugin System: Supports built-in strategies (`preserve-order`, `priority`, `shortest-first`)
+ *    OR custom plugin strategy functions `(items, ctx) => sortedItems`.
+ * 2. Side-Effect Free Callbacks: Invokes `onLayout` safely via `useEffect`.
+ * 3. Event-Driven GPU VRAM Management: Native `transitionend` listener.
+ * 4. Imperative Handle API: Exposes `recalculate`, `invalidate`, `getContainerHeight`, `getActiveColumns`.
  */
+
+// Strategy Handlers Registry
+const defaultStrategyHandlers = {
+  'preserve-order': (items) =>
+    [...items].sort((a, b) => {
+      if (a.fixed !== b.fixed) return a.fixed ? -1 : 1;
+      return a.idx - b.idx;
+    }),
+  'priority': (items) =>
+    [...items].sort((a, b) => {
+      if (a.fixed !== b.fixed) return a.fixed ? -1 : 1;
+      return b.priority - a.priority;
+    }),
+  'shortest-first': (items) =>
+    [...items].sort((a, b) => {
+      if (a.fixed !== b.fixed) return a.fixed ? -1 : 1;
+      return 0; // Shortest column first algorithm handles placement dynamically
+    })
+};
+
 const MasonryGrid = forwardRef(function MasonryGrid(
   {
     children,
@@ -35,6 +55,13 @@ const MasonryGrid = forwardRef(function MasonryGrid(
     positions: [],
     containerHeight: 0
   }));
+
+  // Safe side-effect-free onLayout invocation
+  useEffect(() => {
+    if (typeof onLayout === 'function') {
+      onLayout(layoutState);
+    }
+  }, [layoutState, onLayout]);
 
   // Event-driven GPU VRAM management using native transitionend
   const triggerGPUWillChange = (el) => {
@@ -78,20 +105,15 @@ const MasonryGrid = forwardRef(function MasonryGrid(
       fixed: child.props?.fixed ?? child.props?.pinned ?? false
     }));
 
-    // Sorting according to strategy & fixed status
-    if (layoutStrategy === 'priority') {
-      indexedChildren.sort((a, b) => {
-        if (a.fixed !== b.fixed) return a.fixed ? -1 : 1;
-        return b.priority - a.priority;
-      });
-    } else if (layoutStrategy === 'preserve-order') {
-      indexedChildren.sort((a, b) => {
-        if (a.fixed !== b.fixed) return a.fixed ? -1 : 1;
-        return a.idx - b.idx;
-      });
+    // Execute strategy via Handler Registry or Custom Plugin Function
+    let orderedItems = indexedChildren;
+    if (typeof layoutStrategy === 'function') {
+      orderedItems = layoutStrategy(indexedChildren, { containerWidth, activeCols, gap, minColWidth });
+    } else if (defaultStrategyHandlers[layoutStrategy]) {
+      orderedItems = defaultStrategyHandlers[layoutStrategy](indexedChildren);
     }
 
-    indexedChildren.forEach(({ idx }) => {
+    orderedItems.forEach(({ idx }) => {
       const el = itemRefs.current[idx];
       const measuredH = el ? el.getBoundingClientRect().height : (heightsRef.current[idx] || 300);
       heightsRef.current[idx] = measuredH;
@@ -131,16 +153,10 @@ const MasonryGrid = forwardRef(function MasonryGrid(
 
       if (isHeightSame && isPosSame) return prev;
 
-      const nextState = {
+      return {
         positions: newPositions,
         containerHeight: maxContainerH
       };
-
-      if (typeof onLayout === 'function') {
-        onLayout(nextState);
-      }
-
-      return nextState;
     });
   };
 
