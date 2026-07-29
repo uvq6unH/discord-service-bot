@@ -799,17 +799,7 @@ export default function ModerationPage() {
             </div>
           </Panel>
 
-          <Panel title={t("WORD FILTER DICTIONARY")} className={highlight === 'wordfilter' ? 'flash-target' : ''}>
-            <div className="form-group">
-              <label className="form-label">{t("Forbidden Words Registry")}</label>
-              <BadWordsEditor
-                words={config.badWords ?? []}
-                onChange={v => updateConfig({ badWords: v })}
-              />
-            </div>
-          </Panel>
-
-          <Panel title={t("SELF-ROLE ASSIGNMENT")} className={highlight === 'selfroles' ? 'flash-target' : ''}>
+          <Panel key="selfroles" id="selfroles" title={t("SELF-ROLE ASSIGNMENT")} className={highlight === 'selfroles' ? 'flash-target' : ''}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 'var(--space-4)', paddingBottom: 'var(--space-3)', borderBottom: '1px solid var(--border)' }}>
               <span style={{ fontFamily: 'var(--font-mono)', fontSize: '12px', fontWeight: 'bold', color: 'var(--text-1)' }}>
                 {t("ENABLE SELF-ROLE SYSTEM")}
@@ -850,6 +840,16 @@ export default function ModerationPage() {
                 channels={channels}
                 selectedGuildId={selectedGuild?.id}
                 onUpdatePanels={newPanels => updateConfig({ selfRolePanels: newPanels })}
+              />
+            </div>
+          </Panel>
+
+          <Panel key="wordfilter" id="wordfilter" title={t("WORD FILTER DICTIONARY")} className={highlight === 'wordfilter' ? 'flash-target' : ''}>
+            <div className="form-group">
+              <label className="form-label">{t("Forbidden Words Registry")}</label>
+              <BadWordsEditor
+                words={config.badWords ?? []}
+                onChange={v => updateConfig({ badWords: v })}
               />
             </div>
           </Panel>

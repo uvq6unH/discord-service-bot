@@ -340,9 +340,36 @@ export default function EconomyPage() {
       </StatusZone>
 
       {/* 3. Workspace Zone */}
-      <MasonryGrid cols={2} gap={20}>
+      <MasonryGrid
+        cols={2}
+        gap={20}
+        placementEngine={(orderedItems, ctx) => {
+          const { activeCols, itemWidthPx, gap, getMeasuredHeight } = ctx;
+          if (activeCols < 2) {
+            const colHeights = [0];
+            const positions = {};
+            orderedItems.forEach(({ key, idx }) => {
+              const measuredH = getMeasuredHeight(key, idx);
+              positions[key] = { leftPx: 0, topPx: colHeights[0], widthPx: itemWidthPx };
+              colHeights[0] += measuredH + gap;
+            });
+            return { positions, containerHeight: Math.max(...colHeights, 0) };
+          }
+          const colHeights = [0, 0];
+          const positions = {};
+          orderedItems.forEach(({ key, idx }) => {
+            const targetCol = key === 'betting' ? 1 : 0;
+            const measuredH = getMeasuredHeight(key, idx);
+            const leftPx = targetCol * (itemWidthPx + gap);
+            const topPx = colHeights[targetCol];
+            positions[key] = { leftPx, topPx, widthPx: itemWidthPx };
+            colHeights[targetCol] += measuredH + gap;
+          });
+          return { positions, containerHeight: Math.max(...colHeights, 0) };
+        }}
+      >
         {/* Panel 1: Core Toggles & Currencies */}
-        <Panel title={t("LEDGER STATE CONTROL")} accent className={highlight === 'ledger' ? 'flash-target' : ''}>
+        <Panel key="ledger" id="ledger" title={t("LEDGER STATE CONTROL")} accent className={highlight === 'ledger' ? 'flash-target' : ''}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <span style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--text-2)' }}>
               {t("GLOBAL FINANCIAL SYSTEM")}
@@ -478,8 +505,35 @@ export default function EconomyPage() {
           )}
         </Panel>
 
-        {/* Panel 2: Rewards Claims & Betting Limits */}
-        <Panel title={t("DAILY REWARDS DISTRIBUTOR")} accent className={highlight === 'daily' ? 'flash-target' : ''} style={{ opacity: isEnabled ? 1 : 0.4 }}>
+        {/* Panel 2: Currency Registry */}
+        <Panel key="currency" id="currency" title={t("CURRENCY REGISTRY DATABASE")} className={highlight === 'currency' ? 'flash-target' : ''}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
+            <CurrencyRow 
+              prefix="currencySilver" 
+              defaultName="Silver" 
+              defaultIcon="🥈" 
+              config={config} 
+              updateConfig={updateConfig} 
+            />
+            <CurrencyRow 
+              prefix="currencyGold" 
+              defaultName="Gold" 
+              defaultIcon="🥇" 
+              config={config} 
+              updateConfig={updateConfig} 
+            />
+            <CurrencyRow 
+              prefix="currencyDiamond" 
+              defaultName="Diamond" 
+              defaultIcon="💎" 
+              config={config} 
+              updateConfig={updateConfig} 
+            />
+          </div>
+        </Panel>
+
+        {/* Panel 3: Rewards Claims & Betting Limits */}
+        <Panel key="daily" id="daily" title={t("DAILY REWARDS DISTRIBUTOR")} accent className={highlight === 'daily' ? 'flash-target' : ''} style={{ opacity: isEnabled ? 1 : 0.4 }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <span style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--text-2)' }}>
               {t("REWARDS DISPENSATION")}
@@ -560,35 +614,8 @@ export default function EconomyPage() {
           </div>
         </Panel>
 
-        {/* Panel 3: Currency Registry */}
-        <Panel title={t("CURRENCY REGISTRY DATABASE")} className={highlight === 'currency' ? 'flash-target' : ''}>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
-            <CurrencyRow 
-              prefix="currencySilver" 
-              defaultName="Silver" 
-              defaultIcon="🥈" 
-              config={config} 
-              updateConfig={updateConfig} 
-            />
-            <CurrencyRow 
-              prefix="currencyGold" 
-              defaultName="Gold" 
-              defaultIcon="🥇" 
-              config={config} 
-              updateConfig={updateConfig} 
-            />
-            <CurrencyRow 
-              prefix="currencyDiamond" 
-              defaultName="Diamond" 
-              defaultIcon="💎" 
-              config={config} 
-              updateConfig={updateConfig} 
-            />
-          </div>
-        </Panel>
-
         {/* Panel 4: Betting Suite */}
-        <Panel title={t("BETTING REGULATION SYSTEM")} accent className={highlight === 'games' ? 'flash-target' : ''} style={{ opacity: isEnabled ? 1 : 0.4 }}>
+        <Panel key="betting" id="betting" title={t("BETTING REGULATION SYSTEM")} accent className={highlight === 'games' ? 'flash-target' : ''} style={{ opacity: isEnabled ? 1 : 0.4 }}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
             <CasinoGameRow 
               title="Blackjack Module" 

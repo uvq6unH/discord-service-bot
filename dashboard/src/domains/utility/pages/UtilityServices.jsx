@@ -410,16 +410,8 @@ export default function UtilityServicesPage() {
           </div>
         </Panel>
 
-        {/* Custom Commands Panels */}
-        <Panel title={t("CUSTOM RESPONSE OPERATORS")} accent className={highlight === 'customcmds' ? 'flash-target' : ''}>
-          <CustomCommandEditor
-            commands={config.core?.commands ?? []}
-            onChange={v => updateConfig({ core: { commands: v } })}
-          />
-        </Panel>
-
         {/* Auto Reply Panels */}
-        <Panel title={t("KEYWORD AUTO-RESPONDERS")} accent className={highlight === 'autoreplies' ? 'flash-target' : ''}>
+        <Panel key="autoreplies" id="autoreplies" title={t("KEYWORD AUTO-RESPONDERS")} accent className={highlight === 'autoreplies' ? 'flash-target' : ''}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 'var(--space-4)', paddingBottom: 'var(--space-3)', borderBottom: '1px solid var(--border)' }}>
             <div>
               <span style={{ fontFamily: 'var(--font-mono)', fontSize: '12px', fontWeight: 'bold', color: 'var(--text-1)' }}>
@@ -444,6 +436,14 @@ export default function UtilityServicesPage() {
           <AutoReplyEditor
             replies={config.autoReplies ?? []}
             onChange={v => updateConfig({ autoReplies: v })}
+          />
+        </Panel>
+
+        {/* Custom Commands Panels */}
+        <Panel key="customcmds" id="customcmds" title={t("CUSTOM RESPONSE OPERATORS")} accent className={highlight === 'customcmds' ? 'flash-target' : ''}>
+          <CustomCommandEditor
+            commands={config.core?.commands ?? []}
+            onChange={v => updateConfig({ core: { commands: v } })}
           />
         </Panel>
       </MasonryGrid>
