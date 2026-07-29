@@ -178,14 +178,15 @@ export default function VoiceServicesPage() {
     setSettingUp(true);
     setSetupStatus(null);
     try {
-      const selectedGuildId = localStorage.getItem('selectedGuildId') || '';
-      const data = await apiFetch(`/api/guilds/${selectedGuildId}/temp-vc-setup`, {
+      const selectedGuildId = localStorage.getItem('selectedGuildId') || selectedGuild?.id || '';
+      const res = await apiFetch(`/api/guilds/${selectedGuildId}/temp-vc-setup`, {
         method: 'POST'
       });
-      setSetupStatus({ success: true, message: data.message });
+      const data = await res.json();
+      setSetupStatus({ success: true, message: data.message || 'Đã khởi tạo hệ thống VoiceMaster thành công!' });
       setTimeout(() => window.location.reload(), 1200);
     } catch (err) {
-      setSetupStatus({ success: false, message: err.message });
+      setSetupStatus({ success: false, message: err.message || 'Lỗi hệ thống khi khởi tạo VoiceMaster' });
     } finally {
       setSettingUp(false);
     }
@@ -194,14 +195,17 @@ export default function VoiceServicesPage() {
   const handleResetSetup = async () => {
     if (!window.confirm('Bạn có chắc chắn muốn reset cấu hình VoiceMaster không?')) return;
     setSettingUp(true);
+    setSetupStatus(null);
     try {
-      const selectedGuildId = localStorage.getItem('selectedGuildId') || '';
-      await apiFetch(`/api/guilds/${selectedGuildId}/temp-vc-reset`, {
+      const selectedGuildId = localStorage.getItem('selectedGuildId') || selectedGuild?.id || '';
+      const res = await apiFetch(`/api/guilds/${selectedGuildId}/temp-vc-reset`, {
         method: 'POST'
       });
-      window.location.reload();
+      const data = await res.json();
+      setSetupStatus({ success: true, message: data.message || 'Đã reset VoiceMaster!' });
+      setTimeout(() => window.location.reload(), 1200);
     } catch (err) {
-      alert(err.message);
+      setSetupStatus({ success: false, message: err.message || 'Lỗi hệ thống khi reset VoiceMaster' });
     } finally {
       setSettingUp(false);
     }

@@ -1569,8 +1569,12 @@ export function createServer({ configStore, stateStore, botClient, redis = null 
         masterChannelName: result.masterChannel.name
       });
     } catch (err) {
-      console.error('[server] temp-vc-setup error:', err.message);
-      return res.status(500).json({ error: `Lỗi khi tự động khởi tạo VoiceMaster: ${err.message}` });
+      console.error('[server] temp-vc-setup error:', err);
+      const isPermErr = err?.code === 50013 || /permission/i.test(err?.message ?? '');
+      const detail = isPermErr
+        ? 'Bot thiếu quyền Manage Channels (Quản lý kênh) trong Server Discord.'
+        : (err?.message || 'Internal server error');
+      return res.status(500).json({ error: `Lỗi khi tự động khởi tạo VoiceMaster: ${detail}` });
     }
   });
 
