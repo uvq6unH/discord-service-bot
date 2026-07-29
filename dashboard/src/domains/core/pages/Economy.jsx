@@ -383,6 +383,7 @@ export default function EconomyPage() {
       <MasonryGrid
         cols={2}
         gap={20}
+        minColWidth={250}
         rules={[
           {
             when: (ctx) => ctx.isLeveling,
