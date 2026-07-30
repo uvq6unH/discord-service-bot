@@ -305,19 +305,106 @@ export async function syncSingleCounter(guild, counter, configStore) {
 }
 
 /**
+ * Auto-discovers and imports existing counter voice channels under '📊 Server Stats' category in Discord if they are not yet in configStore.
+ */
+export async function autoDiscoverExistingCounters(guild, configStore) {
+  if (!guild || !configStore) return [];
+
+  const config = await configStore.getGuildConfig(guild.id);
+  let currentCounters = Array.isArray(config.counters) ? [...config.counters] : [];
+
+  const category = guild.channels.cache.find(c => c.type === ChannelType.GuildCategory && /counter|stat/i.test(c.name));
+  if (!category) return currentCounters;
+
+  let fetchedChannels;
+  try { fetchedChannels = await guild.channels.fetch(); } catch { fetchedChannels = guild.channels.cache; }
+
+  const voiceChannels = [...fetchedChannels.values()].filter(ch => ch.parentId === category.id && ch.type === ChannelType.GuildVoice);
+  let updated = false;
+
+  for (const ch of voiceChannels) {
+    const alreadyBound = currentCounters.some(c => c.channelId === ch.id);
+    if (!alreadyBound) {
+      const nameLower = ch.name.toLowerCase();
+      let typeKey = null;
+      let template = '👥 Members: {count}';
+
+      if (nameLower.includes('users') || nameLower.includes('người dùng') || ch.name.includes('👤')) {
+        typeKey = 'users';
+        template = '👤 Users: {count}';
+      } else if (nameLower.includes('bots') || nameLower.includes('robot') || ch.name.includes('🤖')) {
+        typeKey = 'bots';
+        template = '🤖 Bots: {count}';
+      } else if (nameLower.includes('members') || nameLower.includes('thành viên') || ch.name.includes('👥')) {
+        typeKey = 'members';
+        template = '👥 Members: {count}';
+      } else if (nameLower.includes('roles') || nameLower.includes('vai trò')) {
+        typeKey = 'roles';
+        template = '🏷️ Roles: {count}';
+      }
+
+      if (typeKey) {
+        const unboundIdx = currentCounters.findIndex(c => c.type === typeKey && !c.channelId);
+        if (unboundIdx >= 0) {
+          currentCounters[unboundIdx] = {
+            ...currentCounters[unboundIdx],
+            channelId: ch.id
+          };
+          updated = true;
+        } else {
+          currentCounters.push({
+            id: `counter_${typeKey}_${Date.now()}_${Math.floor(Math.random() * 1000)}`,
+            type: typeKey,
+            channelNameTemplate: template,
+            channelId: ch.id,
+            enabled: true,
+            isGoal: false
+          });
+          updated = true;
+        }
+      }
+    }
+  }
+
+  if (updated) {
+    await configStore.updateGuildConfig(guild.id, { counters: currentCounters });
+  }
+
+  return currentCounters;
+}
+
+/**
  * Syncs all counters for a guild and cleans up duplicate/orphan channels under the category.
  */
 export async function syncAllCountersForGuild(guild, configStore) {
   if (!guild || !configStore) return [];
 
+  // Auto-discover any unlinked voice channels under '📊 Server Stats'
+  await autoDiscoverExistingCounters(guild, configStore).catch(() => null);
+
   const config = await configStore.getGuildConfig(guild.id);
-  if (config.countersEnabled === false || !Array.isArray(config.counters) || config.counters.length === 0) {
+  if (config.countersEnabled === false) {
+    return [];
+  }
+
+  const countersList = Array.isArray(config.counters) ? config.counters : [];
+  if (countersList.length === 0) {
+    // If counters list is empty after auto-discover, delete empty category if it exists
+    const category = guild.channels.cache.find(c => c.type === ChannelType.GuildCategory && /counter|stat/i.test(c.name));
+    if (category) {
+      let fetchedChannels;
+      try { fetchedChannels = await guild.channels.fetch(); } catch { fetchedChannels = guild.channels.cache; }
+      const remaining = [...fetchedChannels.values()].filter(ch => ch.parentId === category.id);
+      if (remaining.length === 0) {
+        await category.delete('No active counters').catch(() => null);
+      }
+    }
     return [];
   }
 
   const results = [];
   const validChannelIds = new Set();
-  for (const counter of config.counters) {
+  for (const counter of countersList) {
     const res = await syncSingleCounter(guild, counter, configStore);
     if (res) {
       results.push(res);

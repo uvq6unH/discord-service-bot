@@ -1626,14 +1626,22 @@ export function createServer({ configStore, stateStore, botClient, redis = null 
   // ── Counters Plugin REST Endpoints ─────────────────────────────────────────
   app.get('/api/guilds/:guildId/counters', auth.requireAuth, readRateLimit, requireGuildId, auth.requireGuildAccess, async (req, res) => {
     try {
-      const config = await configStore.getGuildConfig(req.guildId);
       const botClient = req.app.get('botClient');
       const guild = botClient && (botClient.isReady?.() || botClient.user)
         ? (botClient.guilds.cache.get(req.guildId) || await botClient.guilds.fetch(req.guildId).catch(() => null))
         : null;
 
-      const { enrichCounterWithLiveStats } = await import('./bot/services/countersEngine.js');
-      const rawCounters = config.counters || [];
+      const { autoDiscoverExistingCounters, enrichCounterWithLiveStats } = await import('./bot/services/countersEngine.js');
+      
+      let rawCounters = [];
+      if (guild) {
+        rawCounters = await autoDiscoverExistingCounters(guild, configStore).catch(() => []);
+      } else {
+        const config = await configStore.getGuildConfig(req.guildId);
+        rawCounters = config.counters || [];
+      }
+
+      const config = await configStore.getGuildConfig(req.guildId);
       const enrichedCounters = await Promise.all(rawCounters.map(c => enrichCounterWithLiveStats(guild, c)));
 
       return res.json({
