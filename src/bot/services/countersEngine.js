@@ -285,32 +285,6 @@ export async function syncSingleCounter(guild, counter, configStore) {
 
     const category = await getOrResolveCounterCategory(guild, configStore);
 
-    // If channel wasn't found by ID, look under category for any existing voice channel matching this counter type before creating a new one!
-    if (!channel && category) {
-      try {
-        let fetchedChannels;
-        try { fetchedChannels = await guild.channels.fetch(); } catch { fetchedChannels = guild.channels.cache; }
-        const categoryChildren = [...fetchedChannels.values()].filter(ch => ch.parentId === category.id && ch.type === ChannelType.GuildVoice);
-
-        const match = categoryChildren.find(ch => {
-          const nameLower = ch.name.toLowerCase();
-          if (counter.type === 'members' && (nameLower.includes('members') || nameLower.includes('thành viên') || ch.name.includes('👥'))) return true;
-          if (counter.type === 'users' && (nameLower.includes('users') || nameLower.includes('người dùng') || ch.name.includes('👤'))) return true;
-          if (counter.type === 'bots' && (nameLower.includes('bots') || nameLower.includes('robot') || ch.name.includes('🤖'))) return true;
-          if (counter.type === 'roles' && (nameLower.includes('roles') || nameLower.includes('vai trò'))) return true;
-          if (counter.type === 'channels' && nameLower.includes('channels')) return true;
-          if (counter.type === 'voiceChannels' && (nameLower.includes('voice') || ch.name.includes('🔊'))) return true;
-          return false;
-        });
-
-        if (match) {
-          channel = match;
-          counter.channelId = channel.id;
-          console.log(`[countersEngine] Found existing channel under category for counter ${counter.type}: ${channel.id}`);
-        }
-      } catch (_) {}
-    }
-
     if (!channel) {
       const everyoneRoleId = guild.roles?.everyone?.id || guild.id;
 
