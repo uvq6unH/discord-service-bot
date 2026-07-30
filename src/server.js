@@ -1643,12 +1643,10 @@ export function createServer({ configStore, stateStore, botClient, redis = null 
 
       const config = await configStore.getGuildConfig(req.guildId);
       const enrichedCounters = await Promise.all(rawCounters.map(c => enrichCounterWithLiveStats(guild, c, redis, req.guildId)));
-      const botHasManageChannels = enrichedCounters.every(c => c.botHasManageChannels !== false);
 
       return res.json({
         success: true,
         countersEnabled: config.countersEnabled !== false,
-        botHasManageChannels,
         counters: enrichedCounters
       });
     } catch (err) {
@@ -1722,13 +1720,21 @@ export function createServer({ configStore, stateStore, botClient, redis = null 
       if (guild) {
         await syncAllCountersForGuild(guild, configStore).catch(() => null);
       } else if (redis) {
-        // Only dispatch event to Redis event_queue for split-mode bot process if bot is NOT in-process
+        // Dispatch event to Redis event_queue for split-mode bot process
         await redis.rpush('event_queue', JSON.stringify({
           type: 'sync_counters',
           guildId: req.guildId,
           requestedAt: new Date().toISOString()
         })).catch(() => null);
-        await new Promise(resolve => setTimeout(resolve, 1200));
+
+        // Poll configStore for up to 4.5s until bot worker finishes assigning channelIds
+        const startTime = Date.now();
+        while (Date.now() - startTime < 4500) {
+          await new Promise(r => setTimeout(r, 400));
+          const checkConfig = await configStore.getGuildConfig(req.guildId);
+          const allAssigned = Array.isArray(checkConfig.counters) && checkConfig.counters.length > 0 && checkConfig.counters.every(c => Boolean(c.channelId));
+          if (allAssigned) break;
+        }
       }
 
       // Re-fetch latest config after sync to get channelId and indexes
@@ -1803,7 +1809,15 @@ export function createServer({ configStore, stateStore, botClient, redis = null 
           guildId: req.guildId,
           requestedAt: new Date().toISOString()
         })).catch(() => null);
-        await new Promise(resolve => setTimeout(resolve, 1200));
+
+        // Poll configStore for up to 4.5s until bot worker finishes assigning channelIds
+        const startTime = Date.now();
+        while (Date.now() - startTime < 4500) {
+          await new Promise(r => setTimeout(r, 400));
+          const checkConfig = await configStore.getGuildConfig(req.guildId);
+          const allAssigned = Array.isArray(checkConfig.counters) && checkConfig.counters.length > 0 && checkConfig.counters.every(c => Boolean(c.channelId));
+          if (allAssigned) break;
+        }
       }
 
       const latestConfig = await configStore.getGuildConfig(req.guildId);

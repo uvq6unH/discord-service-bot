@@ -185,11 +185,6 @@ export async function enrichCounterWithLiveStats(guild, counter, redis = null, g
     } catch {}
   }
 
-  let botHasManageChannels = true;
-  if (guild && guild.members?.me) {
-    botHasManageChannels = guild.members.me.permissions.has(PermissionFlagsBits.ManageChannels);
-  }
-
   return {
     ...counter,
     liveCount: rawCount,
@@ -197,8 +192,7 @@ export async function enrichCounterWithLiveStats(guild, counter, redis = null, g
     targetGoal,
     formattedGoal: targetGoal !== null ? formatCountNumber(targetGoal) : null,
     evaluatedName,
-    channelExists,
-    botHasManageChannels
+    channelExists
   };
 }
 
@@ -386,10 +380,7 @@ export async function syncSingleCounter(guild, counter, configStore) {
     };
   } catch (err) {
     console.error(`[countersEngine] Error syncing counter ${counter.id} in guild ${guild.id}:`, err);
-    const isPermErr = err?.code === 50013 || /permission/i.test(err?.message ?? '');
-    const userErrMsg = isPermErr
-      ? 'Bot thiếu quyền Manage Channels (Quản lý kênh) trên Discord Server'
-      : (err?.message || 'Không thể tạo kênh Discord');
+    const userErrMsg = err?.message || 'Không thể tạo kênh Discord';
     return { success: false, error: userErrMsg };
   }
 }

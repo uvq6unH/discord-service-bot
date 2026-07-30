@@ -689,6 +689,8 @@ function _startEventQueueWorker(client, configStore, redis) {
           console.error(`[event-queue] Error syncing counters for guild ${guildId}:`, err.message);
           return [];
         });
+        const { writeGuildCache } = await import('./stateStore.js');
+        await writeGuildCache(guild, redis).catch(() => null);
         console.log(`[event-queue] Synced ${results?.length || 0} counter(s) for guild ${guildId}`);
       } else {
         console.warn(`[event-queue] Could not fetch guild ${guildId} for sync_counters (is bot in this server?)`);
