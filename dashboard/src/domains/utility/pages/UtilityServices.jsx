@@ -389,6 +389,10 @@ function CountersManager({ guildId, roles = [] }) {
   }, [guildId]);
 
   const handleAutoSetup = async () => {
+    if (!guildId) {
+      setStatusMsg({ success: false, message: 'Chưa chọn Server Discord!' });
+      return;
+    }
     setLoading(true);
     setStatusMsg(null);
     try {
@@ -397,10 +401,19 @@ function CountersManager({ guildId, roles = [] }) {
         body: { mode: 'default' }
       });
       const data = await res.json();
-      setCounters(data.counters || []);
-      setStatusMsg({ success: true, message: 'Đã tự động khởi tạo 2 kênh Counter mặc định (Members & Users)!' });
+      if (data.error) {
+        setStatusMsg({ success: false, message: data.error });
+        return;
+      }
+      const list = data.counters || [];
+      setCounters(list);
+      if (list.length > 0) {
+        setStatusMsg({ success: true, message: `Đã tự động khởi tạo ${list.length} kênh Counter mặc định (Members & Users)!` });
+      } else {
+        setStatusMsg({ success: false, message: 'Không thể tạo kênh Counter mặc định. Vui lòng thử lại.' });
+      }
     } catch (err) {
-      setStatusMsg({ success: false, message: err.message });
+      setStatusMsg({ success: false, message: err.message || 'Lỗi khi tạo Counter mặc định' });
     } finally {
       setLoading(false);
     }
@@ -408,6 +421,10 @@ function CountersManager({ guildId, roles = [] }) {
 
   const handleCreateCounter = async (e) => {
     e.preventDefault();
+    if (!guildId) {
+      setStatusMsg({ success: false, message: 'Chưa chọn Server Discord!' });
+      return;
+    }
     if (!type) return;
 
     const newCounter = {
@@ -429,18 +446,24 @@ function CountersManager({ guildId, roles = [] }) {
         body: { counter: newCounter }
       });
       const data = await res.json();
-      setCounters(data.counters || []);
+      if (data.error) {
+        setStatusMsg({ success: false, message: data.error });
+        return;
+      }
+      const list = data.counters || [];
+      setCounters(list);
       setStatusMsg({ success: true, message: 'Đã tạo kênh Counter mới thành công!' });
       setChannelNameTemplate('👥 Members: {count}');
       setIsGoal(false);
     } catch (err) {
-      setStatusMsg({ success: false, message: err.message });
+      setStatusMsg({ success: false, message: err.message || 'Lỗi khi tạo Counter mới' });
     } finally {
       setLoading(false);
     }
   };
 
   const handleDeleteCounter = async (counterId) => {
+    if (!guildId) return;
     if (!window.confirm('Bạn có chắc chắn muốn xóa kênh Counter này?')) return;
     setLoading(true);
     try {
@@ -448,6 +471,10 @@ function CountersManager({ guildId, roles = [] }) {
         method: 'DELETE'
       });
       const data = await res.json();
+      if (data.error) {
+        alert(data.error);
+        return;
+      }
       setCounters(data.counters || []);
     } catch (err) {
       alert(err.message);
@@ -457,6 +484,10 @@ function CountersManager({ guildId, roles = [] }) {
   };
 
   const handleSyncNow = async () => {
+    if (!guildId) {
+      setStatusMsg({ success: false, message: 'Chưa chọn Server Discord!' });
+      return;
+    }
     setSyncing(true);
     setStatusMsg(null);
     try {
@@ -464,10 +495,14 @@ function CountersManager({ guildId, roles = [] }) {
         method: 'POST'
       });
       const data = await res.json();
+      if (data.error) {
+        setStatusMsg({ success: false, message: data.error });
+        return;
+      }
       setCounters(data.counters || []);
       setStatusMsg({ success: true, message: data.message || 'Đã đồng bộ các kênh Counter!' });
     } catch (err) {
-      setStatusMsg({ success: false, message: err.message });
+      setStatusMsg({ success: false, message: err.message || 'Lỗi khi đồng bộ Counter' });
     } finally {
       setSyncing(false);
     }

@@ -1625,7 +1625,12 @@ export function createServer({ configStore, stateStore, botClient, redis = null 
     try {
       const config = await configStore.getGuildConfig(req.guildId);
       const existing = config.counters || [];
-      const { mode, counter, countersEnabled } = req.body || {};
+      
+      let bodyData = req.body || {};
+      if (typeof bodyData === 'string') {
+        try { bodyData = JSON.parse(bodyData); } catch {}
+      }
+      const { mode, counter, countersEnabled } = bodyData;
 
       let updatedCounters = [...existing];
 
@@ -1650,13 +1655,20 @@ export function createServer({ configStore, stateStore, botClient, redis = null 
             isGoal: false
           }
         ];
-        updatedCounters = [...updatedCounters, ...defaultCounters];
-      } else if (counter && counter.id) {
-        const idx = updatedCounters.findIndex(c => c.id === counter.id);
-        if (idx >= 0) {
-          updatedCounters[idx] = { ...updatedCounters[idx], ...counter };
-        } else {
-          updatedCounters.push(counter);
+        const nonDefaults = updatedCounters.filter(c => c.type !== 'members' && c.type !== 'users');
+        updatedCounters = [...nonDefaults, ...defaultCounters];
+      } else if (counter) {
+        let counterObj = typeof counter === 'string' ? JSON.parse(counter) : counter;
+        if (counterObj && counterObj.type) {
+          if (!counterObj.id) {
+            counterObj.id = `counter_${counterObj.type}_${Date.now()}`;
+          }
+          const idx = updatedCounters.findIndex(c => c.id === counterObj.id);
+          if (idx >= 0) {
+            updatedCounters[idx] = { ...updatedCounters[idx], ...counterObj };
+          } else {
+            updatedCounters.push(counterObj);
+          }
         }
       }
 

@@ -21,10 +21,10 @@ export async function calculateCounterStat(guild, counter) {
       return guild.memberCount || guild.members.cache.size || 0;
 
     case 'users':
-      return guild.members.cache.filter(m => !m.user.bot).size;
+      return guild.members.cache.filter(m => !m.user?.bot).size;
 
     case 'bots':
-      return guild.members.cache.filter(m => m.user.bot).size;
+      return guild.members.cache.filter(m => m.user?.bot).size;
 
     case 'roles':
       return guild.roles.cache.size;
@@ -208,23 +208,35 @@ export async function syncSingleCounter(guild, counter, configStore) {
         category = await guild.channels.create({
           name: '📊 Server Stats',
           type: ChannelType.GuildCategory
-        });
+        }).catch(() => null);
       }
 
-      // Create a locked voice channel for counter display
+      const everyoneRoleId = guild.roles?.everyone?.id || guild.id;
+
+      // Create a locked voice channel for counter display with safe permission overwrite fallback
       channel = await guild.channels.create({
         name: expectedName,
         type: ChannelType.GuildVoice,
         parent: category?.id,
         permissionOverwrites: [
           {
-            id: guild.roles.everyone.id,
+            id: everyoneRoleId,
             deny: [PermissionFlagsBits.Connect],
             allow: [PermissionFlagsBits.ViewChannel]
           }
         ]
+      }).catch(async (err) => {
+        console.warn(`[countersEngine] Could not create channel with permissionOverwrites, trying basic voice channel:`, err.message);
+        return await guild.channels.create({
+          name: expectedName,
+          type: ChannelType.GuildVoice,
+          parent: category?.id
+        });
       });
-      counter.channelId = channel.id;
+
+      if (channel) {
+        counter.channelId = channel.id;
+      }
     } else {
       // Only rename if channel name actually changed (prevents Discord rate-limits)
       if (channel.name !== expectedName) {
@@ -235,7 +247,7 @@ export async function syncSingleCounter(guild, counter, configStore) {
     }
 
     // Persist updated counter channelId and currentGoalIndex to configStore
-    if (configStore && (counter.channelId !== channel.id || newGoalIndex !== counter.currentGoalIndex)) {
+    if (configStore && channel && (counter.channelId !== channel.id || newGoalIndex !== counter.currentGoalIndex)) {
       const config = await configStore.getGuildConfig(guild.id);
       const updatedCounters = (config.counters || []).map(c => {
         if (c.id === counter.id) {
@@ -252,7 +264,7 @@ export async function syncSingleCounter(guild, counter, configStore) {
 
     return {
       success: true,
-      channelId: channel.id,
+      channelId: channel?.id || null,
       name: expectedName,
       count: rawCount,
       targetGoal
