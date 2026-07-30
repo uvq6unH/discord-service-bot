@@ -242,6 +242,8 @@ export async function getOrResolveCounterCategory(guild, configStore) {
 export async function syncSingleCounter(guild, counter, configStore) {
   if (!guild || !counter || counter.enabled === false) return null;
 
+  const originalChannelId = counter.channelId;
+
   try {
     const rawCount = await calculateCounterStat(guild, counter);
     let targetGoal = null;
@@ -277,6 +279,7 @@ export async function syncSingleCounter(guild, counter, configStore) {
           if (counter.type === 'bots' && (nameLower.includes('bots') || nameLower.includes('robot') || ch.name.includes('🤖'))) return true;
           if (counter.type === 'roles' && (nameLower.includes('roles') || nameLower.includes('vai trò'))) return true;
           if (counter.type === 'channels' && nameLower.includes('channels')) return true;
+          if (counter.type === 'voiceChannels' && (nameLower.includes('voice') || ch.name.includes('🔊'))) return true;
           return false;
         });
 
@@ -325,13 +328,14 @@ export async function syncSingleCounter(guild, counter, configStore) {
     }
 
     // Persist updated counter channelId and currentGoalIndex to configStore
-    if (configStore && channel && (counter.channelId !== channel.id || newGoalIndex !== counter.currentGoalIndex)) {
+    const finalChannelId = channel?.id || null;
+    if (configStore && finalChannelId && (originalChannelId !== finalChannelId || newGoalIndex !== counter.currentGoalIndex)) {
       const config = await configStore.getGuildConfig(guild.id);
       const updatedCounters = (config.counters || []).map(c => {
         if (c.id === counter.id) {
           return {
             ...c,
-            channelId: channel.id,
+            channelId: finalChannelId,
             currentGoalIndex: newGoalIndex
           };
         }
@@ -342,7 +346,7 @@ export async function syncSingleCounter(guild, counter, configStore) {
 
     return {
       success: true,
-      channelId: channel?.id || null,
+      channelId: finalChannelId,
       name: expectedName,
       count: rawCount,
       targetGoal
@@ -357,6 +361,21 @@ export async function syncSingleCounter(guild, counter, configStore) {
   }
 }
 
+export function deduplicateCounters(counters) {
+  if (!Array.isArray(counters)) return [];
+  const seen = new Set();
+  const result = [];
+
+  for (const c of counters) {
+    const key = `${c.type}_${c.channelId || 'unbound'}`;
+    if (!seen.has(key)) {
+      seen.add(key);
+      result.push(c);
+    }
+  }
+  return result;
+}
+
 /**
  * Auto-discovers and imports existing counter voice channels under '📊 Server Stats' category in Discord if they are not yet in configStore.
  */
@@ -366,7 +385,7 @@ export async function autoDiscoverExistingCounters(guild, configStore) {
   const config = await configStore.getGuildConfig(guild.id);
   let currentCounters = Array.isArray(config.counters) ? [...config.counters] : [];
 
-  const category = guild.channels.cache.find(c => c.type === ChannelType.GuildCategory && /counter|stat/i.test(c.name));
+  const category = await getOrResolveCounterCategory(guild, configStore);
   if (!category) return currentCounters;
 
   let fetchedChannels;
@@ -394,6 +413,9 @@ export async function autoDiscoverExistingCounters(guild, configStore) {
       } else if (nameLower.includes('roles') || nameLower.includes('vai trò')) {
         typeKey = 'roles';
         template = '🏷️ Roles: {count}';
+      } else if (nameLower.includes('voice')) {
+        typeKey = 'voiceChannels';
+        template = '🔊 Voice Channels: {count}';
       }
 
       if (typeKey) {
@@ -405,18 +427,27 @@ export async function autoDiscoverExistingCounters(guild, configStore) {
           };
           updated = true;
         } else {
-          currentCounters.push({
-            id: `counter_${typeKey}_${Date.now()}_${Math.floor(Math.random() * 1000)}`,
-            type: typeKey,
-            channelNameTemplate: template,
-            channelId: ch.id,
-            enabled: true,
-            isGoal: false
-          });
-          updated = true;
+          const existingBound = currentCounters.find(c => c.type === typeKey && c.channelId);
+          if (!existingBound) {
+            currentCounters.push({
+              id: `counter_${typeKey}_${Date.now()}_${Math.floor(Math.random() * 1000)}`,
+              type: typeKey,
+              channelNameTemplate: template,
+              channelId: ch.id,
+              enabled: true,
+              isGoal: false
+            });
+            updated = true;
+          }
         }
       }
     }
+  }
+
+  const deduplicated = deduplicateCounters(currentCounters);
+  if (deduplicated.length !== currentCounters.length) {
+    currentCounters = deduplicated;
+    updated = true;
   }
 
   if (updated) {
