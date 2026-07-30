@@ -18,7 +18,7 @@ export async function calculateCounterStat(guild, counter) {
 
   switch (type) {
     case 'members':
-      return guild.memberCount || guild.members.cache.size;
+      return guild.memberCount || guild.members.cache.size || 0;
 
     case 'users':
       return guild.members.cache.filter(m => !m.user.bot).size;
@@ -107,18 +107,21 @@ export function resolveGoalMilestone(counter, currentCount) {
     return { targetGoal: 0, updatedIndex: 0 };
   }
 
+  // Ensure goals array is sorted ascending
+  const sortedGoals = [...goals].sort((a, b) => a - b);
+
   let index = counter.currentGoalIndex || 0;
-  if (index >= goals.length) {
-    index = goals.length - 1;
+  if (index >= sortedGoals.length) {
+    index = sortedGoals.length - 1;
   }
 
   // Auto advance if currentCount reached or exceeded target goal
-  while (index < goals.length - 1 && currentCount >= goals[index]) {
+  while (index < sortedGoals.length - 1 && currentCount >= sortedGoals[index]) {
     index++;
   }
 
   return {
-    targetGoal: goals[index] || 0,
+    targetGoal: sortedGoals[index] || 0,
     updatedIndex: index
   };
 }
@@ -137,6 +140,40 @@ export function generateCounterChannelName(counter, currentCount, targetGoal = n
 
   // Truncate to Discord 100 char limit for channel names
   return resultName.slice(0, 95);
+}
+
+/**
+ * Computes live calculated stats (count, targetGoal, evaluated channelName, channel status)
+ * for a counter without modifying Discord channels (read-only for GET requests).
+ */
+export async function enrichCounterWithLiveStats(guild, counter) {
+  if (!counter) return counter;
+  
+  const rawCount = guild ? await calculateCounterStat(guild, counter) : 0;
+  let targetGoal = null;
+
+  if (counter.isGoal) {
+    const goalRes = resolveGoalMilestone(counter, rawCount);
+    targetGoal = goalRes.targetGoal;
+  }
+
+  const evaluatedName = generateCounterChannelName(counter, rawCount, targetGoal);
+  
+  let channelExists = false;
+  if (guild && counter.channelId) {
+    const ch = guild.channels.cache.get(counter.channelId) || await guild.channels.fetch(counter.channelId).catch(() => null);
+    channelExists = Boolean(ch);
+  }
+
+  return {
+    ...counter,
+    liveCount: rawCount,
+    formattedCount: formatCountNumber(rawCount),
+    targetGoal,
+    formattedGoal: targetGoal !== null ? formatCountNumber(targetGoal) : null,
+    evaluatedName,
+    channelExists
+  };
 }
 
 /**
@@ -166,12 +203,12 @@ export async function syncSingleCounter(guild, counter, configStore) {
 
     if (!channel) {
       // Find or create parent category for counters
-      let category = guild.channels.cache.find(c => c.type === ChannelType.GuildCategory && /counter/i.test(c.name));
+      let category = guild.channels.cache.find(c => c.type === ChannelType.GuildCategory && /counter|stat/i.test(c.name));
       if (!category) {
         category = await guild.channels.create({
           name: '📊 Server Stats',
           type: ChannelType.GuildCategory
-        }).catch(() => null);
+        });
       }
 
       // Create a locked voice channel for counter display
@@ -213,10 +250,20 @@ export async function syncSingleCounter(guild, counter, configStore) {
       await configStore.updateGuildConfig(guild.id, { counters: updatedCounters });
     }
 
-    return { success: true, channelId: channel.id, name: expectedName, count: rawCount };
+    return {
+      success: true,
+      channelId: channel.id,
+      name: expectedName,
+      count: rawCount,
+      targetGoal
+    };
   } catch (err) {
-    console.error(`[countersEngine] Error syncing counter ${counter.id} in guild ${guild.id}:`, err.message);
-    return { success: false, error: err.message };
+    console.error(`[countersEngine] Error syncing counter ${counter.id} in guild ${guild.id}:`, err);
+    const isPermErr = err?.code === 50013 || /permission/i.test(err?.message ?? '');
+    const userErrMsg = isPermErr
+      ? 'Bot thiếu quyền Manage Channels (Quản lý kênh) trên Discord Server'
+      : (err?.message || 'Không thể tạo kênh Discord');
+    return { success: false, error: userErrMsg };
   }
 }
 

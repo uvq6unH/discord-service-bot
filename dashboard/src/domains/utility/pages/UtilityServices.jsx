@@ -335,6 +335,27 @@ const COUNTER_TYPES = [
   { value: 'static', label: '📌 Static Text' }
 ];
 
+const TEMPLATE_PRESETS = {
+  members: '👥 Members: {count}',
+  users: '👤 Users: {count}',
+  bots: '🤖 Bots: {count}',
+  roles: '🛡️ Roles: {count}',
+  channels: '💬 Channels: {count}',
+  textChannels: '📝 Text Channels: {count}',
+  voiceChannels: '🔊 Voice Channels: {count}',
+  categoryChannels: '📁 Categories: {count}',
+  announcementChannels: '📢 Announcements: {count}',
+  stageChannels: '🎙️ Stages: {count}',
+  membersWithRole: '🎖️ Role Members: {count}',
+  membersWithoutRole: '⚪ Non-Role Members: {count}',
+  emojis: '😃 Emojis: {count}',
+  nitroBoosts: '🚀 Boosts: {count}',
+  nitroBoostTier: '⭐ Boost Tier: {count}',
+  onlineMembers: '🟢 Online: {count}',
+  offlineMembers: '⚪ Offline: {count}',
+  static: '📌 Stat: {count}'
+};
+
 function CountersManager({ guildId, roles = [] }) {
   const { t } = useLanguage();
   const [counters, setCounters] = useState([]);
@@ -443,6 +464,7 @@ function CountersManager({ guildId, roles = [] }) {
         method: 'POST'
       });
       const data = await res.json();
+      setCounters(data.counters || []);
       setStatusMsg({ success: true, message: data.message || 'Đã đồng bộ các kênh Counter!' });
     } catch (err) {
       setStatusMsg({ success: false, message: err.message });
@@ -465,8 +487,15 @@ function CountersManager({ guildId, roles = [] }) {
     }
   };
 
+  const insertTag = (tag) => {
+    if (!channelNameTemplate.includes(tag)) {
+      setChannelNameTemplate(prev => `${prev} ${tag}`.trim());
+    }
+  };
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
+      {/* Top Header & Sync Buttons */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 'var(--space-3)' }}>
         <div>
           <div style={{ fontFamily: 'var(--font-mono)', fontWeight: 'bold', fontSize: '13px', color: 'var(--text-1)', display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
@@ -514,6 +543,7 @@ function CountersManager({ guildId, roles = [] }) {
         </div>
       )}
 
+      {/* Add New Counter Form */}
       <form onSubmit={handleCreateCounter} style={{
         padding: 'var(--space-4)',
         background: 'var(--surface-1)',
@@ -536,11 +566,12 @@ function CountersManager({ guildId, roles = [] }) {
               onChange={e => {
                 const newType = e.target.value;
                 setType(newType);
-                if (newType === 'members') setChannelNameTemplate('👥 Members: {count}');
-                else if (newType === 'users') setChannelNameTemplate('👤 Users: {count}');
-                else if (newType === 'bots') setChannelNameTemplate('🤖 Bots: {count}');
-                else if (newType === 'roles') setChannelNameTemplate('🛡️ Roles: {count}');
-                else if (newType === 'nitroBoosts') setChannelNameTemplate('🚀 Boosts: {count}');
+                const preset = TEMPLATE_PRESETS[newType] || '👥 Count: {count}';
+                if (isGoal) {
+                  setChannelNameTemplate(preset.replace('{count}', '{count}/{goal}'));
+                } else {
+                  setChannelNameTemplate(preset);
+                }
               }}
               style={{ fontSize: '12px' }}
             >
@@ -551,15 +582,31 @@ function CountersManager({ guildId, roles = [] }) {
           </div>
 
           <div className="form-group" style={{ margin: 0 }}>
-            <label className="form-label" style={{ fontSize: '11px', fontFamily: 'var(--font-mono)' }}>
-              Channel Name Template <span style={{ color: 'var(--text-3)' }}>({`Tag: {count}, {goal}`})</span>
-            </label>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <label className="form-label" style={{ fontSize: '11px', fontFamily: 'var(--font-mono)', margin: 0 }}>
+                Channel Name Template
+              </label>
+              <div style={{ display: 'flex', gap: '4px' }}>
+                <span
+                  onClick={() => insertTag('{count}')}
+                  style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', color: 'var(--accent)', cursor: 'pointer', fontSize: '10px', padding: '1px 5px', fontFamily: 'var(--font-mono)' }}
+                >
+                  +{`{count}`}
+                </span>
+                <span
+                  onClick={() => insertTag('{goal}')}
+                  style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', color: 'var(--amber)', cursor: 'pointer', fontSize: '10px', padding: '1px 5px', fontFamily: 'var(--font-mono)' }}
+                >
+                  +{`{goal}`}
+                </span>
+              </div>
+            </div>
             <input
               className="form-input"
               value={channelNameTemplate}
               onChange={e => setChannelNameTemplate(e.target.value)}
               placeholder="👥 Members: {count}"
-              style={{ fontSize: '12px', fontFamily: 'var(--font-mono)' }}
+              style={{ fontSize: '12px', fontFamily: 'var(--font-mono)', marginTop: '4px' }}
             />
           </div>
         </div>
@@ -587,9 +634,10 @@ function CountersManager({ guildId, roles = [] }) {
               type="checkbox"
               checked={isGoal}
               onChange={e => {
-                setIsGoal(e.target.checked);
-                if (e.target.checked && !channelNameTemplate.includes('{goal}')) {
-                  setChannelNameTemplate('🎯 Goal: {count}/{goal}');
+                const checked = e.target.checked;
+                setIsGoal(checked);
+                if (checked && !channelNameTemplate.includes('{goal}')) {
+                  setChannelNameTemplate(prev => prev.includes('{count}') ? prev.replace('{count}', '{count}/{goal}') : `${prev} {count}/{goal}`);
                 }
               }}
             />
@@ -615,6 +663,7 @@ function CountersManager({ guildId, roles = [] }) {
         </button>
       </form>
 
+      {/* Active Counters List */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
         <div style={{ fontSize: '11px', color: 'var(--text-3)', fontFamily: 'var(--font-mono)', fontWeight: 'bold' }}>
           ACTIVE COUNTERS ({counters.length}):
@@ -635,19 +684,34 @@ function CountersManager({ guildId, roles = [] }) {
               justifyContent: 'space-between',
               gap: 'var(--space-3)'
             }}>
-              <div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                 <div style={{ fontFamily: 'var(--font-mono)', fontWeight: 'bold', fontSize: '13px', color: 'var(--text-1)', display: 'flex', alignItems: 'center', gap: '8px' }}>
                   <span style={{ color: c.enabled !== false ? 'var(--accent)' : 'var(--text-3)' }}>
-                    {c.channelNameTemplate}
+                    🔊 {c.evaluatedName || c.channelNameTemplate}
                   </span>
                   {c.isGoal && (
                     <span style={{ background: 'rgba(255, 170, 0, 0.15)', color: 'var(--amber)', fontSize: '10px', padding: '1px 6px', borderRadius: '3px' }}>
-                      GOAL
+                      GOAL MILESTONE
                     </span>
                   )}
                 </div>
-                <div style={{ fontSize: '11px', color: 'var(--text-3)', marginTop: '2px' }}>
-                  Type: <code>{c.type}</code> {c.isGoal && Array.isArray(c.goals) ? `• Milestones: [${c.goals.join(', ')}]` : ''}
+
+                <div style={{ fontSize: '11px', color: 'var(--text-3)', display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+                  <span>Type: <code>{c.type}</code></span>
+                  <span>Template: <code>{c.channelNameTemplate}</code></span>
+                  {c.formattedCount !== undefined && (
+                    <span style={{ color: 'var(--accent)' }}>
+                      Current: <strong>{c.formattedCount}</strong>
+                    </span>
+                  )}
+                  {c.isGoal && c.formattedGoal && (
+                    <span style={{ color: 'var(--amber)' }}>
+                      Target Goal: <strong>{c.formattedGoal}</strong>
+                    </span>
+                  )}
+                  <span>
+                    Status: {c.channelExists ? '🟢 Connected' : '🟡 Pending Sync'}
+                  </span>
                 </div>
               </div>
 
