@@ -356,12 +356,13 @@ const TEMPLATE_PRESETS = {
   static: '📌 Stat: {count}'
 };
 
-function CountersManager({ guildId, roles = [] }) {
+function CountersManager({ guildId, roles = [], onUpdateConfig }) {
   const { t } = useLanguage();
   const [counters, setCounters] = useState([]);
   const [loading, setLoading] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [statusMsg, setStatusMsg] = useState(null);
+  const [confirmingDeleteId, setConfirmingDeleteId] = useState(null);
 
   // Form state
   const [type, setType] = useState('members');
@@ -370,13 +371,20 @@ function CountersManager({ guildId, roles = [] }) {
   const [goalsStr, setGoalsStr] = useState('100, 250, 500, 1000');
   const [roleId, setRoleId] = useState('');
 
+  const syncState = (list) => {
+    setCounters(list);
+    if (onUpdateConfig) {
+      onUpdateConfig({ counters: list });
+    }
+  };
+
   const loadCounters = async () => {
     if (!guildId) return;
     setLoading(true);
     try {
       const res = await apiFetch(`/api/guilds/${guildId}/counters`);
       const data = await res.json();
-      setCounters(data.counters || []);
+      syncState(data.counters || []);
     } catch (err) {
       console.error('Failed to load counters:', err);
     } finally {
@@ -406,7 +414,7 @@ function CountersManager({ guildId, roles = [] }) {
         return;
       }
       const list = data.counters || [];
-      setCounters(list);
+      syncState(list);
       if (list.length > 0) {
         setStatusMsg({ success: true, message: `Đã tự động khởi tạo ${list.length} kênh Counter mặc định (Members & Users)!` });
       } else {
@@ -451,7 +459,7 @@ function CountersManager({ guildId, roles = [] }) {
         return;
       }
       const list = data.counters || [];
-      setCounters(list);
+      syncState(list);
       setStatusMsg({ success: true, message: 'Đã tạo kênh Counter mới thành công!' });
       setChannelNameTemplate('👥 Members: {count}');
       setIsGoal(false);
@@ -464,20 +472,22 @@ function CountersManager({ guildId, roles = [] }) {
 
   const handleDeleteCounter = async (counterId) => {
     if (!guildId) return;
-    if (!window.confirm('Bạn có chắc chắn muốn xóa kênh Counter này?')) return;
     setLoading(true);
+    setConfirmingDeleteId(null);
     try {
       const res = await apiFetch(`/api/guilds/${guildId}/counters/${counterId}`, {
         method: 'DELETE'
       });
       const data = await res.json();
       if (data.error) {
-        alert(data.error);
+        setStatusMsg({ success: false, message: data.error });
         return;
       }
-      setCounters(data.counters || []);
+      const list = data.counters || [];
+      syncState(list);
+      setStatusMsg({ success: true, message: 'Đã xóa kênh Counter thành công!' });
     } catch (err) {
-      alert(err.message);
+      setStatusMsg({ success: false, message: err.message || 'Lỗi khi xóa Counter' });
     } finally {
       setLoading(false);
     }
@@ -499,7 +509,8 @@ function CountersManager({ guildId, roles = [] }) {
         setStatusMsg({ success: false, message: data.error });
         return;
       }
-      setCounters(data.counters || []);
+      const list = data.counters || [];
+      syncState(list);
       setStatusMsg({ success: true, message: data.message || 'Đã đồng bộ các kênh Counter!' });
     } catch (err) {
       setStatusMsg({ success: false, message: err.message || 'Lỗi khi đồng bộ Counter' });
@@ -516,9 +527,13 @@ function CountersManager({ guildId, roles = [] }) {
         body: { counter: updated }
       });
       const data = await res.json();
-      setCounters(data.counters || []);
+      if (data.error) {
+        setStatusMsg({ success: false, message: data.error });
+        return;
+      }
+      syncState(data.counters || []);
     } catch (err) {
-      alert(err.message);
+      setStatusMsg({ success: false, message: err.message });
     }
   };
 
@@ -567,14 +582,24 @@ function CountersManager({ guildId, roles = [] }) {
 
       {statusMsg && (
         <div style={{
-          padding: 'var(--space-3)',
-          background: statusMsg.success ? 'rgba(0, 255, 136, 0.08)' : 'rgba(255, 71, 87, 0.08)',
+          padding: 'var(--space-3) var(--space-4)',
+          background: statusMsg.success ? 'rgba(0, 255, 136, 0.06)' : 'rgba(255, 71, 87, 0.06)',
           border: `1px solid ${statusMsg.success ? 'var(--accent)' : 'var(--red)'}`,
           color: statusMsg.success ? 'var(--accent)' : 'var(--red)',
           fontFamily: 'var(--font-mono)',
-          fontSize: '12px'
+          fontSize: '12px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: 'var(--space-3)'
         }}>
-          {statusMsg.success ? '✔ ' : '✖ '}{statusMsg.message}
+          <span>{statusMsg.success ? '✔ ' : '✖ '}{statusMsg.message}</span>
+          <button
+            onClick={() => setStatusMsg(null)}
+            style={{ background: 'none', border: 'none', color: 'inherit', cursor: 'pointer', fontFamily: 'var(--font-mono)', fontSize: '12px' }}
+          >
+            [ × ]
+          </button>
         </div>
       )}
 
@@ -709,71 +734,110 @@ function CountersManager({ guildId, roles = [] }) {
             Chưa có kênh Counter nào. Hãy tạo ở form trên hoặc bấm "Auto-Setup Default".
           </div>
         ) : (
-          counters.map((c, i) => (
-            <div key={c.id || i} style={{
-              padding: 'var(--space-3) var(--space-4)',
-              background: 'var(--surface-1)',
-              border: '1px solid var(--border)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              gap: 'var(--space-3)'
-            }}>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                <div style={{ fontFamily: 'var(--font-mono)', fontWeight: 'bold', fontSize: '13px', color: 'var(--text-1)', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <span style={{ color: c.enabled !== false ? 'var(--accent)' : 'var(--text-3)' }}>
-                    🔊 {c.evaluatedName || c.channelNameTemplate}
-                  </span>
-                  {c.isGoal && (
-                    <span style={{ background: 'rgba(255, 170, 0, 0.15)', color: 'var(--amber)', fontSize: '10px', padding: '1px 6px', borderRadius: '3px' }}>
-                      GOAL MILESTONE
+          counters.map((c, i) => {
+            const isDeleting = confirmingDeleteId === c.id;
+            return (
+              <div key={c.id || i} style={{
+                padding: 'var(--space-3) var(--space-4)',
+                background: 'var(--surface-1)',
+                border: isDeleting ? '1px solid var(--red)' : '1px solid var(--border)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: 'var(--space-3)'
+              }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', flex: 1 }}>
+                  <div style={{ fontFamily: 'var(--font-mono)', fontWeight: 'bold', fontSize: '13px', color: 'var(--text-1)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span style={{ color: c.enabled !== false ? 'var(--accent)' : 'var(--text-3)' }}>
+                      🔊 {c.evaluatedName || c.channelNameTemplate}
                     </span>
-                  )}
-                </div>
-
-                <div style={{ fontSize: '11px', color: 'var(--text-3)', display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
-                  <span>Type: <code>{c.type}</code></span>
-                  <span>Template: <code>{c.channelNameTemplate}</code></span>
-                  {c.formattedCount !== undefined && (
-                    <span style={{ color: 'var(--accent)' }}>
-                      Current: <strong>{c.formattedCount}</strong>
-                    </span>
-                  )}
-                  {c.isGoal && c.formattedGoal && (
-                    <span style={{ color: 'var(--amber)' }}>
-                      Target Goal: <strong>{c.formattedGoal}</strong>
-                    </span>
-                  )}
-                  <span>
-                    Status: {c.channelExists ? '🟢 Connected' : '🟡 Pending Sync'}
-                  </span>
-                </div>
-              </div>
-
-              <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
-                <label className="toggle-switch">
-                  <input
-                    type="checkbox"
-                    className="toggle-switch__input"
-                    checked={c.enabled !== false}
-                    onChange={() => handleToggleCounter(c)}
-                  />
-                  <div className="toggle-switch__track">
-                    <div className="toggle-switch__thumb" />
+                    {c.isGoal && (
+                      <span style={{ background: 'rgba(255, 170, 0, 0.15)', color: 'var(--amber)', fontSize: '10px', padding: '1px 6px', borderRadius: '3px' }}>
+                        GOAL MILESTONE
+                      </span>
+                    )}
                   </div>
-                </label>
 
-                <button
-                  type="button"
-                  className="btn btn--danger"
-                  onClick={() => handleDeleteCounter(c.id)}
-                  style={{ padding: 'var(--space-1) var(--space-2)' }}
-                >
-                  <Trash2 size={14} />
-                </button>
+                  <div style={{ fontSize: '11px', color: 'var(--text-3)', display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+                    <span>Type: <code>{c.type}</code></span>
+                    <span>Template: <code>{c.channelNameTemplate}</code></span>
+                    {c.formattedCount !== undefined && (
+                      <span style={{ color: 'var(--accent)' }}>
+                        Current: <strong>{c.formattedCount}</strong>
+                      </span>
+                    )}
+                    {c.isGoal && c.formattedGoal && (
+                      <span style={{ color: 'var(--amber)' }}>
+                        Target Goal: <strong>{c.formattedGoal}</strong>
+                      </span>
+                    )}
+                    <span>
+                      Status: {c.channelExists ? '🟢 Connected' : '🟡 Pending Sync'}
+                    </span>
+                  </div>
+
+                  {isDeleting && (
+                    <div style={{
+                      marginTop: 'var(--space-2)',
+                      padding: 'var(--space-2) var(--space-3)',
+                      background: 'rgba(255, 71, 87, 0.08)',
+                      border: '1px solid var(--red)',
+                      color: 'var(--red)',
+                      fontSize: '11px',
+                      fontFamily: 'var(--font-mono)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      gap: 'var(--space-2)'
+                    }}>
+                      <span>⚠️ BẠN CÓ CHẮC CHẮN MUỐN XÓA KÊNH COUNTER NÀY?</span>
+                      <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
+                        <button
+                          type="button"
+                          className="btn btn--danger"
+                          onClick={() => handleDeleteCounter(c.id)}
+                          style={{ padding: '2px 8px', fontSize: '10px', fontFamily: 'var(--font-mono)' }}
+                        >
+                          XÓA KÊNH
+                        </button>
+                        <button
+                          type="button"
+                          className="btn btn--secondary"
+                          onClick={() => setConfirmingDeleteId(null)}
+                          style={{ padding: '2px 8px', fontSize: '10px', fontFamily: 'var(--font-mono)' }}
+                        >
+                          HỦY
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
+                  <label className="toggle-switch">
+                    <input
+                      type="checkbox"
+                      className="toggle-switch__input"
+                      checked={c.enabled !== false}
+                      onChange={() => handleToggleCounter(c)}
+                    />
+                    <div className="toggle-switch__track">
+                      <div className="toggle-switch__thumb" />
+                    </div>
+                  </label>
+
+                  <button
+                    type="button"
+                    className="btn btn--danger"
+                    onClick={() => setConfirmingDeleteId(isDeleting ? null : c.id)}
+                    style={{ padding: 'var(--space-1) var(--space-2)' }}
+                  >
+                    <Trash2 size={14} />
+                  </button>
+                </div>
               </div>
-            </div>
-          ))
+            );
+          })
         )}
       </div>
     </div>
@@ -919,7 +983,7 @@ export default function UtilityServicesPage() {
       <div className="grid-12" style={{ marginTop: 'var(--space-6)' }}>
         <div className="col-span-12">
           <Panel title={t("SERVER COUNTERS & GOALS (ARCANE STATS ENGINE)")} accent id="counters" className={highlight === 'counters' ? 'flash-target' : ''}>
-            <CountersManager guildId={selectedGuild?.id} roles={roles} />
+            <CountersManager guildId={selectedGuild?.id} roles={roles} onUpdateConfig={updateConfig} />
           </Panel>
         </div>
       </div>
