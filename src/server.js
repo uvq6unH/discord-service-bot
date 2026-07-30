@@ -1686,10 +1686,8 @@ export function createServer({ configStore, stateStore, botClient, redis = null 
       const { syncAllCountersForGuild, enrichCounterWithLiveStats } = await import('./bot/services/countersEngine.js');
       if (guild) {
         await syncAllCountersForGuild(guild, configStore).catch(() => null);
-      }
-
-      // Also dispatch event to Redis event_queue for split-mode bot process
-      if (redis) {
+      } else if (redis) {
+        // Only dispatch event to Redis event_queue for split-mode bot process if bot is NOT in-process
         await redis.rpush('event_queue', JSON.stringify({
           type: 'sync_counters',
           guildId: req.guildId,
@@ -1721,13 +1719,14 @@ export function createServer({ configStore, stateStore, botClient, redis = null 
         ? (botClient.guilds.cache.get(req.guildId) || await botClient.guilds.fetch(req.guildId).catch(() => null))
         : null;
 
+      const { syncAllCountersForGuild, enrichCounterWithLiveStats } = await import('./bot/services/countersEngine.js');
+
       // Delete associated Discord channel if channelId exists
       if (guild && targetCounter?.channelId) {
         const ch = guild.channels.cache.get(targetCounter.channelId) || await guild.channels.fetch(targetCounter.channelId).catch(() => null);
         if (ch) await ch.delete('Counter deleted via Dashboard').catch(() => null);
-      }
-
-      if (redis) {
+        await syncAllCountersForGuild(guild, configStore).catch(() => null);
+      } else if (redis) {
         await redis.rpush('event_queue', JSON.stringify({
           type: 'sync_counters',
           guildId: req.guildId,
@@ -1735,7 +1734,6 @@ export function createServer({ configStore, stateStore, botClient, redis = null 
         })).catch(() => null);
       }
 
-      const { enrichCounterWithLiveStats } = await import('./bot/services/countersEngine.js');
       const enrichedCounters = await Promise.all(updatedCounters.map(c => enrichCounterWithLiveStats(guild, c)));
 
       return res.json({ success: true, counters: enrichedCounters });
@@ -1757,9 +1755,7 @@ export function createServer({ configStore, stateStore, botClient, redis = null 
       let results = [];
       if (guild) {
         results = await syncAllCountersForGuild(guild, configStore);
-      }
-
-      if (redis) {
+      } else if (redis) {
         await redis.rpush('event_queue', JSON.stringify({
           type: 'sync_counters',
           guildId: req.guildId,

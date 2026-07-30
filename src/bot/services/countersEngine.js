@@ -201,16 +201,41 @@ export async function syncSingleCounter(guild, counter, configStore) {
       channel = guild.channels.cache.get(counter.channelId) || await guild.channels.fetch(counter.channelId).catch(() => null);
     }
 
-    if (!channel) {
-      // Find or create parent category for counters
-      let category = guild.channels.cache.find(c => c.type === ChannelType.GuildCategory && /counter|stat/i.test(c.name));
-      if (!category) {
-        category = await guild.channels.create({
-          name: '📊 Server Stats',
-          type: ChannelType.GuildCategory
-        }).catch(() => null);
-      }
+    // Find or create parent category for counters
+    let category = guild.channels.cache.find(c => c.type === ChannelType.GuildCategory && /counter|stat/i.test(c.name));
+    if (!category) {
+      category = await guild.channels.create({
+        name: '📊 Server Stats',
+        type: ChannelType.GuildCategory
+      }).catch(() => null);
+    }
 
+    // If channel wasn't found by ID, look under category for any existing voice channel matching this counter type before creating a new one!
+    if (!channel && category) {
+      try {
+        let fetchedChannels;
+        try { fetchedChannels = await guild.channels.fetch(); } catch { fetchedChannels = guild.channels.cache; }
+        const categoryChildren = [...fetchedChannels.values()].filter(ch => ch.parentId === category.id && ch.type === ChannelType.GuildVoice);
+
+        const match = categoryChildren.find(ch => {
+          const nameLower = ch.name.toLowerCase();
+          if (counter.type === 'members' && (nameLower.includes('members') || nameLower.includes('thành viên') || ch.name.includes('👥'))) return true;
+          if (counter.type === 'users' && (nameLower.includes('users') || nameLower.includes('người dùng') || ch.name.includes('👤'))) return true;
+          if (counter.type === 'bots' && (nameLower.includes('bots') || nameLower.includes('robot') || ch.name.includes('🤖'))) return true;
+          if (counter.type === 'roles' && (nameLower.includes('roles') || nameLower.includes('vai trò'))) return true;
+          if (counter.type === 'channels' && nameLower.includes('channels')) return true;
+          return false;
+        });
+
+        if (match) {
+          channel = match;
+          counter.channelId = channel.id;
+          console.log(`[countersEngine] Found existing channel under category for counter ${counter.type}: ${channel.id}`);
+        }
+      } catch (_) {}
+    }
+
+    if (!channel) {
       const everyoneRoleId = guild.roles?.everyone?.id || guild.id;
 
       // Create a locked voice channel for counter display with safe permission overwrite fallback
@@ -280,7 +305,7 @@ export async function syncSingleCounter(guild, counter, configStore) {
 }
 
 /**
- * Syncs all counters for a guild.
+ * Syncs all counters for a guild and cleans up duplicate/orphan channels under the category.
  */
 export async function syncAllCountersForGuild(guild, configStore) {
   if (!guild || !configStore) return [];
@@ -291,10 +316,44 @@ export async function syncAllCountersForGuild(guild, configStore) {
   }
 
   const results = [];
+  const validChannelIds = new Set();
   for (const counter of config.counters) {
     const res = await syncSingleCounter(guild, counter, configStore);
-    if (res) results.push(res);
+    if (res) {
+      results.push(res);
+      if (res.channelId) validChannelIds.add(res.channelId);
+    }
   }
+
+  // Auto clean up any excess/duplicate voice channels under '📊 Server Stats' category
+  try {
+    const category = guild.channels.cache.find(c => c.type === ChannelType.GuildCategory && /counter|stat/i.test(c.name));
+    if (category) {
+      let fetchedChannels;
+      try { fetchedChannels = await guild.channels.fetch(); } catch { fetchedChannels = guild.channels.cache; }
+      const voiceChannelsUnderCategory = [...fetchedChannels.values()].filter(c => c.parentId === category.id && c.type === ChannelType.GuildVoice);
+
+      const seenTypes = new Set();
+      for (const ch of voiceChannelsUnderCategory) {
+        const isAssigned = validChannelIds.has(ch.id);
+        const nameLower = ch.name.toLowerCase();
+        let typeKey = null;
+        if (nameLower.includes('users') || ch.name.includes('👤')) typeKey = 'users';
+        else if (nameLower.includes('bots') || ch.name.includes('🤖')) typeKey = 'bots';
+        else if (nameLower.includes('members') || ch.name.includes('👥')) typeKey = 'members';
+
+        if (!isAssigned || (typeKey && seenTypes.has(typeKey))) {
+          console.log(`[countersEngine] Auto-deleting duplicate/orphan channel "${ch.name}" (${ch.id})`);
+          await ch.delete('Cleaning up duplicate counter channel').catch(() => null);
+        } else if (typeKey) {
+          seenTypes.add(typeKey);
+        }
+      }
+    }
+  } catch (err) {
+    console.warn('[countersEngine] Error during duplicate channel cleanup:', err.message);
+  }
+
   return results;
 }
 
