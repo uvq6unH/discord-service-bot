@@ -259,6 +259,21 @@ export async function getOrResolveCounterCategory(guild, configStore) {
     await configStore.updateGuildConfig(guild.id, { counterCategoryId: category.id }).catch(() => null);
   }
 
+  // Ensure bot has explicit ALLOW permissions on the Category so channel creation never gets blocked by Category Overwrites
+  if (category && guild.members?.me) {
+    try {
+      const me = guild.members.me;
+      await category.permissionOverwrites.edit(me, {
+        ViewChannel: true,
+        ManageChannels: true,
+        ManageRoles: true,
+        Connect: true
+      }).catch(err => console.warn(`[countersEngine] Failed to auto-fix category overwrites for bot:`, err.message));
+    } catch (err) {
+      console.warn(`[countersEngine] Could not check/fix category overwrites:`, err.message);
+    }
+  }
+
   return category;
 }
 
