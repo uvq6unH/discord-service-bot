@@ -515,33 +515,36 @@ export async function syncAllCountersForGuild(guild, configStore) {
     }
   }
 
-  // Auto clean up any excess/duplicate voice channels under '📊 Server Stats' category
+  // Re-read latest config to get all assigned channelIds after sync
+  const freshConfig = await configStore.getGuildConfig(guild.id);
+  const freshList = Array.isArray(freshConfig.counters) ? freshConfig.counters : [];
+  for (const c of freshList) {
+    if (c.channelId) validChannelIds.add(c.channelId);
+  }
+
+  // Auto clean up any truly orphaned voice channels under '📊 Server Stats' category
   try {
-    const category = guild.channels.cache.find(c => c.type === ChannelType.GuildCategory && /counter|stat/i.test(c.name));
+    const category = await getOrResolveCounterCategory(guild, configStore);
     if (category) {
       let fetchedChannels;
       try { fetchedChannels = await guild.channels.fetch(); } catch { fetchedChannels = guild.channels.cache; }
       const voiceChannelsUnderCategory = [...fetchedChannels.values()].filter(c => c.parentId === category.id && c.type === ChannelType.GuildVoice);
 
-      const seenTypes = new Set();
       for (const ch of voiceChannelsUnderCategory) {
         const isAssigned = validChannelIds.has(ch.id);
-        const nameLower = ch.name.toLowerCase();
-        let typeKey = null;
-        if (nameLower.includes('users') || ch.name.includes('👤')) typeKey = 'users';
-        else if (nameLower.includes('bots') || ch.name.includes('🤖')) typeKey = 'bots';
-        else if (nameLower.includes('members') || ch.name.includes('👥')) typeKey = 'members';
-
-        if (!isAssigned || (typeKey && seenTypes.has(typeKey))) {
-          console.log(`[countersEngine] Auto-deleting duplicate/orphan channel "${ch.name}" (${ch.id})`);
-          await ch.delete('Cleaning up duplicate counter channel').catch(() => null);
-        } else if (typeKey) {
-          seenTypes.add(typeKey);
+        if (!isAssigned) {
+          // Only auto-delete if it looks like a counter channel (contains digits or counter keywords)
+          const nameLower = ch.name.toLowerCase();
+          const looksLikeCounter = /\d+/.test(ch.name) || /members|users|bots|roles|channels|voice|stat|goal|thành viên|người dùng/i.test(nameLower) || /[👥👤🤖🏷️🔊🎯📊]/.test(ch.name);
+          if (looksLikeCounter) {
+            console.log(`[countersEngine] Auto-deleting orphan counter channel "${ch.name}" (${ch.id})`);
+            await ch.delete('Cleaning up orphan counter channel').catch(() => null);
+          }
         }
       }
     }
   } catch (err) {
-    console.warn('[countersEngine] Error during duplicate channel cleanup:', err.message);
+    console.warn('[countersEngine] Error during orphan channel cleanup:', err.message);
   }
 
   return results;
