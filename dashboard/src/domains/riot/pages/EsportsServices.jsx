@@ -6,6 +6,7 @@ import { useRiot } from '../hooks/useRiot.js';
 import { useGuild } from '../../../shared/hooks/useGuild.js';
 import { useLanguage } from '../../../shared/context/LanguageContext.jsx';
 import { apiFetch } from '../../../api.js';
+import { useNotify } from '../../../shared/context/NotificationContext.jsx';
 import { Trophy, Tv, BellRing, ShieldCheck, Send } from 'lucide-react';
 
 const LEAGUES = [
@@ -30,9 +31,9 @@ export default function EsportsServicesPage() {
   const { config, loading, updateConfig } = useRiot();
   const { guildData, selectedGuild } = useGuild();
   const { t } = useLanguage();
+  const notify = useNotify();
 
   const [testing, setTesting] = useState(false);
-  const [testStatus, setTestStatus] = useState(null);
 
   const channels = guildData?.channels ?? [];
 
@@ -73,15 +74,19 @@ export default function EsportsServicesPage() {
   const handleTestNotify = async () => {
     if (!selectedChannelId) return;
     setTesting(true);
-    setTestStatus(null);
     try {
       const selectedGuildId = localStorage.getItem('selectedGuildId') || '';
-      const data = await apiFetch(`/api/esports/test-notify?guildId=${selectedGuildId}`, {
+      const res = await apiFetch(`/api/esports/test-notify?guildId=${selectedGuildId}`, {
         method: 'POST'
       });
-      setTestStatus({ success: true, message: data.message });
+      const data = await res.json();
+      if (data.error) {
+        notify.error(data.error);
+      } else {
+        notify.success(data.message || 'Đã gửi thông báo thử nghiệm thành công!');
+      }
     } catch (err) {
-      setTestStatus({ success: false, message: err.message });
+      notify.error(err.message || 'Lỗi gửi thông báo thử nghiệm');
     } finally {
       setTesting(false);
     }
@@ -220,17 +225,6 @@ export default function EsportsServicesPage() {
                       <option key={c.id} value={c.id}>#{c.name}</option>
                     ))}
                   </select>
-
-                  {testStatus && (
-                    <div style={{
-                      fontSize: '11px',
-                      fontFamily: 'var(--font-mono)',
-                      marginTop: 'var(--space-2)',
-                      color: testStatus.success ? 'var(--green)' : 'var(--red)'
-                    }}>
-                      {testStatus.success ? '✔ ' : '✖ '}{testStatus.message}
-                    </div>
-                  )}
                 </div>
 
                 {/* Daily Schedule Broadcast Time Selector */}
