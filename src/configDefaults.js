@@ -179,6 +179,8 @@ export const defaultConfig = {
   esportsLeagueRoles: {},
   remindersEnabled: false,
   reminders: [],
+  countersEnabled: true,
+  counters: [],
   autoReplies: [
     {
       keyword: 'hello bot',
