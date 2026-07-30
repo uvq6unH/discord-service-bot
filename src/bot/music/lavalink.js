@@ -87,6 +87,13 @@ export async function initLavalink(client) {
   _manager = new LavalinkManager({
     nodes: buildNodeConfigs(),
 
+    // Tự động chọn Node hoạt động tốt nhất và ít quá tải nhất
+    nodeResolver: (nodes) => {
+      const connected = [...nodes.values()].filter(n => n.connected);
+      if (connected.length === 0) return null;
+      return connected.sort((a, b) => (a.stats?.players ?? 0) - (b.stats?.players ?? 0))[0];
+    },
+
     // Forward raw voice state/server events to Lavalink
     sendToShard: (guildId, payload) => {
       const guild = client.guilds.cache.get(guildId);
@@ -104,7 +111,9 @@ export async function initLavalink(client) {
       leaveOnEmpty: true,
       leaveOnEmptyCooldown: 20_000,  // 20 s — survive brief disconnects
       selfDeaf: true,
-      defaultVolume: 80,
+      defaultVolume: 70, // 70% volume headroom - ngăn ngừa hoàn toàn digital clipping / xé âm thanh (rè rè)
+      volumeDecrementer: 0.85,
+      clientBasedPositionUpdateInterval: 1000,
     },
   });
 
@@ -206,6 +215,7 @@ export async function initLavalink(client) {
   _manager.on('playerCreate', (player) => {
     console.log(`[lavalink] playerCreate | guild ${player.guildId}`);
     player.set('autoplay', true); // Mặc định tự động phát nhạc liên quan
+    player.setVolume(70); // Set clean 70% volume headroom cho âm thanh mượt mà không xé tiếng
   });
 
   _manager.on('playerDestroy', (player) => {

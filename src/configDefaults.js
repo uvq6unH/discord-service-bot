@@ -108,7 +108,7 @@ export const defaultConfig = {
     ]
   },
   music: {
-    defaultVolume: 80,
+    defaultVolume: 70,
     commands: [
       { enabled: true, type: 'musicplay', name: 'play', description: 'Phát nhạc từ link hoặc tên bài hát' },
       { enabled: true, type: 'musicskip', name: 'skip', description: 'Bỏ qua bài nhạc đang phát hiện tại' },

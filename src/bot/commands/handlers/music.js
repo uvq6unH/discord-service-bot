@@ -164,7 +164,7 @@ export async function handleMusicCommand({ message, subcommand, args, config }) 
           voiceChannelId: voiceChannel.id,
           textChannelId:  message.channel.id,
           selfDeaf:       true,
-          volume:         80,
+          volume:         70,
         });
       }
 
