@@ -1756,17 +1756,22 @@ export function createServer({ configStore, stateStore, botClient, redis = null 
       const { syncAllCountersForGuild, enrichCounterWithLiveStats } = await import('./bot/services/countersEngine.js');
 
       // Delete associated Discord channel if channelId exists
-      if (guild && targetCounter?.channelId) {
-        const ch = guild.channels.cache.get(targetCounter.channelId) || await guild.channels.fetch(targetCounter.channelId).catch(() => null);
-        if (ch) await ch.delete('Counter deleted via Dashboard').catch(() => null);
-        await syncAllCountersForGuild(guild, configStore).catch(() => null);
-      } else if (redis) {
-        await redis.rpush('event_queue', JSON.stringify({
-          type: 'sync_counters',
-          guildId: req.guildId,
-          requestedAt: new Date().toISOString()
-        })).catch(() => null);
-        await new Promise(resolve => setTimeout(resolve, 1200));
+      if (targetCounter?.channelId) {
+        if (guild) {
+          const ch = guild.channels.cache.get(targetCounter.channelId) || await guild.channels.fetch(targetCounter.channelId).catch(() => null);
+          if (ch) await ch.delete('Counter deleted via Dashboard').catch(() => null);
+          await syncAllCountersForGuild(guild, configStore).catch(() => null);
+        }
+        
+        if (redis) {
+          await redis.rpush('event_queue', JSON.stringify({
+            type: 'delete_counter_channel',
+            guildId: req.guildId,
+            channelId: targetCounter.channelId,
+            requestedAt: new Date().toISOString()
+          })).catch(() => null);
+          await new Promise(resolve => setTimeout(resolve, 1200));
+        }
       }
 
       const enrichedCounters = await Promise.all(updatedCounters.map(c => enrichCounterWithLiveStats(guild, c, redis, req.guildId)));

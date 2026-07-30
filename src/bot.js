@@ -690,6 +690,16 @@ function _startEventQueueWorker(client, configStore, redis) {
         });
         console.log(`[event-queue] Synced ${results?.length || 0} counter(s) for guild ${guildId}`);
       }
+    } else if (type === 'delete_counter_channel') {
+      if (!guildId || !job.channelId) return;
+      const guild = client.guilds.cache.get(guildId) || await client.guilds.fetch(guildId).catch(() => null);
+      if (guild) {
+        const ch = guild.channels.cache.get(job.channelId) || await guild.channels.fetch(job.channelId).catch(() => null);
+        if (ch) {
+          await ch.delete('Counter deleted via Dashboard').catch(err => console.warn(`[event-queue] Failed to delete channel ${job.channelId}:`, err.message));
+          console.log(`[event-queue] Deleted counter channel ${job.channelId} for guild ${guildId}`);
+        }
+      }
     } else if (type === 'refresh_guild') {
       if (!guildId) return;
       const guild = await client.guilds.fetch(guildId).catch(() => null);
