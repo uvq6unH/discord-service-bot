@@ -272,6 +272,23 @@ export async function getOrResolveCounterCategory(guild, configStore) {
   return category;
 }
 
+async function safeCreateVoiceChannel(guild, options, retries = 2) {
+  for (let i = 0; i <= retries; i++) {
+    try {
+      return await guild.channels.create(options);
+    } catch (err) {
+      const isRateLimit = err?.status === 429 || err?.code === 429 || /rate limit/i.test(err?.message || '');
+      if (isRateLimit && i < retries) {
+        console.warn(`[countersEngine] Discord Rate limited on channel create. Retrying in 2s (attempt ${i + 1}/${retries})...`);
+        await new Promise(r => setTimeout(r, 2000));
+      } else {
+        throw err;
+      }
+    }
+  }
+  return null;
+}
+
 /**
  * Syncs a single counter channel in Discord.
  */
@@ -306,7 +323,7 @@ export async function syncSingleCounter(guild, counter, configStore) {
 
       // 1. Try creating with locked voice channel permissions
       try {
-        channel = await guild.channels.create({
+        channel = await safeCreateVoiceChannel(guild, {
           name: expectedName,
           type: ChannelType.GuildVoice,
           parent: category?.id,
@@ -322,7 +339,7 @@ export async function syncSingleCounter(guild, counter, configStore) {
         console.warn(`[countersEngine] Channel create with overwrites failed (${err1.message}), trying basic voice channel:`);
         // 2. Try creating basic voice channel under category
         try {
-          channel = await guild.channels.create({
+          channel = await safeCreateVoiceChannel(guild, {
             name: expectedName,
             type: ChannelType.GuildVoice,
             parent: category?.id
@@ -331,7 +348,7 @@ export async function syncSingleCounter(guild, counter, configStore) {
           console.warn(`[countersEngine] Channel create under category failed (${err2.message}), trying root level:`);
           // 3. Try creating basic voice channel at root level
           try {
-            channel = await guild.channels.create({
+            channel = await safeCreateVoiceChannel(guild, {
               name: expectedName,
               type: ChannelType.GuildVoice
             });
