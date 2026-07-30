@@ -8,7 +8,7 @@ import { useGuild } from '../../../shared/hooks/useGuild.js';
 import { useLanguage } from '../../../shared/context/LanguageContext.jsx';
 import { apiFetch } from '../../../api.js';
 import { useNotify } from '../../../shared/context/NotificationContext.jsx';
-import { Wrench, Mic, Languages, BellRing, BarChart3, RefreshCw, Plus, Trash2, Flame, Check } from 'lucide-react';
+import { Wrench, Mic, Languages, BellRing, BarChart3, RefreshCw, Plus, Trash2, Flame, Check, AlertTriangle } from 'lucide-react';
 
 function CommandConfigRow({ cmd, roles, onUpdate, displayPrefix = '/' }) {
   const [expanded, setExpanded] = useState(false);
@@ -576,6 +576,27 @@ function CountersManager({ guildId, roles = [], onUpdateConfig }) {
           </button>
         </div>
       </div>
+
+      {/* Permission Warning Banner if Bot lacks Manage Channels */}
+      {counters.some(c => c.botHasManageChannels === false || (c.channelExists === false && c.enabled !== false)) && (
+        <div style={{
+          background: 'rgba(255, 70, 85, 0.08)',
+          border: '1px solid #FF4655',
+          color: '#FF4655',
+          padding: 'var(--space-3) var(--space-4)',
+          fontFamily: 'var(--font-mono)',
+          fontSize: '11px',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '10px'
+        }}>
+          <AlertTriangle size={18} style={{ flexShrink: 0 }} />
+          <div>
+            <strong>⚠️ LƯU Ý PHÂN QUYỀN DISCORD:</strong> Kênh Voice Counter chưa thể tạo nếu Bot thiếu quyền <code>Manage Channels (Quản lý kênh)</code>.
+            Vui lòng kiểm tra <em>Discord Server Settings ➔ Roles ➔ Chỉnh Role Bot ➔ Bật quyền "Quản lý kênh" (Manage Channels)</em> rồi bấm <strong>Sync Counters Now</strong>!
+          </div>
+        </div>
+      )}
 
       {/* Add New Counter Form */}
       <form onSubmit={handleCreateCounter} style={{

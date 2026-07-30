@@ -1643,10 +1643,12 @@ export function createServer({ configStore, stateStore, botClient, redis = null 
 
       const config = await configStore.getGuildConfig(req.guildId);
       const enrichedCounters = await Promise.all(rawCounters.map(c => enrichCounterWithLiveStats(guild, c, redis, req.guildId)));
+      const botHasManageChannels = enrichedCounters.every(c => c.botHasManageChannels !== false);
 
       return res.json({
         success: true,
         countersEnabled: config.countersEnabled !== false,
+        botHasManageChannels,
         counters: enrichedCounters
       });
     } catch (err) {

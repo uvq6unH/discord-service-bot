@@ -185,6 +185,11 @@ export async function enrichCounterWithLiveStats(guild, counter, redis = null, g
     } catch {}
   }
 
+  let botHasManageChannels = true;
+  if (guild && guild.members?.me) {
+    botHasManageChannels = guild.members.me.permissions.has(PermissionFlagsBits.ManageChannels);
+  }
+
   return {
     ...counter,
     liveCount: rawCount,
@@ -192,7 +197,8 @@ export async function enrichCounterWithLiveStats(guild, counter, redis = null, g
     targetGoal,
     formattedGoal: targetGoal !== null ? formatCountNumber(targetGoal) : null,
     evaluatedName,
-    channelExists
+    channelExists,
+    botHasManageChannels
   };
 }
 
