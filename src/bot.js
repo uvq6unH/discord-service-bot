@@ -679,6 +679,17 @@ function _startEventQueueWorker(client, configStore, redis) {
           redis.incr('stats:slash_sync_failed').catch(() => null);
         }
       }
+    } else if (type === 'sync_counters') {
+      if (!guildId) return;
+      const guild = client.guilds.cache.get(guildId) || await client.guilds.fetch(guildId).catch(() => null);
+      if (guild) {
+        const { syncAllCountersForGuild } = await import('./bot/services/countersEngine.js');
+        const results = await syncAllCountersForGuild(guild, configStore).catch((err) => {
+          console.error(`[event-queue] Error syncing counters for guild ${guildId}:`, err.message);
+          return [];
+        });
+        console.log(`[event-queue] Synced ${results?.length || 0} counter(s) for guild ${guildId}`);
+      }
     } else if (type === 'refresh_guild') {
       if (!guildId) return;
       const guild = await client.guilds.fetch(guildId).catch(() => null);

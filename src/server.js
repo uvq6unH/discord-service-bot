@@ -1688,6 +1688,15 @@ export function createServer({ configStore, stateStore, botClient, redis = null 
         await syncAllCountersForGuild(guild, configStore).catch(() => null);
       }
 
+      // Also dispatch event to Redis event_queue for split-mode bot process
+      if (redis) {
+        await redis.rpush('event_queue', JSON.stringify({
+          type: 'sync_counters',
+          guildId: req.guildId,
+          requestedAt: new Date().toISOString()
+        })).catch(() => null);
+      }
+
       // Re-fetch latest config after sync to get channelId and indexes
       const latestConfig = await configStore.getGuildConfig(req.guildId);
       const enrichedCounters = await Promise.all((latestConfig.counters || []).map(c => enrichCounterWithLiveStats(guild, c)));
@@ -1718,6 +1727,14 @@ export function createServer({ configStore, stateStore, botClient, redis = null 
         if (ch) await ch.delete('Counter deleted via Dashboard').catch(() => null);
       }
 
+      if (redis) {
+        await redis.rpush('event_queue', JSON.stringify({
+          type: 'sync_counters',
+          guildId: req.guildId,
+          requestedAt: new Date().toISOString()
+        })).catch(() => null);
+      }
+
       const { enrichCounterWithLiveStats } = await import('./bot/services/countersEngine.js');
       const enrichedCounters = await Promise.all(updatedCounters.map(c => enrichCounterWithLiveStats(guild, c)));
 
@@ -1742,6 +1759,14 @@ export function createServer({ configStore, stateStore, botClient, redis = null 
         results = await syncAllCountersForGuild(guild, configStore);
       }
 
+      if (redis) {
+        await redis.rpush('event_queue', JSON.stringify({
+          type: 'sync_counters',
+          guildId: req.guildId,
+          requestedAt: new Date().toISOString()
+        })).catch(() => null);
+      }
+
       const latestConfig = await configStore.getGuildConfig(req.guildId);
       const enrichedCounters = await Promise.all((latestConfig.counters || []).map(c => enrichCounterWithLiveStats(guild, c)));
 
@@ -1749,7 +1774,7 @@ export function createServer({ configStore, stateStore, botClient, redis = null 
         success: true,
         counters: enrichedCounters,
         results,
-        message: guild ? `Đã đồng bộ ${results.length} kênh Counter trên Discord!` : 'Đã lưu cấu hình! Kênh sẽ tự động tạo khi Bot kết nối.'
+        message: guild || redis ? `Đã phát lệnh đồng bộ ${enrichedCounters.length} kênh Counter lên Discord!` : 'Đã lưu cấu hình! Kênh sẽ tự động tạo khi Bot kết nối.'
       });
     } catch (err) {
       return res.status(500).json({ error: err.message });
