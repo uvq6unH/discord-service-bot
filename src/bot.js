@@ -683,6 +683,7 @@ function _startEventQueueWorker(client, configStore, redis) {
       if (!guildId) return;
       const guild = client.guilds.cache.get(guildId) || await client.guilds.fetch(guildId).catch(() => null);
       if (guild) {
+        try { await guild.channels.fetch(); } catch {}
         const { syncAllCountersForGuild } = await import('./bot/services/countersEngine.js');
         const results = await syncAllCountersForGuild(guild, configStore).catch((err) => {
           console.error(`[event-queue] Error syncing counters for guild ${guildId}:`, err.message);
