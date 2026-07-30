@@ -1642,7 +1642,7 @@ export function createServer({ configStore, stateStore, botClient, redis = null 
       }
 
       const config = await configStore.getGuildConfig(req.guildId);
-      const enrichedCounters = await Promise.all(rawCounters.map(c => enrichCounterWithLiveStats(guild, c)));
+      const enrichedCounters = await Promise.all(rawCounters.map(c => enrichCounterWithLiveStats(guild, c, redis, req.guildId)));
 
       return res.json({
         success: true,
@@ -1726,11 +1726,12 @@ export function createServer({ configStore, stateStore, botClient, redis = null 
           guildId: req.guildId,
           requestedAt: new Date().toISOString()
         })).catch(() => null);
+        await new Promise(resolve => setTimeout(resolve, 1200));
       }
 
       // Re-fetch latest config after sync to get channelId and indexes
       const latestConfig = await configStore.getGuildConfig(req.guildId);
-      const enrichedCounters = await Promise.all((latestConfig.counters || []).map(c => enrichCounterWithLiveStats(guild, c)));
+      const enrichedCounters = await Promise.all((latestConfig.counters || []).map(c => enrichCounterWithLiveStats(guild, c, redis, req.guildId)));
 
       return res.json({ success: true, counters: enrichedCounters });
     } catch (err) {
@@ -1765,9 +1766,10 @@ export function createServer({ configStore, stateStore, botClient, redis = null 
           guildId: req.guildId,
           requestedAt: new Date().toISOString()
         })).catch(() => null);
+        await new Promise(resolve => setTimeout(resolve, 1200));
       }
 
-      const enrichedCounters = await Promise.all(updatedCounters.map(c => enrichCounterWithLiveStats(guild, c)));
+      const enrichedCounters = await Promise.all(updatedCounters.map(c => enrichCounterWithLiveStats(guild, c, redis, req.guildId)));
 
       return res.json({ success: true, counters: enrichedCounters });
     } catch (err) {
@@ -1794,10 +1796,11 @@ export function createServer({ configStore, stateStore, botClient, redis = null 
           guildId: req.guildId,
           requestedAt: new Date().toISOString()
         })).catch(() => null);
+        await new Promise(resolve => setTimeout(resolve, 1200));
       }
 
       const latestConfig = await configStore.getGuildConfig(req.guildId);
-      const enrichedCounters = await Promise.all((latestConfig.counters || []).map(c => enrichCounterWithLiveStats(guild, c)));
+      const enrichedCounters = await Promise.all((latestConfig.counters || []).map(c => enrichCounterWithLiveStats(guild, c, redis, req.guildId)));
 
       return res.json({
         success: true,

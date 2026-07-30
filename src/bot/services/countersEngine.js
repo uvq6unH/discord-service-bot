@@ -3,88 +3,102 @@ import { ChannelType, PermissionFlagsBits } from 'discord.js';
 /**
  * Calculates current statistic count for a specific counter type in a guild.
  */
-export async function calculateCounterStat(guild, counter) {
-  if (!guild) return 0;
-  
+export async function calculateCounterStat(guild, counter, redis = null, guildId = null) {
+  const targetGuildId = guild?.id || guildId;
   const type = counter.type;
   const roleId = counter.roleId;
 
-  // Make sure guild members cache is populated if role/user calculations are needed
-  if (['users', 'bots', 'membersWithRole', 'membersWithoutRole', 'onlineMembers', 'offlineMembers'].includes(type)) {
-    if (guild.members.cache.size < guild.memberCount) {
-      await guild.members.fetch().catch(() => null);
+  if (guild) {
+    if (['users', 'bots', 'membersWithRole', 'membersWithoutRole', 'onlineMembers', 'offlineMembers'].includes(type)) {
+      if (guild.members.cache.size < guild.memberCount) {
+        await guild.members.fetch().catch(() => null);
+      }
+    }
+
+    switch (type) {
+      case 'members':
+        return guild.memberCount || guild.members.cache.size || 0;
+      case 'users':
+        return guild.members.cache.filter(m => !m.user?.bot).size;
+      case 'bots':
+        return guild.members.cache.filter(m => m.user?.bot).size;
+      case 'roles':
+        return guild.roles.cache.size;
+      case 'channels':
+        return guild.channels.cache.size;
+      case 'textChannels':
+        return guild.channels.cache.filter(c => c.type === ChannelType.GuildText).size;
+      case 'voiceChannels':
+        return guild.channels.cache.filter(c => c.type === ChannelType.GuildVoice || c.type === 2).size;
+      case 'categoryChannels':
+        return guild.channels.cache.filter(c => c.type === ChannelType.GuildCategory || c.type === 4).size;
+      case 'announcementChannels':
+        return guild.channels.cache.filter(c => c.type === ChannelType.GuildNews || c.type === ChannelType.GuildAnnouncement).size;
+      case 'stageChannels':
+        return guild.channels.cache.filter(c => c.type === ChannelType.GuildStageVoice).size;
+      case 'membersWithRole':
+        if (!roleId) return 0;
+        return guild.members.cache.filter(m => m.roles.cache.has(roleId)).size;
+      case 'membersWithoutRole':
+        if (!roleId) return 0;
+        return guild.members.cache.filter(m => !m.roles.cache.has(roleId)).size;
+      case 'emojis':
+        return guild.emojis.cache.size;
+      case 'nitroBoosts':
+        return guild.premiumSubscriptionCount || 0;
+      case 'nitroBoostTier':
+        return guild.premiumTier || 0;
+      case 'onlineMembers':
+        return guild.members.cache.filter(m => ['online', 'idle', 'dnd'].includes(m.presence?.status)).size;
+      case 'offlineMembers':
+        return Math.max(0, (guild.memberCount || 0) - guild.members.cache.filter(m => ['online', 'idle', 'dnd'].includes(m.presence?.status)).size);
+      default:
+        return guild.memberCount || 0;
     }
   }
 
-  switch (type) {
-    case 'members':
-      return guild.memberCount || guild.members.cache.size || 0;
+  // Fallback if guild is null (e.g. 2-process split mode in Express server)
+  if (redis && targetGuildId) {
+    try {
+      const rawMeta = await redis.get(`guild_cache:${targetGuildId}`).catch(() => null);
+      if (rawMeta) {
+        const meta = typeof rawMeta === 'string' ? JSON.parse(rawMeta) : rawMeta;
+        const rawMembers = await redis.get(`guild_cache:${targetGuildId}:members`).catch(() => null);
+        const membersList = rawMembers ? (typeof rawMembers === 'string' ? JSON.parse(rawMembers) : rawMembers) : [];
 
-    case 'users':
-      return guild.members.cache.filter(m => !m.user?.bot).size;
-
-    case 'bots':
-      return guild.members.cache.filter(m => m.user?.bot).size;
-
-    case 'roles':
-      return guild.roles.cache.size;
-
-    case 'channels':
-      return guild.channels.cache.size;
-
-    case 'textChannels':
-      return guild.channels.cache.filter(c => c.type === ChannelType.GuildText).size;
-
-    case 'voiceChannels':
-      return guild.channels.cache.filter(c => c.type === ChannelType.GuildVoice).size;
-
-    case 'categoryChannels':
-      return guild.channels.cache.filter(c => c.type === ChannelType.GuildCategory).size;
-
-    case 'announcementChannels':
-      return guild.channels.cache.filter(c => c.type === ChannelType.GuildNews || c.type === ChannelType.GuildAnnouncement).size;
-
-    case 'stageChannels':
-      return guild.channels.cache.filter(c => c.type === ChannelType.GuildStageVoice).size;
-
-    case 'membersWithRole':
-      if (!roleId) return 0;
-      return guild.members.cache.filter(m => m.roles.cache.has(roleId)).size;
-
-    case 'membersWithoutRole':
-      if (!roleId) return 0;
-      return guild.members.cache.filter(m => !m.roles.cache.has(roleId)).size;
-
-    case 'emojis':
-      return guild.emojis.cache.size;
-
-    case 'nitroBoosts':
-      return guild.premiumSubscriptionCount || 0;
-
-    case 'nitroBoostTier':
-      return guild.premiumTier || 0;
-
-    case 'onlineMembers': {
-      return guild.members.cache.filter(m => {
-        const s = m.presence?.status;
-        return s === 'online' || s === 'idle' || s === 'dnd';
-      }).size;
+        switch (type) {
+          case 'members':
+            return meta.memberCount || membersList.length || 0;
+          case 'users':
+            return membersList.length > 0 ? membersList.filter(m => !m.user?.bot && !m.bot).length : Math.max(0, (meta.memberCount || 1) - 1);
+          case 'bots':
+            return membersList.length > 0 ? membersList.filter(m => m.user?.bot || m.bot).length : 1;
+          case 'roles':
+            return meta.roles?.length || 0;
+          case 'channels':
+            return meta.channels?.length || 0;
+          case 'textChannels':
+            return (meta.channels || []).filter(c => c.type === 0 || c.type === ChannelType.GuildText).length;
+          case 'voiceChannels':
+            return (meta.channels || []).filter(c => c.type === 2 || c.type === ChannelType.GuildVoice).length;
+          case 'categoryChannels':
+            return (meta.channels || []).filter(c => c.type === 4 || c.type === ChannelType.GuildCategory).length;
+          case 'membersWithRole':
+            if (!roleId) return 0;
+            return membersList.filter(m => Array.isArray(m.roles) && (m.roles.includes(roleId) || m.roles.some(r => r.id === roleId))).length;
+          case 'membersWithoutRole':
+            if (!roleId) return 0;
+            return membersList.filter(m => Array.isArray(m.roles) && !m.roles.includes(roleId) && !m.roles.some(r => r.id === roleId)).length;
+          default:
+            return meta.memberCount || 0;
+        }
+      }
+    } catch (err) {
+      console.warn('[countersEngine] Fallback calculation via Redis failed:', err.message);
     }
-
-    case 'offlineMembers': {
-      const onlineCount = guild.members.cache.filter(m => {
-        const s = m.presence?.status;
-        return s === 'online' || s === 'idle' || s === 'dnd';
-      }).size;
-      return Math.max(0, (guild.memberCount || guild.members.cache.size) - onlineCount);
-    }
-
-    case 'static':
-      return 0;
-
-    default:
-      return guild.memberCount || 0;
   }
+
+  return 0;
 }
 
 /**
@@ -107,7 +121,6 @@ export function resolveGoalMilestone(counter, currentCount) {
     return { targetGoal: 0, updatedIndex: 0 };
   }
 
-  // Ensure goals array is sorted ascending
   const sortedGoals = [...goals].sort((a, b) => a - b);
 
   let index = counter.currentGoalIndex || 0;
@@ -115,7 +128,6 @@ export function resolveGoalMilestone(counter, currentCount) {
     index = sortedGoals.length - 1;
   }
 
-  // Auto advance if currentCount reached or exceeded target goal
   while (index < sortedGoals.length - 1 && currentCount >= sortedGoals[index]) {
     index++;
   }
@@ -138,7 +150,6 @@ export function generateCounterChannelName(counter, currentCount, targetGoal = n
     .replace(/\{count\}/gi, formattedCount)
     .replace(/\{goal\}/gi, formattedGoal);
 
-  // Truncate to Discord 100 char limit for channel names
   return resultName.slice(0, 95);
 }
 
@@ -146,10 +157,11 @@ export function generateCounterChannelName(counter, currentCount, targetGoal = n
  * Computes live calculated stats (count, targetGoal, evaluated channelName, channel status)
  * for a counter without modifying Discord channels (read-only for GET requests).
  */
-export async function enrichCounterWithLiveStats(guild, counter) {
+export async function enrichCounterWithLiveStats(guild, counter, redis = null, guildId = null) {
   if (!counter) return counter;
+  const targetGuildId = guild?.id || guildId;
   
-  const rawCount = guild ? await calculateCounterStat(guild, counter) : 0;
+  const rawCount = await calculateCounterStat(guild, counter, redis, targetGuildId);
   let targetGoal = null;
 
   if (counter.isGoal) {
@@ -163,6 +175,14 @@ export async function enrichCounterWithLiveStats(guild, counter) {
   if (guild && counter.channelId) {
     const ch = guild.channels.cache.get(counter.channelId) || await guild.channels.fetch(counter.channelId).catch(() => null);
     channelExists = Boolean(ch);
+  } else if (redis && targetGuildId && counter.channelId) {
+    try {
+      const rawMeta = await redis.get(`guild_cache:${targetGuildId}`).catch(() => null);
+      if (rawMeta) {
+        const meta = typeof rawMeta === 'string' ? JSON.parse(rawMeta) : rawMeta;
+        channelExists = Array.isArray(meta.channels) && meta.channels.some(c => c.id === counter.channelId);
+      }
+    } catch {}
   }
 
   return {

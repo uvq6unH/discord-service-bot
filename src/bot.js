@@ -830,8 +830,8 @@ function _startEventQueueWorker(client, configStore, redis) {
           }
           await new Promise(resolve => setImmediate(resolve));
         } else {
-          // Optimized idle sleep 15s — reduces Upstash REST requests down to ~5,700/day
-          await new Promise(resolve => setTimeout(resolve, 15000));
+          // Fast-poll 1s sleep for instant IPC response between Dashboard and Bot Worker
+          await new Promise(resolve => setTimeout(resolve, 1000));
         }
       } catch (err) {
         console.error('[event-queue] Worker error:', err.message);
