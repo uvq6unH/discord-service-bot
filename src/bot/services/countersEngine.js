@@ -177,6 +177,66 @@ export async function enrichCounterWithLiveStats(guild, counter) {
 }
 
 /**
+ * Resolves or creates the parent category for Server Counters.
+ * Supports renaming on Discord by tracking category ID in configStore & parent IDs of bound channels.
+ */
+export async function getOrResolveCounterCategory(guild, configStore) {
+  if (!guild) return null;
+
+  const config = configStore ? await configStore.getGuildConfig(guild.id).catch(() => ({})) : {};
+
+  // 1. Try to find by stored counterCategoryId
+  if (config.counterCategoryId) {
+    let cat = guild.channels.cache.get(config.counterCategoryId);
+    if (!cat) {
+      cat = await guild.channels.fetch(config.counterCategoryId).catch(() => null);
+    }
+    if (cat && cat.type === ChannelType.GuildCategory) {
+      return cat;
+    }
+  }
+
+  // 2. Try to find by parent ID of any currently bound counter channel
+  const counters = Array.isArray(config.counters) ? config.counters : [];
+  for (const c of counters) {
+    if (c.channelId) {
+      const ch = guild.channels.cache.get(c.channelId) || await guild.channels.fetch(c.channelId).catch(() => null);
+      if (ch && ch.parentId) {
+        const cat = guild.channels.cache.get(ch.parentId) || await guild.channels.fetch(ch.parentId).catch(() => null);
+        if (cat && cat.type === ChannelType.GuildCategory) {
+          if (configStore && config.counterCategoryId !== cat.id) {
+            await configStore.updateGuildConfig(guild.id, { counterCategoryId: cat.id }).catch(() => null);
+          }
+          return cat;
+        }
+      }
+    }
+  }
+
+  // 3. Search existing channels for category matching /counter|stat|thống kê|analytics|overview/i
+  let category = guild.channels.cache.find(c => c.type === ChannelType.GuildCategory && /counter|stat|thống kê|analytics|overview/i.test(c.name));
+  if (!category) {
+    let fetched;
+    try { fetched = await guild.channels.fetch(); } catch { fetched = guild.channels.cache; }
+    category = [...fetched.values()].find(c => c.type === ChannelType.GuildCategory && /counter|stat|thống kê|analytics|overview/i.test(c.name));
+  }
+
+  // 4. Create new category if not found
+  if (!category) {
+    category = await guild.channels.create({
+      name: '📊 Server Stats',
+      type: ChannelType.GuildCategory
+    }).catch(() => null);
+  }
+
+  if (category && configStore && config.counterCategoryId !== category.id) {
+    await configStore.updateGuildConfig(guild.id, { counterCategoryId: category.id }).catch(() => null);
+  }
+
+  return category;
+}
+
+/**
  * Syncs a single counter channel in Discord.
  */
 export async function syncSingleCounter(guild, counter, configStore) {
@@ -201,14 +261,7 @@ export async function syncSingleCounter(guild, counter, configStore) {
       channel = guild.channels.cache.get(counter.channelId) || await guild.channels.fetch(counter.channelId).catch(() => null);
     }
 
-    // Find or create parent category for counters
-    let category = guild.channels.cache.find(c => c.type === ChannelType.GuildCategory && /counter|stat/i.test(c.name));
-    if (!category) {
-      category = await guild.channels.create({
-        name: '📊 Server Stats',
-        type: ChannelType.GuildCategory
-      }).catch(() => null);
-    }
+    const category = await getOrResolveCounterCategory(guild, configStore);
 
     // If channel wasn't found by ID, look under category for any existing voice channel matching this counter type before creating a new one!
     if (!channel && category) {

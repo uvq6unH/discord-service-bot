@@ -584,16 +584,19 @@ function CountersManager({ guildId, roles = [], onUpdateConfig }) {
         border: '1px solid var(--border)',
         display: 'flex',
         flexDirection: 'column',
-        gap: 'var(--space-3)'
+        gap: 'var(--space-4)'
       }}>
         <div style={{ fontFamily: 'var(--font-mono)', fontWeight: 'bold', fontSize: '12px', color: 'var(--accent)', display: 'flex', alignItems: 'center', gap: '6px' }}>
           <Plus size={14} />
           {t("THÊM KÊNH COUNTER / GOAL MỚI")}
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 'var(--space-3)' }}>
-          <div className="form-group" style={{ margin: 0 }}>
-            <label className="form-label" style={{ fontSize: '11px', fontFamily: 'var(--font-mono)' }}>Counter Type</label>
+        {/* Grid 2 Column: Counter Type & Channel Name Template */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-4)' }}>
+          <div className="form-group" style={{ margin: 0, display: 'flex', flexDirection: 'column', gap: 'var(--space-1-5)' }}>
+            <label className="form-label" style={{ fontSize: '11px', fontFamily: 'var(--font-mono)', color: 'var(--text-2)', margin: 0 }}>
+              COUNTER TYPE
+            </label>
             <select
               className="form-input"
               value={type}
@@ -607,7 +610,7 @@ function CountersManager({ guildId, roles = [], onUpdateConfig }) {
                   setChannelNameTemplate(preset);
                 }
               }}
-              style={{ fontSize: '12px' }}
+              style={{ fontSize: '12px', height: '38px', padding: '0 12px' }}
             >
               {COUNTER_TYPES.map(ct => (
                 <option key={ct.value} value={ct.value}>{ct.label}</option>
@@ -615,21 +618,23 @@ function CountersManager({ guildId, roles = [], onUpdateConfig }) {
             </select>
           </div>
 
-          <div className="form-group" style={{ margin: 0 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <label className="form-label" style={{ fontSize: '11px', fontFamily: 'var(--font-mono)', margin: 0 }}>
-                Channel Name Template
+          <div className="form-group" style={{ margin: 0, display: 'flex', flexDirection: 'column', gap: 'var(--space-1-5)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', height: '16px' }}>
+              <label className="form-label" style={{ fontSize: '11px', fontFamily: 'var(--font-mono)', color: 'var(--text-2)', margin: 0 }}>
+                CHANNEL NAME TEMPLATE
               </label>
               <div style={{ display: 'flex', gap: '4px' }}>
                 <span
                   onClick={() => insertTag('{count}')}
-                  style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', color: 'var(--accent)', cursor: 'pointer', fontSize: '10px', padding: '1px 5px', fontFamily: 'var(--font-mono)' }}
+                  title="Chèn thẻ {count}"
+                  style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', color: 'var(--accent)', cursor: 'pointer', fontSize: '10px', padding: '1px 6px', fontFamily: 'var(--font-mono)', borderRadius: '2px' }}
                 >
                   +{`{count}`}
                 </span>
                 <span
                   onClick={() => insertTag('{goal}')}
-                  style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', color: 'var(--amber)', cursor: 'pointer', fontSize: '10px', padding: '1px 5px', fontFamily: 'var(--font-mono)' }}
+                  title="Chèn thẻ {goal}"
+                  style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', color: 'var(--amber)', cursor: 'pointer', fontSize: '10px', padding: '1px 6px', fontFamily: 'var(--font-mono)', borderRadius: '2px' }}
                 >
                   +{`{goal}`}
                 </span>
@@ -640,19 +645,19 @@ function CountersManager({ guildId, roles = [], onUpdateConfig }) {
               value={channelNameTemplate}
               onChange={e => setChannelNameTemplate(e.target.value)}
               placeholder="👥 Members: {count}"
-              style={{ fontSize: '12px', fontFamily: 'var(--font-mono)', marginTop: '4px' }}
+              style={{ fontSize: '12px', fontFamily: 'var(--font-mono)', height: '38px', padding: '0 12px' }}
             />
           </div>
         </div>
 
         {['membersWithRole', 'membersWithoutRole'].includes(type) && (
-          <div className="form-group" style={{ margin: 0 }}>
-            <label className="form-label" style={{ fontSize: '11px', fontFamily: 'var(--font-mono)' }}>Target Role</label>
+          <div className="form-group" style={{ margin: 0, display: 'flex', flexDirection: 'column', gap: 'var(--space-1-5)' }}>
+            <label className="form-label" style={{ fontSize: '11px', fontFamily: 'var(--font-mono)', color: 'var(--text-2)', margin: 0 }}>TARGET ROLE</label>
             <select
               className="form-input"
               value={roleId}
               onChange={e => setRoleId(e.target.value)}
-              style={{ fontSize: '12px' }}
+              style={{ fontSize: '12px', height: '38px', padding: '0 12px' }}
             >
               <option value="">-- Chọn Role --</option>
               {roles.map(r => (
@@ -662,39 +667,70 @@ function CountersManager({ guildId, roles = [], onUpdateConfig }) {
           </div>
         )}
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-4)', flexWrap: 'wrap' }}>
-          <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', cursor: 'pointer', fontFamily: 'var(--font-mono)' }}>
-            <input
-              type="checkbox"
-              checked={isGoal}
-              onChange={e => {
-                const checked = e.target.checked;
-                setIsGoal(checked);
-                if (checked && !channelNameTemplate.includes('{goal}')) {
-                  setChannelNameTemplate(prev => prev.includes('{count}') ? prev.replace('{count}', '{count}/{goal}') : `${prev} {count}/{goal}`);
-                }
-              }}
-            />
-            <span>Is Goal Counter? (Theo dõi cột mốc)</span>
-          </label>
+        {/* Goal Configuration Box */}
+        <div style={{
+          background: 'var(--surface-0)',
+          border: '1px solid var(--border)',
+          padding: 'var(--space-3) var(--space-4)',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 'var(--space-3)'
+        }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', cursor: 'pointer', fontFamily: 'var(--font-mono)', color: 'var(--text-1)', fontWeight: 'bold' }}>
+              <input
+                type="checkbox"
+                checked={isGoal}
+                onChange={e => {
+                  const checked = e.target.checked;
+                  setIsGoal(checked);
+                  if (checked && !channelNameTemplate.includes('{goal}')) {
+                    setChannelNameTemplate(prev => prev.includes('{count}') ? prev.replace('{count}', '{count}/{goal}') : `${prev} {count}/{goal}`);
+                  }
+                }}
+                style={{ width: '15px', height: '15px', accentColor: 'var(--accent)', cursor: 'pointer' }}
+              />
+              <span>Is Goal Counter? (Theo dõi cột mốc tăng trưởng)</span>
+            </label>
+            {isGoal && (
+              <span style={{ fontSize: '10px', color: 'var(--amber)', fontFamily: 'var(--font-mono)' }}>
+                🎯 GOAL TRACKING ACTIVE
+              </span>
+            )}
+          </div>
 
           {isGoal && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flex: 1 }}>
-              <span style={{ fontSize: '11px', color: 'var(--text-3)', fontFamily: 'var(--font-mono)' }}>Milestones:</span>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-1-5)' }}>
+              <label style={{ fontSize: '11px', color: 'var(--text-2)', fontFamily: 'var(--font-mono)' }}>
+                Goal Milestones (Phân cách bằng dấu phẩy):
+              </label>
               <input
                 className="form-input"
                 value={goalsStr}
                 onChange={e => setGoalsStr(e.target.value)}
                 placeholder="100, 250, 500, 1000"
-                style={{ fontSize: '12px', fontFamily: 'var(--font-mono)', flex: 1 }}
+                style={{ fontSize: '12px', fontFamily: 'var(--font-mono)', height: '36px', padding: '0 12px' }}
               />
             </div>
           )}
         </div>
 
-        <button type="submit" className="btn btn--primary" disabled={loading} style={{ alignSelf: 'flex-end', fontSize: '11px', fontFamily: 'var(--font-mono)' }}>
-          + Add Counter Channel
-        </button>
+        {/* Footer Action Bar */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: 'var(--space-1)' }}>
+          <div style={{ fontSize: '11px', color: 'var(--text-3)', fontFamily: 'var(--font-mono)' }}>
+            💡 Kênh voice sẽ tự động khóa và cập nhật số liệu trên Discord Server.
+          </div>
+
+          <button
+            type="submit"
+            className="btn btn--primary"
+            disabled={loading}
+            style={{ fontSize: '11px', fontFamily: 'var(--font-mono)', padding: 'var(--space-2) var(--space-4)', display: 'flex', alignItems: 'center', gap: '6px' }}
+          >
+            <Plus size={14} />
+            Add Counter Channel
+          </button>
+        </div>
       </form>
 
       {/* Active Counters List */}
