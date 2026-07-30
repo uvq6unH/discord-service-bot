@@ -1050,40 +1050,65 @@ export function createServer({ configStore, stateStore, botClient, redis = null 
         }
 
         const { EmbedBuilder } = await import('discord.js');
-        const nowSec = Math.floor(Date.now() / 1000);
-        const match1Time = `<t:${nowSec}:t>`;
-        const match1Rel = `<t:${nowSec}:R>`;
-        const match2Time = `<t:${nowSec + 7200}:t>`;
-        const match2Rel = `<t:${nowSec + 7200}:R>`;
+        const { getRecentCompletedMatchesForLeagues, getDailyMatchesForLeagues } = await import('./esportsApi.js');
 
-        const embed1 = new EmbedBuilder()
-          .setTitle('🇰🇷 LCK KOREA 2026 — TRẬN 1')
-          .setDescription(
-            `⚔️ **T1** 🆚 **Gen.G Esports**\n\n` +
-            `⏰ **Thời gian:** ${match1Time} (${match1Rel})\n` +
-            `🎮 **Thể thức:** \`BO3\` | 🔴 **TRỰC TIẾP**`
-          )
-          .setThumbnail('http://static.lolesports.com/leagues/lck-color-on-black.png')
-          .setColor(0xFF4655);
+        const targetLeagues = Array.isArray(config.esportsLeagues) && config.esportsLeagues.length > 0
+          ? config.esportsLeagues
+          : ['lck', 'lcp', 'lpl', 'lec', 'lcs', 'worlds', 'msi', 'first_stand', 'ewc'];
 
-        const embed2 = new EmbedBuilder()
-          .setTitle('🌏 LCP PACIFIC 2026 — TRẬN 2')
-          .setDescription(
-            `⚔️ **GAM Esports** 🆚 **Vikings Esports**\n\n` +
-            `⏰ **Thời gian:** ${match2Time} (${match2Rel})\n` +
-            `🎮 **Thể thức:** \`BO5\` | 📅 **SẮP BẮT ĐẦU**`
-          )
-          .setThumbnail('http://static.lolesports.com/leagues/1733468139601_lcp-color-golden.png')
-          .setColor(0x00FF88)
-          .setFooter({ text: 'Riot Games LoL Esports Pipeline • Real-time Test' })
-          .setTimestamp();
+        // Try getting real completed matches from last 48h
+        const recentCompleted = await getRecentCompletedMatchesForLeagues(targetLeagues, 48).catch(() => []);
+        const embeds = [];
+
+        if (recentCompleted.length > 0) {
+          for (const match of recentCompleted.slice(0, 2)) {
+            const unixSec = Math.floor(new Date(match.startTime).getTime() / 1000);
+            const scoreStr = (match.score1 !== null && match.score2 !== null) ? `[ **${match.score1}** ] 🆚 [ **${match.score2}** ]` : '🆚';
+            const winnerStr = match.winnerName ? `🏆 **CHIẾN THẮNG:** **${match.winnerName}**` : '🏁 **HOÀN THÀNH**';
+
+            const card = new EmbedBuilder()
+              .setTitle(`🏆 KẾT QUẢ THI ĐẤU — ${match.league.name.toUpperCase()}`)
+              .setDescription(
+                `### ${match.league.icon} **${match.team1}** ${scoreStr} **${match.team2}**\n\n` +
+                `> ${winnerStr}\n` +
+                `> ⏰ **Thời gian:** <t:${unixSec}:f>\n` +
+                `> 🎮 **Thể thức:** \`${match.strategy || 'BO3'}\` | 🏁 **KẾT THÚC**`
+              )
+              .setColor(0x00FF88)
+              .setTimestamp();
+
+            if (match.league?.logoUrl) card.setThumbnail(match.league.logoUrl);
+            embeds.push(card);
+          }
+        }
+
+        if (embeds.length === 0) {
+          const todayYMD = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Ho_Chi_Minh' }).format(new Date());
+          const dailyData = await getDailyMatchesForLeagues(targetLeagues, todayYMD).catch(() => []);
+          if (dailyData && dailyData.length > 0) {
+            for (const group of dailyData.slice(0, 2)) {
+              const matchesText = group.matches.map((m) => {
+                const unixSec = Math.floor(new Date(m.startTime).getTime() / 1000);
+                return `⚔️ **${m.team1}** 🆚 **${m.team2}**\n⏰ <t:${unixSec}:t> (<t:${unixSec}:R>) | 🎮 \`${m.strategy || 'BO3'}\``;
+              }).join('\n\n');
+
+              const card = new EmbedBuilder()
+                .setTitle(`${group.league.icon} ${group.league.name.toUpperCase()} (HÔM NAY)`)
+                .setDescription(matchesText)
+                .setColor(0xFF4655)
+                .setTimestamp();
+              if (group.league?.logoUrl) card.setThumbnail(group.league.logoUrl);
+              embeds.push(card);
+            }
+          }
+        }
 
         await channel.send({
-          content: '🧪 **[TEST ESPORTS NOTIFICATION]**',
-          embeds: [embed1, embed2]
+          content: '🧪 **[TEST ESPORTS LIVE BROADCAST]**',
+          embeds
         });
 
-        return res.json({ success: true, channelName: channel.name, message: `Đã gửi thông báo thử nghiệm thành công vào #${channel.name}!` });
+        return res.json({ success: true, channelName: channel.name, message: `Đã gửi thông báo kết quả thi đấu thực tế từ Riot API vào #${channel.name}!` });
       }
 
       if (redis) {

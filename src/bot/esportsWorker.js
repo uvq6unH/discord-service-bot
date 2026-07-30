@@ -1,5 +1,5 @@
 import { EmbedBuilder } from 'discord.js';
-import { getDailyMatchesForLeagues, getEsportsSchedule } from '../esportsApi.js';
+import { getDailyMatchesForLeagues, getEsportsSchedule, getRecentCompletedMatchesForLeagues } from '../esportsApi.js';
 
 const _postedDailyCache = new Set();
 const _postedPre15Cache = new Set();
@@ -195,52 +195,47 @@ async function processEsportsWorkerCycle(client, configStore, redis) {
 
       // ── Job 3: Automated Match Results Broadcast ───────────────────────────
       if (config.esportsMatchResultAlert !== false) {
-        for (const leagueKey of targetLeagues) {
-          const scheduleData = await getEsportsSchedule(leagueKey).catch(() => null);
-          const matches = scheduleData?.matches || [];
+        const completedMatches = await getRecentCompletedMatchesForLeagues(targetLeagues, 48).catch(() => []);
 
-          for (const match of matches) {
-            if (match.state !== 'completed') continue;
+        for (const match of completedMatches) {
+          const cleanTeam1 = (match.team1 || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+          const cleanTeam2 = (match.team2 || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+          const matchTimeMin = Math.floor(new Date(match.startTime).getTime() / 60000);
+          const matchId = match.id || `${match.leagueKey}_${cleanTeam1}_${cleanTeam2}_${matchTimeMin}`;
 
-            const cleanTeam1 = (match.team1 || '').toLowerCase().replace(/[^a-z0-9]/g, '');
-            const cleanTeam2 = (match.team2 || '').toLowerCase().replace(/[^a-z0-9]/g, '');
-            const matchTimeMin = Math.floor(new Date(match.startTime).getTime() / 60000);
-            const matchId = match.id || `${leagueKey}_${cleanTeam1}_${cleanTeam2}_${matchTimeMin}`;
+          const resultKey = `guild:${guild.id}:esports_result:${matchId}`;
+          const alreadyPostedResult = _postedResultCache.has(resultKey) || (redis ? await redis.get(resultKey).catch(() => null) : false);
 
-            const resultKey = `guild:${guild.id}:esports_result:${matchId}`;
-            const alreadyPostedResult = _postedResultCache.has(resultKey) || (redis ? await redis.get(resultKey).catch(() => null) : false);
-
-            if (!alreadyPostedResult) {
-              _postedResultCache.add(resultKey);
-              if (redis) {
-                await redis.set(resultKey, '1', 'EX', 172800).catch(() => null);
-              }
-
-              const unixSec = Math.floor(new Date(match.startTime).getTime() / 1000);
-              const scoreStr = (match.score1 !== null && match.score2 !== null) ? `[ **${match.score1}** ] 🆚 [ **${match.score2}** ]` : '🆚';
-              const winnerStr = match.winnerName ? `🏆 **CHIẾN THẮNG:** **${match.winnerName}**` : '🏁 **HOÀN THÀNH**';
-
-              const resultEmbed = new EmbedBuilder()
-                .setTitle(`🏆 KẾT QUẢ THI ĐẤU — ${scheduleData.league.name.toUpperCase()}`)
-                .setDescription(
-                  `### ${scheduleData.league.icon} **${match.team1}** ${scoreStr} **${match.team2}**\n\n` +
-                  `> ${winnerStr}\n` +
-                  `> ⏰ **Thời gian:** <t:${unixSec}:f>\n` +
-                  `> 🎮 **Thể thức:** \`${match.strategy || 'BO3'}\` | 🏁 **KẾT THÚC**`
-                )
-                .setColor(0x00FF88)
-                .setTimestamp();
-
-              if (scheduleData?.league?.logoUrl) resultEmbed.setThumbnail(scheduleData.league.logoUrl);
-
-              const leagueRole = config.esportsLeagueRoles?.[leagueKey.toLowerCase()];
-              const pingText = leagueRole ? `<@&${leagueRole}>` : '';
-
-              await channel.send({
-                content: `📊 **[ESPORTS MATCH RESULT]** ${pingText}`.trim(),
-                embeds: [resultEmbed]
-              }).catch((err) => console.error('[esportsWorker] Send match result error:', err.message));
+          if (!alreadyPostedResult) {
+            _postedResultCache.add(resultKey);
+            if (redis) {
+              await redis.set(resultKey, '1', 'EX', 172800).catch(() => null);
             }
+
+            const unixSec = Math.floor(new Date(match.startTime).getTime() / 1000);
+            const scoreStr = (match.score1 !== null && match.score2 !== null) ? `[ **${match.score1}** ] 🆚 [ **${match.score2}** ]` : '🆚';
+            const winnerStr = match.winnerName ? `🏆 **CHIẾN THẮNG:** **${match.winnerName}**` : '🏁 **HOÀN THÀNH**';
+
+            const resultEmbed = new EmbedBuilder()
+              .setTitle(`🏆 KẾT QUẢ THI ĐẤU — ${match.league.name.toUpperCase()}`)
+              .setDescription(
+                `### ${match.league.icon} **${match.team1}** ${scoreStr} **${match.team2}**\n\n` +
+                `> ${winnerStr}\n` +
+                `> ⏰ **Thời gian:** <t:${unixSec}:f>\n` +
+                `> 🎮 **Thể thức:** \`${match.strategy || 'BO3'}\` | 🏁 **KẾT THÚC**`
+              )
+              .setColor(0x00FF88)
+              .setTimestamp();
+
+            if (match.league?.logoUrl) resultEmbed.setThumbnail(match.league.logoUrl);
+
+            const leagueRole = config.esportsLeagueRoles?.[match.leagueKey];
+            const pingText = leagueRole ? `<@&${leagueRole}>` : '';
+
+            await channel.send({
+              content: `📊 **[ESPORTS MATCH RESULT]** ${pingText}`.trim(),
+              embeds: [resultEmbed]
+            }).catch((err) => console.error('[esportsWorker] Send match result error:', err.message));
           }
         }
       }

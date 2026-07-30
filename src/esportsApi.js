@@ -217,3 +217,69 @@ export async function getDailyMatchesForLeagues(leagueKeys = ['lck', 'lcp', 'lpl
 
   return results;
 }
+
+/**
+ * Fetch completed matches for specified leagues within the last N hours (default 48h).
+ */
+export async function getRecentCompletedMatchesForLeagues(leagueKeys = ['lck', 'lcp', 'lpl', 'lec', 'lcs', 'worlds', 'msi', 'first_stand', 'ewc'], maxAgeHours = 48) {
+  const results = [];
+  const now = Date.now();
+  const maxAgeMs = maxAgeHours * 60 * 60 * 1000;
+
+  for (const key of leagueKeys) {
+    try {
+      const league = ESPORTS_LEAGUES[key.toLowerCase()];
+      if (!league) continue;
+
+      const url = `https://esports-api.lolesports.com/persisted/gw/getSchedule?hl=vi-VN&leagueId=${league.id}`;
+      const raw = await httpGet(url).catch(() => null);
+      const events = raw?.data?.schedule?.events || [];
+
+      const completedMatches = events.filter(evt => {
+        if (!evt.startTime || evt.state !== 'completed') return false;
+        const matchTime = new Date(evt.startTime).getTime();
+        const ageMs = now - matchTime;
+        return ageMs >= 0 && ageMs <= maxAgeMs;
+      }).map(evt => {
+        const teams = evt.match?.teams || [];
+        const team1 = teams[0]?.name || 'TBD';
+        const team2 = teams[1]?.name || 'TBD';
+        const code1 = teams[0]?.code || team1;
+        const code2 = teams[1]?.code || team2;
+        const score1 = teams[0]?.result?.gameWins ?? (teams[0]?.result?.outcome === 'win' ? 'W' : (teams[0]?.result?.outcome === 'loss' ? 'L' : null));
+        const score2 = teams[1]?.result?.gameWins ?? (teams[1]?.result?.outcome === 'win' ? 'W' : (teams[1]?.result?.outcome === 'loss' ? 'L' : null));
+        const winnerName = teams[0]?.result?.outcome === 'win' ? team1 : (teams[1]?.result?.outcome === 'win' ? team2 : null);
+        const winnerCode = teams[0]?.result?.outcome === 'win' ? code1 : (teams[1]?.result?.outcome === 'win' ? code2 : null);
+
+        return {
+          id: evt.id,
+          leagueKey: key.toLowerCase(),
+          league,
+          team1,
+          team2,
+          code1,
+          code2,
+          logo1: teams[0]?.image || '',
+          logo2: teams[1]?.image || '',
+          score1,
+          score2,
+          winnerName,
+          winnerCode,
+          state: 'completed',
+          startTime: evt.startTime,
+          blockName: evt.blockName || league.name,
+          strategy: evt.match?.strategy?.type ? `${evt.match.strategy.type.toUpperCase()} ${evt.match.strategy.count || ''}` : 'BO3'
+        };
+      });
+
+      if (completedMatches.length > 0) {
+        results.push(...completedMatches);
+      }
+    } catch (err) {
+      console.error(`[esportsApi] Error fetching completed matches for ${key}:`, err.message);
+    }
+  }
+
+  results.sort((a, b) => new Date(b.startTime).getTime() - new Date(a.startTime).getTime());
+  return results;
+}
