@@ -438,6 +438,31 @@ export async function autoDiscoverExistingCounters(guild, configStore) {
     }
   }
 
+  // Reverse-Sync: Check bound channels. If Mod/Admin renamed channel format directly on Discord, auto-sync new template back to Dashboard!
+  for (let i = 0; i < currentCounters.length; i++) {
+    const c = currentCounters[i];
+    if (c.channelId) {
+      const boundCh = voiceChannels.find(ch => ch.id === c.channelId);
+      if (boundCh && boundCh.name) {
+        const rawCount = await calculateCounterStat(guild, c).catch(() => 0);
+        const countStr = String(rawCount);
+        const expectedName = generateCounterChannelName(c, rawCount);
+
+        if (boundCh.name !== expectedName && boundCh.name.includes(countStr)) {
+          const newTemplate = boundCh.name.replace(new RegExp(`\\b${countStr}\\b`, 'g'), '{count}');
+          if (newTemplate && newTemplate !== c.channelNameTemplate && newTemplate.includes('{count}')) {
+            currentCounters[i] = {
+              ...currentCounters[i],
+              channelNameTemplate: newTemplate
+            };
+            updated = true;
+            console.log(`[countersEngine] Auto-synced modified Discord channel name format "${boundCh.name}" -> Dashboard template "${newTemplate}"`);
+          }
+        }
+      }
+    }
+  }
+
   const deduplicated = deduplicateCounters(currentCounters);
   if (deduplicated.length !== currentCounters.length) {
     currentCounters = deduplicated;
