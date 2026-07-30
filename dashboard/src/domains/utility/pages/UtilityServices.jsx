@@ -7,6 +7,7 @@ import { useCommands } from '../../core/hooks/useCommands.js';
 import { useGuild } from '../../../shared/hooks/useGuild.js';
 import { useLanguage } from '../../../shared/context/LanguageContext.jsx';
 import { apiFetch } from '../../../api.js';
+import { useNotify } from '../../../shared/context/NotificationContext.jsx';
 import { Wrench, Mic, Languages, BellRing, BarChart3, RefreshCw, Plus, Trash2, Flame, Check } from 'lucide-react';
 
 function CommandConfigRow({ cmd, roles, onUpdate, displayPrefix = '/' }) {
@@ -358,11 +359,10 @@ const TEMPLATE_PRESETS = {
 
 function CountersManager({ guildId, roles = [], onUpdateConfig }) {
   const { t } = useLanguage();
+  const notify = useNotify();
   const [counters, setCounters] = useState([]);
   const [loading, setLoading] = useState(false);
   const [syncing, setSyncing] = useState(false);
-  const [statusMsg, setStatusMsg] = useState(null);
-  const [confirmingDeleteId, setConfirmingDeleteId] = useState(null);
 
   // Form state
   const [type, setType] = useState('members');
@@ -398,11 +398,10 @@ function CountersManager({ guildId, roles = [], onUpdateConfig }) {
 
   const handleAutoSetup = async () => {
     if (!guildId) {
-      setStatusMsg({ success: false, message: 'Chưa chọn Server Discord!' });
+      notify.error('Chưa chọn Server Discord!');
       return;
     }
     setLoading(true);
-    setStatusMsg(null);
     try {
       const res = await apiFetch(`/api/guilds/${guildId}/counters`, {
         method: 'POST',
@@ -410,18 +409,18 @@ function CountersManager({ guildId, roles = [], onUpdateConfig }) {
       });
       const data = await res.json();
       if (data.error) {
-        setStatusMsg({ success: false, message: data.error });
+        notify.error(data.error);
         return;
       }
       const list = data.counters || [];
       syncState(list);
       if (list.length > 0) {
-        setStatusMsg({ success: true, message: `Đã tự động khởi tạo ${list.length} kênh Counter mặc định (Members & Users)!` });
+        notify.success(`Đã tự động khởi tạo ${list.length} kênh Counter mặc định (Members & Users)!`);
       } else {
-        setStatusMsg({ success: false, message: 'Không thể tạo kênh Counter mặc định. Vui lòng thử lại.' });
+        notify.error('Không thể tạo kênh Counter mặc định. Vui lòng thử lại.');
       }
     } catch (err) {
-      setStatusMsg({ success: false, message: err.message || 'Lỗi khi tạo Counter mặc định' });
+      notify.error(err.message || 'Lỗi khi tạo Counter mặc định');
     } finally {
       setLoading(false);
     }
@@ -430,7 +429,7 @@ function CountersManager({ guildId, roles = [], onUpdateConfig }) {
   const handleCreateCounter = async (e) => {
     e.preventDefault();
     if (!guildId) {
-      setStatusMsg({ success: false, message: 'Chưa chọn Server Discord!' });
+      notify.error('Chưa chọn Server Discord!');
       return;
     }
     if (!type) return;
@@ -447,7 +446,6 @@ function CountersManager({ guildId, roles = [], onUpdateConfig }) {
     };
 
     setLoading(true);
-    setStatusMsg(null);
     try {
       const res = await apiFetch(`/api/guilds/${guildId}/counters`, {
         method: 'POST',
@@ -455,16 +453,16 @@ function CountersManager({ guildId, roles = [], onUpdateConfig }) {
       });
       const data = await res.json();
       if (data.error) {
-        setStatusMsg({ success: false, message: data.error });
+        notify.error(data.error);
         return;
       }
       const list = data.counters || [];
       syncState(list);
-      setStatusMsg({ success: true, message: 'Đã tạo kênh Counter mới thành công!' });
+      notify.success('Đã tạo kênh Counter mới thành công!');
       setChannelNameTemplate('👥 Members: {count}');
       setIsGoal(false);
     } catch (err) {
-      setStatusMsg({ success: false, message: err.message || 'Lỗi khi tạo Counter mới' });
+      notify.error(err.message || 'Lỗi khi tạo Counter mới');
     } finally {
       setLoading(false);
     }
@@ -473,21 +471,20 @@ function CountersManager({ guildId, roles = [], onUpdateConfig }) {
   const handleDeleteCounter = async (counterId) => {
     if (!guildId) return;
     setLoading(true);
-    setConfirmingDeleteId(null);
     try {
       const res = await apiFetch(`/api/guilds/${guildId}/counters/${counterId}`, {
         method: 'DELETE'
       });
       const data = await res.json();
       if (data.error) {
-        setStatusMsg({ success: false, message: data.error });
+        notify.error(data.error);
         return;
       }
       const list = data.counters || [];
       syncState(list);
-      setStatusMsg({ success: true, message: 'Đã xóa kênh Counter thành công!' });
+      notify.success('Đã xóa kênh Counter thành công!');
     } catch (err) {
-      setStatusMsg({ success: false, message: err.message || 'Lỗi khi xóa Counter' });
+      notify.error(err.message || 'Lỗi khi xóa Counter');
     } finally {
       setLoading(false);
     }
@@ -495,25 +492,24 @@ function CountersManager({ guildId, roles = [], onUpdateConfig }) {
 
   const handleSyncNow = async () => {
     if (!guildId) {
-      setStatusMsg({ success: false, message: 'Chưa chọn Server Discord!' });
+      notify.error('Chưa chọn Server Discord!');
       return;
     }
     setSyncing(true);
-    setStatusMsg(null);
     try {
       const res = await apiFetch(`/api/guilds/${guildId}/counters/sync`, {
         method: 'POST'
       });
       const data = await res.json();
       if (data.error) {
-        setStatusMsg({ success: false, message: data.error });
+        notify.error(data.error);
         return;
       }
       const list = data.counters || [];
       syncState(list);
-      setStatusMsg({ success: true, message: data.message || 'Đã đồng bộ các kênh Counter!' });
+      notify.success(data.message || 'Đã đồng bộ các kênh Counter!');
     } catch (err) {
-      setStatusMsg({ success: false, message: err.message || 'Lỗi khi đồng bộ Counter' });
+      notify.error(err.message || 'Lỗi khi đồng bộ Counter');
     } finally {
       setSyncing(false);
     }
@@ -528,12 +524,13 @@ function CountersManager({ guildId, roles = [], onUpdateConfig }) {
       });
       const data = await res.json();
       if (data.error) {
-        setStatusMsg({ success: false, message: data.error });
+        notify.error(data.error);
         return;
       }
       syncState(data.counters || []);
+      notify.success(updated.enabled ? 'Đã bật kênh Counter!' : 'Đã tắt kênh Counter!');
     } catch (err) {
-      setStatusMsg({ success: false, message: err.message });
+      notify.error(err.message);
     }
   };
 
@@ -579,29 +576,6 @@ function CountersManager({ guildId, roles = [], onUpdateConfig }) {
           </button>
         </div>
       </div>
-
-      {statusMsg && (
-        <div style={{
-          padding: 'var(--space-3) var(--space-4)',
-          background: statusMsg.success ? 'rgba(0, 255, 136, 0.06)' : 'rgba(255, 71, 87, 0.06)',
-          border: `1px solid ${statusMsg.success ? 'var(--accent)' : 'var(--red)'}`,
-          color: statusMsg.success ? 'var(--accent)' : 'var(--red)',
-          fontFamily: 'var(--font-mono)',
-          fontSize: '12px',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          gap: 'var(--space-3)'
-        }}>
-          <span>{statusMsg.success ? '✔ ' : '✖ '}{statusMsg.message}</span>
-          <button
-            onClick={() => setStatusMsg(null)}
-            style={{ background: 'none', border: 'none', color: 'inherit', cursor: 'pointer', fontFamily: 'var(--font-mono)', fontSize: '12px' }}
-          >
-            [ × ]
-          </button>
-        </div>
-      )}
 
       {/* Add New Counter Form */}
       <form onSubmit={handleCreateCounter} style={{
@@ -735,12 +709,11 @@ function CountersManager({ guildId, roles = [], onUpdateConfig }) {
           </div>
         ) : (
           counters.map((c, i) => {
-            const isDeleting = confirmingDeleteId === c.id;
             return (
               <div key={c.id || i} style={{
                 padding: 'var(--space-3) var(--space-4)',
                 background: 'var(--surface-1)',
-                border: isDeleting ? '1px solid var(--red)' : '1px solid var(--border)',
+                border: '1px solid var(--border)',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'space-between',
@@ -775,42 +748,6 @@ function CountersManager({ guildId, roles = [], onUpdateConfig }) {
                       Status: {c.channelExists ? '🟢 Connected' : '🟡 Pending Sync'}
                     </span>
                   </div>
-
-                  {isDeleting && (
-                    <div style={{
-                      marginTop: 'var(--space-2)',
-                      padding: 'var(--space-2) var(--space-3)',
-                      background: 'rgba(255, 71, 87, 0.08)',
-                      border: '1px solid var(--red)',
-                      color: 'var(--red)',
-                      fontSize: '11px',
-                      fontFamily: 'var(--font-mono)',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                      gap: 'var(--space-2)'
-                    }}>
-                      <span>⚠️ BẠN CÓ CHẮC CHẮN MUỐN XÓA KÊNH COUNTER NÀY?</span>
-                      <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
-                        <button
-                          type="button"
-                          className="btn btn--danger"
-                          onClick={() => handleDeleteCounter(c.id)}
-                          style={{ padding: '2px 8px', fontSize: '10px', fontFamily: 'var(--font-mono)' }}
-                        >
-                          XÓA KÊNH
-                        </button>
-                        <button
-                          type="button"
-                          className="btn btn--secondary"
-                          onClick={() => setConfirmingDeleteId(null)}
-                          style={{ padding: '2px 8px', fontSize: '10px', fontFamily: 'var(--font-mono)' }}
-                        >
-                          HỦY
-                        </button>
-                      </div>
-                    </div>
-                  )}
                 </div>
 
                 <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
@@ -829,8 +766,9 @@ function CountersManager({ guildId, roles = [], onUpdateConfig }) {
                   <button
                     type="button"
                     className="btn btn--danger"
-                    onClick={() => setConfirmingDeleteId(isDeleting ? null : c.id)}
+                    onClick={() => handleDeleteCounter(c.id)}
                     style={{ padding: 'var(--space-1) var(--space-2)' }}
+                    title={t("Delete Counter Channel")}
                   >
                     <Trash2 size={14} />
                   </button>

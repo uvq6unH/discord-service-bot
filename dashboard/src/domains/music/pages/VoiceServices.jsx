@@ -5,6 +5,7 @@ import DataSlab from '../../../shared/primitives/DataSlab.jsx';
 import { useMusic } from '../hooks/useMusic.js';
 import { useGuild } from '../../../shared/hooks/useGuild.js';
 import { useLanguage } from '../../../shared/context/LanguageContext.jsx';
+import { useNotify } from '../../../shared/context/NotificationContext.jsx';
 import { Mic, Radio, Volume2, ShieldCheck, Wand2 } from 'lucide-react';
 import { apiFetch } from '../../../api.js';
 
@@ -154,8 +155,8 @@ export default function VoiceServicesPage() {
   const { config, loading, updateConfig } = useMusic();
   const { guildData, selectedGuild } = useGuild();
   const { t } = useLanguage();
+  const notify = useNotify();
   const [settingUp, setSettingUp] = useState(false);
-  const [setupStatus, setSetupStatus] = useState(null);
 
   if (loading || !config) {
     return (
@@ -176,41 +177,46 @@ export default function VoiceServicesPage() {
 
   const handleRunAutoSetup = async () => {
     setSettingUp(true);
-    setSetupStatus(null);
     try {
       const selectedGuildId = localStorage.getItem('selectedGuildId') || selectedGuild?.id || '';
       const res = await apiFetch(`/api/guilds/${selectedGuildId}/temp-vc-setup`, {
         method: 'POST'
       });
       const data = await res.json();
+      if (data.error) {
+        notify.error(data.error);
+        return;
+      }
       updateConfig({ tempVcEnabled: true });
-      setSetupStatus({ success: true, message: data.message || 'Đã khởi tạo hệ thống VoiceMaster thành công!' });
+      notify.success(data.message || 'Đã khởi tạo hệ thống VoiceMaster thành công!');
     } catch (err) {
-      setSetupStatus({ success: false, message: err.message || 'Lỗi hệ thống khi khởi tạo VoiceMaster' });
+      notify.error(err.message || 'Lỗi hệ thống khi khởi tạo VoiceMaster');
     } finally {
       setSettingUp(false);
     }
   };
 
   const handleResetSetup = async () => {
-    if (!window.confirm('Bạn có chắc chắn muốn reset cấu hình VoiceMaster không?')) return;
     setSettingUp(true);
-    setSetupStatus(null);
     try {
       const selectedGuildId = localStorage.getItem('selectedGuildId') || selectedGuild?.id || '';
       const res = await apiFetch(`/api/guilds/${selectedGuildId}/temp-vc-reset`, {
         method: 'POST'
       });
       const data = await res.json();
+      if (data.error) {
+        notify.error(data.error);
+        return;
+      }
       updateConfig({
         tempVcEnabled: false,
         tempVcMasterChannelId: '',
         tempVcCategoryId: '',
         tempVcControlChannelId: ''
       });
-      setSetupStatus({ success: true, message: data.message || 'Đã reset VoiceMaster!' });
+      notify.success(data.message || 'Đã reset VoiceMaster!');
     } catch (err) {
-      setSetupStatus({ success: false, message: err.message || 'Lỗi hệ thống khi reset VoiceMaster' });
+      notify.error(err.message || 'Lỗi hệ thống khi reset VoiceMaster');
     } finally {
       setSettingUp(false);
     }
@@ -309,12 +315,6 @@ export default function VoiceServicesPage() {
                   )}
                 </div>
               </div>
-
-              {setupStatus && (
-                <div style={{ fontSize: '12px', fontFamily: 'var(--font-mono)', color: setupStatus.success ? 'var(--green)' : 'var(--red)' }}>
-                  {setupStatus.success ? '✔ ' : '✖ '}{setupStatus.message}
-                </div>
-              )}
 
             </div>
           </Panel>
