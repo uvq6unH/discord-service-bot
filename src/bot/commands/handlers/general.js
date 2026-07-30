@@ -57,7 +57,7 @@ export async function handleGeneral(ctx) {
       )
       .setColor(0x5865F2)
       .setThumbnail(guild?.iconURL({ size: 256 }) ?? client.user.displayAvatarURL())
-      .setFooter({ text: '💡 Quản trị viên có thể tùy chỉnh chi tiết tại Dashboard Web • XeNon Bot' })
+      .setFooter({ text: '💡 Quản trị viên có thể tùy chỉnh chi tiết tại Dashboard Web • uvq6unH Bot' })
       .setTimestamp();
 
     const dashboardUrl = process.env.DASHBOARD_URL || 'https://discord-dashboard-g3xb.onrender.com';

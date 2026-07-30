@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Workspace, { HeaderZone, StatusZone, KpiTile } from '../../../shared/layouts/Workspace.jsx';
 import Panel from '../../../shared/primitives/Panel.jsx';
 import DataSlab from '../../../shared/primitives/DataSlab.jsx';
@@ -6,7 +6,8 @@ import MasonryGrid from '../../../shared/primitives/MasonryGrid.jsx';
 import { useCommands } from '../../core/hooks/useCommands.js';
 import { useGuild } from '../../../shared/hooks/useGuild.js';
 import { useLanguage } from '../../../shared/context/LanguageContext.jsx';
-import { Wrench, Mic, Languages, BellRing } from 'lucide-react';
+import { apiFetch } from '../../../api.js';
+import { Wrench, Mic, Languages, BellRing, BarChart3, RefreshCw, Plus, Trash2, Flame, Check } from 'lucide-react';
 
 function CommandConfigRow({ cmd, roles, onUpdate, displayPrefix = '/' }) {
   const [expanded, setExpanded] = useState(false);
@@ -313,6 +314,373 @@ function AutoReplyEditor({ replies, onChange }) {
   );
 }
 
+const COUNTER_TYPES = [
+  { value: 'members', label: '👥 Total Members' },
+  { value: 'users', label: '👤 Human Users (Excl. Bots)' },
+  { value: 'bots', label: '🤖 Bots / Apps Count' },
+  { value: 'roles', label: '🛡️ Total Roles' },
+  { value: 'channels', label: '💬 Total Channels' },
+  { value: 'textChannels', label: '📝 Text Channels' },
+  { value: 'voiceChannels', label: '🔊 Voice Channels' },
+  { value: 'categoryChannels', label: '📁 Category Channels' },
+  { value: 'announcementChannels', label: '📢 Announcement Channels' },
+  { value: 'stageChannels', label: '🎙️ Stage Channels' },
+  { value: 'membersWithRole', label: '🎖️ Members with Role' },
+  { value: 'membersWithoutRole', label: '⚪ Members without Role' },
+  { value: 'emojis', label: '😃 Total Emojis' },
+  { value: 'nitroBoosts', label: '🚀 Nitro Boosts' },
+  { value: 'nitroBoostTier', label: '⭐ Nitro Boost Tier' },
+  { value: 'onlineMembers', label: '🟢 Estimated Online Members' },
+  { value: 'offlineMembers', label: '⚪ Estimated Offline Members' },
+  { value: 'static', label: '📌 Static Text' }
+];
+
+function CountersManager({ guildId, roles = [] }) {
+  const { t } = useLanguage();
+  const [counters, setCounters] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [syncing, setSyncing] = useState(false);
+  const [statusMsg, setStatusMsg] = useState(null);
+
+  // Form state
+  const [type, setType] = useState('members');
+  const [channelNameTemplate, setChannelNameTemplate] = useState('👥 Members: {count}');
+  const [isGoal, setIsGoal] = useState(false);
+  const [goalsStr, setGoalsStr] = useState('100, 250, 500, 1000');
+  const [roleId, setRoleId] = useState('');
+
+  const loadCounters = async () => {
+    if (!guildId) return;
+    setLoading(true);
+    try {
+      const res = await apiFetch(`/api/guilds/${guildId}/counters`);
+      const data = await res.json();
+      setCounters(data.counters || []);
+    } catch (err) {
+      console.error('Failed to load counters:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadCounters();
+  }, [guildId]);
+
+  const handleAutoSetup = async () => {
+    setLoading(true);
+    setStatusMsg(null);
+    try {
+      const res = await apiFetch(`/api/guilds/${guildId}/counters`, {
+        method: 'POST',
+        body: { mode: 'default' }
+      });
+      const data = await res.json();
+      setCounters(data.counters || []);
+      setStatusMsg({ success: true, message: 'Đã tự động khởi tạo 2 kênh Counter mặc định (Members & Users)!' });
+    } catch (err) {
+      setStatusMsg({ success: false, message: err.message });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleCreateCounter = async (e) => {
+    e.preventDefault();
+    if (!type) return;
+
+    const newCounter = {
+      id: `counter_${type}_${Date.now()}`,
+      type,
+      channelNameTemplate: channelNameTemplate.trim() || (isGoal ? '🎯 Goal: {count}/{goal}' : '👥 Count: {count}'),
+      isGoal,
+      goals: isGoal ? goalsStr.split(',').map(g => parseInt(g.trim(), 10)).filter(n => !isNaN(n)) : [],
+      currentGoalIndex: 0,
+      roleId: ['membersWithRole', 'membersWithoutRole'].includes(type) ? roleId : '',
+      enabled: true
+    };
+
+    setLoading(true);
+    setStatusMsg(null);
+    try {
+      const res = await apiFetch(`/api/guilds/${guildId}/counters`, {
+        method: 'POST',
+        body: { counter: newCounter }
+      });
+      const data = await res.json();
+      setCounters(data.counters || []);
+      setStatusMsg({ success: true, message: 'Đã tạo kênh Counter mới thành công!' });
+      setChannelNameTemplate('👥 Members: {count}');
+      setIsGoal(false);
+    } catch (err) {
+      setStatusMsg({ success: false, message: err.message });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDeleteCounter = async (counterId) => {
+    if (!window.confirm('Bạn có chắc chắn muốn xóa kênh Counter này?')) return;
+    setLoading(true);
+    try {
+      const res = await apiFetch(`/api/guilds/${guildId}/counters/${counterId}`, {
+        method: 'DELETE'
+      });
+      const data = await res.json();
+      setCounters(data.counters || []);
+    } catch (err) {
+      alert(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSyncNow = async () => {
+    setSyncing(true);
+    setStatusMsg(null);
+    try {
+      const res = await apiFetch(`/api/guilds/${guildId}/counters/sync`, {
+        method: 'POST'
+      });
+      const data = await res.json();
+      setStatusMsg({ success: true, message: data.message || 'Đã đồng bộ các kênh Counter!' });
+    } catch (err) {
+      setStatusMsg({ success: false, message: err.message });
+    } finally {
+      setSyncing(false);
+    }
+  };
+
+  const handleToggleCounter = async (counter) => {
+    const updated = { ...counter, enabled: !counter.enabled };
+    try {
+      const res = await apiFetch(`/api/guilds/${guildId}/counters`, {
+        method: 'POST',
+        body: { counter: updated }
+      });
+      const data = await res.json();
+      setCounters(data.counters || []);
+    } catch (err) {
+      alert(err.message);
+    }
+  };
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 'var(--space-3)' }}>
+        <div>
+          <div style={{ fontFamily: 'var(--font-mono)', fontWeight: 'bold', fontSize: '13px', color: 'var(--text-1)', display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
+            <BarChart3 size={16} color="var(--accent)" />
+            {t("Discord Live Stat Counters & Goal Milestones")}
+          </div>
+          <div style={{ fontSize: '11px', color: 'var(--text-3)', marginTop: '2px' }}>
+            Hiển thị thống kê Server dạng kênh Voice tự động cập nhật mỗi 10–15 phút.
+          </div>
+        </div>
+
+        <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
+          <button
+            type="button"
+            className="btn btn--secondary"
+            disabled={loading}
+            onClick={handleAutoSetup}
+            style={{ fontSize: '11px', fontFamily: 'var(--font-mono)' }}
+          >
+            ⚡ Auto-Setup Default (2 Counters)
+          </button>
+          <button
+            type="button"
+            className="btn btn--primary"
+            disabled={syncing || loading}
+            onClick={handleSyncNow}
+            style={{ fontSize: '11px', fontFamily: 'var(--font-mono)', display: 'flex', alignItems: 'center', gap: '6px' }}
+          >
+            <RefreshCw size={14} className={syncing ? 'spin' : ''} />
+            {syncing ? 'Syncing...' : 'Sync Counters Now'}
+          </button>
+        </div>
+      </div>
+
+      {statusMsg && (
+        <div style={{
+          padding: 'var(--space-3)',
+          background: statusMsg.success ? 'rgba(0, 255, 136, 0.08)' : 'rgba(255, 71, 87, 0.08)',
+          border: `1px solid ${statusMsg.success ? 'var(--accent)' : 'var(--red)'}`,
+          color: statusMsg.success ? 'var(--accent)' : 'var(--red)',
+          fontFamily: 'var(--font-mono)',
+          fontSize: '12px'
+        }}>
+          {statusMsg.success ? '✔ ' : '✖ '}{statusMsg.message}
+        </div>
+      )}
+
+      <form onSubmit={handleCreateCounter} style={{
+        padding: 'var(--space-4)',
+        background: 'var(--surface-1)',
+        border: '1px solid var(--border)',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 'var(--space-3)'
+      }}>
+        <div style={{ fontFamily: 'var(--font-mono)', fontWeight: 'bold', fontSize: '12px', color: 'var(--accent)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <Plus size={14} />
+          {t("THÊM KÊNH COUNTER / GOAL MỚI")}
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 'var(--space-3)' }}>
+          <div className="form-group" style={{ margin: 0 }}>
+            <label className="form-label" style={{ fontSize: '11px', fontFamily: 'var(--font-mono)' }}>Counter Type</label>
+            <select
+              className="form-input"
+              value={type}
+              onChange={e => {
+                const newType = e.target.value;
+                setType(newType);
+                if (newType === 'members') setChannelNameTemplate('👥 Members: {count}');
+                else if (newType === 'users') setChannelNameTemplate('👤 Users: {count}');
+                else if (newType === 'bots') setChannelNameTemplate('🤖 Bots: {count}');
+                else if (newType === 'roles') setChannelNameTemplate('🛡️ Roles: {count}');
+                else if (newType === 'nitroBoosts') setChannelNameTemplate('🚀 Boosts: {count}');
+              }}
+              style={{ fontSize: '12px' }}
+            >
+              {COUNTER_TYPES.map(ct => (
+                <option key={ct.value} value={ct.value}>{ct.label}</option>
+              ))}
+            </select>
+          </div>
+
+          <div className="form-group" style={{ margin: 0 }}>
+            <label className="form-label" style={{ fontSize: '11px', fontFamily: 'var(--font-mono)' }}>
+              Channel Name Template <span style={{ color: 'var(--text-3)' }}>({`Tag: {count}, {goal}`})</span>
+            </label>
+            <input
+              className="form-input"
+              value={channelNameTemplate}
+              onChange={e => setChannelNameTemplate(e.target.value)}
+              placeholder="👥 Members: {count}"
+              style={{ fontSize: '12px', fontFamily: 'var(--font-mono)' }}
+            />
+          </div>
+        </div>
+
+        {['membersWithRole', 'membersWithoutRole'].includes(type) && (
+          <div className="form-group" style={{ margin: 0 }}>
+            <label className="form-label" style={{ fontSize: '11px', fontFamily: 'var(--font-mono)' }}>Target Role</label>
+            <select
+              className="form-input"
+              value={roleId}
+              onChange={e => setRoleId(e.target.value)}
+              style={{ fontSize: '12px' }}
+            >
+              <option value="">-- Chọn Role --</option>
+              {roles.map(r => (
+                <option key={r.id} value={r.id}>{r.name}</option>
+              ))}
+            </select>
+          </div>
+        )}
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-4)', flexWrap: 'wrap' }}>
+          <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', cursor: 'pointer', fontFamily: 'var(--font-mono)' }}>
+            <input
+              type="checkbox"
+              checked={isGoal}
+              onChange={e => {
+                setIsGoal(e.target.checked);
+                if (e.target.checked && !channelNameTemplate.includes('{goal}')) {
+                  setChannelNameTemplate('🎯 Goal: {count}/{goal}');
+                }
+              }}
+            />
+            <span>Is Goal Counter? (Theo dõi cột mốc)</span>
+          </label>
+
+          {isGoal && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flex: 1 }}>
+              <span style={{ fontSize: '11px', color: 'var(--text-3)', fontFamily: 'var(--font-mono)' }}>Milestones:</span>
+              <input
+                className="form-input"
+                value={goalsStr}
+                onChange={e => setGoalsStr(e.target.value)}
+                placeholder="100, 250, 500, 1000"
+                style={{ fontSize: '12px', fontFamily: 'var(--font-mono)', flex: 1 }}
+              />
+            </div>
+          )}
+        </div>
+
+        <button type="submit" className="btn btn--primary" disabled={loading} style={{ alignSelf: 'flex-end', fontSize: '11px', fontFamily: 'var(--font-mono)' }}>
+          + Add Counter Channel
+        </button>
+      </form>
+
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
+        <div style={{ fontSize: '11px', color: 'var(--text-3)', fontFamily: 'var(--font-mono)', fontWeight: 'bold' }}>
+          ACTIVE COUNTERS ({counters.length}):
+        </div>
+
+        {counters.length === 0 ? (
+          <div style={{ padding: 'var(--space-4)', background: 'var(--surface-1)', border: '1px dashed var(--border)', textAlign: 'center', color: 'var(--text-3)', fontSize: '12px', fontFamily: 'var(--font-mono)' }}>
+            Chưa có kênh Counter nào. Hãy tạo ở form trên hoặc bấm "Auto-Setup Default".
+          </div>
+        ) : (
+          counters.map((c, i) => (
+            <div key={c.id || i} style={{
+              padding: 'var(--space-3) var(--space-4)',
+              background: 'var(--surface-1)',
+              border: '1px solid var(--border)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: 'var(--space-3)'
+            }}>
+              <div>
+                <div style={{ fontFamily: 'var(--font-mono)', fontWeight: 'bold', fontSize: '13px', color: 'var(--text-1)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span style={{ color: c.enabled !== false ? 'var(--accent)' : 'var(--text-3)' }}>
+                    {c.channelNameTemplate}
+                  </span>
+                  {c.isGoal && (
+                    <span style={{ background: 'rgba(255, 170, 0, 0.15)', color: 'var(--amber)', fontSize: '10px', padding: '1px 6px', borderRadius: '3px' }}>
+                      GOAL
+                    </span>
+                  )}
+                </div>
+                <div style={{ fontSize: '11px', color: 'var(--text-3)', marginTop: '2px' }}>
+                  Type: <code>{c.type}</code> {c.isGoal && Array.isArray(c.goals) ? `• Milestones: [${c.goals.join(', ')}]` : ''}
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
+                <label className="toggle-switch">
+                  <input
+                    type="checkbox"
+                    className="toggle-switch__input"
+                    checked={c.enabled !== false}
+                    onChange={() => handleToggleCounter(c)}
+                  />
+                  <div className="toggle-switch__track">
+                    <div className="toggle-switch__thumb" />
+                  </div>
+                </label>
+
+                <button
+                  type="button"
+                  className="btn btn--danger"
+                  onClick={() => handleDeleteCounter(c.id)}
+                  style={{ padding: 'var(--space-1) var(--space-2)' }}
+                >
+                  <Trash2 size={14} />
+                </button>
+              </div>
+            </div>
+          ))
+        )}
+      </div>
+    </div>
+  );
+}
+
 import { useLocation } from 'react-router-dom';
 
 export default function UtilityServicesPage() {
@@ -447,6 +815,15 @@ export default function UtilityServicesPage() {
           />
         </Panel>
       </MasonryGrid>
+
+      {/* Arcane Counters & Goals Panel (Full Width) */}
+      <div className="grid-12" style={{ marginTop: 'var(--space-6)' }}>
+        <div className="col-span-12">
+          <Panel title={t("SERVER COUNTERS & GOALS (ARCANE STATS ENGINE)")} accent id="counters" className={highlight === 'counters' ? 'flash-target' : ''}>
+            <CountersManager guildId={selectedGuild?.id} roles={roles} />
+          </Panel>
+        </div>
+      </div>
 
       {/* Utility Commands Routing Panel (Full Width) */}
       <div className="grid-12" style={{ marginTop: 'var(--space-6)' }}>

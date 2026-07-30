@@ -30,6 +30,7 @@ import { handleMusicCommand }                  from './bot/commands/handlers/mus
 import { initLavalink, forwardVoiceEvent }     from './bot/music/lavalink.js';
 import { startReminderWorker }                 from './bot/reminderWorker.js';
 import { startEsportsWorker }                  from './bot/esportsWorker.js';
+import { startCountersEngine }                 from './bot/services/countersEngine.js';
 import { handleVoiceStateUpdate }             from './bot/tempVoice.js';
 import { handleXp }                            from './bot/xpHandler.js';
 import { runAutoMod, runMentionReact }         from './bot/autoMod.js';
@@ -261,6 +262,7 @@ export function createBot(configStore, stateStore, redis = null) {
       // Workers
       startReminderWorker(readyClient, configStore);
       startEsportsWorker(readyClient, configStore, redis);
+      startCountersEngine(readyClient, configStore);
       _startEventQueueWorker(readyClient, configStore, redis);
 
     })().catch((err) => console.error('[bot] Startup error:', err));

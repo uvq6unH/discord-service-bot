@@ -10,6 +10,7 @@ import { handleRiot } from './handlers/riot.js';
 import { handleTranslate } from './handlers/translate.js';
 import { handleDuolingo } from './handlers/duolingo.js';
 import { handleVoiceControl } from './handlers/tempVcSetup.js';
+import { handleCountersCommand } from './handlers/counters.js';
 
 const HANDLERS = [
   handleHelp,
@@ -21,7 +22,8 @@ const HANDLERS = [
   handleRiot,
   handleTranslate,
   handleDuolingo,
-  handleVoiceControl
+  handleVoiceControl,
+  handleCountersCommand
 ];
 
 export async function runBuiltInCommand(params) {

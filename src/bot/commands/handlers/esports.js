@@ -16,7 +16,7 @@ export async function handleEsports(ctx) {
     .setDescription(`Danh sách các trận đấu mới nhất của giải **${data.league.name}**:`)
     .setColor(0x0099FF)
     .setTimestamp()
-    .setFooter({ text: 'Riot Esports Official Schedule • XeNon Bot' });
+    .setFooter({ text: 'Riot Esports Official Schedule • uvq6unH Bot' });
 
   if (matches.length === 0) {
     embed.addFields({ name: '📭 Thông báo', value: 'Hiện chưa có lịch thi đấu mới cho giải đấu này.' });

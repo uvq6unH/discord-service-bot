@@ -1598,6 +1598,112 @@ export function createServer({ configStore, stateStore, botClient, redis = null 
     }
   });
 
+  // ── Counters Plugin REST Endpoints ─────────────────────────────────────────
+  app.get('/api/guilds/:guildId/counters', auth.requireAuth, readRateLimit, requireGuildId, auth.requireGuildAccess, async (req, res) => {
+    try {
+      const config = await configStore.getGuildConfig(req.guildId);
+      return res.json({
+        countersEnabled: config.countersEnabled !== false,
+        counters: config.counters || []
+      });
+    } catch (err) {
+      return res.status(500).json({ error: err.message });
+    }
+  });
+
+  app.post('/api/guilds/:guildId/counters', auth.requireAuth, writeRateLimit, requireGuildId, auth.requireGuildAccess, async (req, res) => {
+    try {
+      const config = await configStore.getGuildConfig(req.guildId);
+      const existing = config.counters || [];
+      const { mode, counter, countersEnabled } = req.body || {};
+
+      let updatedCounters = [...existing];
+
+      if (typeof countersEnabled === 'boolean') {
+        await configStore.updateGuildConfig(req.guildId, { countersEnabled });
+      }
+
+      if (mode === 'default') {
+        const defaultCounters = [
+          {
+            id: `counter_mem_${Date.now()}_1`,
+            type: 'members',
+            channelNameTemplate: '👥 Members: {count}',
+            enabled: true,
+            isGoal: false
+          },
+          {
+            id: `counter_usr_${Date.now()}_2`,
+            type: 'users',
+            channelNameTemplate: '👤 Users: {count}',
+            enabled: true,
+            isGoal: false
+          }
+        ];
+        updatedCounters = [...updatedCounters, ...defaultCounters];
+      } else if (counter && counter.id) {
+        const idx = updatedCounters.findIndex(c => c.id === counter.id);
+        if (idx >= 0) {
+          updatedCounters[idx] = { ...updatedCounters[idx], ...counter };
+        } else {
+          updatedCounters.push(counter);
+        }
+      }
+
+      await configStore.updateGuildConfig(req.guildId, {
+        countersEnabled: true,
+        counters: updatedCounters
+      });
+
+      // Trigger counter sync if botClient is ready
+      const botClient = req.app.get('botClient');
+      if (botClient && (botClient.isReady?.() || botClient.user)) {
+        const guild = botClient.guilds.cache.get(req.guildId) || await botClient.guilds.fetch(req.guildId).catch(() => null);
+        if (guild) {
+          const { syncAllCountersForGuild } = await import('./bot/services/countersEngine.js');
+          syncAllCountersForGuild(guild, configStore).catch(() => null);
+        }
+      }
+
+      return res.json({ success: true, counters: updatedCounters });
+    } catch (err) {
+      return res.status(500).json({ error: err.message });
+    }
+  });
+
+  app.delete('/api/guilds/:guildId/counters/:counterId', auth.requireAuth, writeRateLimit, requireGuildId, auth.requireGuildAccess, async (req, res) => {
+    try {
+      const config = await configStore.getGuildConfig(req.guildId);
+      const counterId = req.params.counterId;
+      const updatedCounters = (config.counters || []).filter(c => c.id !== counterId);
+
+      await configStore.updateGuildConfig(req.guildId, { counters: updatedCounters });
+      return res.json({ success: true, counters: updatedCounters });
+    } catch (err) {
+      return res.status(500).json({ error: err.message });
+    }
+  });
+
+  app.post('/api/guilds/:guildId/counters/sync', auth.requireAuth, writeRateLimit, requireGuildId, auth.requireGuildAccess, async (req, res) => {
+    try {
+      const botClient = req.app.get('botClient');
+      if (!botClient || (!botClient.isReady?.() && !botClient.user)) {
+        return res.json({ success: true, message: 'Đã lưu cấu hình! Kênh Counter sẽ cập nhật khi Bot kết nối.' });
+      }
+
+      const guild = botClient.guilds.cache.get(req.guildId) || await botClient.guilds.fetch(req.guildId).catch(() => null);
+      if (!guild) {
+        return res.status(404).json({ error: 'Không tìm thấy Server Discord trong hệ thống Bot.' });
+      }
+
+      const { syncAllCountersForGuild } = await import('./bot/services/countersEngine.js');
+      const results = await syncAllCountersForGuild(guild, configStore);
+      return res.json({ success: true, results, message: `Đã đồng bộ ${results.length} kênh Counter!` });
+    } catch (err) {
+      return res.status(500).json({ error: err.message });
+    }
+  });
+
   // Central error handler — catches unhandled async errors in Express 5 routes
   app.use((err, req, res, _next) => {
     console.error('[server] Unhandled error:', err?.message ?? err);
