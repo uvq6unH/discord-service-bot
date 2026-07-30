@@ -207,12 +207,13 @@ export async function getOrResolveCounterCategory(guild, configStore) {
 
   // 1. Try to find by stored counterCategoryId
   if (config.counterCategoryId) {
-    let cat = guild.channels.cache.get(config.counterCategoryId);
-    if (!cat) {
-      cat = await guild.channels.fetch(config.counterCategoryId).catch(() => null);
-    }
+    let cat = await guild.channels.fetch(config.counterCategoryId).catch(() => null);
     if (cat && cat.type === ChannelType.GuildCategory) {
       return cat;
+    }
+    // If category was deleted on Discord, clear stale counterCategoryId from configStore
+    if (configStore) {
+      await configStore.updateGuildConfig(guild.id, { counterCategoryId: '' }).catch(() => null);
     }
   }
 
@@ -522,16 +523,6 @@ export async function syncAllCountersForGuild(guild, configStore) {
 
   const countersList = Array.isArray(config.counters) ? config.counters : [];
   if (countersList.length === 0) {
-    // If counters list is empty after auto-discover, delete empty category if it exists
-    const category = guild.channels.cache.find(c => c.type === ChannelType.GuildCategory && /counter|stat/i.test(c.name));
-    if (category) {
-      let fetchedChannels;
-      try { fetchedChannels = await guild.channels.fetch(); } catch { fetchedChannels = guild.channels.cache; }
-      const remaining = [...fetchedChannels.values()].filter(ch => ch.parentId === category.id);
-      if (remaining.length === 0) {
-        await category.delete('No active counters').catch(() => null);
-      }
-    }
     return [];
   }
 
