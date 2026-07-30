@@ -288,29 +288,47 @@ export async function syncSingleCounter(guild, counter, configStore) {
     if (!channel) {
       const everyoneRoleId = guild.roles?.everyone?.id || guild.id;
 
-      // Create a locked voice channel for counter display with safe permission overwrite fallback
-      channel = await guild.channels.create({
-        name: expectedName,
-        type: ChannelType.GuildVoice,
-        parent: category?.id,
-        permissionOverwrites: [
-          {
-            id: everyoneRoleId,
-            deny: [PermissionFlagsBits.Connect],
-            allow: [PermissionFlagsBits.ViewChannel]
-          }
-        ]
-      }).catch(async (err) => {
-        console.warn(`[countersEngine] Could not create channel with permissionOverwrites, trying basic voice channel:`, err.message);
-        return await guild.channels.create({
+      // 1. Try creating with locked voice channel permissions
+      try {
+        channel = await guild.channels.create({
           name: expectedName,
           type: ChannelType.GuildVoice,
-          parent: category?.id
+          parent: category?.id,
+          permissionOverwrites: [
+            {
+              id: everyoneRoleId,
+              deny: [PermissionFlagsBits.Connect],
+              allow: [PermissionFlagsBits.ViewChannel]
+            }
+          ]
         });
-      });
+      } catch (err1) {
+        console.warn(`[countersEngine] Channel create with overwrites failed (${err1.message}), trying basic voice channel:`);
+        // 2. Try creating basic voice channel under category
+        try {
+          channel = await guild.channels.create({
+            name: expectedName,
+            type: ChannelType.GuildVoice,
+            parent: category?.id
+          });
+        } catch (err2) {
+          console.warn(`[countersEngine] Channel create under category failed (${err2.message}), trying root level:`);
+          // 3. Try creating basic voice channel at root level
+          try {
+            channel = await guild.channels.create({
+              name: expectedName,
+              type: ChannelType.GuildVoice
+            });
+          } catch (err3) {
+            console.error(`[countersEngine] CRITICAL: Channel creation failed completely for counter ${counter.id}:`, err3.message);
+            channel = null;
+          }
+        }
+      }
 
       if (channel) {
         counter.channelId = channel.id;
+        console.log(`[countersEngine] ✅ Successfully created counter channel "${channel.name}" (${channel.id}) on Discord!`);
       }
     } else {
       // Only rename if channel name actually changed (prevents Discord rate-limits)

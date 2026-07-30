@@ -689,6 +689,8 @@ function _startEventQueueWorker(client, configStore, redis) {
           return [];
         });
         console.log(`[event-queue] Synced ${results?.length || 0} counter(s) for guild ${guildId}`);
+      } else {
+        console.warn(`[event-queue] Could not fetch guild ${guildId} for sync_counters (is bot in this server?)`);
       }
     } else if (type === 'delete_counter_channel') {
       if (!guildId || !job.channelId) return;
