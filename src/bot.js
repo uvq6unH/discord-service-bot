@@ -827,11 +827,7 @@ function _startEventQueueWorker(client, configStore, redis) {
   const loop = async () => {
     while (isRunning) {
       try {
-        let raw = await redis.lpop(EVENT_QUEUE).catch(() => null);
-
-        if (!raw) {
-          raw = await redis.lpop(LEGACY_SLASH_SYNC_QUEUE).catch(() => null);
-        }
+        const raw = await redis.lpop(EVENT_QUEUE).catch(() => null);
 
         if (raw) {
           let job;
@@ -845,12 +841,12 @@ function _startEventQueueWorker(client, configStore, redis) {
           }
           await new Promise(resolve => setImmediate(resolve));
         } else {
-          // Fast-poll 1s sleep for instant IPC response between Dashboard and Bot Worker
-          await new Promise(resolve => setTimeout(resolve, 1000));
+          // Idle poll: 15s sleep to protect Upstash Redis quota (< 6k calls/day)
+          await new Promise(resolve => setTimeout(resolve, 15000));
         }
       } catch (err) {
         console.error('[event-queue] Worker error:', err.message);
-        await new Promise(resolve => setTimeout(resolve, 10000));
+        await new Promise(resolve => setTimeout(resolve, 30000));
       }
     }
   };
@@ -910,9 +906,9 @@ function _startHeartbeat(client, redis) {
   };
 
   write();
-  const handle = setInterval(write, 60_000);
+  const handle = setInterval(write, 120_000);
   handle.unref();
-  console.log('[heartbeat] Bot heartbeat started — writing every 60 s');
+  console.log('[heartbeat] Bot heartbeat started — writing every 120 s');
 }
 
 function _updatePresence(client) {

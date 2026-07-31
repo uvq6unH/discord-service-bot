@@ -536,8 +536,8 @@ export class ConfigStore {
 
   async getGuildConfig(guildId) {
     await this.ready;
-    let stored = null;
-    if (this._redis) {
+    let stored = this.cache[guildId];
+    if (!stored && this._redis) {
       try {
         const val = await this._redis.get(this._keyFor(guildId));
         if (val) {
@@ -549,7 +549,7 @@ export class ConfigStore {
       }
     }
     if (!stored) {
-      stored = this.cache[guildId] ?? {};
+      stored = {};
     }
 
     const coreCmds = normalizeCommands(

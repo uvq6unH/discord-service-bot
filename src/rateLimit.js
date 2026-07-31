@@ -59,21 +59,10 @@ async function redisRateLimit(redis, key, windowMs, max) {
   return { allowed: true, retryAfterMs: 0 };
 }
 
-export function createRateLimiter({ windowMs, max, keyPrefix = 'global', redis = null }) {
-  return async function rateLimitMiddleware(req, res, next) {
+export function createRateLimiter({ windowMs, max, keyPrefix = 'global' }) {
+  return function rateLimitMiddleware(req, res, next) {
     const key = `${keyPrefix}:${req.ip}:${req.session?.user?.id ?? 'anon'}`;
-
-    let result = { allowed: true, retryAfterMs: 0 };
-    if (redis) {
-      try {
-        result = await redisRateLimit(redis, `ratelimit:${key}`, windowMs, max);
-      } catch (error) {
-        console.warn('[rateLimit] Redis unavailable, falling back to memory:', error.message);
-        result = memoryRateLimit(key, windowMs, max);
-      }
-    } else {
-      result = memoryRateLimit(key, windowMs, max);
-    }
+    const result = memoryRateLimit(key, windowMs, max);
 
     if (!result.allowed) {
       res.set('Retry-After', String(Math.ceil(result.retryAfterMs / 1000)));
