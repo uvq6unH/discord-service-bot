@@ -63,23 +63,9 @@ export async function pushLiveLog(redis, { type = 'INFO', message = '', metadata
     try { cb(item); } catch {}
   }
 
-  if (redis) {
-    try {
-      await redis.rpush('telemetry:live_logs', JSON.stringify(item)).catch(() => null);
-    } catch {}
-  }
-
   return item;
 }
 
-export async function getLiveLogs(redis) {
-  if (redis) {
-    try {
-      const rawLogs = await redis._request(['LRANGE', 'telemetry:live_logs', '0', '-1']);
-      if (Array.isArray(rawLogs) && rawLogs.length > 0) {
-        return rawLogs.map(r => (typeof r === 'string' ? JSON.parse(r) : r)).reverse();
-      }
-    } catch {}
-  }
+export async function getLiveLogs() {
   return _inMemoryLiveLogs;
 }

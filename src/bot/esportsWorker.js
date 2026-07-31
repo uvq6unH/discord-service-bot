@@ -8,14 +8,14 @@ const _postedResultCache = new Set();
 export function startEsportsWorker(client, configStore, redis) {
   console.log('[esportsWorker] Starting Automated Esports Daily Broadcast, Live Alerts & Match Results Worker...');
 
-  // Check every 60 seconds
+  // Check every 5 minutes (300 seconds) to protect Redis API quota
   setInterval(async () => {
     try {
       await processEsportsWorkerCycle(client, configStore, redis);
     } catch (err) {
       console.error('[esportsWorker] Error in worker cycle:', err.message);
     }
-  }, 60 * 1000).unref();
+  }, 5 * 60 * 1000).unref();
 }
 
 async function processEsportsWorkerCycle(client, configStore, redis) {
@@ -59,7 +59,7 @@ async function processEsportsWorkerCycle(client, configStore, redis) {
       const configuredDailyTime = config.esportsDailyTime || '08:00';
       if (currentHHMM === configuredDailyTime) {
         const dailyKey = `guild:${guild.id}:esports_daily:${todayYMD}`;
-        const alreadyPosted = _postedDailyCache.has(dailyKey) || (redis ? await redis.get(dailyKey).catch(() => null) : false);
+        const alreadyPosted = _postedDailyCache.has(dailyKey);
 
         if (!alreadyPosted) {
           _postedDailyCache.add(dailyKey);
@@ -158,7 +158,7 @@ async function processEsportsWorkerCycle(client, configStore, redis) {
 
             const preKey = `guild:${guild.id}:esports_alert:${stage}:${matchId}`;
 
-            const alreadyAlerted = _postedPre15Cache.has(preKey) || (redis ? await redis.get(preKey).catch(() => null) : false);
+            const alreadyAlerted = _postedPre15Cache.has(preKey);
 
             if (!alreadyAlerted) {
               _postedPre15Cache.add(preKey);
@@ -204,7 +204,7 @@ async function processEsportsWorkerCycle(client, configStore, redis) {
           const matchId = match.id || `${match.leagueKey}_${cleanTeam1}_${cleanTeam2}_${matchTimeMin}`;
 
           const resultKey = `guild:${guild.id}:esports_result:${matchId}`;
-          const alreadyPostedResult = _postedResultCache.has(resultKey) || (redis ? await redis.get(resultKey).catch(() => null) : false);
+          const alreadyPostedResult = _postedResultCache.has(resultKey);
 
           if (!alreadyPostedResult) {
             _postedResultCache.add(resultKey);
