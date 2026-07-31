@@ -178,11 +178,7 @@ export async function handleVoiceStateUpdate(oldState, newState, configStore, re
   // ── 2. User left a channel — delete if temp channel is now empty ─────────
   const prevChannel = oldState.channel;
   if (prevChannel && prevChannel.id !== masterChannelId) {
-    let isTempVc = _tempChannels.has(prevChannel.id);
-    if (!isTempVc && redis) {
-      const ownerId = await redis.hget(`guild:${guild.id}:temp_vcs`, prevChannel.id).catch(() => null);
-      if (ownerId) isTempVc = true;
-    }
+    const isTempVc = _tempChannels.has(prevChannel.id);
 
     if (isTempVc && prevChannel.members.size === 0) {
       try {

@@ -63,9 +63,6 @@ async function processEsportsWorkerCycle(client, configStore, redis) {
 
         if (!alreadyPosted) {
           _postedDailyCache.add(dailyKey);
-          if (redis) {
-            await redis.set(dailyKey, '1', 'EX', 172800).catch(() => null);
-          }
 
           const dailyData = await getDailyMatchesForLeagues(targetLeagues, todayYMD);
           if (dailyData && dailyData.length > 0) {
@@ -162,9 +159,6 @@ async function processEsportsWorkerCycle(client, configStore, redis) {
 
             if (!alreadyAlerted) {
               _postedPre15Cache.add(preKey);
-              if (redis) {
-                await redis.set(preKey, '1', 'EX', 172800).catch(() => null);
-              }
 
               const unixSec = Math.floor(matchTime / 1000);
 
@@ -208,9 +202,6 @@ async function processEsportsWorkerCycle(client, configStore, redis) {
 
           if (!alreadyPostedResult) {
             _postedResultCache.add(resultKey);
-            if (redis) {
-              await redis.set(resultKey, '1', 'EX', 172800).catch(() => null);
-            }
 
             const unixSec = Math.floor(new Date(match.startTime).getTime() / 1000);
             const scoreStr = (match.score1 !== null && match.score2 !== null) ? `[ **${match.score1}** ] 🆚 [ **${match.score2}** ]` : '🆚';
