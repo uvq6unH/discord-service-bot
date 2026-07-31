@@ -520,11 +520,9 @@ export class ConfigStore {
     const stored = this.cache[guildId];
     if (!stored) return;
     await this._redis.set(this._keyFor(guildId), JSON.stringify(this._serializeForStorage(guildId, stored)));
-    // Update index (re-read to avoid racing on multi-guild concurrent saves)
-    const raw = await this._redis.get(this._KEY_INDEX).catch(() => null);
-    const ids = new Set(raw ? JSON.parse(raw) : []);
-    ids.add(guildId);
-    await this._redis.set(this._KEY_INDEX, JSON.stringify([...ids]));
+    // Keep index synced in Redis asynchronously without blocking or reading
+    const ids = Object.keys(this.cache);
+    this._redis.set(this._KEY_INDEX, JSON.stringify(ids)).catch(() => null);
   }
 
   save(guildId) {
@@ -859,23 +857,15 @@ export class ConfigStore {
 
   async listGuildIds() {
     await this.ready;
+    if (this.cache && Object.keys(this.cache).length > 0) {
+      return Object.keys(this.cache);
+    }
     if (this._redis) {
       try {
         const raw = await this._redis.get(this._KEY_INDEX).catch(() => null);
-        if (raw) {
-          const ids = JSON.parse(raw);
-          // Sync keys to this.cache to make sure they exist for fallback
-          for (const id of ids) {
-            if (!(id in this.cache)) {
-              this.cache[id] = {};
-            }
-          }
-          return ids;
-        }
-      } catch (err) {
-        console.warn(`[ConfigStore] Failed to list guild IDs from Redis: ${err.message}`);
-      }
+        if (raw) return JSON.parse(raw);
+      } catch {}
     }
-    return Object.keys(this.cache);
+    return Object.keys(this.cache ?? {});
   }
 }

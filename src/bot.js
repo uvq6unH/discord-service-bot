@@ -841,8 +841,8 @@ function _startEventQueueWorker(client, configStore, redis) {
           }
           await new Promise(resolve => setImmediate(resolve));
         } else {
-          // Idle poll: 15s sleep to protect Upstash Redis quota (< 6k calls/day)
-          await new Promise(resolve => setTimeout(resolve, 15000));
+          // Idle poll: 60s sleep to strictly protect Upstash Redis quota (< 1.5k calls/day)
+          await new Promise(resolve => setTimeout(resolve, 60000));
         }
       } catch (err) {
         console.error('[event-queue] Worker error:', err.message);
@@ -906,9 +906,9 @@ function _startHeartbeat(client, redis) {
   };
 
   write();
-  const handle = setInterval(write, 120_000);
+  const handle = setInterval(write, 300_000);
   handle.unref();
-  console.log('[heartbeat] Bot heartbeat started — writing every 120 s');
+  console.log('[heartbeat] Bot heartbeat started — writing every 300 s');
 }
 
 function _updatePresence(client) {
