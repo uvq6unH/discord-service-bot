@@ -239,15 +239,22 @@ export async function getRecentCompletedMatchesForLeagues(leagueKeys = ['lck', '
         if (!evt.startTime || evt.state !== 'completed') return false;
         const matchTime = new Date(evt.startTime).getTime();
         const ageMs = now - matchTime;
-        return ageMs >= 0 && ageMs <= maxAgeMs;
+        if (ageMs < 0 || ageMs > maxAgeMs) return false;
+
+        // Ensure match is TRULY finished with scores or a declared winner
+        const teams = evt.match?.teams || [];
+        const hasWinner = teams[0]?.result?.outcome === 'win' || teams[1]?.result?.outcome === 'win';
+        const wins1 = teams[0]?.result?.gameWins ?? 0;
+        const wins2 = teams[1]?.result?.gameWins ?? 0;
+        return hasWinner || (wins1 + wins2 > 0);
       }).map(evt => {
         const teams = evt.match?.teams || [];
         const team1 = teams[0]?.name || 'TBD';
         const team2 = teams[1]?.name || 'TBD';
         const code1 = teams[0]?.code || team1;
         const code2 = teams[1]?.code || team2;
-        const score1 = teams[0]?.result?.gameWins ?? (teams[0]?.result?.outcome === 'win' ? 'W' : (teams[0]?.result?.outcome === 'loss' ? 'L' : null));
-        const score2 = teams[1]?.result?.gameWins ?? (teams[1]?.result?.outcome === 'win' ? 'W' : (teams[1]?.result?.outcome === 'loss' ? 'L' : null));
+        const score1 = teams[0]?.result?.gameWins ?? (teams[0]?.result?.outcome === 'win' ? 1 : (teams[0]?.result?.outcome === 'loss' ? 0 : 0));
+        const score2 = teams[1]?.result?.gameWins ?? (teams[1]?.result?.outcome === 'win' ? 1 : (teams[1]?.result?.outcome === 'loss' ? 0 : 0));
         const winnerName = teams[0]?.result?.outcome === 'win' ? team1 : (teams[1]?.result?.outcome === 'win' ? team2 : null);
         const winnerCode = teams[0]?.result?.outcome === 'win' ? code1 : (teams[1]?.result?.outcome === 'win' ? code2 : null);
 
