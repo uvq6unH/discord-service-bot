@@ -1631,7 +1631,7 @@ export function createServer({ configStore, stateStore, botClient, redis = null 
         ? (botClient.guilds.cache.get(req.guildId) || await botClient.guilds.fetch(req.guildId).catch(() => null))
         : null;
 
-      const { autoDiscoverExistingCounters, enrichCounterWithLiveStats } = await import('./bot/services/countersEngine.js');
+      const { autoDiscoverExistingCounters, enrichCounterWithLiveStats, getOrResolveCounterCategory } = await import('./bot/services/countersEngine.js');
       
       let rawCounters = [];
       if (guild) {
@@ -1642,7 +1642,8 @@ export function createServer({ configStore, stateStore, botClient, redis = null 
       }
 
       const config = await configStore.getGuildConfig(req.guildId);
-      const enrichedCounters = await Promise.all(rawCounters.map(c => enrichCounterWithLiveStats(guild, c, redis, req.guildId)));
+      const counterCategoryId = config.counterCategoryId || null;
+      const enrichedCounters = await Promise.all(rawCounters.map(c => enrichCounterWithLiveStats(guild, c, redis, req.guildId, counterCategoryId)));
 
       return res.json({
         success: true,
@@ -1739,7 +1740,8 @@ export function createServer({ configStore, stateStore, botClient, redis = null 
 
       // Re-fetch latest config after sync to get channelId and indexes
       const latestConfig = await configStore.getGuildConfig(req.guildId);
-      const enrichedCounters = await Promise.all((latestConfig.counters || []).map(c => enrichCounterWithLiveStats(guild, c, redis, req.guildId)));
+      const counterCategoryId = latestConfig.counterCategoryId || null;
+      const enrichedCounters = await Promise.all((latestConfig.counters || []).map(c => enrichCounterWithLiveStats(guild, c, redis, req.guildId, counterCategoryId)));
 
       return res.json({ success: true, counters: enrichedCounters });
     } catch (err) {
@@ -1782,7 +1784,9 @@ export function createServer({ configStore, stateStore, botClient, redis = null 
         }
       }
 
-      const enrichedCounters = await Promise.all(updatedCounters.map(c => enrichCounterWithLiveStats(guild, c, redis, req.guildId)));
+      const latestDelConfig = await configStore.getGuildConfig(req.guildId);
+      const delCategoryId = latestDelConfig.counterCategoryId || null;
+      const enrichedCounters = await Promise.all(updatedCounters.map(c => enrichCounterWithLiveStats(guild, c, redis, req.guildId, delCategoryId)));
 
       return res.json({ success: true, counters: enrichedCounters });
     } catch (err) {
@@ -1821,7 +1825,8 @@ export function createServer({ configStore, stateStore, botClient, redis = null 
       }
 
       const latestConfig = await configStore.getGuildConfig(req.guildId);
-      const enrichedCounters = await Promise.all((latestConfig.counters || []).map(c => enrichCounterWithLiveStats(guild, c, redis, req.guildId)));
+      const syncCategoryId = latestConfig.counterCategoryId || null;
+      const enrichedCounters = await Promise.all((latestConfig.counters || []).map(c => enrichCounterWithLiveStats(guild, c, redis, req.guildId, syncCategoryId)));
 
       return res.json({
         success: true,

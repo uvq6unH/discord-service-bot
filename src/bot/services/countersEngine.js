@@ -3,7 +3,7 @@ import { ChannelType, PermissionFlagsBits } from 'discord.js';
 /**
  * Calculates current statistic count for a specific counter type in a guild.
  */
-export async function calculateCounterStat(guild, counter, redis = null, guildId = null) {
+export async function calculateCounterStat(guild, counter, redis = null, guildId = null, counterCategoryId = null) {
   const targetGuildId = guild?.id || guildId;
   const type = counter.type;
   const roleId = counter.roleId;
@@ -15,6 +15,12 @@ export async function calculateCounterStat(guild, counter, redis = null, guildId
       }
     }
 
+    // Helper: exclude counter-engine channels (the category itself + voice channels under it)
+    const isCounterChannel = (ch) => {
+      if (!counterCategoryId) return false;
+      return ch.id === counterCategoryId || ch.parentId === counterCategoryId;
+    };
+
     switch (type) {
       case 'members':
         return guild.memberCount || guild.members.cache.size || 0;
@@ -25,13 +31,13 @@ export async function calculateCounterStat(guild, counter, redis = null, guildId
       case 'roles':
         return guild.roles.cache.size;
       case 'channels':
-        return guild.channels.cache.size;
+        return guild.channels.cache.filter(c => !isCounterChannel(c)).size;
       case 'textChannels':
         return guild.channels.cache.filter(c => c.type === ChannelType.GuildText).size;
       case 'voiceChannels':
-        return guild.channels.cache.filter(c => c.type === ChannelType.GuildVoice || c.type === 2).size;
+        return guild.channels.cache.filter(c => (c.type === ChannelType.GuildVoice || c.type === 2) && !isCounterChannel(c)).size;
       case 'categoryChannels':
-        return guild.channels.cache.filter(c => c.type === ChannelType.GuildCategory || c.type === 4).size;
+        return guild.channels.cache.filter(c => (c.type === ChannelType.GuildCategory || c.type === 4) && !isCounterChannel(c)).size;
       case 'announcementChannels':
         return guild.channels.cache.filter(c => c.type === ChannelType.GuildNews || c.type === ChannelType.GuildAnnouncement).size;
       case 'stageChannels':
@@ -52,6 +58,8 @@ export async function calculateCounterStat(guild, counter, redis = null, guildId
         return guild.members.cache.filter(m => ['online', 'idle', 'dnd'].includes(m.presence?.status)).size;
       case 'offlineMembers':
         return Math.max(0, (guild.memberCount || 0) - guild.members.cache.filter(m => ['online', 'idle', 'dnd'].includes(m.presence?.status)).size);
+      case 'static':
+        return counter.staticValue ?? 0;
       default:
         return guild.memberCount || 0;
     }
@@ -157,11 +165,11 @@ export function generateCounterChannelName(counter, currentCount, targetGoal = n
  * Computes live calculated stats (count, targetGoal, evaluated channelName, channel status)
  * for a counter without modifying Discord channels (read-only for GET requests).
  */
-export async function enrichCounterWithLiveStats(guild, counter, redis = null, guildId = null) {
+export async function enrichCounterWithLiveStats(guild, counter, redis = null, guildId = null, counterCategoryId = null) {
   if (!counter) return counter;
   const targetGuildId = guild?.id || guildId;
   
-  const rawCount = await calculateCounterStat(guild, counter, redis, targetGuildId);
+  const rawCount = await calculateCounterStat(guild, counter, redis, targetGuildId, counterCategoryId);
   let targetGoal = null;
 
   if (counter.isGoal) {
@@ -298,7 +306,9 @@ export async function syncSingleCounter(guild, counter, configStore) {
   const originalChannelId = counter.channelId;
 
   try {
-    const rawCount = await calculateCounterStat(guild, counter);
+    const category = await getOrResolveCounterCategory(guild, configStore);
+    const counterCategoryId = category?.id || null;
+    const rawCount = await calculateCounterStat(guild, counter, null, null, counterCategoryId);
     let targetGoal = null;
     let newGoalIndex = counter.currentGoalIndex;
 
@@ -316,7 +326,7 @@ export async function syncSingleCounter(guild, counter, configStore) {
       channel = guild.channels.cache.get(counter.channelId) || await guild.channels.fetch(counter.channelId).catch(() => null);
     }
 
-    const category = await getOrResolveCounterCategory(guild, configStore);
+    // Reuse category already resolved above (line 309)
 
     if (!channel) {
       const everyoneRoleId = guild.roles?.everyone?.id || guild.id;
@@ -409,7 +419,8 @@ export function deduplicateCounters(counters) {
   const result = [];
 
   for (const c of counters) {
-    const key = `${c.type}_${c.channelId || 'unbound'}`;
+    // Use unique counter ID as dedup key to allow multiple counters of same type
+    const key = c.id || `${c.type}_${c.channelId || 'unbound'}`;
     if (!seen.has(key)) {
       seen.add(key);
       result.push(c);

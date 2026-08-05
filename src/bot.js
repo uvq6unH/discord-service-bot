@@ -134,6 +134,7 @@ export function createBot(configStore, stateStore, redis = null) {
       GatewayIntentBits.GuildVoiceStates,
       GatewayIntentBits.MessageContent,
       GatewayIntentBits.GuildMessageReactions,
+      GatewayIntentBits.GuildPresences,
     ],
     partials: [
       Partials.Channel,
