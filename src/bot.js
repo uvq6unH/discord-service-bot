@@ -842,8 +842,8 @@ function _startEventQueueWorker(client, configStore, redis) {
           }
           await new Promise(resolve => setImmediate(resolve));
         } else {
-          // Idle poll: 180s sleep to strictly protect Upstash Redis quota (< 480 calls/day)
-          await new Promise(resolve => setTimeout(resolve, 180000));
+          // Idle poll: 5s sleep to process dashboard events quickly while respecting Upstash Redis quota
+          await new Promise(resolve => setTimeout(resolve, 5000));
         }
       } catch (err) {
         console.error('[event-queue] Worker error:', err.message);

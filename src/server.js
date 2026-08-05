@@ -228,6 +228,9 @@ async function fetchAnalytics(guildId, range, redis, stateStore) {
 
 export function createServer({ configStore, stateStore, botClient, redis = null }) {
   const app = express();
+  if (botClient) app.set('botClient', botClient);
+  if (configStore) app.set('configStore', configStore);
+  if (redis) app.set('redis', redis);
   const isProduction = process.env.NODE_ENV === 'production';
   const sessionSecret = process.env.SESSION_SECRET;
   const csrf = createCsrfProtection();
@@ -1728,9 +1731,9 @@ export function createServer({ configStore, stateStore, botClient, redis = null 
           requestedAt: new Date().toISOString()
         })).catch(() => null);
 
-        // Poll configStore for up to 4.5s until bot worker finishes assigning channelIds
+        // Poll configStore for up to 10s until bot worker finishes assigning channelIds
         const startTime = Date.now();
-        while (Date.now() - startTime < 4500) {
+        while (Date.now() - startTime < 10000) {
           await new Promise(r => setTimeout(r, 400));
           const checkConfig = await configStore.getGuildConfig(req.guildId);
           const allAssigned = Array.isArray(checkConfig.counters) && checkConfig.counters.length > 0 && checkConfig.counters.every(c => Boolean(c.channelId));
@@ -1814,9 +1817,9 @@ export function createServer({ configStore, stateStore, botClient, redis = null 
           requestedAt: new Date().toISOString()
         })).catch(() => null);
 
-        // Poll configStore for up to 4.5s until bot worker finishes assigning channelIds
+        // Poll configStore for up to 10s until bot worker finishes assigning channelIds
         const startTime = Date.now();
-        while (Date.now() - startTime < 4500) {
+        while (Date.now() - startTime < 10000) {
           await new Promise(r => setTimeout(r, 400));
           const checkConfig = await configStore.getGuildConfig(req.guildId);
           const allAssigned = Array.isArray(checkConfig.counters) && checkConfig.counters.length > 0 && checkConfig.counters.every(c => Boolean(c.channelId));
