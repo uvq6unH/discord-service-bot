@@ -825,6 +825,10 @@ function _startEventQueueWorker(client, configStore, redis) {
     }
   };
 
+  const SIGNAL_KEY = 'event_queue:signal';
+  const FAST_POLL_MS = 3000;   // 3s when dashboard just pushed an event
+  const SLOW_POLL_MS = 30000;  // 30s idle poll (~2880 LPOP calls/day)
+
   const loop = async () => {
     while (isRunning) {
       try {
@@ -840,10 +844,19 @@ function _startEventQueueWorker(client, configStore, redis) {
           if (job) {
             await processJob(job);
           }
+          // Drain remaining jobs immediately
           await new Promise(resolve => setImmediate(resolve));
         } else {
-          // Idle poll: 5s sleep to process dashboard events quickly while respecting Upstash Redis quota
-          await new Promise(resolve => setTimeout(resolve, 5000));
+          // Check if dashboard signaled a new event (key with 15s TTL)
+          const hasSignal = await redis.get(SIGNAL_KEY).catch(() => null);
+          if (hasSignal) {
+            // Fast poll: dashboard just pushed something, check again soon
+            await redis.del(SIGNAL_KEY).catch(() => null);
+            await new Promise(resolve => setTimeout(resolve, FAST_POLL_MS));
+          } else {
+            // Slow idle poll
+            await new Promise(resolve => setTimeout(resolve, SLOW_POLL_MS));
+          }
         }
       } catch (err) {
         console.error('[event-queue] Worker error:', err.message);

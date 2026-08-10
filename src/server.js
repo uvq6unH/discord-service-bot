@@ -43,6 +43,17 @@ async function addAuditLog(redis, guildId, entry) {
   }
 }
 
+/**
+ * Push a job into event_queue AND set a signal key so the bot worker wakes up
+ * from its idle-sleep within ~3 seconds instead of waiting up to 30 seconds.
+ */
+async function pushEventQueue(redis, job) {
+  if (!redis) return;
+  await redis.rpush('event_queue', JSON.stringify(job));
+  // Signal key with 15s TTL — bot worker checks this to fast-poll
+  await redis.set('event_queue:signal', '1', 'EX', 15).catch(() => null);
+}
+
 async function mapWithConcurrency(items, limit, mapper) {
   const results = new Array(items.length);
   let nextIndex = 0;
@@ -895,7 +906,7 @@ export function createServer({ configStore, stateStore, botClient, redis = null 
         .catch((e) => ({ synced: false, reason: e.message }));
     } else if (redis) {
       // Split mode: đẩy vào event_queue để bot worker xử lý tức thì
-      await redis.rpush('event_queue', JSON.stringify({ type: 'sync_commands', guildId: req.guildId, requestedAt: new Date().toISOString() }));
+      await pushEventQueue(redis, { type: 'sync_commands', guildId: req.guildId, requestedAt: new Date().toISOString() });
       slashSync = { synced: false, queued: true, reason: 'bot_not_in_process' };
     } else {
       slashSync = { synced: false, reason: 'bot_not_available' };
@@ -918,7 +929,7 @@ export function createServer({ configStore, stateStore, botClient, redis = null 
       return res.status(503).json({ error: 'Bot not available and no Redis queue configured.' });
     }
 
-    await redis.rpush('event_queue', JSON.stringify({ type: 'sync_commands', guildId: req.guildId, requestedAt: new Date().toISOString() }));
+    await pushEventQueue(redis, { type: 'sync_commands', guildId: req.guildId, requestedAt: new Date().toISOString() });
     res.json({ queued: true, message: 'Slash sync event dispatched to real-time IPC queue. Bot will process instantly.' });
   });
 
@@ -1015,12 +1026,12 @@ export function createServer({ configStore, stateStore, botClient, redis = null 
       }
     } else if (redis) {
       // Split mode: Push to event_queue for bot worker
-      await redis.rpush('event_queue', JSON.stringify({
+      await pushEventQueue(redis, {
         type: 'post_selfrole_panel',
         guildId: req.guildId,
         panelId: panel.id,
         requestedAt: new Date().toISOString()
-      }));
+      });
 
       addAuditLog(redis, req.guildId, {
         user: req.session?.user?.username ?? 'Admin',
@@ -1115,12 +1126,12 @@ export function createServer({ configStore, stateStore, botClient, redis = null 
       }
 
       if (redis) {
-        await redis.rpush('event_queue', JSON.stringify({
+        await pushEventQueue(redis, {
           type: 'esports_test_notify',
           guildId: req.guildId,
           channelId: config.esportsChannelId,
           requestedAt: new Date().toISOString()
-        }));
+        });
         return res.json({ success: true, message: 'Đã gửi yêu cầu test thông báo tới Bot Worker!' });
       }
 
@@ -1725,16 +1736,16 @@ export function createServer({ configStore, stateStore, botClient, redis = null 
         await syncAllCountersForGuild(guild, configStore).catch(() => null);
       } else if (redis) {
         // Dispatch event to Redis event_queue for split-mode bot process
-        await redis.rpush('event_queue', JSON.stringify({
+        await pushEventQueue(redis, {
           type: 'sync_counters',
           guildId: req.guildId,
           requestedAt: new Date().toISOString()
-        })).catch(() => null);
+        }).catch(() => null);
 
-        // Poll configStore for up to 4.5s until bot worker finishes assigning channelIds
+        // Poll configStore for up to 10s until bot worker finishes assigning channelIds
         const startTime = Date.now();
-        while (Date.now() - startTime < 4500) {
-          await new Promise(r => setTimeout(r, 400));
+        while (Date.now() - startTime < 10000) {
+          await new Promise(r => setTimeout(r, 500));
           const checkConfig = await configStore.getGuildConfig(req.guildId);
           const allAssigned = Array.isArray(checkConfig.counters) && checkConfig.counters.length > 0 && checkConfig.counters.every(c => Boolean(c.channelId));
           if (allAssigned) break;
@@ -1777,12 +1788,12 @@ export function createServer({ configStore, stateStore, botClient, redis = null 
         }
         
         if (redis) {
-          await redis.rpush('event_queue', JSON.stringify({
+          await pushEventQueue(redis, {
             type: 'delete_counter_channel',
             guildId: req.guildId,
             channelId: targetCounter.channelId,
             requestedAt: new Date().toISOString()
-          })).catch(() => null);
+          }).catch(() => null);
           await new Promise(resolve => setTimeout(resolve, 1200));
         }
       }
@@ -1811,16 +1822,16 @@ export function createServer({ configStore, stateStore, botClient, redis = null 
       if (guild) {
         results = await syncAllCountersForGuild(guild, configStore);
       } else if (redis) {
-        await redis.rpush('event_queue', JSON.stringify({
+        await pushEventQueue(redis, {
           type: 'sync_counters',
           guildId: req.guildId,
           requestedAt: new Date().toISOString()
-        })).catch(() => null);
+        }).catch(() => null);
 
-        // Poll configStore for up to 4.5s until bot worker finishes assigning channelIds
+        // Poll configStore for up to 10s until bot worker finishes assigning channelIds
         const startTime = Date.now();
-        while (Date.now() - startTime < 4500) {
-          await new Promise(r => setTimeout(r, 400));
+        while (Date.now() - startTime < 10000) {
+          await new Promise(r => setTimeout(r, 500));
           const checkConfig = await configStore.getGuildConfig(req.guildId);
           const allAssigned = Array.isArray(checkConfig.counters) && checkConfig.counters.length > 0 && checkConfig.counters.every(c => Boolean(c.channelId));
           if (allAssigned) break;
