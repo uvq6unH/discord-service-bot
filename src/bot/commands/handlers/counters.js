@@ -1,5 +1,5 @@
 import { EmbedBuilder, PermissionFlagsBits } from 'discord.js';
-import { syncAllCountersForGuild, calculateCounterStat, formatCountNumber } from '../../services/countersEngine.js';
+import { createCounterChannel, refreshCounterNames, calculateCounterStat, formatCountNumber } from '../../services/countersEngine.js';
 
 export async function handleCountersCommand(ctx) {
   const { command, reply, args, source, guild, actorMember, configStore, isInteraction } = ctx;
@@ -23,22 +23,32 @@ export async function handleCountersCommand(ctx) {
     const store = configStore || ctx.client?.configStore;
 
     try {
-      // /counter sync
+      // /counter sync — create missing channels + refresh names
       if (sub === 'sync') {
-        const results = await syncAllCountersForGuild(guild, store);
+        const config = await store.getGuildConfig(guild.id);
+        const counters = config.counters || [];
+        let created = 0;
+        for (const c of counters) {
+          if (!c.channelId && c.enabled !== false) {
+            const res = await createCounterChannel(guild, c, store).catch(() => null);
+            if (res?.success) created++;
+          }
+        }
+        await refreshCounterNames(guild, store).catch(() => null);
+
         const embed = new EmbedBuilder()
-          .setTitle('📊 Counters Sync Completed')
-          .setDescription(`Đã cập nhật đồng bộ **${results.length}** kênh Counter trên máy chủ.`)
+          .setTitle('📊 Counters Sync')
+          .setDescription(`Đã tạo **${created}** kênh mới và cập nhật tên tất cả kênh Counter.`)
           .setColor(0x00FF88)
           .setTimestamp();
         return reply({ embeds: [embed] });
       }
 
-      // /counter setup (bulk default setup: Members & Users)
+      // /counter setup — create default counters
       if (sub === 'setup') {
         const config = await store.getGuildConfig(guild.id);
         const existing = config.counters || [];
-        
+
         const defaultCounters = [
           {
             id: `counter_mem_${Date.now()}_1`,
@@ -62,12 +72,16 @@ export async function handleCountersCommand(ctx) {
           counters: updatedCounters
         });
 
-        // Trigger immediate sync
-        await syncAllCountersForGuild(guild, store);
+        // Create channels immediately
+        let created = 0;
+        for (const c of defaultCounters) {
+          const res = await createCounterChannel(guild, c, store).catch(() => null);
+          if (res?.success) created++;
+        }
 
         const embed = new EmbedBuilder()
-          .setTitle('⚡ Default Counters Setup Complete')
-          .setDescription('Đã tự động khởi tạo 2 kênh Counter mặc định (**Members** & **Users**) trên máy chủ!')
+          .setTitle('⚡ Default Counters Setup')
+          .setDescription(`Đã tạo **${created}** kênh Counter mặc định (**Members** & **Users**).`)
           .setColor(0x00FF88)
           .setTimestamp();
         return reply({ embeds: [embed] });
@@ -80,7 +94,7 @@ export async function handleCountersCommand(ctx) {
       if (counters.length === 0) {
         const embed = new EmbedBuilder()
           .setTitle('📊 Server Counters')
-          .setDescription('Máy chủ chưa cấu hình kênh Counter nào.\n👉 Dùng lệnh `/counter setup` hoặc qua **Web Dashboard (Utility)** để tạo nhanh!')
+          .setDescription('Chưa có Counter nào.\n👉 Dùng `/counter setup` hoặc **Dashboard** để tạo!')
           .setColor(0xFFAA00);
         return reply({ embeds: [embed] });
       }

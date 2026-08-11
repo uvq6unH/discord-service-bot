@@ -30,7 +30,7 @@ import { handleMusicCommand }                  from './bot/commands/handlers/mus
 import { initLavalink, forwardVoiceEvent }     from './bot/music/lavalink.js';
 import { startReminderWorker }                 from './bot/reminderWorker.js';
 import { startEsportsWorker }                  from './bot/esportsWorker.js';
-import { startCountersEngine }                 from './bot/services/countersEngine.js';
+import { startCounterRefreshLoop }              from './bot/services/countersEngine.js';
 import { handleVoiceStateUpdate }             from './bot/tempVoice.js';
 import { handleXp }                            from './bot/xpHandler.js';
 import { runAutoMod, runMentionReact }         from './bot/autoMod.js';
@@ -263,7 +263,7 @@ export function createBot(configStore, stateStore, redis = null) {
       // Workers
       startReminderWorker(readyClient, configStore);
       startEsportsWorker(readyClient, configStore, redis);
-      startCountersEngine(readyClient, configStore);
+      startCounterRefreshLoop(readyClient, configStore);
       _startEventQueueWorker(readyClient, configStore, redis);
 
     })().catch((err) => console.error('[bot] Startup error:', err));
@@ -680,21 +680,26 @@ function _startEventQueueWorker(client, configStore, redis) {
           redis.incr('stats:slash_sync_failed').catch(() => null);
         }
       }
-    } else if (type === 'sync_counters') {
+    } else if (type === 'sync_counters' || type === 'create_counter_channels') {
       if (!guildId) return;
       const guild = client.guilds.cache.get(guildId) || await client.guilds.fetch(guildId).catch(() => null);
       if (guild) {
         try { await guild.channels.fetch(); } catch {}
-        const { syncAllCountersForGuild } = await import('./bot/services/countersEngine.js');
-        const results = await syncAllCountersForGuild(guild, configStore).catch((err) => {
-          console.error(`[event-queue] Error syncing counters for guild ${guildId}:`, err.message);
-          return [];
-        });
+        const { createCounterChannel } = await import('./bot/services/countersEngine.js');
+        const config = await configStore.getGuildConfig(guildId);
+        const counters = Array.isArray(config.counters) ? config.counters : [];
+        let created = 0;
+        for (const counter of counters) {
+          if (!counter.channelId && counter.enabled !== false) {
+            const res = await createCounterChannel(guild, counter, configStore).catch(() => null);
+            if (res?.success) created++;
+          }
+        }
         const { writeGuildCache } = await import('./stateStore.js');
         await writeGuildCache(guild, redis).catch(() => null);
-        console.log(`[event-queue] Synced ${results?.length || 0} counter(s) for guild ${guildId}`);
+        console.log(`[event-queue] Created ${created} counter channel(s) for guild ${guildId}`);
       } else {
-        console.warn(`[event-queue] Could not fetch guild ${guildId} for sync_counters (is bot in this server?)`);
+        console.warn(`[event-queue] Could not fetch guild ${guildId} for counter creation`);
       }
     } else if (type === 'delete_counter_channel') {
       if (!guildId || !job.channelId) return;

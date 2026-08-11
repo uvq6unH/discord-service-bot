@@ -1645,19 +1645,10 @@ export function createServer({ configStore, stateStore, botClient, redis = null 
         ? (botClient.guilds.cache.get(req.guildId) || await botClient.guilds.fetch(req.guildId).catch(() => null))
         : null;
 
-      const { autoDiscoverExistingCounters, enrichCounterWithLiveStats, getOrResolveCounterCategory } = await import('./bot/services/countersEngine.js');
-      
-      let rawCounters = [];
-      if (guild) {
-        rawCounters = await autoDiscoverExistingCounters(guild, configStore).catch(() => []);
-      } else {
-        const config = await configStore.getGuildConfig(req.guildId);
-        rawCounters = config.counters || [];
-      }
-
+      const { enrichCounterWithLiveStats } = await import('./bot/services/countersEngine.js');
       const config = await configStore.getGuildConfig(req.guildId);
-      const counterCategoryId = config.counterCategoryId || null;
-      const enrichedCounters = await Promise.all(rawCounters.map(c => enrichCounterWithLiveStats(guild, c, redis, req.guildId, counterCategoryId)));
+      const rawCounters = config.counters || [];
+      const enrichedCounters = await Promise.all(rawCounters.map(c => enrichCounterWithLiveStats(guild, c, redis, req.guildId)));
 
       return res.json({
         success: true,
@@ -1673,7 +1664,7 @@ export function createServer({ configStore, stateStore, botClient, redis = null 
     try {
       const config = await configStore.getGuildConfig(req.guildId);
       const existing = config.counters || [];
-      
+
       let bodyData = req.body || {};
       if (typeof bodyData === 'string') {
         try { bodyData = JSON.parse(bodyData); } catch {}
@@ -1720,29 +1711,38 @@ export function createServer({ configStore, stateStore, botClient, redis = null 
         }
       }
 
+      // Save config first
       await configStore.updateGuildConfig(req.guildId, {
         countersEnabled: true,
         counters: updatedCounters
       });
 
-      // Synchronously sync channel creation if bot is connected
+      // Create channels for counters that don't have channelId yet
       const botClient = req.app.get('botClient');
       const guild = botClient && (botClient.isReady?.() || botClient.user)
         ? (botClient.guilds.cache.get(req.guildId) || await botClient.guilds.fetch(req.guildId).catch(() => null))
         : null;
 
-      const { syncAllCountersForGuild, enrichCounterWithLiveStats } = await import('./bot/services/countersEngine.js');
+      const { createCounterChannel, enrichCounterWithLiveStats } = await import('./bot/services/countersEngine.js');
+
       if (guild) {
-        await syncAllCountersForGuild(guild, configStore).catch(() => null);
+        // Direct mode: create channels immediately
+        for (const c of updatedCounters) {
+          if (!c.channelId && c.enabled !== false) {
+            await createCounterChannel(guild, c, configStore).catch(err =>
+              console.warn(`[server] Failed to create counter channel:`, err.message)
+            );
+          }
+        }
       } else if (redis) {
-        // Dispatch event to Redis event_queue for split-mode bot process
+        // Split mode: dispatch to bot worker
         await pushEventQueue(redis, {
-          type: 'sync_counters',
+          type: 'create_counter_channels',
           guildId: req.guildId,
           requestedAt: new Date().toISOString()
         }).catch(() => null);
 
-        // Poll configStore for up to 10s until bot worker finishes assigning channelIds
+        // Poll for up to 10s
         const startTime = Date.now();
         while (Date.now() - startTime < 10000) {
           await new Promise(r => setTimeout(r, 500));
@@ -1752,10 +1752,9 @@ export function createServer({ configStore, stateStore, botClient, redis = null 
         }
       }
 
-      // Re-fetch latest config after sync to get channelId and indexes
+      // Return latest state
       const latestConfig = await configStore.getGuildConfig(req.guildId);
-      const counterCategoryId = latestConfig.counterCategoryId || null;
-      const enrichedCounters = await Promise.all((latestConfig.counters || []).map(c => enrichCounterWithLiveStats(guild, c, redis, req.guildId, counterCategoryId)));
+      const enrichedCounters = await Promise.all((latestConfig.counters || []).map(c => enrichCounterWithLiveStats(guild, c, redis, req.guildId)));
 
       return res.json({ success: true, counters: enrichedCounters });
     } catch (err) {
@@ -1772,22 +1771,17 @@ export function createServer({ configStore, stateStore, botClient, redis = null 
 
       await configStore.updateGuildConfig(req.guildId, { counters: updatedCounters });
 
-      const botClient = req.app.get('botClient');
-      const guild = botClient && (botClient.isReady?.() || botClient.user)
-        ? (botClient.guilds.cache.get(req.guildId) || await botClient.guilds.fetch(req.guildId).catch(() => null))
-        : null;
-
-      const { syncAllCountersForGuild, enrichCounterWithLiveStats } = await import('./bot/services/countersEngine.js');
-
-      // Delete associated Discord channel if channelId exists
+      // Delete the Discord channel
       if (targetCounter?.channelId) {
+        const botClient = req.app.get('botClient');
+        const guild = botClient && (botClient.isReady?.() || botClient.user)
+          ? (botClient.guilds.cache.get(req.guildId) || await botClient.guilds.fetch(req.guildId).catch(() => null))
+          : null;
+
         if (guild) {
-          const ch = guild.channels.cache.get(targetCounter.channelId) || await guild.channels.fetch(targetCounter.channelId).catch(() => null);
-          if (ch) await ch.delete('Counter deleted via Dashboard').catch(() => null);
-          await syncAllCountersForGuild(guild, configStore).catch(() => null);
-        }
-        
-        if (redis) {
+          const { deleteCounterChannel } = await import('./bot/services/countersEngine.js');
+          await deleteCounterChannel(guild, targetCounter.channelId);
+        } else if (redis) {
           await pushEventQueue(redis, {
             type: 'delete_counter_channel',
             guildId: req.guildId,
@@ -1798,9 +1792,8 @@ export function createServer({ configStore, stateStore, botClient, redis = null 
         }
       }
 
-      const latestDelConfig = await configStore.getGuildConfig(req.guildId);
-      const delCategoryId = latestDelConfig.counterCategoryId || null;
-      const enrichedCounters = await Promise.all(updatedCounters.map(c => enrichCounterWithLiveStats(guild, c, redis, req.guildId, delCategoryId)));
+      const { enrichCounterWithLiveStats } = await import('./bot/services/countersEngine.js');
+      const enrichedCounters = await Promise.all(updatedCounters.map(c => enrichCounterWithLiveStats(null, c, redis, req.guildId)));
 
       return res.json({ success: true, counters: enrichedCounters });
     } catch (err) {
@@ -1810,25 +1803,31 @@ export function createServer({ configStore, stateStore, botClient, redis = null 
 
   app.post('/api/guilds/:guildId/counters/sync', auth.requireAuth, writeRateLimit, requireGuildId, auth.requireGuildAccess, async (req, res) => {
     try {
-      const config = await configStore.getGuildConfig(req.guildId);
       const botClient = req.app.get('botClient');
       const guild = botClient && (botClient.isReady?.() || botClient.user)
         ? (botClient.guilds.cache.get(req.guildId) || await botClient.guilds.fetch(req.guildId).catch(() => null))
         : null;
 
-      const { syncAllCountersForGuild, enrichCounterWithLiveStats } = await import('./bot/services/countersEngine.js');
+      const { createCounterChannel, enrichCounterWithLiveStats, refreshCounterNames } = await import('./bot/services/countersEngine.js');
 
-      let results = [];
       if (guild) {
-        results = await syncAllCountersForGuild(guild, configStore);
+        // Create any missing channels
+        const config = await configStore.getGuildConfig(req.guildId);
+        const counters = config.counters || [];
+        for (const c of counters) {
+          if (!c.channelId && c.enabled !== false) {
+            await createCounterChannel(guild, c, configStore).catch(() => null);
+          }
+        }
+        // Refresh existing channel names
+        await refreshCounterNames(guild, configStore).catch(() => null);
       } else if (redis) {
         await pushEventQueue(redis, {
-          type: 'sync_counters',
+          type: 'create_counter_channels',
           guildId: req.guildId,
           requestedAt: new Date().toISOString()
         }).catch(() => null);
 
-        // Poll configStore for up to 10s until bot worker finishes assigning channelIds
         const startTime = Date.now();
         while (Date.now() - startTime < 10000) {
           await new Promise(r => setTimeout(r, 500));
@@ -1839,14 +1838,12 @@ export function createServer({ configStore, stateStore, botClient, redis = null 
       }
 
       const latestConfig = await configStore.getGuildConfig(req.guildId);
-      const syncCategoryId = latestConfig.counterCategoryId || null;
-      const enrichedCounters = await Promise.all((latestConfig.counters || []).map(c => enrichCounterWithLiveStats(guild, c, redis, req.guildId, syncCategoryId)));
+      const enrichedCounters = await Promise.all((latestConfig.counters || []).map(c => enrichCounterWithLiveStats(guild, c, redis, req.guildId)));
 
       return res.json({
         success: true,
         counters: enrichedCounters,
-        results,
-        message: guild || redis ? `Đã phát lệnh đồng bộ ${enrichedCounters.length} kênh Counter lên Discord!` : 'Đã lưu cấu hình! Kênh sẽ tự động tạo khi Bot kết nối.'
+        message: `Đã tạo/cập nhật ${enrichedCounters.length} kênh Counter.`
       });
     } catch (err) {
       return res.status(500).json({ error: err.message });
