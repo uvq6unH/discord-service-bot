@@ -349,12 +349,12 @@ export async function refreshCounterNames(guild, configStore) {
 }
 
 /**
- * Background name-refresh loop (every 15 min). Only renames, never creates/deletes.
+ * Background name-refresh loop (every 30 min). Only renames, never creates/deletes.
  */
-export function startCounterRefreshLoop(client, configStore, intervalMs = 15 * 60 * 1000) {
+export function startCounterRefreshLoop(client, configStore, intervalMs = 30 * 60 * 1000) {
   if (!client || !configStore) return;
 
-  console.log('[countersEngine] Counter name-refresh loop started (every 15 min, rename only).');
+  console.log('[countersEngine] Counter name-refresh loop started (every 30 min, rename only).');
 
   setInterval(async () => {
     try {
