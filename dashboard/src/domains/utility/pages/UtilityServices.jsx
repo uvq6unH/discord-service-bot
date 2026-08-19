@@ -8,7 +8,7 @@ import { useGuild } from '../../../shared/hooks/useGuild.js';
 import { useLanguage } from '../../../shared/context/LanguageContext.jsx';
 import { apiFetch } from '../../../api.js';
 import { useNotify } from '../../../shared/context/NotificationContext.jsx';
-import { Wrench, Mic, Languages, BellRing, BarChart3, RefreshCw, Plus, Trash2, Flame, Check, AlertTriangle } from 'lucide-react';
+import { Wrench, Mic, Languages, BellRing, BarChart3, Plus, Trash2, Flame, Check, AlertTriangle } from 'lucide-react';
 
 function CommandConfigRow({ cmd, roles, onUpdate, displayPrefix = '/' }) {
   const [expanded, setExpanded] = useState(false);
@@ -362,7 +362,6 @@ function CountersManager({ guildId, roles = [], onUpdateConfig }) {
   const notify = useNotify();
   const [counters, setCounters] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [syncing, setSyncing] = useState(false);
 
   // Form state
   const [type, setType] = useState('members');
@@ -395,36 +394,6 @@ function CountersManager({ guildId, roles = [], onUpdateConfig }) {
   useEffect(() => {
     loadCounters();
   }, [guildId]);
-
-  const handleAutoSetup = async () => {
-    if (!guildId) {
-      notify.error('Chưa chọn Server Discord!');
-      return;
-    }
-    setLoading(true);
-    try {
-      const res = await apiFetch(`/api/guilds/${guildId}/counters`, {
-        method: 'POST',
-        body: { mode: 'default' }
-      });
-      const data = await res.json();
-      if (data.error) {
-        notify.error(data.error);
-        return;
-      }
-      const list = data.counters || [];
-      syncState(list);
-      if (list.length > 0) {
-        notify.success(`Đã tự động khởi tạo ${list.length} kênh Counter mặc định (Members & Users)!`);
-      } else {
-        notify.error('Không thể tạo kênh Counter mặc định. Vui lòng thử lại.');
-      }
-    } catch (err) {
-      notify.error(err.message || 'Lỗi khi tạo Counter mặc định');
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const handleCreateCounter = async (e) => {
     e.preventDefault();
@@ -490,31 +459,6 @@ function CountersManager({ guildId, roles = [], onUpdateConfig }) {
     }
   };
 
-  const handleSyncNow = async () => {
-    if (!guildId) {
-      notify.error('Chưa chọn Server Discord!');
-      return;
-    }
-    setSyncing(true);
-    try {
-      const res = await apiFetch(`/api/guilds/${guildId}/counters/sync`, {
-        method: 'POST'
-      });
-      const data = await res.json();
-      if (data.error) {
-        notify.error(data.error);
-        return;
-      }
-      const list = data.counters || [];
-      syncState(list);
-      notify.success(data.message || 'Đã đồng bộ các kênh Counter!');
-    } catch (err) {
-      notify.error(err.message || 'Lỗi khi đồng bộ Counter');
-    } finally {
-      setSyncing(false);
-    }
-  };
-
   const handleToggleCounter = async (counter) => {
     const updated = { ...counter, enabled: !counter.enabled };
     try {
@@ -550,30 +494,8 @@ function CountersManager({ guildId, roles = [], onUpdateConfig }) {
             {t("Discord Live Stat Counters & Goal Milestones")}
           </div>
           <div style={{ fontSize: '11px', color: 'var(--text-3)', marginTop: '2px' }}>
-            Hiển thị thống kê Server dạng kênh Voice tự động cập nhật mỗi 10–15 phút.
+            Hiển thị thống kê Server dạng kênh Voice tự động cập nhật mỗi 30 phút.
           </div>
-        </div>
-
-        <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
-          <button
-            type="button"
-            className="btn btn--secondary"
-            disabled={loading}
-            onClick={handleAutoSetup}
-            style={{ fontSize: '11px', fontFamily: 'var(--font-mono)' }}
-          >
-            ⚡ Auto-Setup Default (2 Counters)
-          </button>
-          <button
-            type="button"
-            className="btn btn--primary"
-            disabled={syncing || loading}
-            onClick={handleSyncNow}
-            style={{ fontSize: '11px', fontFamily: 'var(--font-mono)', display: 'flex', alignItems: 'center', gap: '6px' }}
-          >
-            <RefreshCw size={14} className={syncing ? 'spin' : ''} />
-            {syncing ? 'Syncing...' : 'Sync Counters Now'}
-          </button>
         </div>
       </div>
 
