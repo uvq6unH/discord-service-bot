@@ -6,7 +6,6 @@ import { useRiot } from '../hooks/useRiot.js';
 import { useGuild } from '../../../shared/hooks/useGuild.js';
 import { useLanguage } from '../../../shared/context/LanguageContext.jsx';
 import { apiFetch } from '../../../api.js';
-import { useNotify } from '../../../shared/context/NotificationContext.jsx';
 import { Trophy, Tv, BellRing, ShieldCheck, Send } from 'lucide-react';
 
 const LEAGUES = [
@@ -31,7 +30,6 @@ export default function EsportsServicesPage() {
   const { config, loading, updateConfig } = useRiot();
   const { guildData, selectedGuild } = useGuild();
   const { t } = useLanguage();
-  const notify = useNotify();
 
   const [testing, setTesting] = useState(false);
 
@@ -76,17 +74,11 @@ export default function EsportsServicesPage() {
     setTesting(true);
     try {
       const selectedGuildId = localStorage.getItem('selectedGuildId') || '';
-      const res = await apiFetch(`/api/esports/test-notify?guildId=${selectedGuildId}`, {
+      await apiFetch(`/api/esports/test-notify?guildId=${selectedGuildId}`, {
         method: 'POST'
       });
-      const data = await res.json();
-      if (data.error) {
-        notify.error(data.error);
-      } else {
-        notify.success(data.message || 'Đã gửi thông báo thử nghiệm thành công!');
-      }
     } catch (err) {
-      notify.error(err.message || 'Lỗi gửi thông báo thử nghiệm');
+      console.error('Error sending test notification:', err);
     } finally {
       setTesting(false);
     }

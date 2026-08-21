@@ -11,7 +11,6 @@ import PermissionGuard from '../components/PermissionGuard.jsx';
 import { useModeration } from '../hooks/useModeration.js';
 import { useGuild } from '../../../shared/hooks/useGuild.js';
 import { useLanguage } from '../../../shared/context/LanguageContext.jsx';
-import { useNotify } from '../../../shared/context/NotificationContext.jsx';
 
 function CommandConfigRow({ cmd, roles, onUpdate, displayPrefix = '/' }) {
   const [expanded, setExpanded] = useState(false);
@@ -267,36 +266,22 @@ function SelfRolePanelsManager({ panels = [], legacyRoles = [], allRoles = [], c
     setActivePanelIdx(nextPanels.length - 1);
   };
 
-  const notify = useNotify();
-
   const removeActivePanel = () => {
     const nextPanels = currentPanels.filter((_, idx) => idx !== safeIdx);
     onUpdatePanels(nextPanels);
     setActivePanelIdx(Math.max(0, safeIdx - 1));
-    notify.success(t("Đã xóa nhóm Self-Role Panel thành công!"));
   };
 
   const handlePostPanel = async () => {
-    if (!activePanel.channelId) {
-      notify.error('Vui lòng chọn Kênh Discord trước khi đăng Panel!');
-      return;
-    }
-    if (!activePanel.roles || activePanel.roles.length === 0) {
-      notify.error('Vui lòng thêm ít nhất 1 Role vào nhóm Panel này!');
+    if (!activePanel.channelId || !activePanel.roles || activePanel.roles.length === 0) {
       return;
     }
 
     setPosting(true);
     try {
-      const res = await api.postSelfRolePanel(selectedGuildId, activePanel.id);
-      if (res.error) {
-        notify.error(res.error);
-      } else {
-        const targetChan = textChannels.find(c => c.id === activePanel.channelId);
-        notify.success(`🚀 Đã đăng thành công Panel "${activePanel.title}" vào kênh #${targetChan?.name ?? 'Discord'}!`);
-      }
+      await api.postSelfRolePanel(selectedGuildId, activePanel.id);
     } catch (err) {
-      notify.error(`Lỗi đăng Panel: ${err.message}`);
+      console.error('Error posting self-role panel:', err);
     } finally {
       setPosting(false);
     }

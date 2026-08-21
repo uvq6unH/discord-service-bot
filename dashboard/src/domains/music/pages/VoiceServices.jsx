@@ -5,7 +5,6 @@ import DataSlab from '../../../shared/primitives/DataSlab.jsx';
 import { useMusic } from '../hooks/useMusic.js';
 import { useGuild } from '../../../shared/hooks/useGuild.js';
 import { useLanguage } from '../../../shared/context/LanguageContext.jsx';
-import { useNotify } from '../../../shared/context/NotificationContext.jsx';
 import { Mic, Radio, Volume2, ShieldCheck, Wand2 } from 'lucide-react';
 import { apiFetch } from '../../../api.js';
 
@@ -155,7 +154,6 @@ export default function VoiceServicesPage() {
   const { config, loading, updateConfig } = useMusic();
   const { guildData, selectedGuild } = useGuild();
   const { t } = useLanguage();
-  const notify = useNotify();
   const [settingUp, setSettingUp] = useState(false);
 
   if (loading || !config) {
@@ -183,14 +181,11 @@ export default function VoiceServicesPage() {
         method: 'POST'
       });
       const data = await res.json();
-      if (data.error) {
-        notify.error(data.error);
-        return;
+      if (!data.error) {
+        updateConfig({ tempVcEnabled: true });
       }
-      updateConfig({ tempVcEnabled: true });
-      notify.success(data.message || 'Đã khởi tạo hệ thống VoiceMaster thành công!');
     } catch (err) {
-      notify.error(err.message || 'Lỗi hệ thống khi khởi tạo VoiceMaster');
+      console.error('Error in temp-vc-setup:', err);
     } finally {
       setSettingUp(false);
     }
@@ -204,19 +199,16 @@ export default function VoiceServicesPage() {
         method: 'POST'
       });
       const data = await res.json();
-      if (data.error) {
-        notify.error(data.error);
-        return;
+      if (!data.error) {
+        updateConfig({
+          tempVcEnabled: false,
+          tempVcMasterChannelId: '',
+          tempVcCategoryId: '',
+          tempVcControlChannelId: ''
+        });
       }
-      updateConfig({
-        tempVcEnabled: false,
-        tempVcMasterChannelId: '',
-        tempVcCategoryId: '',
-        tempVcControlChannelId: ''
-      });
-      notify.success(data.message || 'Đã reset VoiceMaster!');
     } catch (err) {
-      notify.error(err.message || 'Lỗi hệ thống khi reset VoiceMaster');
+      console.error('Error in temp-vc-reset:', err);
     } finally {
       setSettingUp(false);
     }

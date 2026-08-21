@@ -7,7 +7,6 @@ import { useCommands } from '../../core/hooks/useCommands.js';
 import { useGuild } from '../../../shared/hooks/useGuild.js';
 import { useLanguage } from '../../../shared/context/LanguageContext.jsx';
 import { apiFetch } from '../../../api.js';
-import { useNotify } from '../../../shared/context/NotificationContext.jsx';
 import { Wrench, Mic, Languages, BellRing, BarChart3, Plus, Trash2, Flame, Check, AlertTriangle } from 'lucide-react';
 
 function CommandConfigRow({ cmd, roles, onUpdate, displayPrefix = '/' }) {
@@ -359,7 +358,6 @@ const TEMPLATE_PRESETS = {
 
 function CountersManager({ guildId, roles = [], onUpdateConfig }) {
   const { t } = useLanguage();
-  const notify = useNotify();
   const [counters, setCounters] = useState([]);
   const [loading, setLoading] = useState(false);
 
@@ -397,11 +395,7 @@ function CountersManager({ guildId, roles = [], onUpdateConfig }) {
 
   const handleCreateCounter = async (e) => {
     e.preventDefault();
-    if (!guildId) {
-      notify.error('Chưa chọn Server Discord!');
-      return;
-    }
-    if (!type) return;
+    if (!guildId || !type) return;
 
     const newCounter = {
       id: `counter_${type}_${Date.now()}`,
@@ -421,17 +415,14 @@ function CountersManager({ guildId, roles = [], onUpdateConfig }) {
         body: { counter: newCounter }
       });
       const data = await res.json();
-      if (data.error) {
-        notify.error(data.error);
-        return;
+      if (!data.error) {
+        const list = data.counters || [];
+        syncState(list);
+        setChannelNameTemplate('👥 Members: {count}');
+        setIsGoal(false);
       }
-      const list = data.counters || [];
-      syncState(list);
-      notify.success('Đã tạo kênh Counter mới thành công!');
-      setChannelNameTemplate('👥 Members: {count}');
-      setIsGoal(false);
     } catch (err) {
-      notify.error(err.message || 'Lỗi khi tạo Counter mới');
+      console.error('Error creating counter:', err);
     } finally {
       setLoading(false);
     }
@@ -445,15 +436,12 @@ function CountersManager({ guildId, roles = [], onUpdateConfig }) {
         method: 'DELETE'
       });
       const data = await res.json();
-      if (data.error) {
-        notify.error(data.error);
-        return;
+      if (!data.error) {
+        const list = data.counters || [];
+        syncState(list);
       }
-      const list = data.counters || [];
-      syncState(list);
-      notify.success('Đã xóa kênh Counter thành công!');
     } catch (err) {
-      notify.error(err.message || 'Lỗi khi xóa Counter');
+      console.error('Error deleting counter:', err);
     } finally {
       setLoading(false);
     }
@@ -467,14 +455,11 @@ function CountersManager({ guildId, roles = [], onUpdateConfig }) {
         body: { counter: updated }
       });
       const data = await res.json();
-      if (data.error) {
-        notify.error(data.error);
-        return;
+      if (!data.error) {
+        syncState(data.counters || []);
       }
-      syncState(data.counters || []);
-      notify.success(updated.enabled ? 'Đã bật kênh Counter!' : 'Đã tắt kênh Counter!');
     } catch (err) {
-      notify.error(err.message);
+      console.error('Error toggling counter:', err);
     }
   };
 
@@ -663,7 +648,7 @@ function CountersManager({ guildId, roles = [], onUpdateConfig }) {
 
         {counters.length === 0 ? (
           <div style={{ padding: 'var(--space-4)', background: 'var(--surface-1)', border: '1px dashed var(--border)', textAlign: 'center', color: 'var(--text-3)', fontSize: '12px', fontFamily: 'var(--font-mono)' }}>
-            Chưa có kênh Counter nào. Hãy tạo ở form trên hoặc bấm "Auto-Setup Default".
+            Chưa có kênh Counter nào. Hãy tạo mới bằng form ở trên.
           </div>
         ) : (
           counters.map((c, i) => {

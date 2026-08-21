@@ -889,6 +889,7 @@ export function createServer({ configStore, stateStore, botClient, redis = null 
       return res.status(400).json({ error: errors.join(' ') });
     }
 
+    const oldConfig = await configStore.getGuildConfig(req.guildId).catch(() => ({}));
     const config = await configStore.updateGuildConfig(req.guildId, body);
 
     if (redis) {
@@ -897,6 +898,53 @@ export function createServer({ configStore, stateStore, botClient, redis = null 
         action: 'UPDATE_GUILD_CONFIG',
         details: { fields: Object.keys(body) }
       });
+    }
+
+    // Sync counter channels with Discord if counters were updated
+    if (Array.isArray(body.counters) || body.countersEnabled !== undefined) {
+      try {
+        const { createCounterChannel, deleteCounterChannel } = await import('./bot/services/countersEngine.js');
+        const oldCounters = Array.isArray(oldConfig.counters) ? oldConfig.counters : [];
+        const newCounters = Array.isArray(config.counters) ? config.counters : [];
+        const newChannelIds = new Set(newCounters.map(c => c.channelId).filter(Boolean));
+
+        // 1. Delete Discord channels for counters removed from config
+        const deletedCounters = oldCounters.filter(c => c.channelId && !newChannelIds.has(c.channelId));
+        for (const dc of deletedCounters) {
+          if (botClient?.user) {
+            const guild = botClient.guilds.cache.get(req.guildId) || await botClient.guilds.fetch(req.guildId).catch(() => null);
+            if (guild) await deleteCounterChannel(guild, dc.channelId).catch(() => null);
+          } else if (redis) {
+            await pushEventQueue(redis, {
+              type: 'delete_counter_channel',
+              guildId: req.guildId,
+              channelId: dc.channelId,
+              requestedAt: new Date().toISOString()
+            }).catch(() => null);
+          }
+        }
+
+        // 2. Create Discord channels for counters missing channelId
+        const missingChannels = newCounters.filter(c => !c.channelId && c.enabled !== false && config.countersEnabled !== false);
+        if (missingChannels.length > 0) {
+          if (botClient?.user) {
+            const guild = botClient.guilds.cache.get(req.guildId) || await botClient.guilds.fetch(req.guildId).catch(() => null);
+            if (guild) {
+              for (const mc of missingChannels) {
+                await createCounterChannel(guild, mc, configStore).catch(() => null);
+              }
+            }
+          } else if (redis) {
+            await pushEventQueue(redis, {
+              type: 'create_counter_channels',
+              guildId: req.guildId,
+              requestedAt: new Date().toISOString()
+            }).catch(() => null);
+          }
+        }
+      } catch (counterSyncErr) {
+        console.warn('[server] Error syncing counter channels during config update:', counterSyncErr.message);
+      }
     }
 
     let slashSync;

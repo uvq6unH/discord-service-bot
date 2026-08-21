@@ -107,6 +107,37 @@ function normalizeReminders(reminders) {
     .slice(0, 50);
 }
 
+function normalizeCounters(items, currentCounters = []) {
+  if (!Array.isArray(items)) {
+    return Array.isArray(currentCounters) ? currentCounters : [];
+  }
+
+  const currentMap = new Map((Array.isArray(currentCounters) ? currentCounters : []).map(c => [c?.id, c]));
+
+  return items
+    .filter(item => item && typeof item === 'object')
+    .map(item => {
+      const existing = currentMap.get(item.id);
+      return {
+        id: String(item.id || `counter_${item.type || 'members'}_${Date.now()}`),
+        type: String(item.type || 'members'),
+        channelNameTemplate: String(item.channelNameTemplate ?? existing?.channelNameTemplate ?? '').trim() || '👥 Members: {count}',
+        isGoal: Boolean(item.isGoal ?? existing?.isGoal),
+        goals: Array.isArray(item.goals)
+          ? item.goals.map(Number).filter(n => Number.isInteger(n) && n > 0)
+          : (Array.isArray(existing?.goals) ? existing.goals : []),
+        currentGoalIndex: typeof item.currentGoalIndex === 'number'
+          ? item.currentGoalIndex
+          : (existing?.currentGoalIndex || 0),
+        roleId: normalizeSnowflakeId(item.roleId || existing?.roleId),
+        enabled: item.enabled !== false,
+        channelId: normalizeSnowflakeId(item.channelId || existing?.channelId) || null,
+        staticValue: typeof item.staticValue === 'number' ? item.staticValue : (existing?.staticValue ?? 0)
+      };
+    })
+    .slice(0, 30);
+}
+
 function normalizeStringList(items, limit = 100) {
   if (!Array.isArray(items)) {
     return [];
@@ -621,7 +652,7 @@ export class ConfigStore {
       autoReplies: normalizeAutoReplies(stored.autoReplies ?? defaultConfig.autoReplies),
       reminders: normalizeReminders(stored.reminders ?? defaultConfig.reminders),
       countersEnabled: pickBoolean(stored, 'countersEnabled', defaultConfig.countersEnabled ?? true),
-      counters: Array.isArray(stored.counters) ? stored.counters : [],
+      counters: normalizeCounters(stored.counters),
       quizScoring: normalizeQuizScoring(stored.quizScoring ?? defaultConfig.quizScoring),
       esportsNotifyEnabled: pickBoolean(stored, 'esportsNotifyEnabled', defaultConfig.esportsNotifyEnabled),
       esportsChannelId: normalizeSnowflakeId(stored.esportsChannelId ?? defaultConfig.esportsChannelId),
@@ -827,7 +858,7 @@ export class ConfigStore {
         remindersEnabled: pickBoolean(patch, 'remindersEnabled', current),
         reminders: normalizeReminders(patch.reminders ?? current.reminders),
         countersEnabled: pickBoolean(patch, 'countersEnabled', current.countersEnabled ?? true),
-        counters: Array.isArray(patch.counters) ? patch.counters : (current.counters ?? []),
+        counters: normalizeCounters(patch.counters !== undefined ? patch.counters : current.counters, current.counters),
         musicEnabled: pickBoolean(patch, 'musicEnabled', current),
         musicPrefix: String(patch.musicPrefix ?? current.musicPrefix ?? 'hb').trim().slice(0, 10) || 'hb',
         quizScoring: normalizeQuizScoring(patch.quizScoring ?? current.quizScoring),
