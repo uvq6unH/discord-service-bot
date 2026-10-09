@@ -1,9 +1,49 @@
 import React from 'react';
-import { Bot, Shield, Music, Trophy, Coins, ArrowRight, ExternalLink, Activity, Lock } from 'lucide-react';
+import { useSearchParams } from 'react-router-dom';
+import { Bot, Shield, Music, Trophy, Coins, ArrowRight, ExternalLink, Activity, Lock, AlertTriangle } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext.jsx';
 
 export default function LandingPage() {
   const { t, language, setLanguage } = useLanguage();
+  const [searchParams] = useSearchParams();
+  const errorCode = searchParams.get('error');
+
+  const getErrorMessage = (code) => {
+    if (!code) return null;
+    switch (code) {
+      case 'code_expired':
+      case 'invalid_grant':
+        return language === 'vi'
+          ? 'Mã xác thực Discord đã hết hạn hoặc đã được sử dụng. Vui lòng bấm "Thử lại" bên dưới.'
+          : 'Discord authorization code expired or was already used. Please click Retry below.';
+      case 'rate_limited':
+        return language === 'vi'
+          ? 'Discord API đang tạm thời giới hạn tần suất (Rate Limit 429). Vui lòng đợi vài giây và thử lại.'
+          : 'Discord API is currently rate limited (429). Please wait a few moments and try again.';
+      case 'state_mismatch':
+        return language === 'vi'
+          ? 'Phiên đăng nhập đã hết hạn hoặc không khớp. Vui lòng thử đăng nhập lại.'
+          : 'OAuth session expired or mismatched. Please try logging in again.';
+      case 'redirect_uri_mismatch':
+        return language === 'vi'
+          ? 'Cấu hình Redirect URI không khớp với Discord Developer Portal.'
+          : 'Redirect URI mismatch with Discord Developer Portal.';
+      case 'missing_code':
+        return language === 'vi'
+          ? 'Không nhận được mã xác thực từ Discord. Vui lòng thử lại.'
+          : 'No authorization code received from Discord. Please try again.';
+      case 'session_error':
+        return language === 'vi'
+          ? 'Lỗi lưu phiên làm việc. Vui lòng kiểm tra cookie trình duyệt và thử lại.'
+          : 'Session error. Please check browser cookies and try again.';
+      default:
+        return language === 'vi'
+          ? `Đăng nhập không thành công (${code}). Vui lòng thử lại.`
+          : `Login failed (${code}). Please try again.`;
+    }
+  };
+
+  const errorMessage = getErrorMessage(errorCode);
 
   const handleLogin = () => {
     window.location.href = '/auth/login';
@@ -61,8 +101,43 @@ export default function LandingPage() {
       </header>
 
       {/* Hero Section */}
-      <main style={{ flex: 1, maxWidth: '1200px', margin: '0 auto', padding: '60px 24px', display: 'flex', flexDirection: 'column', gap: '60px' }}>
+      <main style={{ flex: 1, maxWidth: '1200px', margin: '0 auto', padding: '40px 24px 60px', display: 'flex', flexDirection: 'column', gap: '50px' }}>
         
+        {errorMessage && (
+          <div style={{
+            width: '100%',
+            maxWidth: '840px',
+            margin: '0 auto',
+            padding: '16px 20px',
+            backgroundColor: 'rgba(239, 68, 68, 0.12)',
+            border: '1px solid var(--red)',
+            borderRadius: '4px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: '16px',
+            fontFamily: 'var(--font-mono)',
+            fontSize: '13px'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+              <AlertTriangle size={22} style={{ color: 'var(--red)', flexShrink: 0 }} />
+              <div>
+                <div style={{ fontWeight: 'bold', color: 'var(--red)', marginBottom: '3px' }}>
+                  {language === 'vi' ? 'LỖI ĐĂNG NHẬP OAUTH2' : 'OAUTH2 LOGIN ERROR'}
+                </div>
+                <div style={{ color: 'var(--text-1)' }}>{errorMessage}</div>
+              </div>
+            </div>
+            <button 
+              onClick={handleLogin}
+              className="btn btn--primary"
+              style={{ padding: '8px 18px', fontSize: '11px', flexShrink: 0, whiteSpace: 'nowrap' }}
+            >
+              {language === 'vi' ? 'THỬ LẠI' : 'RETRY'}
+            </button>
+          </div>
+        )}
+
         <section style={{ textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '20px' }}>
           <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', padding: '4px 12px', border: '1px solid var(--border-strong)', backgroundColor: 'var(--surface-0)', fontSize: '11px', fontFamily: 'var(--font-mono)', color: 'var(--accent)' }}>
             <Lock size={12} />

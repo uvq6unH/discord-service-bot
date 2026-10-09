@@ -122,62 +122,144 @@ export function createAuthRouter(botClient, redis = null, guildService = null) {
     });
   });
 
+  // In-flight authorization code exchange cache to prevent race conditions & duplicate token burn
+  const inFlightExchanges = new Map();
+
   // GET /auth/callback
   router.get('/auth/callback', async (req, res) => {
+    // 1. Ignore prefetch requests (Chrome / Edge / Firefox speculative prefetch)
+    const isPrefetch = req.headers['purpose'] === 'prefetch' ||
+      req.headers['sec-purpose'] === 'prefetch' ||
+      req.headers['x-moz'] === 'prefetch';
+    if (isPrefetch) {
+      return res.status(204).end();
+    }
+
+    // 2. If user already has an active authenticated session, redirect smoothly to dashboard
+    if (req.session?.user?.id) {
+      const returnTo = safeReturnTo(req.session.returnTo);
+      return res.redirect(returnTo);
+    }
+
     const { code, state } = req.query;
 
-    if (!code || state !== req.session.oauthState) {
-      return res.status(400).send('OAuth state mismatch. Please try again.');
+    // 3. Validate code and state parameters
+    if (!code || typeof code !== 'string') {
+      return res.redirect('/login?error=missing_code');
     }
-    req.session.oauthState = null;
+
+    const hasInFlight = inFlightExchanges.has(code);
+    if (!hasInFlight) {
+      if (!req.session?.oauthState || state !== req.session.oauthState) {
+        console.warn(`[auth] state mismatch: query state=${String(state).slice(0, 8)}..., session state=${String(req.session?.oauthState).slice(0, 8)}...`);
+        return res.redirect('/login?error=state_mismatch');
+      }
+
+      // Clear oauthState and persist immediately so duplicate requests cannot pass state validation
+      req.session.oauthState = null;
+      await new Promise((resolve) => req.session.save(resolve));
+    }
 
     try {
-      const tokenController = new AbortController();
-      const tokenTimeout = setTimeout(() => tokenController.abort(), 10_000);
-      let tokenRes;
-      try {
-        tokenRes = await fetch(`${DISCORD_API}/oauth2/token`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-          body: new URLSearchParams({
-            client_id: clientId,
-            client_secret: clientSecret,
-            grant_type: 'authorization_code',
-            code,
-            redirect_uri: redirectUri,
-          }),
-          signal: tokenController.signal,
-        });
-      } finally {
-        clearTimeout(tokenTimeout);
-      }
-      const tokenCt = tokenRes.headers.get('content-type') ?? '';
-      if (!tokenCt.includes('application/json')) {
-        throw new Error(`Unexpected response from Discord token endpoint: ${tokenRes.status} ${tokenRes.statusText}`);
-      }
-      const tokens = await tokenRes.json();
-      if (!tokenRes.ok) {
-        console.error('[auth] token exchange failed:', JSON.stringify(tokens));
-        throw new Error(tokens.error_description ?? tokens.error ?? 'Token exchange failed');
+      // 4. In-flight promise deduplication for concurrent requests with identical code
+      let exchangePromise = inFlightExchanges.get(code);
+      if (!exchangePromise) {
+        exchangePromise = (async () => {
+          let tokenRes;
+          let attempt = 0;
+          while (attempt < 2) {
+            attempt++;
+            const tokenController = new AbortController();
+            const tokenTimeout = setTimeout(() => tokenController.abort(), 10_000);
+            try {
+              tokenRes = await fetch(`${DISCORD_API}/oauth2/token`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: new URLSearchParams({
+                  client_id: clientId,
+                  client_secret: clientSecret,
+                  grant_type: 'authorization_code',
+                  code,
+                  redirect_uri: redirectUri,
+                }),
+                signal: tokenController.signal,
+              });
+            } finally {
+              clearTimeout(tokenTimeout);
+            }
+
+            if (tokenRes.status === 429 && attempt === 1) {
+              const retryAfter = parseFloat(tokenRes.headers.get('retry-after') || '0');
+              if (retryAfter > 0 && retryAfter <= 3) {
+                console.warn(`[auth] Discord token rate limit (429), waiting ${retryAfter}s before retry...`);
+                await new Promise((r) => setTimeout(r, Math.ceil(retryAfter * 1000) + 100));
+                continue;
+              }
+            }
+            break;
+          }
+
+          if (tokenRes.status === 429) {
+            throw new Error('RATE_LIMITED');
+          }
+
+          const rawTokenText = await tokenRes.text();
+          let tokens;
+          try {
+            tokens = JSON.parse(rawTokenText);
+          } catch {
+            tokens = null;
+          }
+
+          if (!tokenRes.ok || !tokens) {
+            console.error('[auth] token exchange failed:', tokenRes.status, rawTokenText);
+            if (tokens?.error === 'invalid_grant') {
+              throw new Error('INVALID_GRANT');
+            }
+            if (tokens?.error === 'redirect_uri_mismatch') {
+              throw new Error('REDIRECT_URI_MISMATCH');
+            }
+            throw new Error(tokens?.error_description ?? tokens?.error ?? 'TOKEN_EXCHANGE_FAILED');
+          }
+
+          // Fetch Discord User Info
+          const userController = new AbortController();
+          const userTimeout = setTimeout(() => userController.abort(), 10_000);
+          let userRes;
+          try {
+            userRes = await fetch(`${DISCORD_API}/users/@me`, {
+              headers: { Authorization: `Bearer ${tokens.access_token}` },
+              signal: userController.signal,
+            });
+          } finally {
+            clearTimeout(userTimeout);
+          }
+
+          if (userRes.status === 429) {
+            throw new Error('RATE_LIMITED');
+          }
+
+          if (!userRes.ok) {
+            console.error('[auth] user fetch failed:', userRes.status);
+            throw new Error('USER_FETCH_FAILED');
+          }
+
+          const user = await userRes.json();
+          return {
+            tokens,
+            user,
+          };
+        })();
+
+        inFlightExchanges.set(code, exchangePromise);
+        exchangePromise
+          .catch(() => {})
+          .finally(() => {
+            setTimeout(() => inFlightExchanges.delete(code), 6_000);
+          });
       }
 
-      const userController = new AbortController();
-      const userTimeout = setTimeout(() => userController.abort(), 10_000);
-      let userRes;
-      try {
-        userRes = await fetch(`${DISCORD_API}/users/@me`, {
-          headers: { Authorization: `Bearer ${tokens.access_token}` },
-          signal: userController.signal,
-        });
-      } finally {
-        clearTimeout(userTimeout);
-      }
-      const userCt = userRes.headers.get('content-type') ?? '';
-      if (!userCt.includes('application/json')) {
-        throw new Error(`Unexpected response from Discord users endpoint: ${userRes.status} ${userRes.statusText}`);
-      }
-      const user = await userRes.json();
-      if (!userRes.ok) throw new Error('Failed to fetch user info');
+      const { tokens, user } = await exchangePromise;
 
       const newUser = {
         id: user.id,
@@ -193,13 +275,13 @@ export function createAuthRouter(botClient, redis = null, guildService = null) {
       req.session.regenerate((err) => {
         if (err) {
           console.error('[auth] session regenerate error after login:', err);
-          return res.status(500).send('Login failed. Please try again.');
+          return res.redirect('/login?error=session_error');
         }
         req.session.user = newUser;
         req.session.save((saveErr) => {
           if (saveErr) {
             console.error('[auth] session save error after login:', saveErr);
-            return res.status(500).send('Login failed. Please try again.');
+            return res.redirect('/login?error=session_error');
           }
           console.log('[auth] session set for', newUser.username);
           res.redirect(returnTo);
@@ -207,7 +289,16 @@ export function createAuthRouter(botClient, redis = null, guildService = null) {
       });
     } catch (err) {
       console.error('[auth] callback error:', err.message);
-      res.status(500).send('Login failed. Please try again later.');
+      if (err.message === 'RATE_LIMITED') {
+        return res.redirect('/login?error=rate_limited');
+      }
+      if (err.message === 'INVALID_GRANT') {
+        return res.redirect('/login?error=code_expired');
+      }
+      if (err.message === 'REDIRECT_URI_MISMATCH') {
+        return res.redirect('/login?error=redirect_uri_mismatch');
+      }
+      return res.redirect('/login?error=login_failed');
     }
   });
 

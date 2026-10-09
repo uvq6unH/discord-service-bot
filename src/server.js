@@ -281,7 +281,7 @@ export function createServer({ configStore, stateStore, botClient, redis = null 
     store: sessionStore,
     cookie: {
       maxAge: 7 * 24 * 60 * 60 * 1000,
-      secure: isProduction,
+      secure: 'auto',
       httpOnly: true,
       sameSite: 'lax',
     },
@@ -846,6 +846,28 @@ export function createServer({ configStore, stateStore, botClient, redis = null 
         errors.push(`${key} phải là array.`);
       } else if (Array.isArray(body[key]) && body[key].length > limit) {
         errors.push(`${key} vượt giới hạn ${limit} entries.`);
+      }
+    }
+
+    // Reminders validation (prevent silent omission of incomplete reminders)
+    if (Array.isArray(body.reminders)) {
+      for (const [idx, item] of body.reminders.entries()) {
+        if (!item || typeof item !== 'object') {
+          errors.push(`Lời nhắc #${idx + 1} không hợp lệ.`);
+          continue;
+        }
+        const chId = String(item.channelId ?? '').trim();
+        const msg = String(item.message ?? '').trim();
+        const t = String(item.time ?? '').trim();
+        if (!chId || !/^\d{17,20}$/.test(chId)) {
+          errors.push(`Lời nhắc #${idx + 1}: Kênh phát sóng chưa được chọn hoặc không hợp lệ.`);
+        }
+        if (!msg) {
+          errors.push(`Lời nhắc #${idx + 1}: Nội dung thông báo không được để trống.`);
+        }
+        if (!t || isNaN(new Date(t).getTime())) {
+          errors.push(`Lời nhắc #${idx + 1}: Thời gian không hợp lệ.`);
+        }
       }
     }
 

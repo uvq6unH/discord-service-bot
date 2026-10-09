@@ -18,7 +18,9 @@ export function useReminders() {
   };
 
   const addReminder = () => {
-    const newRem = reminderService.createDefaultReminder();
+    const textChannels = (guildData?.channels ?? []).filter(c => c.type === 0 || c.type === 5);
+    const defaultChannelId = textChannels[0]?.id || '';
+    const newRem = reminderService.createDefaultReminder(defaultChannelId);
     const currentList = config?.reminders ?? [];
     updateConfig({ reminders: [...currentList, newRem] });
   };

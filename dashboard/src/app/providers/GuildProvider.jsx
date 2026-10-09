@@ -138,10 +138,12 @@ export function GuildProvider({ children }) {
   }, [queryClient, selectedGuildId, saveStatus]);
 
   const saveConfig = useCallback(async () => {
-    if (!selectedGuildId || !config) return;
-    const patch = stripServerFields(config);
+    if (!selectedGuildId) return;
+    const currentConfig = queryClient.getQueryData(['config', selectedGuildId]) || config;
+    if (!currentConfig) return;
+    const patch = stripServerFields(currentConfig);
     await saveMutation.mutateAsync(patch);
-  }, [selectedGuildId, config, saveMutation]);
+  }, [selectedGuildId, config, queryClient, saveMutation]);
 
   const effectiveSaveStatus = saveMutation.isPending ? 'saving' : saveStatus;
 

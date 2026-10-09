@@ -37,7 +37,11 @@ async function processOneReminder(reminder, guild) {
     const mentions = [userMentions, roleMentions].filter(Boolean).join(' ');
     const resolvedMsg = resolveEmojiNames(reminder.message, guild);
     const finalText = mentions ? `${mentions} ${resolvedMsg}` : resolvedMsg;
-    await channel.send(finalText).catch((err) => console.error(`[reminder] Failed to send message to channel ${reminder.channelId}:`, err.message));
+    await channel.send(finalText)
+      .then(() => console.log(`[reminder] ✅ Sent reminder "${reminder.message}" to #${channel.name} (${reminder.channelId}) in guild ${guild.name}`))
+      .catch((err) => console.error(`[reminder] Failed to send message to channel ${reminder.channelId}:`, err.message));
+  } else {
+    console.warn(`[reminder] Channel ${reminder.channelId} not found or not text-based in guild ${guild.name}`);
   }
 
   const repeat = reminder.repeat ?? 'none';
@@ -63,7 +67,7 @@ async function reminderTick(discordClient, configStore) {
 
   for (const guildId of guildIds) {
     try {
-      const config = await configStore.getGuildConfig(guildId);
+      const config = await configStore.getGuildConfig(guildId, { fresh: true });
       if (!config.enabled || !config.remindersEnabled || !config.reminders?.length) continue;
 
       let modified = false;

@@ -93,8 +93,11 @@ function normalizeReminders(reminders) {
         roleIds = [];
       }
 
+      const rawId = String(item?.id ?? '').trim();
+      const id = rawId || `rem_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+
       return {
-        id: String(item?.id ?? '').trim(),
+        id,
         userIds,
         roleIds,
         channelId: normalizeSnowflakeId(item?.channelId),
@@ -563,9 +566,17 @@ export class ConfigStore {
     return this._saveQueue;
   }
 
-  async getGuildConfig(guildId) {
+  invalidate(guildId) {
+    if (guildId) {
+      delete this.cache[guildId];
+    } else {
+      this.cache = {};
+    }
+  }
+
+  async getGuildConfig(guildId, options = {}) {
     await this.ready;
-    let stored = this.cache[guildId];
+    let stored = options?.fresh ? null : this.cache[guildId];
     if (!stored && this._redis) {
       try {
         const val = await this._redis.get(this._keyFor(guildId));
@@ -575,10 +586,11 @@ export class ConfigStore {
         }
       } catch (err) {
         console.warn(`[ConfigStore] Failed to fetch fresh config for guild ${guildId}: ${err.message}`);
+        stored = this.cache[guildId] ?? {};
       }
     }
     if (!stored) {
-      stored = {};
+      stored = this.cache[guildId] ?? {};
     }
 
     const coreCmds = normalizeCommands(

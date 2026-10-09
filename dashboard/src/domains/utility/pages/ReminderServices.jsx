@@ -36,6 +36,9 @@ function ReminderItemRow({ reminder, channels, members, roles, onUpdate, onRemov
     onUpdate(reminder.id, { roleIds: rIds.filter(id => id !== roleId) });
   };
 
+  const isMessageEmpty = !String(reminder.message ?? '').trim();
+  const isChannelEmpty = !reminder.channelId;
+
   return (
     <div style={{
       background: 'var(--surface-1)',
@@ -50,10 +53,19 @@ function ReminderItemRow({ reminder, channels, members, roles, onUpdate, onRemov
           
           {/* Message Input */}
           <div className="form-group">
-            <label className="form-label" style={{ fontSize: '10px' }}>{t("Alert Message Payload")}</label>
+            <label className="form-label" style={{ fontSize: '10px', display: 'flex', justifyContent: 'space-between' }}>
+              <span>{t("Alert Message Payload")} *</span>
+              {isMessageEmpty && (
+                <span style={{ color: 'var(--red)', fontWeight: 'bold' }}>{t("(Required)")}</span>
+              )}
+            </label>
             <IMEInput
               className="form-input"
-              style={{ fontSize: '12px' }}
+              style={{
+                fontSize: '12px',
+                borderColor: isMessageEmpty ? 'var(--red)' : undefined,
+                boxShadow: isMessageEmpty ? '0 0 0 1px var(--red)' : undefined
+              }}
               value={reminder.message}
               placeholder={t("System notification content...")}
               onChange={e => onUpdate(reminder.id, { message: e.target.value })}
@@ -199,14 +211,24 @@ function ReminderItemRow({ reminder, channels, members, roles, onUpdate, onRemov
 
           {/* Target Channel */}
           <div className="form-group" style={{ borderTop: '1px solid var(--border)', paddingTop: 'var(--space-3)' }}>
-            <label className="form-label" style={{ fontSize: '10px' }}>{t("Target Channel Broadcast")}</label>
+            <label className="form-label" style={{ fontSize: '10px', display: 'flex', justifyContent: 'space-between' }}>
+              <span>{t("Target Channel Broadcast")} *</span>
+              {isChannelEmpty && (
+                <span style={{ color: 'var(--red)', fontWeight: 'bold' }}>{t("(Required)")}</span>
+              )}
+            </label>
             <select
               className="form-select"
-              style={{ fontSize: '12px', fontFamily: 'var(--font-mono)' }}
+              style={{
+                fontSize: '12px',
+                fontFamily: 'var(--font-mono)',
+                borderColor: isChannelEmpty ? 'var(--red)' : undefined,
+                boxShadow: isChannelEmpty ? '0 0 0 1px var(--red)' : undefined
+              }}
               value={reminder.channelId ?? ''}
               onChange={e => onUpdate(reminder.id, { channelId: e.target.value })}
             >
-              <option value="">{t("-- Select Channel --")}</option>
+              <option value="">{t("-- Select Channel (Required) --")}</option>
               {textChannels.map(c => <option key={c.id} value={c.id}>#{c.name}</option>)}
             </select>
           </div>
@@ -252,6 +274,7 @@ export default function ReminderServicesPage() {
 
   const isEnabled = config.remindersEnabled ?? false;
   const reminders = config.reminders ?? [];
+  const hasIncompleteReminders = reminders.some(r => !r.channelId || !String(r.message ?? '').trim());
 
   // Count unique channels used
   const activeChannelsCount = new Set(
@@ -312,6 +335,25 @@ export default function ReminderServicesPage() {
                 </div>
               </label>
             </div>
+
+            {/* Incomplete warning banner */}
+            {isEnabled && hasIncompleteReminders && reminders.length > 0 && (
+              <div style={{
+                marginTop: 'var(--space-4)',
+                background: 'rgba(239, 68, 68, 0.1)',
+                border: '1px solid var(--red)',
+                padding: 'var(--space-2-5) var(--space-4)',
+                color: 'var(--red)',
+                fontSize: '11px',
+                fontFamily: 'var(--font-mono)',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 'var(--space-2)'
+              }}>
+                <span>⚠️</span>
+                <span>{t("Attention: Target broadcast channel and alert message payload are required before committing.")}</span>
+              </div>
+            )}
 
             {/* List reminders */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)', marginTop: 'var(--space-4)', opacity: isEnabled ? 1 : 0.4, pointerEvents: isEnabled ? 'auto' : 'none' }}>

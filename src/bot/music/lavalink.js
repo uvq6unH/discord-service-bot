@@ -49,27 +49,6 @@ function buildNodeConfigs() {
     });
   }
 
-  // Fallback public Lavalink v4 nodes (ensures music stays active if primary returns 403 or drops)
-  nodes.push({
-    id: 'public-darren',
-    host: 'lavalink.darrennathanael.com',
-    port: 443,
-    authorization: 'LL.darrennathanael.com',
-    secure: true,
-    retryAmount: 5,
-    retryDelay: 10_000,
-  });
-
-  nodes.push({
-    id: 'public-jirayu',
-    host: 'lavalink.jirayu.net',
-    port: 13592,
-    authorization: 'youshallnotpass',
-    secure: false,
-    retryAmount: 5,
-    retryDelay: 10_000,
-  });
-
   return nodes;
 }
 

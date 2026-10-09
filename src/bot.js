@@ -656,6 +656,10 @@ function _startEventQueueWorker(client, configStore, redis) {
     const type = job.type || 'sync_commands';
     const guildId = job.guildId;
 
+    if (guildId && typeof configStore?.invalidate === 'function') {
+      configStore.invalidate(guildId);
+    }
+
     if (type === 'sync_commands') {
       if (!guildId) return;
       const config = await configStore.getGuildConfig(guildId).catch(() => null);
