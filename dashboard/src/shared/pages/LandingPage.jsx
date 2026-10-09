@@ -16,10 +16,15 @@ export default function LandingPage() {
         return language === 'vi'
           ? 'Mã xác thực Discord đã hết hạn hoặc đã được sử dụng. Vui lòng bấm "Thử lại" bên dưới.'
           : 'Discord authorization code expired or was already used. Please click Retry below.';
-      case 'rate_limited':
+      case 'rate_limited': {
+        const retryAfter = searchParams.get('retry_after');
+        const minutes = retryAfter ? Math.ceil(parseInt(retryAfter, 10) / 60) : null;
+        const timeText = minutes && minutes > 0 ? ` (còn ~${minutes} phút)` : '';
+        const timeTextEn = minutes && minutes > 0 ? ` (~${minutes}m cooldown)` : '';
         return language === 'vi'
-          ? 'Discord API đang tạm thời giới hạn tần suất (Rate Limit 429). Vui lòng đợi vài giây và thử lại.'
-          : 'Discord API is currently rate limited (429). Please wait a few moments and try again.';
+          ? `IP datacenter của Render đang bị Discord Cloudflare chặn tạm thời${timeText}. Cách khắc phục ngay: Đổi Region sang Oregon (US) trên Render Dashboard để nhận IP mới, hoặc đợi hết thời gian chặn.`
+          : `Render's datacenter IP is temporarily blocked by Discord Cloudflare${timeTextEn}. Quick fix: Switch Render Region to Oregon (US) for a clean IP, or wait for cooldown.`;
+      }
       case 'state_mismatch':
         return language === 'vi'
           ? 'Phiên đăng nhập đã hết hạn hoặc không khớp. Vui lòng thử đăng nhập lại.'

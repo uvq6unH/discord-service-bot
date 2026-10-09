@@ -5,7 +5,7 @@
 import { Router } from 'express';
 import crypto from 'node:crypto';
 
-const DISCORD_API = 'https://discord.com/api/v10';
+const DISCORD_API = process.env.DISCORD_API_BASE_URL || 'https://discord.com/api/v10';
 const DISCORD_USER_AGENT = 'DiscordBot (https://github.com/uvq6unH/discord-service-bot, 1.0.0)';
 
 function safeReturnTo(value) {
@@ -169,6 +169,7 @@ export function createAuthRouter(botClient, redis = null, guildService = null) {
           let tokenRes;
           let attempt = 0;
           let lastToken429 = '';
+          let lastTokenRetryAfter = 0;
           while (attempt < 3) {
             attempt++;
             const tokenController = new AbortController();
@@ -205,6 +206,7 @@ export function createAuthRouter(botClient, redis = null, guildService = null) {
                   lastToken429 = await tokenRes.clone().text();
                 } catch {}
               }
+              lastTokenRetryAfter = retryAfter;
               const waitSec = (retryAfter > 0 && retryAfter <= 10) ? retryAfter : Math.min(attempt * 2.5, 6);
               console.warn(`[auth] Discord token rate limit (429), waiting ${waitSec}s (attempt ${attempt}/3)...`);
               await new Promise((r) => setTimeout(r, Math.ceil(waitSec * 1000) + 200));
@@ -224,7 +226,9 @@ export function createAuthRouter(botClient, redis = null, guildService = null) {
                 body: errText.slice(0, 500)
               }), 'EX', 86400).catch(() => null);
             }
-            throw new Error('RATE_LIMITED');
+            const err = new Error('RATE_LIMITED');
+            err.retryAfter = lastTokenRetryAfter || parseFloat(tokenRes.headers.get('retry-after') || '0');
+            throw err;
           }
 
           const rawTokenText = await tokenRes.text();
@@ -250,6 +254,7 @@ export function createAuthRouter(botClient, redis = null, guildService = null) {
           let userRes;
           let userAttempt = 0;
           let lastUser429 = '';
+          let lastUserRetryAfter = 0;
           while (userAttempt < 3) {
             userAttempt++;
             const userController = new AbortController();
@@ -278,6 +283,7 @@ export function createAuthRouter(botClient, redis = null, guildService = null) {
                   lastUser429 = await userRes.clone().text();
                 } catch {}
               }
+              lastUserRetryAfter = retryAfter;
               const waitSec = (retryAfter > 0 && retryAfter <= 10) ? retryAfter : Math.min(userAttempt * 2.5, 6);
               console.warn(`[auth] Discord user fetch rate limit (429), waiting ${waitSec}s (attempt ${userAttempt}/3)...`);
               await new Promise((r) => setTimeout(r, Math.ceil(waitSec * 1000) + 200));
@@ -297,7 +303,9 @@ export function createAuthRouter(botClient, redis = null, guildService = null) {
                 body: errText.slice(0, 500)
               }), 'EX', 86400).catch(() => null);
             }
-            throw new Error('RATE_LIMITED');
+            const err = new Error('RATE_LIMITED');
+            err.retryAfter = lastUserRetryAfter || parseFloat(userRes.headers.get('retry-after') || '0');
+            throw err;
           }
 
           if (!userRes.ok) {
@@ -351,7 +359,8 @@ export function createAuthRouter(botClient, redis = null, guildService = null) {
     } catch (err) {
       console.error('[auth] callback error:', err.message);
       if (err.message === 'RATE_LIMITED') {
-        return res.redirect('/login?error=rate_limited');
+        const sec = err.retryAfter ? Math.ceil(err.retryAfter) : 0;
+        return res.redirect(`/login?error=rate_limited${sec > 0 ? `&retry_after=${sec}` : ''}`);
       }
       if (err.message === 'INVALID_GRANT') {
         return res.redirect('/login?error=code_expired');
