@@ -1,6 +1,7 @@
 import crypto from 'crypto';
 
 const DISCORD_API = 'https://discord.com/api/v10';
+const DISCORD_USER_AGENT = 'DiscordBot (https://github.com/uvq6unH/discord-service-bot, 1.0.0)';
 const SOFT_TTL_MS = 30 * 1000;          // 30 seconds (Quick refresh for newly created servers)
 const HARD_TTL_SEC = 7 * 24 * 60 * 60;   // 7 days in Redis
 const REVALIDATE_LEASE_SEC = 60;         // 60 seconds
@@ -244,7 +245,10 @@ export function createGuildService(redis) {
       const t = setTimeout(() => ctrl.abort(), FETCH_TIMEOUT_MS);
       try {
         const res = await fetch(`${DISCORD_API}/users/@me/guilds`, {
-          headers: { Authorization: `Bearer ${accessToken}` },
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+            'User-Agent': DISCORD_USER_AGENT,
+          },
           signal: ctrl.signal,
         });
 

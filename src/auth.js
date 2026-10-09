@@ -6,6 +6,7 @@ import { Router } from 'express';
 import crypto from 'node:crypto';
 
 const DISCORD_API = 'https://discord.com/api/v10';
+const DISCORD_USER_AGENT = 'DiscordBot (https://github.com/uvq6unH/discord-service-bot, 1.0.0)';
 
 function safeReturnTo(value) {
   const fallback = '/';
@@ -167,14 +168,18 @@ export function createAuthRouter(botClient, redis = null, guildService = null) {
         exchangePromise = (async () => {
           let tokenRes;
           let attempt = 0;
-          while (attempt < 2) {
+          let lastToken429 = '';
+          while (attempt < 3) {
             attempt++;
             const tokenController = new AbortController();
-            const tokenTimeout = setTimeout(() => tokenController.abort(), 10_000);
+            const tokenTimeout = setTimeout(() => tokenController.abort(), 12_000);
             try {
               tokenRes = await fetch(`${DISCORD_API}/oauth2/token`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                headers: {
+                  'Content-Type': 'application/x-www-form-urlencoded',
+                  'User-Agent': DISCORD_USER_AGENT,
+                },
                 body: new URLSearchParams({
                   client_id: clientId,
                   client_secret: clientSecret,
@@ -188,18 +193,37 @@ export function createAuthRouter(botClient, redis = null, guildService = null) {
               clearTimeout(tokenTimeout);
             }
 
-            if (tokenRes.status === 429 && attempt === 1) {
-              const retryAfter = parseFloat(tokenRes.headers.get('retry-after') || '0');
-              if (retryAfter > 0 && retryAfter <= 3) {
-                console.warn(`[auth] Discord token rate limit (429), waiting ${retryAfter}s before retry...`);
-                await new Promise((r) => setTimeout(r, Math.ceil(retryAfter * 1000) + 100));
-                continue;
+            if (tokenRes.status === 429 && attempt < 3) {
+              let retryAfter = parseFloat(tokenRes.headers.get('retry-after') || '0');
+              try {
+                const clone = await tokenRes.clone().json();
+                if (typeof clone?.retry_after === 'number') {
+                  retryAfter = clone.retry_after;
+                }
+              } catch {
+                try {
+                  lastToken429 = await tokenRes.clone().text();
+                } catch {}
               }
+              const waitSec = (retryAfter > 0 && retryAfter <= 10) ? retryAfter : Math.min(attempt * 2.5, 6);
+              console.warn(`[auth] Discord token rate limit (429), waiting ${waitSec}s (attempt ${attempt}/3)...`);
+              await new Promise((r) => setTimeout(r, Math.ceil(waitSec * 1000) + 200));
+              continue;
             }
             break;
           }
 
           if (tokenRes.status === 429) {
+            const errText = lastToken429 || await tokenRes.text().catch(() => '');
+            console.error('[auth] Discord token 429 after retries:', errText);
+            if (redis) {
+              await redis.set('debug:last_auth_429', JSON.stringify({
+                endpoint: 'token',
+                time: new Date().toISOString(),
+                headers: Object.fromEntries(tokenRes.headers.entries()),
+                body: errText.slice(0, 500)
+              }), 'EX', 86400).catch(() => null);
+            }
             throw new Error('RATE_LIMITED');
           }
 
@@ -222,20 +246,57 @@ export function createAuthRouter(botClient, redis = null, guildService = null) {
             throw new Error(tokens?.error_description ?? tokens?.error ?? 'TOKEN_EXCHANGE_FAILED');
           }
 
-          // Fetch Discord User Info
-          const userController = new AbortController();
-          const userTimeout = setTimeout(() => userController.abort(), 10_000);
+          // Fetch Discord User Info with retry
           let userRes;
-          try {
-            userRes = await fetch(`${DISCORD_API}/users/@me`, {
-              headers: { Authorization: `Bearer ${tokens.access_token}` },
-              signal: userController.signal,
-            });
-          } finally {
-            clearTimeout(userTimeout);
+          let userAttempt = 0;
+          let lastUser429 = '';
+          while (userAttempt < 3) {
+            userAttempt++;
+            const userController = new AbortController();
+            const userTimeout = setTimeout(() => userController.abort(), 12_000);
+            try {
+              userRes = await fetch(`${DISCORD_API}/users/@me`, {
+                headers: {
+                  Authorization: `Bearer ${tokens.access_token}`,
+                  'User-Agent': DISCORD_USER_AGENT,
+                },
+                signal: userController.signal,
+              });
+            } finally {
+              clearTimeout(userTimeout);
+            }
+
+            if (userRes.status === 429 && userAttempt < 3) {
+              let retryAfter = parseFloat(userRes.headers.get('retry-after') || '0');
+              try {
+                const clone = await userRes.clone().json();
+                if (typeof clone?.retry_after === 'number') {
+                  retryAfter = clone.retry_after;
+                }
+              } catch {
+                try {
+                  lastUser429 = await userRes.clone().text();
+                } catch {}
+              }
+              const waitSec = (retryAfter > 0 && retryAfter <= 10) ? retryAfter : Math.min(userAttempt * 2.5, 6);
+              console.warn(`[auth] Discord user fetch rate limit (429), waiting ${waitSec}s (attempt ${userAttempt}/3)...`);
+              await new Promise((r) => setTimeout(r, Math.ceil(waitSec * 1000) + 200));
+              continue;
+            }
+            break;
           }
 
           if (userRes.status === 429) {
+            const errText = lastUser429 || await userRes.text().catch(() => '');
+            console.error('[auth] Discord user fetch 429 after retries:', errText);
+            if (redis) {
+              await redis.set('debug:last_auth_429', JSON.stringify({
+                endpoint: 'users/@me',
+                time: new Date().toISOString(),
+                headers: Object.fromEntries(userRes.headers.entries()),
+                body: errText.slice(0, 500)
+              }), 'EX', 86400).catch(() => null);
+            }
             throw new Error('RATE_LIMITED');
           }
 
@@ -302,6 +363,61 @@ export function createAuthRouter(botClient, redis = null, guildService = null) {
     }
   });
 
+  // GET /auth/diag — host connectivity and Discord API rate-limit probe
+  router.get('/auth/diag', async (_req, res) => {
+    try {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 10_000);
+      let discordRes;
+      try {
+        discordRes = await fetch(`${DISCORD_API}/oauth2/token`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'User-Agent': DISCORD_USER_AGENT,
+          },
+          body: new URLSearchParams({
+            client_id: clientId || 'missing',
+            client_secret: clientSecret || 'missing',
+            grant_type: 'authorization_code',
+            code: 'diag_probe_test_code',
+            redirect_uri: redirectUri || 'missing',
+          }),
+          signal: controller.signal,
+        });
+      } finally {
+        clearTimeout(timeout);
+      }
+
+      const bodyText = await discordRes.text();
+      let parsedBody;
+      try {
+        parsedBody = JSON.parse(bodyText);
+      } catch {
+        parsedBody = bodyText.slice(0, 500);
+      }
+
+      const last429 = redis ? await redis.get('debug:last_auth_429').catch(() => null) : null;
+
+      res.json({
+        ok: true,
+        host: process.env.RENDER_SERVICE_NAME || process.env.RENDER_INSTANCE_ID || 'render/local',
+        discordStatus: discordRes.status,
+        headers: {
+          'retry-after': discordRes.headers.get('retry-after'),
+          'cf-ray': discordRes.headers.get('cf-ray'),
+          server: discordRes.headers.get('server'),
+          'x-ratelimit-remaining': discordRes.headers.get('x-ratelimit-remaining'),
+          'x-ratelimit-reset-after': discordRes.headers.get('x-ratelimit-reset-after'),
+        },
+        discordBody: parsedBody,
+        lastRecorded429: last429 ? (typeof last429 === 'string' ? JSON.parse(last429) : last429) : null,
+      });
+    } catch (err) {
+      res.status(500).json({ ok: false, error: err.message });
+    }
+  });
+
   // GET /auth/logout
   router.get('/auth/logout', (req, res) => {
     req.session.destroy(() => {
@@ -342,7 +458,10 @@ export function createAuthRouter(botClient, redis = null, guildService = null) {
     try {
       const res = await fetch(`${DISCORD_API}/oauth2/token`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+          'User-Agent': DISCORD_USER_AGENT,
+        },
         body: new URLSearchParams({
           client_id: clientId,
           client_secret: clientSecret,
