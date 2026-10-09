@@ -207,6 +207,10 @@ export function createAuthRouter(botClient, redis = null, guildService = null) {
                 } catch {}
               }
               lastTokenRetryAfter = retryAfter;
+              if (retryAfter > 15) {
+                console.warn(`[auth] Global Discord IP ban detected (retryAfter: ${retryAfter}s). Failing fast.`);
+                break;
+              }
               const waitSec = (retryAfter > 0 && retryAfter <= 10) ? retryAfter : Math.min(attempt * 2.5, 6);
               console.warn(`[auth] Discord token rate limit (429), waiting ${waitSec}s (attempt ${attempt}/3)...`);
               await new Promise((r) => setTimeout(r, Math.ceil(waitSec * 1000) + 200));
@@ -284,6 +288,10 @@ export function createAuthRouter(botClient, redis = null, guildService = null) {
                 } catch {}
               }
               lastUserRetryAfter = retryAfter;
+              if (retryAfter > 15) {
+                console.warn(`[auth] Global Discord IP ban detected on user fetch (retryAfter: ${retryAfter}s). Failing fast.`);
+                break;
+              }
               const waitSec = (retryAfter > 0 && retryAfter <= 10) ? retryAfter : Math.min(userAttempt * 2.5, 6);
               console.warn(`[auth] Discord user fetch rate limit (429), waiting ${waitSec}s (attempt ${userAttempt}/3)...`);
               await new Promise((r) => setTimeout(r, Math.ceil(waitSec * 1000) + 200));

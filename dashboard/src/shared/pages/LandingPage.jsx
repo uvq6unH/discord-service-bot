@@ -22,8 +22,8 @@ export default function LandingPage() {
         const timeText = minutes && minutes > 0 ? ` (còn ~${minutes} phút)` : '';
         const timeTextEn = minutes && minutes > 0 ? ` (~${minutes}m cooldown)` : '';
         return language === 'vi'
-          ? `IP datacenter của Render đang bị Discord Cloudflare chặn tạm thời${timeText}. Cách khắc phục ngay: Đổi Region sang Oregon (US) trên Render Dashboard để nhận IP mới, hoặc đợi hết thời gian chặn.`
-          : `Render's datacenter IP is temporarily blocked by Discord Cloudflare${timeTextEn}. Quick fix: Switch Render Region to Oregon (US) for a clean IP, or wait for cooldown.`;
+          ? `IP datacenter của Render đang bị Discord Cloudflare chặn tạm thời${timeText}. Cách khắc phục ngay: 1) Đổi Region sang Oregon (US) trên Render Dashboard (Settings > Region), hoặc 2) Cấu hình Cloudflare Worker proxy (DISCORD_API_BASE_URL).`
+          : `Render's datacenter IP is temporarily blocked by Discord Cloudflare${timeTextEn}. Solutions: 1) Switch Render Region to Oregon (US) in Settings > Region, or 2) Use Cloudflare Worker proxy (DISCORD_API_BASE_URL).`;
       }
       case 'state_mismatch':
         return language === 'vi'

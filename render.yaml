@@ -15,6 +15,7 @@ services:
     name: discord-bot
     runtime: node
     plan: starter
+    region: oregon
     buildCommand: NODE_ENV=development pnpm install --no-lockfile
     startCommand: node src/index.bot.js
     healthCheckPath: /health
@@ -34,6 +35,8 @@ services:
       - key: DISCORD_TOKEN
         sync: false
       - key: DISCORD_CLIENT_ID
+        sync: false
+      - key: DISCORD_API_BASE_URL
         sync: false
       - key: RIOT_API_KEY
         sync: false
@@ -59,6 +62,7 @@ services:
     name: discord-dashboard
     runtime: node
     plan: starter
+    region: oregon
     buildCommand: NODE_ENV=development pnpm install --no-lockfile && pnpm build:ui
     startCommand: node src/index.server.js
     healthCheckPath: /health
@@ -72,6 +76,8 @@ services:
       - key: DISCORD_CLIENT_SECRET
         sync: false
       - key: DISCORD_REDIRECT_URI
+        sync: false
+      - key: DISCORD_API_BASE_URL
         sync: false
       - key: SESSION_SECRET
         sync: false
