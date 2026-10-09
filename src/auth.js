@@ -5,7 +5,16 @@
 import { Router } from 'express';
 import crypto from 'node:crypto';
 
-const DISCORD_API = process.env.DISCORD_API_BASE_URL || 'https://discord.com/api/v10';
+function getDiscordApiBaseUrl() {
+  const raw = process.env.DISCORD_API_BASE_URL?.trim();
+  if (!raw) return 'https://discord.com/api/v10';
+  const clean = raw.replace(/\/+$/, '');
+  if (!clean.includes('/api')) {
+    return `${clean}/api/v10`;
+  }
+  return clean;
+}
+const DISCORD_API = getDiscordApiBaseUrl();
 const DISCORD_USER_AGENT = 'DiscordBot (https://github.com/uvq6unH/discord-service-bot, 1.0.0)';
 
 function safeReturnTo(value) {

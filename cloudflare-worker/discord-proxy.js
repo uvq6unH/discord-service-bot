@@ -18,8 +18,14 @@ export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
 
+    // Tự động thêm /api/v10 nếu caller chỉ truyền domain mà không có /api
+    let pathname = url.pathname;
+    if (!pathname.startsWith('/api')) {
+      pathname = `/api/v10${pathname}`;
+    }
+
     // Chuyển tiếp toàn bộ path và query sang discord.com
-    const targetUrl = new URL(url.pathname + url.search, 'https://discord.com');
+    const targetUrl = new URL(pathname + url.search, 'https://discord.com');
 
     // Clone headers và ghi đè Host header sang discord.com
     const newHeaders = new Headers(request.headers);
