@@ -419,7 +419,12 @@ export function createServer({ configStore, stateStore, botClient, redis = null 
   }
 
   let upstashDbCacheId = null;
+  let cachedOfficialStats = null;
+  let lastOfficialStatsTime = 0;
   async function getUpstashOfficialStats(email, apiKey) {
+    if (cachedOfficialStats && Date.now() - lastOfficialStatsTime < 60_000) {
+      return cachedOfficialStats;
+    }
     try {
       const auth = Buffer.from(`${email.trim()}:${apiKey.trim()}`).toString('base64');
       let dbId = upstashDbCacheId;
@@ -503,6 +508,9 @@ export function createServer({ configStore, stateStore, botClient, redis = null 
         },
         keys: dbInfo?.user_key_count ?? 45
       };
+      cachedOfficialStats = result;
+      lastOfficialStatsTime = Date.now();
+      return result;
     } catch (err) {
       console.warn('[upstash-api] Failed to fetch official Upstash stats:', err.message);
       return null;
@@ -1939,12 +1947,12 @@ export function createServer({ configStore, stateStore, botClient, redis = null 
           uptimeS: Math.floor(process.uptime()),
           commit: process.env.RENDER_GIT_COMMIT?.slice(0, 7) ?? process.env.GIT_COMMIT?.slice(0, 7) ?? 'unknown',
           version: process.env.npm_package_version ?? 'unknown',
-        }), 'EX', 90);
+        }), 'EX', 600);
       } catch { /* non-fatal */ }
     };
     writeDashboardHeartbeat();
-    setInterval(writeDashboardHeartbeat, 60_000).unref();
-    console.log('[heartbeat] Dashboard heartbeat started — writing every 60s');
+    setInterval(writeDashboardHeartbeat, 300_000).unref();
+    console.log('[heartbeat] Dashboard heartbeat started — writing every 300s');
   }
 
   return app;

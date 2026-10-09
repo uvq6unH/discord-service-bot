@@ -253,10 +253,10 @@ export function createAuthRouter(botClient, redis = null, guildService = null) {
 
         inFlightExchanges.set(code, exchangePromise);
         exchangePromise
-          .catch(() => {})
           .finally(() => {
             setTimeout(() => inFlightExchanges.delete(code), 6_000);
-          });
+          })
+          .catch(() => {});
       }
 
       const { tokens, user } = await exchangePromise;

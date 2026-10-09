@@ -67,7 +67,7 @@ async function reminderTick(discordClient, configStore) {
 
   for (const guildId of guildIds) {
     try {
-      const config = await configStore.getGuildConfig(guildId, { fresh: true });
+      const config = await configStore.getGuildConfig(guildId);
       if (!config.enabled || !config.remindersEnabled || !config.reminders?.length) continue;
 
       let modified = false;
