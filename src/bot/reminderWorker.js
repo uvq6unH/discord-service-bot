@@ -13,17 +13,57 @@
 
 import { resolveEmojiNames } from './emojiMap.js';
 
-const REPEAT_INTERVALS_MS = {
+export const REPEAT_INTERVALS_MS = {
   hourly: 60 * 60 * 1_000,
   daily: 24 * 60 * 60 * 1_000,
   weekly: 7 * 24 * 60 * 60 * 1_000,
 };
 
 /**
+ * Tính thời điểm tiếp theo cho reminder lặp lại.
+ * Hỗ trợ: hourly, daily, weekly, monthly.
+ * @param {string} currentTimeIso Thời điểm hiện tại của reminder (ISO 8601)
+ * @param {string} repeat 'none' | 'hourly' | 'daily' | 'weekly' | 'monthly'
+ * @param {number|Date} [referenceNow] Thời điểm tham chiếu (mặc định Date.now())
+ * @returns {string|null} Thời điểm tiếp theo (ISO 8601), hoặc null nếu không lặp
+ */
+export function calculateNextReminderTime(currentTimeIso, repeat = 'none', referenceNow = Date.now()) {
+  const nowMs = typeof referenceNow === 'number' ? referenceNow : new Date(referenceNow).getTime();
+
+  if (repeat === 'hourly' || repeat === 'daily' || repeat === 'weekly') {
+    const ms = REPEAT_INTERVALS_MS[repeat];
+    let nextTime = new Date(currentTimeIso).getTime() + ms;
+    while (nextTime <= nowMs) nextTime += ms;
+    return new Date(nextTime).toISOString();
+  }
+
+  if (repeat === 'monthly') {
+    const date = new Date(currentTimeIso);
+    if (isNaN(date.getTime())) return null;
+    const targetDay = date.getDate();
+
+    while (date.getTime() <= nowMs) {
+      const curYear = date.getFullYear();
+      const curMonth = date.getMonth();
+      const nextMonth = (curMonth + 1) % 12;
+      const nextYear = curMonth === 11 ? curYear + 1 : curYear;
+
+      const daysInNextMonth = new Date(nextYear, nextMonth + 1, 0).getDate();
+      const clampedDay = Math.min(targetDay, daysInNextMonth);
+
+      date.setFullYear(nextYear, nextMonth, clampedDay);
+    }
+    return date.toISOString();
+  }
+
+  return null;
+}
+
+/**
  * Xử lý một reminder đến hạn: gửi tin, reschedule / xoá.
  * @returns {object|null} Reminder mới (nếu reschedule), hoặc null (nếu đã xoá)
  */
-async function processOneReminder(reminder, guild) {
+async function processOneReminder(reminder, guild, referenceNow = Date.now()) {
   const channel = await guild.channels.fetch(reminder.channelId).catch(() => null);
   if (channel?.isTextBased()) {
     const ids = Array.isArray(reminder.userIds) && reminder.userIds.length
@@ -45,15 +85,10 @@ async function processOneReminder(reminder, guild) {
   }
 
   const repeat = reminder.repeat ?? 'none';
-  const ms = REPEAT_INTERVALS_MS[repeat];
-  if (!ms) return null; // one-shot — consume
+  const nextTime = calculateNextReminderTime(reminder.time, repeat, referenceNow);
+  if (!nextTime) return null; // one-shot — consume
 
-  const baseTime = new Date(reminder.time).getTime();
-  const now = Date.now();
-  let nextTime = baseTime + ms;
-  while (nextTime <= now) nextTime += ms;
-
-  return { ...reminder, time: new Date(nextTime).toISOString() };
+  return { ...reminder, time: nextTime };
 }
 
 /**
@@ -85,13 +120,11 @@ async function reminderTick(discordClient, configStore) {
           if (staleMs > STALE_THRESHOLD_MS) {
             // Stale reminder — don't fire the message
             const repeat = reminder.repeat ?? 'none';
-            const ms = REPEAT_INTERVALS_MS[repeat];
-            if (ms) {
+            const nextTime = calculateNextReminderTime(reminder.time, repeat, now.getTime());
+            if (nextTime) {
               // Recurring: reschedule to next future slot without firing
-              let nextTime = time.getTime() + ms;
-              while (nextTime <= now.getTime()) nextTime += ms;
-              nextReminders.push({ ...reminder, time: new Date(nextTime).toISOString() });
-              console.log(`[reminder] Skipped stale recurring reminder ${reminder.id} (was ${Math.round(staleMs / 60000)}m late), rescheduled to ${new Date(nextTime).toISOString()}`);
+              nextReminders.push({ ...reminder, time: nextTime });
+              console.log(`[reminder] Skipped stale recurring reminder ${reminder.id} (was ${Math.round(staleMs / 60000)}m late), rescheduled to ${nextTime}`);
             } else {
               // One-shot: silently discard
               console.log(`[reminder] Discarded stale one-shot reminder ${reminder.id} (was ${Math.round(staleMs / 60000)}m late)`);
@@ -100,7 +133,7 @@ async function reminderTick(discordClient, configStore) {
           }
 
           const guild = await discordClient.guilds.fetch(guildId).catch(() => null);
-          const updated = guild ? await processOneReminder(reminder, guild) : null;
+          const updated = guild ? await processOneReminder(reminder, guild, now.getTime()) : null;
           if (updated) nextReminders.push(updated);
           // updated === null → one-shot, không push → reminder tự xoá
         } else {

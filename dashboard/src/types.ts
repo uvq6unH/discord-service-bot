@@ -70,7 +70,7 @@ export interface AutoReply {
 
 // ── Reminder ─────────────────────────────────────────────────────────────────
 
-export type RepeatInterval = 'none' | 'hourly' | 'daily' | 'weekly';
+export type RepeatInterval = 'none' | 'hourly' | 'daily' | 'weekly' | 'monthly';
 
 export interface Reminder {
   id: string;

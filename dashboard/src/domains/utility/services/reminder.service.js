@@ -12,12 +12,14 @@ export const reminderService = {
     };
   },
   validateReminder: (reminder) => {
+    const validRepeats = ['none', 'hourly', 'daily', 'weekly', 'monthly'];
     return {
       ...reminder,
       channelId: String(reminder.channelId ?? '').trim(),
       userIds: Array.isArray(reminder.userIds) ? reminder.userIds : [],
       roleIds: Array.isArray(reminder.roleIds) ? reminder.roleIds : [],
       message: String(reminder.message ?? '').slice(0, 500),
+      repeat: validRepeats.includes(reminder?.repeat) ? reminder.repeat : 'none',
     };
   },
   isReminderComplete: (reminder) => {

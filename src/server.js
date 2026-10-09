@@ -876,6 +876,9 @@ export function createServer({ configStore, stateStore, botClient, redis = null 
         if (!t || isNaN(new Date(t).getTime())) {
           errors.push(`Lời nhắc #${idx + 1}: Thời gian không hợp lệ.`);
         }
+        if (item.repeat && !['none', 'hourly', 'daily', 'weekly', 'monthly'].includes(item.repeat)) {
+          errors.push(`Lời nhắc #${idx + 1}: Chu kỳ lặp lại không hợp lệ.`);
+        }
       }
     }
 

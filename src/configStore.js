@@ -103,7 +103,7 @@ function normalizeReminders(reminders) {
         channelId: normalizeSnowflakeId(item?.channelId),
         message: String(item?.message ?? '').trim(),
         time: String(item?.time ?? '').trim(),
-        repeat: ['none', 'hourly', 'daily', 'weekly'].includes(item?.repeat) ? item.repeat : 'none',
+        repeat: ['none', 'hourly', 'daily', 'weekly', 'monthly'].includes(item?.repeat) ? item.repeat : 'none',
       };
     })
     .filter((item) => item.id && item.channelId && item.message && item.time)

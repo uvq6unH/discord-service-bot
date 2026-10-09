@@ -201,10 +201,11 @@ function ReminderItemRow({ reminder, channels, members, roles, onUpdate, onRemov
                 value={reminder.repeat ?? 'none'}
                 onChange={e => onUpdate(reminder.id, { repeat: e.target.value })}
               >
-                <option value="none">RUN_ONCE</option>
-                <option value="hourly">HOURLY_CRON</option>
-                <option value="daily">DAILY_CRON</option>
-                <option value="weekly">WEEKLY_CRON</option>
+                <option value="none">{t("RUN_ONCE") || "RUN_ONCE"}</option>
+                <option value="hourly">{t("HOURLY_CRON") || "HOURLY_CRON"}</option>
+                <option value="daily">{t("DAILY_CRON") || "DAILY_CRON"}</option>
+                <option value="weekly">{t("WEEKLY_CRON") || "WEEKLY_CRON"}</option>
+                <option value="monthly">{t("MONTHLY_CRON") || "MONTHLY_CRON"}</option>
               </select>
             </div>
           </div>
