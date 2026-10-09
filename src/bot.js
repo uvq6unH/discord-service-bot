@@ -48,8 +48,8 @@ const GUILD_CACHE_MEMBERS_KEY = (id) => `guild_cache:${id}:members`;
 const GUILD_CACHE_TTL_S       = 900;
 const GUILD_CACHE_REFRESH_MS  = 10 * 60_000;
 
-async function writeGuildCache(guild, redis) {
-  if (!redis) return;
+async function writeGuildMetaCache(guild, redis) {
+  if (!redis || !guild) return;
   try {
     let fetchedChannels;
     try {
@@ -84,6 +84,30 @@ async function writeGuildCache(guild, redis) {
       updatedAt:   new Date().toISOString(),
     });
     await redis.set(GUILD_CACHE_KEY(guild.id), metaPayload, 'EX', GUILD_CACHE_TTL_S);
+    console.log(`[guild-cache] ⚡ Meta updated for ${guild.name} (${guild.id}): ${channels.length} channels, ${roles.length} roles`);
+  } catch (err) {
+    console.error(`[guild-cache] ❌ Failed to write meta cache for ${guild.id}:`, err.message);
+  }
+}
+
+const metaDebounceTimers = new Map();
+function scheduleGuildMetaRefresh(guild, redis, delayMs = 2000) {
+  if (!guild || !redis) return;
+  const existing = metaDebounceTimers.get(guild.id);
+  if (existing) clearTimeout(existing);
+  const timer = setTimeout(() => {
+    metaDebounceTimers.delete(guild.id);
+    writeGuildMetaCache(guild, redis).catch((err) =>
+      console.error(`[guild-cache] Debounced meta update failed for ${guild.id}:`, err.message)
+    );
+  }, delayMs);
+  metaDebounceTimers.set(guild.id, timer);
+}
+
+async function writeGuildCache(guild, redis) {
+  if (!redis) return;
+  try {
+    await writeGuildMetaCache(guild, redis);
 
     // Key 2: members — scale theo kích thước guild, dùng cho /api/members
     let membersFetched;
@@ -389,6 +413,28 @@ export function createBot(configStore, stateStore, redis = null) {
   });
   client.on(Events.GuildUpdate, async (_old, newGuild) => {
     if (redis) await writeGuildCache(newGuild, redis).catch(err => console.error(`[bot] Error updating guild cache:`, err.message));
+  });
+
+  // ── Real-time Channel & Role Sync to Redis ────────────────────────────────────
+  client.on(Events.ChannelCreate, (channel) => {
+    if (channel?.guild) scheduleGuildMetaRefresh(channel.guild, redis);
+  });
+  client.on(Events.ChannelDelete, (channel) => {
+    if (channel?.guild) scheduleGuildMetaRefresh(channel.guild, redis);
+  });
+  client.on(Events.ChannelUpdate, (oldCh, newCh) => {
+    const guild = newCh?.guild ?? oldCh?.guild;
+    if (guild) scheduleGuildMetaRefresh(guild, redis);
+  });
+  client.on(Events.GuildRoleCreate, (role) => {
+    if (role?.guild) scheduleGuildMetaRefresh(role.guild, redis);
+  });
+  client.on(Events.GuildRoleDelete, (role) => {
+    if (role?.guild) scheduleGuildMetaRefresh(role.guild, redis);
+  });
+  client.on(Events.GuildRoleUpdate, (oldRole, newRole) => {
+    const guild = newRole?.guild ?? oldRole?.guild;
+    if (guild) scheduleGuildMetaRefresh(guild, redis);
   });
 
   // ── Member auto-role + welcome ──────────────────────────────────────────────

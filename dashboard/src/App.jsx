@@ -52,6 +52,7 @@ export default function App() {
     try {
       const data = await api.guilds(true);
       queryClient.setQueryData(['guilds'], data);
+      queryClient.invalidateQueries({ queryKey: ['guild-data'] });
     } catch (err) {
       console.error('Error refreshing guilds:', err);
     } finally {
