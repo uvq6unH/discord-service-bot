@@ -31,8 +31,27 @@ describe('ConfigStore Implementation (src/configStore.js)', () => {
     redisStorage = new Map();
     mockRedisClient = {
       get: vi.fn(async (key) => redisStorage.get(key) ?? null),
-      set: vi.fn(async (key, val) => {
+      set: vi.fn(async (key, val, ...args) => {
+        if (args.includes('NX') && redisStorage.has(key)) {
+          return null;
+        }
         redisStorage.set(key, val);
+        return 'OK';
+      }),
+      del: vi.fn(async (key) => {
+        redisStorage.delete(key);
+        return 1;
+      }),
+      eval: vi.fn(async (script, numkeys, ...args) => {
+        if (typeof script === 'string' && script.includes('del')) {
+          const k = args[0];
+          const tok = args[1];
+          if (redisStorage.get(k) === tok) {
+            redisStorage.delete(k);
+            return 1;
+          }
+          return 0;
+        }
         return 'OK';
       }),
     };

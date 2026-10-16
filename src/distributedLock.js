@@ -80,6 +80,17 @@ export async function withRedisLock(
     return await fn(lockContext);
   } finally {
     if (renewalTimer) clearInterval(renewalTimer);
-    await redis.eval(LUA_RELEASE, 1, lockKey, token).catch(() => null);
+    if (typeof redis?.eval === 'function') {
+      await redis.eval(LUA_RELEASE, 1, lockKey, token).catch(() => null);
+    } else if (typeof redis?.get === 'function' && typeof redis?.del === 'function') {
+      try {
+        const cur = await redis.get(lockKey);
+        if (cur === token) {
+          await redis.del(lockKey);
+        }
+      } catch {
+        // ignore cleanup error
+      }
+    }
   }
 }

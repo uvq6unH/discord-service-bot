@@ -8,6 +8,7 @@ import { fileURLToPath } from 'node:url';
 import { createAuthRouter } from './auth.js';
 import { createCsrfProtection } from './csrf.js';
 import { createGuildService } from './guildService.js';
+import { getGuildLifecycle, setGuildLifecycle } from './guildLifecycle.js';
 const snowflakePattern = /^\d{17,20}$/;
 // React build output (pnpm build:ui → public-react/)
 // Build trước khi deploy: pnpm build:ui
@@ -922,7 +923,27 @@ export function createServer({ configStore, stateStore, botClient, redis = null 
       return res.status(400).json({ error: errors.join(' ') });
     }
 
-    const oldConfig = await configStore.getGuildConfig(req.guildId).catch(() => ({}));
+    const oldConfig = await configStore.getGuildConfig(req.guildId, { fresh: true }).catch(() => ({}));
+
+    // ── Protect reminder times from being overwritten by stale dashboard state ──
+    // The reminder worker reschedules reminders by advancing their `time` field in DB.
+    // Dashboard React state may hold stale `time` values if page was open for minutes/hours.
+    // When user commits changes, prevent rolling back already-rescheduled future reminders into the past.
+    if (Array.isArray(body.reminders) && Array.isArray(oldConfig.reminders)) {
+      const dbTimeMap = new Map(oldConfig.reminders.map(r => [r.id, r.time]));
+      body.reminders = body.reminders.map(r => {
+        if (r.id && dbTimeMap.has(r.id)) {
+          const dbTime = new Date(dbTimeMap.get(r.id)).getTime();
+          const bodyTime = new Date(r.time).getTime();
+          // If DB has already advanced to the future and body is stale in the past, preserve DB time
+          if (!isNaN(dbTime) && !isNaN(bodyTime) && dbTime > bodyTime) {
+            return { ...r, time: dbTimeMap.get(r.id) };
+          }
+        }
+        return r;
+      });
+    }
+
     const config = await configStore.updateGuildConfig(req.guildId, body);
 
     if (redis) {
@@ -1264,6 +1285,8 @@ export function createServer({ configStore, stateStore, botClient, redis = null 
       }
     }
 
+    const clientId = process.env.DISCORD_CLIENT_ID;
+
     // Determine bot presence for each manageable guild
     for (const [id, oauthMeta] of userManageableMap.entries()) {
       const oauthIcon = oauthMeta?.icon
@@ -1271,6 +1294,7 @@ export function createServer({ configStore, stateStore, botClient, redis = null 
         : null;
 
       let isBotPresent = false;
+      let presence = 'unknown'; // 'present' | 'absent' | 'unknown'
       let guildName = oauthMeta.name;
       let iconUrl = oauthIcon;
 
@@ -1279,35 +1303,76 @@ export function createServer({ configStore, stateStore, botClient, redis = null 
         const botGuild = botClient.guilds.cache.get(id);
         if (botGuild) {
           isBotPresent = true;
+          presence = 'present';
           guildName = botGuild.name;
           iconUrl = botGuild.iconURL({ size: 64 }) || oauthIcon;
         }
       }
 
-      // 2. Check Redis cache if not found in memory
+      // 2. Check Redis gateway cache if not found in memory
       if (!isBotPresent && redis) {
         try {
           const raw = await redis.get(`guild_cache:${id}`);
           if (raw) {
             const meta = typeof raw === 'string' ? JSON.parse(raw) : raw;
             isBotPresent = true;
+            presence = 'present';
             guildName = meta?.name ?? oauthMeta.name;
             iconUrl = meta?.iconURL ?? oauthIcon;
           }
         } catch { /* ignore */ }
       }
 
-      // 3. Fallback to configStore check
-      if (!isBotPresent && configuredGuildIds.includes(id)) {
-        isBotPresent = true;
+      // 3. Check distributed lifecycle record in Redis
+      if (!isBotPresent) {
+        try {
+          const lifecycle = await getGuildLifecycle(redis, id);
+          if (lifecycle) {
+            if (lifecycle.botPresent) {
+              isBotPresent = true;
+              presence = 'present';
+            } else if (lifecycle.reason === 'kicked' || lifecycle.reason === 'inaccessible') {
+              isBotPresent = false;
+              presence = 'absent';
+            } else if (lifecycle.reason === 'outage') {
+              // Discord temporary outage: do not treat as confirmed absence
+              isBotPresent = false;
+              presence = 'unknown';
+            }
+          }
+        } catch { /* ignore */ }
       }
+
+      // 4. If botClient is connected and ready, but guild is absent from its cache and no lifecycle says present
+      if (presence === 'unknown' && (botClient?.isReady?.() || botClient?.user)) {
+        isBotPresent = false;
+        presence = 'absent';
+      }
+
+      // IMPORTANT: Never infer `botPresent = true` solely from configuredGuildIds!
+      // Bot presence and saved configuration are independent concepts.
+      const isConfigured = configuredGuildIds.includes(id);
+      let isArchived = false;
+      if (isConfigured) {
+        try {
+          const config = await configStore.getGuildConfig(id);
+          isArchived = Boolean(config?.archived);
+        } catch { /* ignore */ }
+      }
+
+      const inviteUrl = !isBotPresent && clientId
+        ? `https://discord.com/oauth2/authorize?client_id=${clientId}&permissions=8&integration_type=0&scope=bot%20applications.commands&guild_id=${id}`
+        : null;
 
       guildsById.set(id, {
         id,
         name: guildName,
         icon: iconUrl,
-        configured: configuredGuildIds.includes(id),
-        botPresent: isBotPresent
+        configured: isConfigured,
+        archived: isArchived,
+        botPresent: isBotPresent,
+        presence,
+        inviteUrl
       });
     }
 
@@ -1315,8 +1380,32 @@ export function createServer({ configStore, stateStore, botClient, redis = null 
     if (isDev && userManageableMap.size === 0) {
       for (const guildId of configuredGuildIds) {
         if (!guildsById.has(guildId)) {
-          const isBotPresent = botClient?.guilds?.cache ? botClient.guilds.cache.has(guildId) : true;
-          guildsById.set(guildId, { id: guildId, name: `Server ${guildId}`, icon: null, configured: true, botPresent: isBotPresent });
+          let isBotPresent = false;
+          let presence = 'unknown';
+          if (botClient?.guilds?.cache) {
+            isBotPresent = botClient.guilds.cache.has(guildId);
+            presence = isBotPresent ? 'present' : 'absent';
+          } else {
+            const lifecycle = await getGuildLifecycle(redis, guildId).catch(() => null);
+            if (lifecycle) {
+              isBotPresent = Boolean(lifecycle.botPresent);
+              presence = lifecycle.botPresent ? 'present' : (lifecycle.reason === 'kicked' ? 'absent' : 'unknown');
+            }
+          }
+          const config = await configStore.getGuildConfig(guildId).catch(() => null);
+          const inviteUrl = !isBotPresent && clientId
+            ? `https://discord.com/oauth2/authorize?client_id=${clientId}&permissions=8&integration_type=0&scope=bot%20applications.commands&guild_id=${guildId}`
+            : null;
+          guildsById.set(guildId, {
+            id: guildId,
+            name: `Server ${guildId}`,
+            icon: null,
+            configured: true,
+            archived: Boolean(config?.archived),
+            botPresent: isBotPresent,
+            presence,
+            inviteUrl
+          });
         }
       }
     }
@@ -1340,12 +1429,34 @@ export function createServer({ configStore, stateStore, botClient, redis = null 
 
     if (isDev) {
       const configuredGuildIds = await configStore.listGuildIds();
-      const guilds = configuredGuildIds.map(id => ({
-        id,
-        name: `Server ${id}`,
-        icon: null,
-        configured: true,
-        botPresent: true
+      const clientId = process.env.DISCORD_CLIENT_ID;
+      const guilds = await Promise.all(configuredGuildIds.map(async id => {
+        let isBotPresent = false;
+        let presence = 'unknown';
+        if (botClient?.guilds?.cache) {
+          isBotPresent = botClient.guilds.cache.has(id);
+          presence = isBotPresent ? 'present' : 'absent';
+        } else {
+          const lifecycle = await getGuildLifecycle(redis, id).catch(() => null);
+          if (lifecycle) {
+            isBotPresent = Boolean(lifecycle.botPresent);
+            presence = lifecycle.botPresent ? 'present' : (lifecycle.reason === 'kicked' ? 'absent' : 'unknown');
+          }
+        }
+        const config = await configStore.getGuildConfig(id).catch(() => null);
+        const inviteUrl = !isBotPresent && clientId
+          ? `https://discord.com/oauth2/authorize?client_id=${clientId}&permissions=8&integration_type=0&scope=bot%20applications.commands&guild_id=${id}`
+          : null;
+        return {
+          id,
+          name: `Server ${id}`,
+          icon: null,
+          configured: true,
+          archived: Boolean(config?.archived),
+          botPresent: isBotPresent,
+          presence,
+          inviteUrl
+        };
       }));
       return res.json({ status: 'ready', guilds });
     }
@@ -1715,6 +1826,85 @@ export function createServer({ configStore, stateStore, botClient, redis = null 
       return res.json({ success: true, message: 'Đã reset cấu hình VoiceMaster thành công.' });
     } catch (err) {
       return res.status(500).json({ error: err.message });
+    }
+  });
+
+  // ── Guild Configuration Lifecycle Endpoints (Archive / Restore / Reset) ────
+  app.post('/api/guilds/:guildId/archive', auth.requireAuth, writeRateLimit, requireGuildId, auth.requireGuildAccess, async (req, res) => {
+    try {
+      const config = await configStore.archiveGuildConfig(req.guildId);
+
+      if (redis) {
+        addAuditLog(redis, req.guildId, {
+          user: req.session?.user?.username ?? 'Admin',
+          action: 'ARCHIVE_CONFIG',
+          details: { guildId: req.guildId }
+        });
+      }
+
+      return res.json({
+        success: true,
+        archived: true,
+        message: 'Cấu hình guild đã được lưu trữ (archived).',
+        config: sanitizeConfigForClient(config)
+      });
+    } catch (err) {
+      console.error('[server] archive config error:', err);
+      return res.status(500).json({ error: err.message || 'Internal server error' });
+    }
+  });
+
+  app.post('/api/guilds/:guildId/restore', auth.requireAuth, writeRateLimit, requireGuildId, auth.requireGuildAccess, async (req, res) => {
+    try {
+      const config = await configStore.restoreGuildConfig(req.guildId);
+
+      if (redis) {
+        addAuditLog(redis, req.guildId, {
+          user: req.session?.user?.username ?? 'Admin',
+          action: 'RESTORE_CONFIG',
+          details: { guildId: req.guildId }
+        });
+      }
+
+      return res.json({
+        success: true,
+        archived: false,
+        message: 'Cấu hình guild đã được khôi phục thành công.',
+        config: sanitizeConfigForClient(config)
+      });
+    } catch (err) {
+      console.error('[server] restore config error:', err);
+      return res.status(500).json({ error: err.message || 'Internal server error' });
+    }
+  });
+
+  app.post('/api/guilds/:guildId/reset', auth.requireAuth, writeRateLimit, requireGuildId, auth.requireGuildAccess, async (req, res) => {
+    try {
+      const { confirmGuildId } = req.body ?? {};
+      if (confirmGuildId !== req.guildId) {
+        return res.status(400).json({
+          error: 'Thao tác reset cấu hình có tính phá hủy. Vui lòng gửi confirmGuildId trùng khớp với guildId để xác nhận.'
+        });
+      }
+
+      const config = await configStore.resetGuildConfig(req.guildId);
+
+      if (redis) {
+        addAuditLog(redis, req.guildId, {
+          user: req.session?.user?.username ?? 'Admin',
+          action: 'RESET_CONFIG',
+          details: { guildId: req.guildId }
+        });
+      }
+
+      return res.json({
+        success: true,
+        message: 'Cấu hình guild đã được reset về mặc định thành công.',
+        config: sanitizeConfigForClient(config)
+      });
+    } catch (err) {
+      console.error('[server] reset config error:', err);
+      return res.status(500).json({ error: err.message || 'Internal server error' });
     }
   });
 

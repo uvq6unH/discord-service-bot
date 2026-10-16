@@ -693,7 +693,7 @@ function timingSafeEqualStr(a, b) {
       return res.status(401).json({ error: 'Unauthorized', loginUrl: '/auth/login' });
     }
 
-    const guildId = String(req.query.guildId ?? req.body?.guildId ?? '').trim();
+    const guildId = String(req.guildId ?? req.params?.guildId ?? req.query.guildId ?? req.body?.guildId ?? '').trim();
     if (!guildId) return next();
 
     try {

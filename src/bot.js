@@ -36,6 +36,7 @@ import { handleXp }                            from './bot/xpHandler.js';
 import { runAutoMod, runMentionReact }         from './bot/autoMod.js';
 import { activeQuizSessions, buildQuizEmbed }  from './bot/lolQuiz.js';
 import { defaultConfig, builtInTypesByName } from './configDefaults.js';
+import { setGuildLifecycle }                   from './guildLifecycle.js';
 
 // ── Guild Cache ───────────────────────────────────────────────────────────────
 // Hai key tách biệt để tránh Upstash 1 MB REST limit trên guild lớn:
@@ -317,7 +318,10 @@ export function createBot(configStore, stateStore, redis = null) {
       // Guild cache initial write
       if (redis) {
         console.log(`[guild-cache] Writing initial cache for ${guilds.length} guild(s)...`);
-        for (const guild of guilds) await writeGuildCache(guild, redis);
+        for (const guild of guilds) {
+          await setGuildLifecycle(redis, guild.id, true, Date.now(), 'ready');
+          await writeGuildCache(guild, redis);
+        }
 
         setInterval(async () => {
           for (const guild of [...readyClient.guilds.cache.values()]) {
@@ -348,6 +352,7 @@ export function createBot(configStore, stateStore, redis = null) {
     console.log(`[bot] Shard ${id} resumed (${n} events replayed). Reconciling guild cache...`);
     if (redis && client.guilds?.cache) {
       for (const guild of client.guilds.cache.values()) {
+        setGuildLifecycle(redis, guild.id, true, Date.now(), 'resumed').catch(() => null);
         scheduleGuildMetaRefresh(guild, redis, 500);
       }
       reconcilePendingGuilds(client, redis).catch(() => null);
@@ -433,6 +438,7 @@ export function createBot(configStore, stateStore, redis = null) {
   client.on(Events.GuildCreate, async (guild) => {
     console.log(`[bot] Joined guild: ${guild.name} (${guild.id})`);
     if (redis) {
+      await setGuildLifecycle(redis, guild.id, true, Date.now(), 'joined');
       await writeGuildCache(guild, redis).catch(err => console.error(`[bot] Error caching new guild ${guild.id}:`, err.message));
     }
     
@@ -454,8 +460,18 @@ export function createBot(configStore, stateStore, redis = null) {
     _updatePresence(client);
   });
   client.on(Events.GuildDelete, async (guild) => {
+    // Check if this is a temporary Discord outage rather than kick/ban/deletion
+    if (guild.available === false) {
+      console.warn(`[bot] Guild temporarily unavailable due to Discord outage: ${guild.name || guild.id} (${guild.id})`);
+      if (redis) {
+        await setGuildLifecycle(redis, guild.id, true, Date.now(), 'outage');
+      }
+      return;
+    }
+
     console.log(`[bot] Left or deleted guild: ${guild.name} (${guild.id})`);
     if (redis) {
+      await setGuildLifecycle(redis, guild.id, false, Date.now(), 'kicked');
       await redis.del(`guild_cache:${guild.id}`).catch(() => null);
       await redis.del(`guild_cache:${guild.id}:members`).catch(() => null);
     }

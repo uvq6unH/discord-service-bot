@@ -2655,5 +2655,65 @@ describe('P0 Deterministic Regression Tests (User Review P0.5 A-H)', () => {
       expect(claimInRedis.token).toBeDefined();
     }
   });
+
+  it('P0.5 Test L: Occurrence 2 spam protection — 100 rapid dispatch attempts within 55s are blocked by hard cooldown guard', async () => {
+    _resetWorkerStateForTest();
+    const reminder = {
+      id: 'rem_occurrence_2',
+      channelId: mockChannel.id,
+      message: 'Occurrence 2 test message',
+      time: '2026-10-16T12:00:00.000Z',
+      repeat: 'hourly',
+    };
+    const scheduledMs = new Date(reminder.time).getTime();
+    let sendCount = 0;
+    mockChannel.send = vi.fn(async (content) => {
+      sendCount++;
+      return { id: `msg_${sendCount}`, content, author: { id: 'bot_id' } };
+    });
+
+    // 1st dispatch attempt succeeds
+    const firstRes = await processOneReminder(reminder, mockGuild, scheduledMs, null);
+    expect(sendCount).toBe(1);
+    expect(firstRes).toBeDefined();
+
+    // 100 rapid subsequent calls in the same minute (e.g. rapid ticks or race conditions)
+    for (let i = 0; i < 100; i++) {
+      const burstRes = await processOneReminder(reminder, mockGuild, scheduledMs + (i * 100), null);
+      // Because cooldown is active, reminder is returned without any new Discord sends!
+      expect(burstRes).toEqual(reminder);
+    }
+
+    // channel.send was called EXACTLY ONCE! Zero duplicate sends!
+    expect(sendCount).toBe(1);
+  });
+
+  it('P0.5 Test M: ACQUIRE_LEASE_LUA returning -2 yields immediately and never calls channel.send()', async () => {
+    _resetWorkerStateForTest();
+    const reminder = {
+      id: 'rem_active_dispatch',
+      channelId: mockChannel.id,
+      message: 'Active dispatch in progress test',
+      time: '2026-10-16T12:00:00.000Z',
+      repeat: 'daily',
+    };
+    mockChannel.send = vi.fn();
+
+    const mockRedis = {
+      get: vi.fn(async () => null),
+      set: vi.fn(async () => 'OK'),
+      eval: vi.fn(async (script) => {
+        if (script.includes('-- SCRIPT: ACQUIRE_LEASE')) {
+          return -2; // Another worker is actively dispatching
+        }
+        return 0;
+      }),
+    };
+
+    const res = await processOneReminder(reminder, mockGuild, Date.now(), mockRedis);
+    expect(res).toEqual(reminder);
+    // Verified: channel.send is NEVER called when res === -2!
+    expect(mockChannel.send).not.toHaveBeenCalled();
+  });
 });
 

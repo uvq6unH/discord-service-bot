@@ -18,6 +18,7 @@ import crypto from 'node:crypto';
 import { PermissionFlagsBits } from 'discord.js';
 import { resolveEmojiNames } from './emojiMap.js';
 import { withRedisLock } from '../distributedLock.js';
+import { isGuildInaccessible, setGuildLifecycle } from '../guildLifecycle.js';
 
 export const REPEAT_INTERVALS_MS = {
   hourly: 60 * 60 * 1_000,
@@ -42,10 +43,14 @@ export const _inFlightSends = new Map();
 // Emergency dispatch rate-limiter tracker: occurrenceKey -> Array<timestamp>
 export const _dispatchHistory = new Map();
 
+// 55s per-reminder cooldown tracker for in-memory / local mode: reminderId -> timestamp
+export const _recentlyFiredInMemory = new Map();
+
 // In-memory claim deduplication fallback for local/single-process environments: claimKey -> JSON string
 export const _inMemoryClaims = new Map();
 setInterval(() => {
   if (_inMemoryClaims.size > 10_000) _inMemoryClaims.clear();
+  if (_recentlyFiredInMemory.size > 10_000) _recentlyFiredInMemory.clear();
 }, 24 * 60 * 60 * 1000).unref();
 
 export function _resetWorkerStateForTest() {
@@ -57,6 +62,7 @@ export function _resetWorkerStateForTest() {
   _currentTickPromise = null;
   _inFlightSends.clear();
   _dispatchHistory.clear();
+  _recentlyFiredInMemory.clear();
   _inMemoryClaims.clear();
 }
 
@@ -642,11 +648,33 @@ export async function processOneReminder(reminder, guild, referenceNow = Date.no
   const scheduledTimeMs = new Date(reminder.time).getTime();
   const occurrenceId = `${reminder.id}:${scheduledTimeMs}`;
   const claimKey = `reminder:claim:${occurrenceId}`;
+  const cooldownKey = `reminder:cooldown:${reminder.id}`;
 
   // 1. Kiểm tra deduplication các request đang in-flight trong process này
   if (_inFlightSends.has(occurrenceId)) {
     console.warn(`[reminder] Occurrence ${occurrenceId} already has an in-flight send request. Yielding to avoid duplicate dispatch.`);
     return reminder;
+  }
+
+  // 1b. Distributed & in-process 55s hard cooldown per reminder.id
+  // Strictly eliminates burst duplicates or multi-fire loops within 1 minute
+  if (redis) {
+    try {
+      const cd = await redis.set(cooldownKey, '1', 'NX', 'EX', '55');
+      if (cd !== 'OK') {
+        console.log(`[reminder] Hard cooldown active for reminder ${reminder.id} (already dispatched within 55s). Skipping duplicate burst.`);
+        return reminder;
+      }
+    } catch {
+      // If Redis cooldown check encounters error, fall through to CAS lease check
+    }
+  } else {
+    const lastFired = _recentlyFiredInMemory.get(reminder.id);
+    if (lastFired && (referenceNow - lastFired) < 55_000) {
+      console.log(`[reminder] In-memory cooldown active for reminder ${reminder.id} (last: ${lastFired}). Skipping duplicate.`);
+      return reminder;
+    }
+    _recentlyFiredInMemory.set(reminder.id, referenceNow);
   }
 
   // 2. Đọc claim hiện thời
@@ -717,15 +745,18 @@ export async function processOneReminder(reminder, guild, referenceNow = Date.no
         const nextTime = calculateNextReminderTime(reminder.time, repeat, referenceNow);
         return nextTime ? { ...reminder, time: nextTime } : null;
       }
-      if (res === -2) {
-        console.warn(`[reminder] Previous worker initiated dispatch for ${reminder.id} but lease expired. Entering Oracle reconciliation.`);
+      if (res === 2) {
+        // Expired lease safely claimed for Oracle reconciliation
         isReconciliation = true;
         leaseAcquired = true;
-      } else if (res === 2) {
-        isReconciliation = true;
+      } else if (res === 1) {
         leaseAcquired = true;
+      } else if (res === -2) {
+        // Active dispatching in progress by another live worker! Yield immediately!
+        console.log(`[reminder] Active dispatch in progress by another worker for ${reminder.id}. Yielding.`);
+        return reminder;
       } else {
-        leaseAcquired = res === 1;
+        leaseAcquired = false;
       }
     } catch (err) {
       console.warn(`[reminder] Redis eval error on ACQUIRE_LEASE_LUA for ${reminder.id}: ${err.message}. Checking read-back...`);
@@ -751,11 +782,16 @@ export async function processOneReminder(reminder, guild, referenceNow = Date.no
       const nextTime = calculateNextReminderTime(reminder.time, repeat, referenceNow);
       return nextTime ? { ...reminder, time: nextTime } : null;
     }
-    if (res === -2 || res === 2) {
+    if (res === 2) {
       isReconciliation = true;
       leaseAcquired = true;
+    } else if (res === 1) {
+      leaseAcquired = true;
+    } else if (res === -2) {
+      console.log(`[reminder] In-memory active dispatch in progress for ${reminder.id}. Yielding.`);
+      return reminder;
     } else {
-      leaseAcquired = res === 1;
+      leaseAcquired = false;
     }
   }
 
@@ -1169,8 +1205,15 @@ async function _executeReminderTick(discordClient, configStore, redis = null) {
 
   for (const guildId of guildIds) {
     try {
-      const config = await configStore.getGuildConfig(guildId);
+      const config = await configStore.getGuildConfig(guildId, { fresh: true });
       if (!config.enabled || !config.remindersEnabled || !config.reminders?.length) continue;
+      if (config.archived) continue; // Skip administratively archived guilds
+
+      // Check if guild is known to be inaccessible before calling Discord API
+      const inaccessible = await isGuildInaccessible(redis, guildId, discordClient);
+      if (inaccessible) {
+        continue;
+      }
 
       let modified = false;
       const nextReminders = [];
@@ -1205,9 +1248,22 @@ async function _executeReminderTick(discordClient, configStore, redis = null) {
             continue;
           }
 
-          const guild = await discordClient.guilds.fetch(guildId).catch(() => null);
+          let guild = null;
+          try {
+            guild = discordClient?.guilds?.cache?.get(guildId) || await discordClient.guilds.fetch(guildId);
+          } catch (fetchErr) {
+            const status = fetchErr?.status || fetchErr?.code;
+            if (status === 404 || status === 10004 || status === 403 || status === 50001) {
+              console.warn(`[reminder] Guild ${guildId} confirmed inaccessible (HTTP ${status}). Updating lifecycle and skipping reminders.`);
+              if (redis) {
+                await setGuildLifecycle(redis, guildId, false, now.getTime(), 'kicked').catch(() => null);
+              }
+            } else {
+              console.warn(`[reminder] Transient Discord error fetching guild ${guildId}: ${fetchErr.message}. Preserving reminder ${reminder.id} for next tick.`);
+            }
+          }
+
           if (!guild) {
-            console.warn(`[reminder] Transient Discord fetch error for guild ${guildId}. Preserving reminder ${reminder.id} in queue for next tick.`);
             nextReminders.push(reminder);
             continue;
           }

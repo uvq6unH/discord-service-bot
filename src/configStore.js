@@ -3,6 +3,7 @@ import { createUpstashFromEnv } from './upstash.js';
 
 import { defaultConfig, COMMAND_TYPES, builtInTypesByName } from './configDefaults.js';
 import { createMutexPool } from './asyncMutex.js';
+import { withRedisLock } from './distributedLock.js';
 const snowflakePattern = /^\d{17,20}$/;
 
 function clone(value) {
@@ -71,6 +72,7 @@ function normalizeReminders(reminders) {
   }
 
   const seenIds = new Set();
+  const seenContent = new Set();
   const result = [];
 
   for (const item of reminders) {
@@ -107,6 +109,11 @@ function normalizeReminders(reminders) {
     // Deduplicate duplicate IDs only; preserve distinct IDs even if content matches
     if (seenIds.has(id)) continue;
     seenIds.add(id);
+
+    // Deduplicate identical reminder occurrences (same channel, message, time)
+    const contentKey = `${channelId}:${message}:${time}`;
+    if (seenContent.has(contentKey)) continue;
+    seenContent.add(contentKey);
 
     result.push({
       id,
@@ -436,20 +443,33 @@ function readStoredApiSecrets(stored) {
 }
 
 export class ConfigStore {
-  constructor(_filePath) {
+  constructor(_filePath, redisClient = null) {
     // _filePath kept for API compat but ignored — storage is Upstash Redis.
-    this._redis = createUpstashFromEnv();
+    this._redis = redisClient || createUpstashFromEnv();
     if (!this._redis) {
       throw new Error('ConfigStore requires UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN.');
     }
     this._KEY_INDEX = 'config:_index';        // SET of guildIds
     this._keyFor = (guildId) => `config:guild:${guildId}`;
     this.cache = {};
+    /** @type {Map<string, number>} */
+    this._cacheTimestamps = new Map();
     /** @type {Map<string, { riotApiKey?: string, tftApiKey?: string }>} */
     this._runtimeSecrets = new Map();
     this._saveQueue = Promise.resolve();
     this._withLock = createMutexPool();
     this.ready = this.load();
+  }
+
+  async _withDistributedLock(guildId, fn) {
+    if (this._redis) {
+      return this._withLock(guildId, async () => {
+        return withRedisLock(this._redis, `lock:config:${guildId}`, 10, async () => {
+          return fn();
+        }, { waitMs: 5000 });
+      });
+    }
+    return this._withLock(guildId, fn);
   }
 
   _applyRuntimeSecrets(guildId, config) {
@@ -568,9 +588,18 @@ export class ConfigStore {
     const stored = this.cache[guildId];
     if (!stored) return;
     await this._redis.set(this._keyFor(guildId), JSON.stringify(this._serializeForStorage(guildId, stored)));
-    // Keep index synced in Redis asynchronously without blocking or reading
-    const ids = Object.keys(this.cache);
-    this._redis.set(this._KEY_INDEX, JSON.stringify(ids)).catch(() => null);
+    this._cacheTimestamps.set(guildId, Date.now());
+    // Keep index synced in Redis without wiping out other guilds
+    try {
+      const raw = await this._redis.get(this._KEY_INDEX).catch(() => null);
+      const ids = raw ? (typeof raw === 'string' ? JSON.parse(raw) : raw) : [];
+      if (!Array.isArray(ids) || !ids.includes(guildId)) {
+        const merged = Array.from(new Set([...(Array.isArray(ids) ? ids : []), guildId]));
+        await this._redis.set(this._KEY_INDEX, JSON.stringify(merged));
+      }
+    } catch {
+      // Best-effort index update
+    }
   }
 
   save(guildId) {
@@ -583,20 +612,27 @@ export class ConfigStore {
   invalidate(guildId) {
     if (guildId) {
       delete this.cache[guildId];
+      this._cacheTimestamps.delete(guildId);
     } else {
       this.cache = {};
+      this._cacheTimestamps.clear();
     }
   }
 
   async getGuildConfig(guildId, options = {}) {
     await this.ready;
-    let stored = options?.fresh ? null : this.cache[guildId];
+    const now = Date.now();
+    const lastCached = this._cacheTimestamps.get(guildId) || 0;
+    const isCacheStale = (now - lastCached) > 5000; // 5s TTL for distributed consistency
+
+    let stored = (options?.fresh || (this._redis && isCacheStale)) ? null : this.cache[guildId];
     if (!stored && this._redis) {
       try {
         const val = await this._redis.get(this._keyFor(guildId));
         if (val) {
           stored = typeof val === 'string' ? JSON.parse(val) : val;
           this.cache[guildId] = stored;
+          this._cacheTimestamps.set(guildId, now);
         }
       } catch (err) {
         console.warn(`[ConfigStore] Failed to fetch fresh config for guild ${guildId}: ${err.message}`);
@@ -708,10 +744,10 @@ export class ConfigStore {
     const patch = Object.fromEntries(
       Object.entries(rawPatch).filter(([k]) => !['__proto__', 'constructor', 'prototype'].includes(k))
     );
-    return this._withLock(guildId, async () => {
+    return this._withDistributedLock(guildId, async () => {
       await this.ready;
       const runtimeCurrent = this._runtimeSecrets.get(guildId) ?? {};
-      const current = await this.getGuildConfig(guildId);
+      const current = await this.getGuildConfig(guildId, { fresh: true });
       const nextRiotKey = resolveSecretPatch(patch.riotApiKey, runtimeCurrent.riotApiKey ?? '');
       const nextTftKey = resolveSecretPatch(patch.tftApiKey, runtimeCurrent.tftApiKey ?? '');
       const runtimeNext = { ...runtimeCurrent };
@@ -899,7 +935,9 @@ export class ConfigStore {
           commands: modCmds
         },
         autoModEnabled: normalizeModeration(patch.moderation ?? current.moderation).enabled,
-        antiLinkEnabled: normalizeModeration(patch.moderation ?? current.moderation).antiLink
+        antiLinkEnabled: normalizeModeration(patch.moderation ?? current.moderation).antiLink,
+        archived: pickBoolean(patch, 'archived', current.archived ?? false),
+        archivedAt: patch.archived !== undefined ? (patch.archived ? (current.archivedAt || Date.now()) : null) : (current.archivedAt ?? null)
       };
 
       delete next.commands;
@@ -910,6 +948,29 @@ export class ConfigStore {
       await this.save(guildId);
       return this.getGuildConfig(guildId);
     }); // end _withLock
+  }
+
+  async archiveGuildConfig(guildId) {
+    return this.updateGuildConfig(guildId, { archived: true });
+  }
+
+  async restoreGuildConfig(guildId) {
+    return this.updateGuildConfig(guildId, { archived: false });
+  }
+
+  async resetGuildConfig(guildId) {
+    return this._withDistributedLock(guildId, async () => {
+      await this.ready;
+      this._runtimeSecrets.delete(guildId);
+      const clean = clone(defaultConfig);
+      clean.guildId = guildId;
+      delete clean.commands;
+      delete clean.riotApiKey;
+      delete clean.tftApiKey;
+      this.cache[guildId] = clean;
+      await this.save(guildId);
+      return this.getGuildConfig(guildId, { fresh: true });
+    });
   }
 
   async listGuildIds() {

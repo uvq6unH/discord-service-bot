@@ -1,5 +1,7 @@
 export const defaultConfig = {
   enabled: true,
+  archived: false,
+  archivedAt: null,
   prefix: '!',
   disabledCommands: [],
   commands: [],
