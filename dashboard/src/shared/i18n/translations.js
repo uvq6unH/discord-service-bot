@@ -308,6 +308,12 @@ export const translations = {
     "-- Select Channel --": "-- Select Channel --",
     "Delete Reminder Job": "Delete Reminder Job",
     "LAUNCHING CRON CONTROLLERS...": "LAUNCHING CRON CONTROLLERS...",
+    "Attached Banner / Preset Image (Optional)": "Attached Banner / Preset Image (Optional)",
+    "Quick Presets": "Quick Presets",
+    "Custom Image URL": "Custom Image URL",
+    "Paste image link (https://...) or select a preset above...": "Paste image link (https://...) or select a preset above...",
+    "Remove Image": "Remove Image",
+    "Image Preview": "Image Preview",
 
     // Members Page
     "MEMBERS REGISTRY": "MEMBERS REGISTRY",
@@ -712,6 +718,12 @@ export const translations = {
     "-- Select Channel --": "-- Chọn Kênh --",
     "Delete Reminder Job": "Xóa Tác Vụ Nhắc Nhở",
     "LAUNCHING CRON CONTROLLERS...": "ĐANG KHỞI CHẠY BỘ ĐIỀU KHIỂN CRON...",
+    "Attached Banner / Preset Image (Optional)": "Ảnh Banner / Chọn Ảnh Trước (Tuỳ chọn)",
+    "Quick Presets": "Mẫu Ảnh Chọn Nhanh",
+    "Custom Image URL": "URL Ảnh Tuỳ Chỉnh",
+    "Paste image link (https://...) or select a preset above...": "Dán liên kết ảnh (https://...) hoặc chọn mẫu ở trên...",
+    "Remove Image": "Gỡ Ảnh",
+    "Image Preview": "Xem Trước Ảnh",
 
     // Members Page
     "MEMBERS REGISTRY": "DANH BẠ THÀNH VIÊN",

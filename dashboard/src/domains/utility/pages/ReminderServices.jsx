@@ -4,8 +4,9 @@ import Panel from '../../../shared/primitives/Panel.jsx';
 import IMEInput from '../../../shared/primitives/IMEInput.jsx';
 import { useReminders } from '../hooks/useReminders.js';
 import { useGuild } from '../../../shared/hooks/useGuild.js';
-import { Trash2, Plus } from 'lucide-react';
+import { Trash2, Plus, Image as ImageIcon, X } from 'lucide-react';
 import { useLanguage } from '../../../shared/context/LanguageContext.jsx';
+import { REMINDER_IMAGE_PRESETS } from '../services/reminder.service.js';
 
 function ReminderItemRow({ reminder, channels, members, roles, onUpdate, onRemove }) {
   const { t } = useLanguage();
@@ -208,6 +209,133 @@ function ReminderItemRow({ reminder, channels, members, roles, onUpdate, onRemov
                 <option value="monthly">{t("MONTHLY_CRON") || "MONTHLY_CRON"}</option>
               </select>
             </div>
+          </div>
+
+          {/* Attached Image / Preset Image ("Ảnh chọn trước") */}
+          <div className="form-group" style={{ borderTop: '1px solid var(--border)', paddingTop: 'var(--space-3)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 'var(--space-2)' }}>
+              <label className="form-label" style={{ fontSize: '10px', display: 'flex', alignItems: 'center', gap: 'var(--space-1)', margin: 0 }}>
+                <ImageIcon size={12} style={{ color: 'var(--primary, #5865F2)' }} />
+                <span>{t("Attached Banner / Preset Image (Optional)")}</span>
+              </label>
+              {String(reminder.imageUrl ?? '').trim() && (
+                <button
+                  type="button"
+                  onClick={() => onUpdate(reminder.id, { imageUrl: '' })}
+                  style={{
+                    background: 'transparent',
+                    border: 'none',
+                    color: 'var(--red)',
+                    fontSize: '10px',
+                    fontFamily: 'var(--font-mono)',
+                    cursor: 'pointer',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '4px',
+                    padding: 0
+                  }}
+                  title={t("Remove Image")}
+                >
+                  <X size={12} /> {t("Remove Image")}
+                </button>
+              )}
+            </div>
+
+            {/* Quick Presets Selection ("Ảnh chọn trước") */}
+            <div style={{ marginBottom: 'var(--space-2)' }}>
+              <span style={{ fontSize: '10px', color: 'var(--text-3)', fontFamily: 'var(--font-mono)', display: 'block', marginBottom: 'var(--space-1-5)' }}>
+                {t("Quick Presets")}:
+              </span>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--space-1-5)' }}>
+                {REMINDER_IMAGE_PRESETS.map((preset) => {
+                  const isSelected = String(reminder.imageUrl ?? '').trim() === preset.url;
+                  return (
+                    <button
+                      key={preset.id}
+                      type="button"
+                      onClick={() => onUpdate(reminder.id, { imageUrl: isSelected ? '' : preset.url })}
+                      style={{
+                        background: isSelected ? 'rgba(88, 101, 242, 0.15)' : 'var(--surface-2)',
+                        border: isSelected ? '1px solid var(--primary, #5865F2)' : '1px solid var(--border)',
+                        color: isSelected ? 'var(--primary, #5865F2)' : 'var(--text-2)',
+                        padding: 'var(--space-1) var(--space-2-5)',
+                        fontSize: '11px',
+                        cursor: 'pointer',
+                        borderRadius: '4px',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        transition: 'all 0.15s ease'
+                      }}
+                      title={preset.desc}
+                    >
+                      <span>{preset.name}</span>
+                      {isSelected && <span style={{ fontSize: '10px', fontWeight: 'bold' }}>✓</span>}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Custom Image URL Input */}
+            <div>
+              <IMEInput
+                className="form-input"
+                style={{ fontSize: '12px', width: '100%', fontFamily: 'var(--font-mono)' }}
+                value={reminder.imageUrl ?? ''}
+                placeholder={t("Paste image link (https://...) or select a preset above...")}
+                onChange={e => onUpdate(reminder.id, { imageUrl: e.target.value })}
+              />
+            </div>
+
+            {/* Live Image Preview Card */}
+            {String(reminder.imageUrl ?? '').trim() && (
+              <div style={{
+                marginTop: 'var(--space-2-5)',
+                padding: 'var(--space-2)',
+                background: 'var(--surface-2)',
+                border: '1px solid var(--border)',
+                borderRadius: '6px',
+                display: 'flex',
+                gap: 'var(--space-3)',
+                alignItems: 'center'
+              }}>
+                <div style={{
+                  width: '96px',
+                  height: '54px',
+                  borderRadius: '4px',
+                  overflow: 'hidden',
+                  background: 'rgba(0,0,0,0.2)',
+                  flexShrink: 0,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center'
+                }}>
+                  <img
+                    src={String(reminder.imageUrl ?? '').trim()}
+                    alt="Reminder Banner Preview"
+                    style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                    onError={(e) => {
+                      e.currentTarget.style.display = 'none';
+                      if (e.currentTarget.parentNode) {
+                        e.currentTarget.parentNode.innerHTML = '<span style="font-size: 10px; color: var(--red); font-family: var(--font-mono);">Failed</span>';
+                      }
+                    }}
+                  />
+                </div>
+                <div style={{ flex: 1, minWidth: 0, overflow: 'hidden' }}>
+                  <div style={{ fontSize: '11px', color: 'var(--text-1)', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <span>{t("Image Preview")}</span>
+                    <span style={{ fontSize: '9px', background: 'rgba(88, 101, 242, 0.2)', color: 'var(--primary, #5865F2)', padding: '1px 5px', borderRadius: '3px', fontFamily: 'var(--font-mono)' }}>
+                      ATTACHED
+                    </span>
+                  </div>
+                  <div style={{ fontSize: '10px', color: 'var(--text-3)', fontFamily: 'var(--font-mono)', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>
+                    {String(reminder.imageUrl ?? '').trim()}
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Target Channel */}

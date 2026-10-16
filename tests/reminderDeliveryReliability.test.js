@@ -2715,5 +2715,71 @@ describe('P0 Deterministic Regression Tests (User Review P0.5 A-H)', () => {
     // Verified: channel.send is NEVER called when res === -2!
     expect(mockChannel.send).not.toHaveBeenCalled();
   });
+
+  it('Feature: sends Embed with image when reminder.imageUrl is configured', async () => {
+    _resetWorkerStateForTest();
+    const reminder = {
+      id: 'rem_img_ok',
+      channelId: mockChannel.id,
+      message: 'Hello with image banner',
+      time: '2026-10-16T12:00:00.000Z',
+      repeat: 'daily',
+      imageUrl: 'https://images.unsplash.com/photo-1577563908411-5077b6dc7624?auto=format'
+    };
+
+    let sentPayload = null;
+    mockChannel.send = vi.fn().mockImplementation(async (payload) => {
+      sentPayload = payload;
+      return { id: 'msg_img_ok' };
+    });
+
+    const res = await processOneReminder(reminder, mockGuild, Date.now(), null);
+    expect(res.repeat).toBe('daily');
+    expect(mockChannel.send).toHaveBeenCalledTimes(1);
+    expect(sentPayload).toBeDefined();
+    expect(typeof sentPayload).toBe('object');
+    expect(sentPayload.content).toContain('Hello with image banner');
+    expect(Array.isArray(sentPayload.embeds)).toBe(true);
+    expect(sentPayload.embeds.length).toBe(1);
+    expect(sentPayload.embeds[0].data.image.url).toBe(reminder.imageUrl);
+  });
+
+  it('Feature: gracefully falls back to plain text send when embed send fails with permission/form error', async () => {
+    _resetWorkerStateForTest();
+    const reminder = {
+      id: 'rem_img_fallback',
+      channelId: mockChannel.id,
+      message: 'Alert without embed permission',
+      time: '2026-10-16T12:00:00.000Z',
+      repeat: 'hourly',
+      imageUrl: 'https://images.unsplash.com/photo-1522071820081-009f0129c71c?auto=format'
+    };
+
+    let sendCallCount = 0;
+    const sentPayloads = [];
+    mockChannel.send = vi.fn().mockImplementation(async (payload) => {
+      sendCallCount++;
+      sentPayloads.push(payload);
+      if (sendCallCount === 1) {
+        // First call with embed fails with 50013 Missing Permissions
+        const permError = new Error('Missing Permissions');
+        permError.code = 50013;
+        permError.status = 403;
+        throw permError;
+      }
+      // Fallback plain text call succeeds
+      return { id: 'msg_fallback_ok' };
+    });
+
+    const res = await processOneReminder(reminder, mockGuild, Date.now(), null);
+    expect(res.repeat).toBe('hourly');
+    expect(mockChannel.send).toHaveBeenCalledTimes(2);
+    // First call had embed
+    expect(typeof sentPayloads[0]).toBe('object');
+    expect(sentPayloads[0].embeds).toBeDefined();
+    // Second call fell back to plain text string
+    expect(typeof sentPayloads[1]).toBe('string');
+    expect(sentPayloads[1]).toContain('Alert without embed permission');
+  });
 });
 

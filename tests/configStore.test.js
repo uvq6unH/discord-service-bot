@@ -190,5 +190,42 @@ describe('ConfigStore Implementation (src/configStore.js)', () => {
     expect(config.reminders.length).toBe(1);
     expect(config.reminders[0].id).toBe('rem_1');
   });
+
+  it('normalizes, persists, and sanitizes imageUrl in reminders', async () => {
+    const store = new ConfigStore(null, mockRedisClient);
+    await store.ready;
+
+    await store.updateGuildConfig('guild_img_test', {
+      remindersEnabled: true,
+      reminders: [
+        {
+          id: 'rem_with_img',
+          channelId: '123456789012345678',
+          message: 'Meeting with banner',
+          time: '2026-10-16T15:00:00.000Z',
+          repeat: 'daily',
+          imageUrl: 'https://images.unsplash.com/photo-1522071820081-009f0129c71c?auto=format'
+        },
+        {
+          id: 'rem_invalid_img',
+          channelId: '123456789012345678',
+          message: 'Invalid banner scheme',
+          time: '2026-10-16T16:00:00.000Z',
+          repeat: 'none',
+          imageUrl: 'javascript:alert(1)'
+        }
+      ]
+    });
+
+    const config = await store.getGuildConfig('guild_img_test');
+    expect(config.reminders.length).toBe(2);
+
+    const remWithImg = config.reminders.find(r => r.id === 'rem_with_img');
+    expect(remWithImg.imageUrl).toBe('https://images.unsplash.com/photo-1522071820081-009f0129c71c?auto=format');
+
+    const remInvalid = config.reminders.find(r => r.id === 'rem_invalid_img');
+    expect(remInvalid.imageUrl).toBe('');
+  });
 });
+
 

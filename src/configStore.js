@@ -104,14 +104,25 @@ function normalizeReminders(reminders) {
     const time = String(item?.time ?? '').trim();
     const repeat = ['none', 'hourly', 'daily', 'weekly', 'monthly'].includes(item?.repeat) ? item.repeat : 'none';
 
+    let imageUrl = '';
+    if (typeof item?.imageUrl === 'string' && item.imageUrl.trim()) {
+      const trimmed = item.imageUrl.trim().slice(0, 500);
+      try {
+        const u = new URL(trimmed);
+        if (u.protocol === 'http:' || u.protocol === 'https:') {
+          imageUrl = trimmed;
+        }
+      } catch {}
+    }
+
     if (!id || !channelId || !message || !time) continue;
 
     // Deduplicate duplicate IDs only; preserve distinct IDs even if content matches
     if (seenIds.has(id)) continue;
     seenIds.add(id);
 
-    // Deduplicate identical reminder occurrences (same channel, message, time)
-    const contentKey = `${channelId}:${message}:${time}`;
+    // Deduplicate identical reminder occurrences (same channel, message, time, imageUrl)
+    const contentKey = `${channelId}:${message}:${time}:${imageUrl}`;
     if (seenContent.has(contentKey)) continue;
     seenContent.add(contentKey);
 
@@ -123,6 +134,7 @@ function normalizeReminders(reminders) {
       message,
       time,
       repeat,
+      imageUrl: imageUrl || '',
     });
 
     if (result.length >= 50) break;

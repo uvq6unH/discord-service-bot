@@ -261,7 +261,7 @@ export function createServer({ configStore, stateStore, botClient, redis = null 
         scriptSrc: ["'self'"],
         styleSrc: ["'self'", "'unsafe-inline'", 'https://cdn.jsdelivr.net', 'https://fonts.googleapis.com'],
         fontSrc: ["'self'", 'https://fonts.gstatic.com', 'https://cdn.jsdelivr.net'],
-        imgSrc: ["'self'", 'https://cdn.discordapp.com', 'https://discordapp.com', 'https://discord.com', 'data:'],
+        imgSrc: ["'self'", 'https:', 'data:', 'blob:'],
         connectSrc: ["'self'", 'https://cdn.jsdelivr.net'],
         frameSrc: ["'none'"],
         objectSrc: ["'none'"],

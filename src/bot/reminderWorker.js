@@ -15,10 +15,20 @@
  */
 
 import crypto from 'node:crypto';
-import { PermissionFlagsBits } from 'discord.js';
+import { PermissionFlagsBits, EmbedBuilder } from 'discord.js';
 import { resolveEmojiNames } from './emojiMap.js';
 import { withRedisLock } from '../distributedLock.js';
 import { isGuildInaccessible, setGuildLifecycle } from '../guildLifecycle.js';
+
+export function isValidImageUrl(url) {
+  if (!url || typeof url !== 'string') return false;
+  try {
+    const parsed = new URL(url.trim());
+    return parsed.protocol === 'http:' || parsed.protocol === 'https:';
+  } catch {
+    return false;
+  }
+}
 
 export const REPEAT_INTERVALS_MS = {
   hourly: 60 * 60 * 1_000,
@@ -1007,7 +1017,38 @@ export async function processOneReminder(reminder, guild, referenceNow = Date.no
     }
 
     logReminderEvent('DISPATCH_STARTED', { occurrenceId, reminderId: reminder.id, token: leaseToken });
-    const sendPromise = channel.send(finalText);
+    
+    let sendPayload = finalText;
+    const cleanImageUrl = typeof reminder.imageUrl === 'string' ? reminder.imageUrl.trim() : '';
+    if (cleanImageUrl && isValidImageUrl(cleanImageUrl)) {
+      const embed = new EmbedBuilder()
+        .setColor(0x5865F2)
+        .setImage(cleanImageUrl);
+
+      const intervalLabel = reminder.repeat && reminder.repeat !== 'none'
+        ? `Lặp lại: ${reminder.repeat}`
+        : 'Nhắc nhở một lần';
+      embed.setFooter({ text: `⏰ ${intervalLabel}` });
+
+      sendPayload = {
+        content: finalText,
+        embeds: [embed],
+      };
+    }
+
+    let sendPromise = channel.send(sendPayload);
+    if (typeof sendPayload !== 'string') {
+      sendPromise = sendPromise.catch(async (embedErr) => {
+        const isPerm = embedErr?.status === 403 || embedErr?.code === 50013 || embedErr?.code === 50001;
+        const isBadEmbed = embedErr?.code === 50035;
+        if (isPerm || isBadEmbed) {
+          console.warn(`[reminder] Embed send failed (${embedErr.message}) for ${reminder.id}. Falling back to plain text send.`);
+          return channel.send(finalText);
+        }
+        throw embedErr;
+      });
+    }
+
     _inFlightSends.set(occurrenceId, sendPromise);
     sendPromise.catch(() => {}).finally(() => {
       _inFlightSends.delete(occurrenceId);
@@ -1017,7 +1058,7 @@ export async function processOneReminder(reminder, guild, referenceNow = Date.no
       await withTimeout(sendPromise, 15_000);
       terminalOutcome = 'dispatched';
       logReminderEvent('DISPATCH_SUCCESS', { occurrenceId, reminderId: reminder.id, token: leaseToken, status: 'dispatched' });
-      console.log(`[reminder] ✅ Sent reminder "${reminder.message}" to #${channel.name} (${reminder.channelId}) in guild ${guild.name}`);
+      console.log(`[reminder] ✅ Sent reminder "${reminder.message}" to #${channel.name} (${reminder.channelId}) in guild ${guild.name}${cleanImageUrl ? ' [with image]' : ''}`);
     } catch (sendErr) {
       console.warn(`[reminder] Discord send error for ${reminder.id}: ${sendErr.message}. Checking channel oracle...`);
       const oracle = await verifyMessageSentInChannel(channel, finalText, 60_000, footprint);
