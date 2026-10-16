@@ -445,7 +445,12 @@ function readStoredApiSecrets(stored) {
 export class ConfigStore {
   constructor(_filePath, redisClient = null) {
     // _filePath kept for API compat but ignored — storage is Upstash Redis.
-    this._redis = redisClient || createUpstashFromEnv();
+    const resolvedRedis = (redisClient && typeof redisClient.get === 'function')
+      ? redisClient
+      : (redisClient?.redis && typeof redisClient.redis.get === 'function')
+        ? redisClient.redis
+        : createUpstashFromEnv();
+    this._redis = resolvedRedis;
     if (!this._redis) {
       throw new Error('ConfigStore requires UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN.');
     }

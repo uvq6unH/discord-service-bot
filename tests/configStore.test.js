@@ -157,4 +157,38 @@ describe('ConfigStore Implementation (src/configStore.js)', () => {
     store.invalidate();
     expect(Object.keys(store.cache).length).toBe(0);
   });
+
+  it('supports direct redisClient passed as second parameter', async () => {
+    redisStorage.set('config:_index', JSON.stringify(['guild_direct']));
+    redisStorage.set('config:guild:guild_direct', JSON.stringify({ prefix: '%' }));
+
+    const store = new ConfigStore(null, mockRedisClient);
+    await store.ready;
+    const config = await store.getGuildConfig('guild_direct');
+    expect(config.prefix).toBe('%');
+  });
+
+  it('supports options object { redis } passed as second parameter', async () => {
+    redisStorage.set('config:_index', JSON.stringify(['guild_opt']));
+    redisStorage.set('config:guild:guild_opt', JSON.stringify({
+      prefix: '^',
+      remindersEnabled: true,
+      reminders: [{
+        id: 'rem_1',
+        channelId: '123456789012345678',
+        message: 'test',
+        time: '2026-10-16T14:40:00.000Z',
+        repeat: 'hourly'
+      }]
+    }));
+
+    const store = new ConfigStore(null, { redis: mockRedisClient });
+    await store.ready;
+    const config = await store.getGuildConfig('guild_opt');
+    expect(config.prefix).toBe('^');
+    expect(config.remindersEnabled).toBe(true);
+    expect(config.reminders.length).toBe(1);
+    expect(config.reminders[0].id).toBe('rem_1');
+  });
 });
+
