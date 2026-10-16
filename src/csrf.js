@@ -32,7 +32,14 @@ export function createCsrfProtection() {
 
     const expected = ensureToken(req);
     const provided = req.get('x-csrf-token') ?? req.body?.csrfToken;
-    if (!expected || typeof provided !== 'string' || provided !== expected) {
+    if (!expected || typeof provided !== 'string') {
+      res.status(403).json({ error: 'Invalid or missing CSRF token.' });
+      return;
+    }
+
+    const expectedBuf = Buffer.from(expected);
+    const providedBuf = Buffer.from(provided);
+    if (expectedBuf.length !== providedBuf.length || !crypto.timingSafeEqual(expectedBuf, providedBuf)) {
       res.status(403).json({ error: 'Invalid or missing CSRF token.' });
       return;
     }

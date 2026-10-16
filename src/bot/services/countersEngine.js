@@ -1,5 +1,63 @@
 import { ChannelType, PermissionFlagsBits } from 'discord.js';
 
+// Cooldown registry: channelId -> nextAllowedAt timestamp (ms)
+export const channelRenameCooldowns = new Map();
+
+/**
+ * Standardizes retry_after units from Discord API or Discord.js into milliseconds.
+ */
+export function extractRetryAfterMs(err) {
+  // 1. Raw Discord REST HTTP JSON body: retry_after (seconds)
+  if (typeof err?.rawError?.retry_after === 'number') {
+    return Math.max(1000, Math.ceil(err.rawError.retry_after * 1000));
+  }
+  // 2. Discord.js internal retryAfter property
+  if (typeof err?.retryAfter === 'number') {
+    return Math.max(1000, err.retryAfter > 1000 ? Math.ceil(err.retryAfter) : Math.ceil(err.retryAfter * 1000));
+  }
+  // 3. HTTP response headers: 'retry-after' header (seconds or RFC 7231)
+  const headerRetryAfter = err?.response?.headers?.get?.('retry-after') ?? err?.headers?.['retry-after'];
+  if (headerRetryAfter) {
+    const parsedSec = parseFloat(headerRetryAfter);
+    if (Number.isFinite(parsedSec) && parsedSec > 0) {
+      return Math.max(1000, Math.ceil(parsedSec * 1000));
+    }
+  }
+  if (typeof err?.data?.retry_after === 'number') {
+    return Math.max(1000, Math.ceil(err.data.retry_after * 1000));
+  }
+  // 4. Fallback backoff window if Discord omitted explicit retry-after (5 minutes = 300,000 ms)
+  return 300_000;
+}
+
+export async function isChannelRenameUnderCooldown(channelId, redis = null) {
+  if (redis) {
+    try {
+      const val = await redis.get(`cooldown:channel_rename:${channelId}`);
+      if (val) return true;
+    } catch {}
+  }
+  const localCooldown = channelRenameCooldowns.get(channelId) ?? 0;
+  return Date.now() < localCooldown;
+}
+
+export function handleChannelRenameError(err, channelId, redis = null) {
+  const isRateLimit = err?.status === 429 || err?.code === 'RATE_LIMITED' || err?.name === 'RateLimitError';
+  if (isRateLimit) {
+    const retryAfterMs = extractRetryAfterMs(err);
+    const nextAllowedAt = Date.now() + retryAfterMs;
+    channelRenameCooldowns.set(channelId, nextAllowedAt);
+    if (redis) {
+      const ttlSec = Math.max(1, Math.ceil(retryAfterMs / 1000));
+      redis.set(`cooldown:channel_rename:${channelId}`, '1', 'EX', String(ttlSec)).catch(() => null);
+    }
+    console.warn(`[countersEngine] Discord rate limit (429) renaming #${channelId}: backing off for ${Math.ceil(retryAfterMs / 1000)}s`);
+    return retryAfterMs;
+  }
+  console.warn(`[countersEngine] Could not rename channel #${channelId} (Code ${err?.code || 'ERR'}):`, err?.message);
+  return null;
+}
+
 /**
  * Calculates current statistic count for a specific counter type in a guild.
  */
@@ -180,10 +238,14 @@ export async function createCounterChannel(guild, counter, configStore) {
     if (counter.channelId) {
       const existing = guild.channels.cache.get(counter.channelId) || await guild.channels.fetch(counter.channelId).catch(() => null);
       if (existing) {
+        const redis = configStore?._redis;
+        const underCooldown = await isChannelRenameUnderCooldown(existing.id, redis);
+        if (underCooldown) {
+          console.log(`[countersEngine] Channel #${existing.id} is under cluster rate limit backoff. Skipping rename.`);
+          return { success: true, channelId: existing.id, name: existing.name, count: rawCount, targetGoal };
+        }
         if (existing.name !== expectedName) {
-          await existing.setName(expectedName).catch(err =>
-            console.warn(`[countersEngine] Could not rename channel ${existing.id}:`, err.message)
-          );
+          await existing.setName(expectedName).catch(err => handleChannelRenameError(err, existing.id, redis));
         }
         return { success: true, channelId: existing.id, name: expectedName, count: rawCount, targetGoal };
       }
@@ -334,10 +396,14 @@ export async function refreshCounterNames(guild, configStore) {
 
       const expectedName = generateCounterChannelName(counter, rawCount, targetGoal);
 
+      const redis = configStore?._redis;
+      const underCooldown = await isChannelRenameUnderCooldown(ch.id, redis);
+      if (underCooldown) {
+        continue;
+      }
+
       if (ch.name !== expectedName) {
-        await ch.setName(expectedName).catch(err =>
-          console.warn(`[countersEngine] Could not rename channel ${ch.id}:`, err.message)
-        );
+        await ch.setName(expectedName).catch(err => handleChannelRenameError(err, ch.id, redis));
         results.push({ id: counter.id, name: expectedName, count: rawCount });
       }
     } catch (err) {

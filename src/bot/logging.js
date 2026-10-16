@@ -1,3 +1,6 @@
+import { PermissionFlagsBits } from 'discord.js';
+import { canBotExecuteInChannel } from '../commandAccess.js';
+
 export function formatMessage(template, member) {
   return template
     .replaceAll('{user}', `<@${member.id}>`)
@@ -12,7 +15,17 @@ export async function sendLog(guild, config, message) {
 
   const channel = await guild.channels.fetch(config.logChannelId).catch(() => null);
   if (channel?.isTextBased()) {
-    await channel.send(message).catch(() => null);
+    const perm = canBotExecuteInChannel(channel, [
+      PermissionFlagsBits.ViewChannel,
+      PermissionFlagsBits.SendMessages
+    ], { failClosed: true });
+    if (!perm.ok) {
+      console.warn(`[logging] Cannot send audit log to #${channel.name || channel.id}: ${perm.reason}`);
+      return;
+    }
+    await channel.send(message).catch((err) => {
+      console.warn(`[logging] Failed to send audit log to #${channel.name || channel.id}:`, err.message);
+    });
   }
 }
 
@@ -24,7 +37,17 @@ export async function sendTicketLog(guild, config, message) {
 
   const channel = await guild.channels.fetch(channelId).catch(() => null);
   if (channel?.isTextBased()) {
-    await channel.send(message).catch(() => null);
+    const perm = canBotExecuteInChannel(channel, [
+      PermissionFlagsBits.ViewChannel,
+      PermissionFlagsBits.SendMessages
+    ], { failClosed: true });
+    if (!perm.ok) {
+      console.warn(`[logging] Cannot send ticket log to #${channel.name || channel.id}: ${perm.reason}`);
+      return;
+    }
+    await channel.send(message).catch((err) => {
+      console.warn(`[logging] Failed to send ticket log to #${channel.name || channel.id}:`, err.message);
+    });
   }
 }
 

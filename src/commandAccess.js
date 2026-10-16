@@ -127,3 +127,53 @@ export function canModerateMember(actorMember, targetMember) {
   }
   return { ok: true };
 }
+
+/**
+ * Checks whether the bot has all required permissions in a specific channel.
+ * Prevents unhandled Discord API 50013 (Missing Permissions) errors on localized channel overrides.
+ */
+export function canBotExecuteInChannel(channel, requiredPermissions = [PermissionFlagsBits.SendMessages, PermissionFlagsBits.ViewChannel], options = { failClosed: false }) {
+  if (!channel) return { ok: true, status: 'NO_CHANNEL' };
+
+  // DMs do not have guild permission overwrites
+  if (channel.isDMBased?.()) {
+    return { ok: true, status: 'DM_CHANNEL' };
+  }
+
+  try {
+    const botMember = channel.guild?.members?.me || channel.guild?.members?.cache?.get(channel.client?.user?.id);
+    if (!botMember) {
+      if (options.failClosed) {
+        return { ok: false, indeterminate: true, status: 'BOT_MEMBER_UNCACHED', reason: 'Bot membership could not be resolved in this server.' };
+      }
+      return { ok: true, indeterminate: true, status: 'BOT_MEMBER_UNCACHED' };
+    }
+
+    let perms = channel.permissionsFor?.(botMember);
+    // For threads, fallback to parent channel permissions if thread-specific permissions are not available
+    if (!perms && channel.isThread?.() && channel.parent) {
+      perms = channel.parent.permissionsFor?.(botMember);
+    }
+
+    if (!perms) {
+      if (options.failClosed) {
+        return { ok: false, indeterminate: true, status: 'PERMISSIONS_UNDETERMINED', reason: `Could not verify bot permissions for channel #${channel.name || channel.id}.` };
+      }
+      return { ok: true, indeterminate: true, status: 'PERMISSIONS_UNDETERMINED' };
+    }
+
+    for (const perm of requiredPermissions) {
+      if (!perms.has(perm)) {
+        return { ok: false, missing: perm, status: 'PERMISSION_DENIED', reason: `Bot is missing required permissions in channel #${channel.name || 'current'}.` };
+      }
+    }
+  } catch (err) {
+    console.warn(`[commandAccess] canBotExecuteInChannel error for #${channel.name || channel.id}:`, err.message);
+    if (options.failClosed) {
+      return { ok: false, indeterminate: true, status: 'ERROR', reason: `Permission verification failed: ${err.message}` };
+    }
+    return { ok: true, indeterminate: true, status: 'ERROR' };
+  }
+
+  return { ok: true, status: 'AUTHORIZED' };
+}

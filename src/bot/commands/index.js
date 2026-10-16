@@ -11,6 +11,7 @@ import { handleTranslate } from './handlers/translate.js';
 import { handleDuolingo } from './handlers/duolingo.js';
 import { handleVoiceControl } from './handlers/tempVcSetup.js';
 import { handleCountersCommand } from './handlers/counters.js';
+import { handleEsports } from './handlers/esports.js';
 
 const HANDLERS = [
   handleHelp,
@@ -20,6 +21,7 @@ const HANDLERS = [
   handleEconomy,
   handlePanels,
   handleRiot,
+  handleEsports,
   handleTranslate,
   handleDuolingo,
   handleVoiceControl,

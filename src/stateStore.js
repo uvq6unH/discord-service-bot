@@ -24,6 +24,7 @@
  *   - File JSON local vẫn hoạt động như cũ (không đổi format)
  */
 
+import crypto from 'node:crypto';
 import { mkdir, rename, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { createMutexPool } from './asyncMutex.js';
@@ -71,8 +72,10 @@ const DEFAULT_LEVELS_USER = () => ({
 // ── StateStore ─────────────────────────────────────────────────────────────────
 
 export class StateStore {
-  constructor(filePath, { redis = null } = {}) {
-    this.filePath = path.resolve(filePath);
+  constructor(filePath, options = {}) {
+    const opts = (options && typeof options === 'object') ? options : {};
+    const redis = opts.redis !== undefined ? opts.redis : (opts.get ? opts : null);
+    this.filePath = filePath ? path.resolve(filePath) : path.resolve(process.cwd(), 'data', 'state.json');
 
     // Local mutex pools (single-process fallback)
     this._economyMutex    = createMutexPool();
@@ -102,14 +105,16 @@ export class StateStore {
 
   _k = {
     guildIndex:        ()                          => `guild:index`,
-    economy:           (gId, uId)                  => `guild:${gId}:economy:${uId}`,
-    levels:            (gId, uId)                  => `guild:${gId}:levels:${uId}`,
-    warnings:          (gId, uId)                  => `guild:${gId}:warnings:${uId}`,
-    ticketCounter:     (gId)                       => `guild:${gId}:tickets:nextNumber`,
-    game:              (gId, type, msgId)           => `guild:${gId}:game:${type}:${msgId}`,
-    lolAccount:        (gId, uId)                  => `guild:${gId}:lolAccount:${uId}`,
-    tftAccount:        (gId, uId)                  => `guild:${gId}:tftAccount:${uId}`,
-    musicQueue:        (gId)                       => `guild:${gId}:music:queue`,
+    economy:           (gId, uId)                  => `{guild:${gId}}:economy:${uId}`,
+    economyMembers:    (gId)                       => `{guild:${gId}}:economy:_members`,
+    levels:            (gId, uId)                  => `{guild:${gId}}:levels:${uId}`,
+    levelsMembers:     (gId)                       => `{guild:${gId}}:levels:_members`,
+    warnings:          (gId, uId)                  => `{guild:${gId}}:warnings:${uId}`,
+    ticketCounter:     (gId)                       => `{guild:${gId}}:tickets:nextNumber`,
+    game:              (gId, type, msgId)           => `{guild:${gId}}:game:${type}:${msgId}`,
+    lolAccount:        (gId, uId)                  => `{guild:${gId}}:lolAccount:${uId}`,
+    tftAccount:        (gId, uId)                  => `{guild:${gId}}:tftAccount:${uId}`,
+    musicQueue:        (gId)                       => `{guild:${gId}}:music:queue`,
     // Compat: blob key cũ (đọc migrate, không ghi)
     legacyGuild:       (gId)                       => `guild:${gId}`,
   };
@@ -429,7 +434,164 @@ export class StateStore {
   // Economy
   // ════════════════════════════════════════════════════════════════════════════
 
+  static CAD_LUA = `if redis.call("get", KEYS[1]) == ARGV[1] then return redis.call("del", KEYS[1]) else return 0 end`;
+
+  async _cadDelete(key, expectedVal) {
+    if (typeof this._redis.eval === 'function') {
+      try {
+        const res = await this._redis.eval(StateStore.CAD_LUA, 1, key, expectedVal);
+        return res === 1 || res === '1' ? 1 : 0;
+      } catch (err) {
+        console.warn(`[stateStore] CAD_LUA failed: ${err.message}`);
+      }
+    }
+    const current = await this._redis.get(key);
+    if (current === expectedVal) {
+      await this._redis.del(key);
+      return 1;
+    }
+    return 0;
+  }
+
+  async _reconcileLegacyDelta(guildId, userId, legacyKey, newKey, knownSnapshot = null) {
+    const memberIndexKey = this._k.economyMembers(guildId);
+    const maxRetries = 3;
+
+    for (let attempt = 0; attempt < maxRetries; attempt++) {
+      const currentLegacyRaw = await this._redis.get(legacyKey);
+      if (currentLegacyRaw == null) return; // Cleaned up
+
+      let currentLegacy = null;
+      try { currentLegacy = JSON.parse(currentLegacyRaw); } catch { currentLegacy = {}; }
+
+      const currentNewRaw = await this._redis.get(newKey);
+      let currentNew = null;
+      try { currentNew = currentNewRaw ? JSON.parse(currentNewRaw) : null; } catch { currentNew = null; }
+
+      if (!currentNew) {
+        // newKey disappeared or invalid; establish it from legacy
+        await this._redis.set(newKey, currentLegacyRaw);
+        await this._cadDelete(legacyKey, currentLegacyRaw);
+        await this._redis.sadd(memberIndexKey, userId).catch(() => null);
+        return;
+      }
+
+      // Check if currentLegacy is identical to what was previously migrated
+      const legacyHash = crypto.createHash('sha256').update(currentLegacyRaw).digest('hex');
+      if (currentNew._legacyHash === legacyHash) {
+        // Clean remnant from prior crash: legacyKey is identical to the snapshot migrated into newKey!
+        const cad = await this._cadDelete(legacyKey, currentLegacyRaw);
+        if (cad === 1) {
+          await this._redis.sadd(memberIndexKey, userId).catch(() => null);
+          return;
+        }
+        continue;
+      }
+
+      // Baseline snapshot to compare against
+      const baseline = knownSnapshot || currentNew._legacySnapshot || currentNew;
+
+      const deltaSilver = Math.max(0, (currentLegacy.silver ?? 0) - (baseline.silver ?? 0));
+      const deltaGold = Math.max(0, (currentLegacy.gold ?? 0) - (baseline.gold ?? 0));
+      const deltaDiamond = Math.max(0, (currentLegacy.diamond ?? 0) - (baseline.diamond ?? 0));
+
+      if (deltaSilver > 0 || deltaGold > 0 || deltaDiamond > 0) {
+        currentNew.silver = (currentNew.silver ?? 0) + deltaSilver;
+        currentNew.gold = (currentNew.gold ?? 0) + deltaGold;
+        currentNew.diamond = (currentNew.diamond ?? 0) + deltaDiamond;
+        console.warn(`[stateStore] Reconciled unmerged legacy balance for ${userId}: +${deltaSilver}s, +${deltaGold}g, +${deltaDiamond}d`);
+      }
+
+      currentNew._legacyHash = legacyHash;
+      currentNew._legacySnapshot = {
+        silver: currentLegacy.silver ?? 0,
+        gold: currentLegacy.gold ?? 0,
+        diamond: currentLegacy.diamond ?? 0,
+      };
+
+      await this._redis.set(newKey, JSON.stringify(currentNew));
+      const cad = await this._cadDelete(legacyKey, currentLegacyRaw);
+      if (cad === 1) {
+        await this._redis.sadd(memberIndexKey, userId).catch(() => null);
+        return;
+      }
+    }
+  }
+
+  async _ensureEconUserKeyMigrated(guildId, userId) {
+    if (!this._useRedis) return;
+    const newKey = this._k.economy(guildId, userId);
+    const legacyKey = `guild:${guildId}:economy:${userId}`;
+    const memberIndexKey = this._k.economyMembers(guildId);
+
+    try {
+      let legacyRaw = await this._redis.get(legacyKey);
+      if (legacyRaw == null) return;
+
+      const lockKey = `{guild:${guildId}}:lock:migrate:${userId}`;
+      const lockToken = `${Date.now()}:${crypto.randomBytes(8).toString('hex')}`;
+      let locked = await this._redis.set(lockKey, lockToken, 'EX', 5, 'NX').catch(() => null);
+
+      if (locked !== 'OK' && locked !== true && locked !== 1) {
+        for (let attempt = 0; attempt < 3; attempt++) {
+          await new Promise((r) => setTimeout(r, 40));
+          legacyRaw = await this._redis.get(legacyKey);
+          if (legacyRaw == null) return;
+        }
+        locked = await this._redis.set(lockKey, lockToken, 'EX', 5, 'NX').catch(() => null);
+        if (locked !== 'OK' && locked !== true && locked !== 1) {
+          // Contention: defer destructive action to owner of active lock
+          return;
+        }
+      }
+
+      try {
+        legacyRaw = await this._redis.get(legacyKey);
+        if (legacyRaw == null) return;
+
+        let legacyData = null;
+        try { legacyData = JSON.parse(legacyRaw); } catch { legacyData = {}; }
+
+        const newRaw = await this._redis.get(newKey);
+
+        if (newRaw == null) {
+          const legacyHash = crypto.createHash('sha256').update(legacyRaw).digest('hex');
+          const payloadObj = {
+            ...DEFAULT_ECONOMY_USER(),
+            ...legacyData,
+            _legacyHash: legacyHash,
+            _legacySnapshot: {
+              silver: legacyData.silver ?? 0,
+              gold: legacyData.gold ?? 0,
+              diamond: legacyData.diamond ?? 0,
+            },
+          };
+
+          const setRes = await this._redis.set(newKey, JSON.stringify(payloadObj), 'NX');
+          if (setRes === 'OK' || setRes === true || setRes === 1) {
+            const cadRes = await this._cadDelete(legacyKey, legacyRaw);
+            if (cadRes === 1) {
+              await this._redis.sadd(memberIndexKey, userId).catch(() => null);
+            } else {
+              await this._reconcileLegacyDelta(guildId, userId, legacyKey, newKey, payloadObj._legacySnapshot);
+            }
+          } else {
+            await this._reconcileLegacyDelta(guildId, userId, legacyKey, newKey, null);
+          }
+        } else {
+          await this._reconcileLegacyDelta(guildId, userId, legacyKey, newKey, null);
+        }
+      } finally {
+        const releaseLua = 'if redis.call("get", KEYS[1]) == ARGV[1] then return redis.call("del", KEYS[1]) else return 0 end';
+        await this._redis.eval(releaseLua, 1, lockKey, lockToken).catch(() => null);
+      }
+    } catch (err) {
+      console.warn(`[stateStore] Warning: _ensureEconUserKeyMigrated failed for ${userId}: ${err.message}`);
+    }
+  }
+
   async _redisGetEconUser(guildId, userId) {
+    await this._ensureEconUserKeyMigrated(guildId, userId);
     let data = await this._rGet(this._k.economy(guildId, userId));
     if (!data) {
       // Thử migrate từ blob cũ nếu có
@@ -451,11 +613,67 @@ export class StateStore {
     return { ...guild.economy.users[userId] };
   }
 
+  static DEBIT_LUA = `
+local raw = redis.call('GET', KEYS[1])
+local user = raw and cjson.decode(raw) or { silver = 0, gold = 0, diamond = 0 }
+local currency = ARGV[1]
+local debit = tonumber(ARGV[2])
+local current = tonumber(user[currency] or 0)
+
+if current < debit then
+    return cjson.encode({ ok = false, user = user })
+end
+
+user[currency] = math.max(0, math.floor(current - debit))
+local updated = cjson.encode(user)
+redis.call('SET', KEYS[1], updated)
+redis.call('SADD', KEYS[2], ARGV[3])
+
+return cjson.encode({ ok = true, user = user })
+`;
+
+  static ADJUST_LUA = `
+local raw = redis.call('GET', KEYS[1])
+local user = raw and cjson.decode(raw) or { silver = 0, gold = 0, diamond = 0 }
+local currency = ARGV[1]
+local amount = tonumber(ARGV[2])
+local current = tonumber(user[currency] or 0)
+
+user[currency] = math.max(0, math.floor(current + amount))
+local updated = cjson.encode(user)
+redis.call('SET', KEYS[1], updated)
+redis.call('SADD', KEYS[2], ARGV[3])
+
+return updated
+`;
+
   async adjustBalance(guildId, userId, currency, amount) {
+    if (this._useRedis) {
+      await this._registerGuild(guildId);
+      await this._ensureEconUserKeyMigrated(guildId, userId);
+      const memberIndexKey = this._k.economyMembers(guildId);
+      const userKey = this._k.economy(guildId, userId);
+      try {
+        const rawRes = await this._redis.eval(
+          StateStore.ADJUST_LUA,
+          2,
+          userKey,
+          memberIndexKey,
+          currency,
+          String(amount),
+          userId
+        );
+        const parsed = typeof rawRes === 'string' ? JSON.parse(rawRes) : rawRes;
+        if (parsed) return parsed;
+      } catch (luaErr) {
+        console.warn(`[stateStore] adjustBalance Lua fallback: ${luaErr.message}`);
+      }
+    }
+
     return this._withEconomyLock(guildId, userId, async () => {
       if (this._useRedis) {
         await this._registerGuild(guildId);
-        const memberIndexKey = `guild:${guildId}:economy:_members`;
+        const memberIndexKey = this._k.economyMembers(guildId);
         const user = await this._redisGetEconUser(guildId, userId);
         user[currency] = Math.max(0, Math.floor((user[currency] ?? 0) + amount));
         await this._redis.pipeline([
@@ -479,6 +697,30 @@ export class StateStore {
       return { ok: false, balance: await this.getBalance(guildId, userId) };
     }
 
+    if (this._useRedis) {
+      await this._registerGuild(guildId);
+      await this._ensureEconUserKeyMigrated(guildId, userId);
+      const memberIndexKey = this._k.economyMembers(guildId);
+      const userKey = this._k.economy(guildId, userId);
+      try {
+        const rawRes = await this._redis.eval(
+          StateStore.DEBIT_LUA,
+          2,
+          userKey,
+          memberIndexKey,
+          currency,
+          String(debit),
+          userId
+        );
+        const parsed = typeof rawRes === 'string' ? JSON.parse(rawRes) : rawRes;
+        if (parsed && typeof parsed.ok === 'boolean') {
+          return { ok: parsed.ok, balance: parsed.user ?? {} };
+        }
+      } catch (luaErr) {
+        console.warn(`[stateStore] tryDebitBalance Lua fallback: ${luaErr.message}`);
+      }
+    }
+
     return this._withEconomyLock(guildId, userId, async () => {
       if (this._useRedis) {
         await this._registerGuild(guildId);
@@ -500,47 +742,264 @@ export class StateStore {
     });
   }
 
-  async setBalance(guildId, userId, currency, amount) {
-    return this._withEconomyLock(guildId, userId, async () => {
-      if (this._useRedis) {
-        await this._registerGuild(guildId);
-        const user = await this._redisGetEconUser(guildId, userId);
-        user[currency] = Math.max(0, Math.floor(amount));
-        await this._rSet(this._k.economy(guildId, userId), user);
-        return { ...user };
+  static TRANSFER_LUA = `
+local function parse_user(raw)
+    if not raw or raw == '' then return { silver = 0, gold = 0, diamond = 0 } end
+    local ok, parsed = pcall(cjson.decode, raw)
+    if ok and type(parsed) == 'table' then return parsed end
+    return nil
+end
+
+local rawFrom = redis.call('GET', KEYS[1])
+local rawTo   = redis.call('GET', KEYS[2])
+local userFrom = parse_user(rawFrom)
+local userTo   = parse_user(rawTo)
+
+if not userFrom or not userTo then
+    return cjson.encode({ ok = false, error = 'CORRUPTED_USER_DATA' })
+end
+
+local currency = ARGV[1]
+local amount = tonumber(ARGV[2])
+
+if not amount or amount <= 0 or amount ~= math.floor(amount) then
+    return cjson.encode({ ok = false, error = 'INVALID_AMOUNT' })
+end
+
+local currentFrom = tonumber(userFrom[currency] or 0)
+if currentFrom < amount then
+    return cjson.encode({ ok = false, error = 'INSUFFICIENT_FUNDS', balance = userFrom })
+end
+
+local currentTo = tonumber(userTo[currency] or 0)
+
+userFrom[currency] = math.max(0, math.floor(currentFrom - amount))
+userTo[currency]   = math.max(0, math.floor(currentTo + amount))
+
+local okFrom, encFrom = pcall(cjson.encode, userFrom)
+local okTo, encTo     = pcall(cjson.encode, userTo)
+
+if not okFrom or not okTo then
+    return cjson.encode({ ok = false, error = 'ENCODE_FAILURE' })
+end
+
+-- Commit atomic updates with explicit rollback compensation if second write fails
+local ok1, err1 = pcall(redis.call, 'SET', KEYS[1], encFrom)
+if not ok1 then
+    return cjson.encode({ ok = false, error = 'REDIS_RUNTIME_ERROR_FROM', details = tostring(err1) })
+end
+
+local ok2, err2 = pcall(redis.call, 'SET', KEYS[2], encTo)
+if not ok2 then
+    -- ROLLBACK KEYS[1] to rawFrom to preserve Conservation of Money!
+    local rollOk, rollErr = pcall(function()
+        if rawFrom then
+            local okKeepttl = pcall(redis.call, 'SET', KEYS[1], rawFrom, 'KEEPTTL')
+            if not okKeepttl then
+                redis.call('SET', KEYS[1], rawFrom)
+            end
+        else
+            redis.call('DEL', KEYS[1])
+        end
+    end)
+    if not rollOk then
+        return cjson.encode({ ok = false, error = 'CRITICAL_ROLLBACK_FAILED', details = tostring(err2), rollbackDetails = tostring(rollErr) })
+    end
+    return cjson.encode({ ok = false, error = 'REDIS_RUNTIME_ERROR_TO_ROLLED_BACK', details = tostring(err2) })
+end
+
+pcall(redis.call, 'SADD', KEYS[3], ARGV[3])
+pcall(redis.call, 'SADD', KEYS[3], ARGV[4])
+
+return cjson.encode({ ok = true, fromBalance = userFrom, toBalance = userTo })
+`;
+
+  async transferBalance(guildId, fromUserId, toUserId, currency, amount) {
+    const val = Math.floor(Number(amount));
+    if (!Number.isFinite(val) || val <= 0) {
+      return { ok: false, error: 'INVALID_AMOUNT' };
+    }
+    if (fromUserId === toUserId) {
+      return { ok: false, error: 'SELF_TRANSFER' };
+    }
+
+    if (this._useRedis) {
+      await this._registerGuild(guildId);
+      await this._ensureEconUserKeyMigrated(guildId, fromUserId);
+      await this._ensureEconUserKeyMigrated(guildId, toUserId);
+      const memberIndexKey = this._k.economyMembers(guildId);
+      const fromKey = this._k.economy(guildId, fromUserId);
+      const toKey = this._k.economy(guildId, toUserId);
+      try {
+        const rawRes = await this._redis.eval(
+          StateStore.TRANSFER_LUA,
+          3,
+          fromKey,
+          toKey,
+          memberIndexKey,
+          currency,
+          String(val),
+          fromUserId,
+          toUserId
+        );
+        const parsed = typeof rawRes === 'string' ? JSON.parse(rawRes) : rawRes;
+        if (parsed && typeof parsed.ok === 'boolean') {
+          if (!parsed.ok && parsed.error === 'CRITICAL_ROLLBACK_FAILED') {
+            console.error(`[stateStore] CRITICAL AUDIT: Compensation rollback failed between ${fromUserId} and ${toUserId} in guild ${guildId}:`, parsed);
+          }
+          return parsed;
+        }
+      } catch (luaErr) {
+        console.warn(`[stateStore] transferBalance Lua fallback: ${luaErr.message}`);
       }
+    }
+
+    const [firstId, secondId] = [fromUserId, toUserId].sort();
+    return this._withEconomyLock(guildId, firstId, () => {
+      return this._withEconomyLock(guildId, secondId, async () => {
+        if (this._useRedis) {
+          const fromUser = await this._redisGetEconUser(guildId, fromUserId);
+          const currentFrom = fromUser[currency] ?? 0;
+          if (currentFrom < val) return { ok: false, error: 'INSUFFICIENT_FUNDS', balance: { ...fromUser } };
+          const toUser = await this._redisGetEconUser(guildId, toUserId);
+          fromUser[currency] = Math.max(0, Math.floor(currentFrom - val));
+          toUser[currency] = Math.max(0, Math.floor((toUser[currency] ?? 0) + val));
+          const memberIndexKey = this._k.economyMembers(guildId);
+          await this._redis.pipeline([
+            ['SADD', memberIndexKey, fromUserId],
+            ['SADD', memberIndexKey, toUserId],
+            ['SET', this._k.economy(guildId, fromUserId), JSON.stringify(fromUser)],
+            ['SET', this._k.economy(guildId, toUserId), JSON.stringify(toUser)],
+          ]);
+          return { ok: true, fromBalance: { ...fromUser }, toBalance: { ...toUser } };
+        }
+
+        const guild = await this._fileGetGuild(guildId);
+        guild.economy.users[fromUserId] ??= DEFAULT_ECONOMY_USER();
+        guild.economy.users[toUserId]   ??= DEFAULT_ECONOMY_USER();
+        const fromUser = guild.economy.users[fromUserId];
+        const currentFrom = fromUser[currency] ?? 0;
+        if (currentFrom < val) return { ok: false, error: 'INSUFFICIENT_FUNDS', balance: { ...fromUser } };
+        const toUser = guild.economy.users[toUserId];
+        fromUser[currency] = Math.max(0, Math.floor(currentFrom - val));
+        toUser[currency] = Math.max(0, Math.floor((toUser[currency] ?? 0) + val));
+        await this._save();
+        return { ok: true, fromBalance: { ...fromUser }, toBalance: { ...toUser } };
+      });
+    });
+  }
+
+  static SET_LUA = `
+local raw = redis.call('GET', KEYS[1])
+local user = raw and cjson.decode(raw) or { silver = 0, gold = 0, diamond = 0 }
+local currency = ARGV[1]
+local amount = tonumber(ARGV[2])
+user[currency] = math.max(0, math.floor(amount))
+local updated = cjson.encode(user)
+redis.call('SET', KEYS[1], updated)
+redis.call('SADD', KEYS[2], ARGV[3])
+return updated
+`;
+
+  static CLAIM_DAILY_LUA = `
+local raw = redis.call('GET', KEYS[1])
+local user = raw and cjson.decode(raw) or { silver = 0, gold = 0, diamond = 0 }
+local todayKey = tonumber(ARGV[1])
+local now = tonumber(ARGV[2])
+local silver = tonumber(ARGV[3]) or 0
+local gold = tonumber(ARGV[4]) or 0
+local diamond = tonumber(ARGV[5]) or 0
+
+if user.lastDailyDay == todayKey then
+    return cjson.encode({ claimed = false, user = user })
+end
+
+user.silver = (user.silver or 0) + silver
+user.gold = (user.gold or 0) + gold
+user.diamond = (user.diamond or 0) + diamond
+user.lastDailyAt = now
+user.lastDailyDay = todayKey
+
+local updated = cjson.encode(user)
+redis.call('SET', KEYS[1], updated)
+redis.call('SADD', KEYS[2], ARGV[6])
+
+return cjson.encode({ claimed = true, user = user })
+`;
+
+  async setBalance(guildId, userId, currency, amount) {
+    const val = Math.max(0, Math.floor(Number(amount)));
+    if (!Number.isFinite(val)) {
+      return this.getBalance(guildId, userId);
+    }
+
+    if (this._useRedis) {
+      await this._registerGuild(guildId);
+      await this._ensureEconUserKeyMigrated(guildId, userId);
+      const memberIndexKey = this._k.economyMembers(guildId);
+      const userKey = this._k.economy(guildId, userId);
+      try {
+        const rawRes = await this._redis.eval(
+          StateStore.SET_LUA,
+          2,
+          userKey,
+          memberIndexKey,
+          currency,
+          String(val),
+          userId
+        );
+        const parsed = typeof rawRes === 'string' ? JSON.parse(rawRes) : rawRes;
+        if (parsed) return parsed;
+      } catch (luaErr) {
+        console.warn(`[stateStore] setBalance Lua fallback: ${luaErr.message}`);
+      }
+    }
+
+    return this._withEconomyLock(guildId, userId, async () => {
       const guild = await this._fileGetGuild(guildId);
       guild.economy.users[userId] ??= DEFAULT_ECONOMY_USER();
       const user = guild.economy.users[userId];
-      user[currency] = Math.max(0, Math.floor(amount));
+      user[currency] = val;
       await this._save();
       return { ...user };
     });
   }
 
   async claimDaily(guildId, userId, rewards, options = {}) {
-    return this._withEconomyLock(guildId, userId, async () => {
-      const utcOffsetMinutes = Number.isFinite(options.utcOffsetMinutes)
-        ? options.utcOffsetMinutes : 420;
-      const now      = Date.now();
-      const todayKey = dayKeyForOffset(now, utcOffsetMinutes);
-      const nextAt   = nextDayStartForOffset(todayKey, utcOffsetMinutes);
+    const utcOffsetMinutes = Number.isFinite(options.utcOffsetMinutes)
+      ? options.utcOffsetMinutes : 420;
+    const now      = Date.now();
+    const todayKey = dayKeyForOffset(now, utcOffsetMinutes);
+    const nextAt   = nextDayStartForOffset(todayKey, utcOffsetMinutes);
 
-      if (this._useRedis) {
-        await this._registerGuild(guildId);
-        const user = await this._redisGetEconUser(guildId, userId);
-        if (user.lastDailyDay === todayKey) {
-          return { claimed: false, nextAt, balance: { ...user } };
+    if (this._useRedis) {
+      await this._registerGuild(guildId);
+      await this._ensureEconUserKeyMigrated(guildId, userId);
+      const memberIndexKey = this._k.economyMembers(guildId);
+      const userKey = this._k.economy(guildId, userId);
+      try {
+        const rawRes = await this._redis.eval(
+          StateStore.CLAIM_DAILY_LUA,
+          2,
+          userKey,
+          memberIndexKey,
+          String(todayKey),
+          String(now),
+          String(rewards.silver ?? 0),
+          String(rewards.gold ?? 0),
+          String(rewards.diamond ?? 0),
+          userId
+        );
+        const parsed = typeof rawRes === 'string' ? JSON.parse(rawRes) : rawRes;
+        if (parsed && typeof parsed.claimed === 'boolean') {
+          return { claimed: parsed.claimed, nextAt, balance: parsed.user ?? {} };
         }
-        user.silver     += rewards.silver  ?? 0;
-        user.gold       += rewards.gold    ?? 0;
-        user.diamond    += rewards.diamond ?? 0;
-        user.lastDailyAt  = now;
-        user.lastDailyDay = todayKey;
-        await this._rSet(this._k.economy(guildId, userId), user);
-        return { claimed: true, nextAt, balance: { ...user } };
+      } catch (luaErr) {
+        console.warn(`[stateStore] claimDaily Lua fallback: ${luaErr.message}`);
       }
+    }
 
+    return this._withEconomyLock(guildId, userId, async () => {
       const guild = await this._fileGetGuild(guildId);
       guild.economy.users[userId] ??= DEFAULT_ECONOMY_USER();
       const user = guild.economy.users[userId];
@@ -569,8 +1028,15 @@ export class StateStore {
 
     // Redis: Upstash không support SCAN — leaderboard cần guild member index
     // Workaround: lưu danh sách userId đã từng có economy trong guild
-    const memberIndexKey = `guild:${guildId}:economy:_members`;
-    const memberIds = (await this._redis.smembers(memberIndexKey)) ?? [];
+    const memberIndexKey = this._k.economyMembers(guildId);
+    let memberIds = (await this._redis.smembers(memberIndexKey)) ?? [];
+    const legacyMemberKey = `guild:${guildId}:economy:_members`;
+    const legacyMemberIds = (await this._redis.smembers(legacyMemberKey)) ?? [];
+    if (legacyMemberIds.length) {
+      await this._redis.sadd(memberIndexKey, ...legacyMemberIds).catch(() => null);
+      await this._redis.del(legacyMemberKey).catch(() => null);
+      memberIds = Array.from(new Set([...memberIds, ...legacyMemberIds]));
+    }
 
     const entries = await Promise.all(
       memberIds.map(async (userId) => {
@@ -587,7 +1053,7 @@ export class StateStore {
 
   // Ghi economy và đăng ký userId vào member index của guild
   async _redisSetEconUserWithIndex(guildId, userId, user) {
-    const memberIndexKey = `guild:${guildId}:economy:_members`;
+    const memberIndexKey = this._k.economyMembers(guildId);
     await this._redis.pipeline([
       ['SADD', `guild:index`, guildId],
       ['SADD', memberIndexKey, userId],

@@ -48,7 +48,7 @@ const GUILD_CACHE_MEMBERS_KEY = (id) => `guild_cache:${id}:members`;
 const GUILD_CACHE_TTL_S       = 900;
 const GUILD_CACHE_REFRESH_MS  = 10 * 60_000;
 
-async function writeGuildMetaCache(guild, redis) {
+export async function writeGuildMetaCache(guild, redis, retries = 2) {
   if (!redis || !guild) return;
   try {
     let fetchedChannels;
@@ -57,7 +57,7 @@ async function writeGuildMetaCache(guild, redis) {
     } catch (err) {
       fetchedChannels = guild.channels.cache;
     }
-    const channels = [...fetchedChannels.values()].map((c) => ({ id: c.id, name: c.name, type: c.type }));
+    const channels = [...(fetchedChannels?.values?.() || [])].map((c) => ({ id: c.id, name: c.name, type: c.type }));
 
     let fetchedRoles;
     try {
@@ -66,7 +66,7 @@ async function writeGuildMetaCache(guild, redis) {
       fetchedRoles = guild.roles.cache;
     }
 
-    const roles = fetchedRoles
+    const roles = [...(fetchedRoles?.values?.() || [])]
       .map((r) => ({
         id: r.id, name: r.name, rawPosition: r.rawPosition,
         color: r.color ? `#${r.color.toString(16).padStart(6, '0')}` : null,
@@ -76,7 +76,7 @@ async function writeGuildMetaCache(guild, redis) {
     // Key 1: meta — kích thước nhỏ, dùng cho /api/guild-data
     const metaPayload = JSON.stringify({
       name:        guild.name,
-      iconURL:     guild.iconURL({ size: 64 }) ?? null,
+      iconURL:     guild.iconURL?.({ size: 64 }) ?? null,
       channels,
       roles,
       memberCount: guild.memberCount,
@@ -84,14 +84,54 @@ async function writeGuildMetaCache(guild, redis) {
       updatedAt:   new Date().toISOString(),
     });
     await redis.set(GUILD_CACHE_KEY(guild.id), metaPayload, 'EX', GUILD_CACHE_TTL_S);
+    pendingReconcileGuilds.delete(guild.id);
+    redis.srem?.(REDIS_PENDING_RECONCILE_KEY, guild.id).catch?.(() => null);
     console.log(`[guild-cache] ⚡ Meta updated for ${guild.name} (${guild.id}): ${channels.length} channels, ${roles.length} roles`);
+    return true;
   } catch (err) {
     console.error(`[guild-cache] ❌ Failed to write meta cache for ${guild.id}:`, err.message);
+    if (retries > 0) {
+      setTimeout(() => writeGuildMetaCache(guild, redis, retries - 1).catch(() => null), 1500).unref?.();
+    } else {
+      pendingReconcileGuilds.add(guild.id);
+      redis.sadd?.(REDIS_PENDING_RECONCILE_KEY, guild.id).catch?.(() => null);
+    }
+    return false;
   }
 }
 
-const metaDebounceTimers = new Map();
-function scheduleGuildMetaRefresh(guild, redis, delayMs = 2000) {
+export const REDIS_PENDING_RECONCILE_KEY = 'cache:pending_reconcile_guilds';
+export const pendingReconcileGuilds = new Set();
+export async function reconcilePendingGuilds(client, redis) {
+  if (!redis || !client?.guilds?.cache) return 0;
+
+  // Restore any pending guilds persisted in Redis from prior crashed process
+  try {
+    const persisted = await redis.smembers?.(REDIS_PENDING_RECONCILE_KEY);
+    if (Array.isArray(persisted)) {
+      for (const id of persisted) pendingReconcileGuilds.add(id);
+    }
+  } catch {}
+
+  if (pendingReconcileGuilds.size === 0) return 0;
+  let recovered = 0;
+  for (const guildId of [...pendingReconcileGuilds]) {
+    const guild = client.guilds.cache.get(guildId);
+    if (guild) {
+      const ok = await writeGuildMetaCache(guild, redis, 0);
+      if (ok) {
+        recovered++;
+      }
+    } else {
+      pendingReconcileGuilds.delete(guildId);
+      redis.srem?.(REDIS_PENDING_RECONCILE_KEY, guildId).catch?.(() => null);
+    }
+  }
+  return recovered;
+}
+
+export const metaDebounceTimers = new Map();
+export function scheduleGuildMetaRefresh(guild, redis, delayMs = 2000) {
   if (!guild || !redis) return;
   const existing = metaDebounceTimers.get(guild.id);
   if (existing) clearTimeout(existing);
@@ -101,7 +141,9 @@ function scheduleGuildMetaRefresh(guild, redis, delayMs = 2000) {
       console.error(`[guild-cache] Debounced meta update failed for ${guild.id}:`, err.message)
     );
   }, delayMs);
+  timer.unref?.();
   metaDebounceTimers.set(guild.id, timer);
+  return timer;
 }
 
 async function writeGuildCache(guild, redis) {
@@ -302,7 +344,15 @@ export function createBot(configStore, stateStore, redis = null) {
   // ── Resilience ──────────────────────────────────────────────────────────────
   client.on(Events.ShardDisconnect,   (ev, id) => console.warn(`[bot] Shard ${id} disconnected (code ${ev.code}). Will auto-reconnect.`));
   client.on(Events.ShardReconnecting, (id)      => console.log(`[bot] Shard ${id} reconnecting…`));
-  client.on(Events.ShardResume,       (id, n)   => console.log(`[bot] Shard ${id} resumed (${n} events replayed).`));
+  client.on(Events.ShardResume,       (id, n)   => {
+    console.log(`[bot] Shard ${id} resumed (${n} events replayed). Reconciling guild cache...`);
+    if (redis && client.guilds?.cache) {
+      for (const guild of client.guilds.cache.values()) {
+        scheduleGuildMetaRefresh(guild, redis, 500);
+      }
+      reconcilePendingGuilds(client, redis).catch(() => null);
+    }
+  });
   client.on(Events.ShardError,        (err, id) => {
     console.error(`[bot] Shard ${id} error:`, err.message);
     if (redis) redis.incr('stats:discord_errors').catch(() => null);

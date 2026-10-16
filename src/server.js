@@ -1935,7 +1935,12 @@ export function createServer({ configStore, stateStore, botClient, redis = null 
   app.use((err, req, res, _next) => {
     console.error('[server] Unhandled error:', err?.message ?? err);
     if (!res.headersSent) {
-      res.status(500).json({ error: 'Internal server error' });
+      const statusCode = (typeof err?.status === 'number' && err.status >= 400 && err.status < 600)
+        ? err.status
+        : (typeof err?.statusCode === 'number' && err.statusCode >= 400 && err.statusCode < 600)
+          ? err.statusCode
+          : 500;
+      res.status(statusCode).json({ error: statusCode === 500 ? 'Internal server error' : (err.message || 'Error') });
     }
   });
 

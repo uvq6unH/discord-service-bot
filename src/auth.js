@@ -17,6 +17,18 @@ function getDiscordApiBaseUrl() {
 const DISCORD_API = getDiscordApiBaseUrl();
 const DISCORD_USER_AGENT = 'DiscordBot (https://github.com/uvq6unH/discord-service-bot, 1.0.0)';
 
+export function getDiscordFetchHeaders(customHeaders = {}) {
+  const headers = {
+    'User-Agent': DISCORD_USER_AGENT,
+    ...customHeaders,
+  };
+  const secret = process.env.DISCORD_PROXY_SECRET?.trim();
+  if (secret) {
+    headers['x-proxy-secret'] = secret;
+  }
+  return headers;
+}
+
 function safeReturnTo(value) {
   const fallback = '/';
   if (typeof value !== 'string') {
@@ -95,6 +107,33 @@ export function createAuthRouter(botClient, redis = null, guildService = null) {
     return cache ? cache.guilds : null;
   }
 
+  // Active single-use OAuth states tracker (cluster-wide via Redis or local atomic Map)
+  const activeOAuthStates = new Map();
+  setInterval(() => {
+    const now = Date.now();
+    for (const [st, info] of activeOAuthStates.entries()) {
+      if (info.expiresAt < now) activeOAuthStates.delete(st);
+    }
+  }, 60_000).unref?.();
+
+  const CONSUME_OAUTH_STATE_LUA = `
+local raw = redis.call('GET', KEYS[1])
+if not raw then return -1 end
+local ok, data = pcall(cjson.decode, raw)
+if not ok or type(data) ~= 'table' then
+  if raw == '1' then
+    redis.call('DEL', KEYS[1])
+    return 1
+  end
+  return -3
+end
+if ARGV[1] ~= '' and data.sessionId and data.sessionId ~= ARGV[1] then
+  return -2
+end
+redis.call('DEL', KEYS[1])
+return 1
+`;
+
   // GET /auth/login
   router.get('/auth/login', (req, res) => {
     const returnTo = safeReturnTo(req.query.returnTo);
@@ -106,8 +145,12 @@ export function createAuthRouter(botClient, redis = null, guildService = null) {
       response_type: 'code',
       scope: 'identify guilds guilds.members.read',
       state,
-      prompt: 'none',
     });
+    // Allow explicitly passing prompt=consent or prompt=none, but omit by default
+    // so Discord performs standard OAuth2 (auto-redirect if authorized, show consent if not)
+    if (req.query.prompt === 'consent' || req.query.prompt === 'none') {
+      params.set('prompt', req.query.prompt);
+    }
 
     // Regenerate session on each login attempt to:
     //   1. Prevent session fixation attacks
@@ -115,19 +158,40 @@ export function createAuthRouter(botClient, redis = null, guildService = null) {
     //      different browsers) never share oauthState
     // Then save to Redis BEFORE redirecting to Discord so /auth/callback
     // can read back oauthState reliably.
-    req.session.regenerate((err) => {
-      if (err) {
-        console.error('[auth] session regenerate error:', err);
-        return res.status(500).send('Login failed. Please try again.');
-      }
-      req.session.oauthState = state;
-      req.session.returnTo   = returnTo;
-      req.session.save((saveErr) => {
-        if (saveErr) {
-          console.error('[auth] session save error on login:', saveErr);
-          return res.status(500).send('Login failed. Please try again.');
+    return new Promise((resolve) => {
+      req.session.regenerate(async (err) => {
+        if (err) {
+          console.error('[auth] session regenerate error:', err);
+          res.status(500).send('Login failed. Please try again.');
+          return resolve();
         }
-        res.redirect(`https://discord.com/oauth2/authorize?${params}`);
+        const sessionId = req.session.id || crypto.randomUUID();
+        req.session.oauthState = state;
+        req.session.returnTo   = returnTo;
+
+        // Cryptographically bind OAuth state to initiating session ID
+        const statePayload = JSON.stringify({ sessionId, expiresAt: Date.now() + 600_000 });
+        if (redis) {
+          try {
+            await redis.set(`oauth:state:${state}`, statePayload, 'EX', '600');
+          } catch (setErr) {
+            console.error('[auth] Failed to persist OAuth state to Redis on login:', setErr.message);
+            res.status(500).send('Authentication service temporarily unavailable. Please try again.');
+            return resolve();
+          }
+        } else {
+          activeOAuthStates.set(state, { sessionId, expiresAt: Date.now() + 600_000 });
+        }
+
+        req.session.save((saveErr) => {
+          if (saveErr) {
+            console.error('[auth] session save error on login:', saveErr);
+            res.status(500).send('Login failed. Please try again.');
+            return resolve();
+          }
+          res.redirect(`https://discord.com/oauth2/authorize?${params}`);
+          resolve();
+        });
       });
     });
   });
@@ -151,20 +215,126 @@ export function createAuthRouter(botClient, redis = null, guildService = null) {
       return res.redirect(returnTo);
     }
 
-    const { code, state } = req.query;
+function timingSafeEqualStr(a, b) {
+  if (typeof a !== 'string' || typeof b !== 'string') return false;
+  const bufA = Buffer.from(a);
+  const bufB = Buffer.from(b);
+  if (bufA.length !== bufB.length) return false;
+  return crypto.timingSafeEqual(bufA, bufB);
+}
 
-    // 3. Validate code and state parameters
+    const { code, state, error, error_description } = req.query;
+
+    // 3. Validate state parameter first with constant-time comparison (RFC 6749 Section 10.12 - CSRF defense)
+    if (!state || typeof state !== 'string' || state.length < 16 || state.length > 512 || !req.session?.oauthState || !timingSafeEqualStr(state, req.session.oauthState)) {
+      console.warn(`[auth] state mismatch or missing state: query state=${String(state).slice(0, 8)}..., session state=${String(req.session?.oauthState).slice(0, 8)}...`);
+      return res.redirect('/login?error=state_mismatch');
+    }
+
+    // 4. Atomic single-use state consumption with session binding check
+    let stateConsumed = false;
+    let sessionMismatch = false;
+    const currentSessionId = req.session?.id || '';
+
+    if (redis) {
+      try {
+        let resLua;
+        if (typeof redis.eval === 'function') {
+          resLua = await redis.eval(CONSUME_OAUTH_STATE_LUA, 1, `oauth:state:${state}`, currentSessionId);
+        } else {
+          // Fallback inspect-before-del: never delete key before verifying session match
+          const raw = await redis.get(`oauth:state:${state}`);
+          if (!raw) {
+            resLua = -1;
+          } else {
+            let data = null;
+            try { data = JSON.parse(raw); } catch { data = { sessionId: null }; }
+            if (currentSessionId && data?.sessionId && data.sessionId !== currentSessionId) {
+              resLua = -2;
+            } else {
+              await redis.del(`oauth:state:${state}`);
+              resLua = 1;
+            }
+          }
+        }
+
+        if (resLua === 1) {
+          stateConsumed = true;
+        } else if (resLua === -2) {
+          sessionMismatch = true;
+        } else {
+          stateConsumed = false;
+        }
+      } catch (redisErr) {
+        console.error('[auth] Redis error during OAuth callback state verification:', redisErr.message);
+        // FAIL CLOSED: Khi Redis đã được cấu hình mà gặp lỗi, tuyệt đối KHÔNG fallback sang RAM!
+        return res.redirect('/login?error=auth_service_unavailable');
+      }
+    } else {
+      const localEntry = activeOAuthStates.get(state);
+      if (localEntry) {
+        if (currentSessionId && localEntry.sessionId && localEntry.sessionId !== currentSessionId) {
+          sessionMismatch = true;
+        } else {
+          activeOAuthStates.delete(state);
+          stateConsumed = true;
+        }
+      }
+    }
+
+    req.session.oauthState = null;
+    let sessionSaveFailed = false;
+    await new Promise((resolve) => req.session.save((err) => {
+      if (err) sessionSaveFailed = true;
+      resolve();
+    }));
+
+    if (sessionSaveFailed) {
+      console.error('[auth] Failed to persist session after consuming oauthState');
+      return res.status(500).send('Session persistence error. Please retry login.');
+    }
+
+    if (sessionMismatch) {
+      console.warn(`[auth] OAuth state session mismatch: initiated by different session. Possible CSRF!`);
+      return res.redirect('/login?error=session_mismatch');
+    }
+
+    if (!stateConsumed) {
+      console.warn(`[auth] State already consumed or replayed for state=${state.slice(0, 8)}...`);
+      return res.redirect('/login?error=state_already_consumed');
+    }
+
+    // 4. Handle OAuth error returned from Discord (e.g. prompt=none failure, access_denied)
+    if (error) {
+      req.session.oauthState = null;
+      await new Promise((resolve) => req.session.save(resolve));
+
+      console.warn(`[auth] Discord OAuth error callback: ${error} (${error_description || 'no description'})`);
+      if (error === 'consent_required' || error === 'interaction_required' || error === 'login_required') {
+        // Prevent infinite redirect loop: if consent was already retried in this session, abort with error
+        if (req.session?.consentRetried) {
+          req.session.consentRetried = null;
+          await new Promise((resolve) => req.session.save(resolve));
+          return res.redirect('/login?error=consent_required');
+        }
+        req.session.consentRetried = true;
+        await new Promise((resolve) => req.session.save(resolve));
+        const returnTo = safeReturnTo(req.session.returnTo);
+        return res.redirect(`/auth/login?prompt=consent&returnTo=${encodeURIComponent(returnTo)}`);
+      }
+      if (error === 'access_denied') {
+        return res.redirect('/login?error=access_denied');
+      }
+      return res.redirect(`/login?error=${encodeURIComponent(error)}`);
+    }
+
+    // 5. Validate authorization code parameter
     if (!code || typeof code !== 'string') {
       return res.redirect('/login?error=missing_code');
     }
 
     const hasInFlight = inFlightExchanges.has(code);
     if (!hasInFlight) {
-      if (!req.session?.oauthState || state !== req.session.oauthState) {
-        console.warn(`[auth] state mismatch: query state=${String(state).slice(0, 8)}..., session state=${String(req.session?.oauthState).slice(0, 8)}...`);
-        return res.redirect('/login?error=state_mismatch');
-      }
-
       // Clear oauthState and persist immediately so duplicate requests cannot pass state validation
       req.session.oauthState = null;
       await new Promise((resolve) => req.session.save(resolve));
@@ -186,10 +356,9 @@ export function createAuthRouter(botClient, redis = null, guildService = null) {
             try {
               tokenRes = await fetch(`${DISCORD_API}/oauth2/token`, {
                 method: 'POST',
-                headers: {
+                headers: getDiscordFetchHeaders({
                   'Content-Type': 'application/x-www-form-urlencoded',
-                  'User-Agent': DISCORD_USER_AGENT,
-                },
+                }),
                 body: new URLSearchParams({
                   client_id: clientId,
                   client_secret: clientSecret,
@@ -274,10 +443,9 @@ export function createAuthRouter(botClient, redis = null, guildService = null) {
             const userTimeout = setTimeout(() => userController.abort(), 12_000);
             try {
               userRes = await fetch(`${DISCORD_API}/users/@me`, {
-                headers: {
+                headers: getDiscordFetchHeaders({
                   Authorization: `Bearer ${tokens.access_token}`,
-                  'User-Agent': DISCORD_USER_AGENT,
-                },
+                }),
                 signal: userController.signal,
               });
             } finally {
@@ -398,10 +566,9 @@ export function createAuthRouter(botClient, redis = null, guildService = null) {
       try {
         discordRes = await fetch(`${DISCORD_API}/oauth2/token`, {
           method: 'POST',
-          headers: {
+          headers: getDiscordFetchHeaders({
             'Content-Type': 'application/x-www-form-urlencoded',
-            'User-Agent': DISCORD_USER_AGENT,
-          },
+          }),
           body: new URLSearchParams({
             client_id: clientId || 'missing',
             client_secret: clientSecret || 'missing',
@@ -484,10 +651,9 @@ export function createAuthRouter(botClient, redis = null, guildService = null) {
     try {
       const res = await fetch(`${DISCORD_API}/oauth2/token`, {
         method: 'POST',
-        headers: {
+        headers: getDiscordFetchHeaders({
           'Content-Type': 'application/x-www-form-urlencoded',
-          'User-Agent': DISCORD_USER_AGENT,
-        },
+        }),
         body: new URLSearchParams({
           client_id: clientId,
           client_secret: clientSecret,

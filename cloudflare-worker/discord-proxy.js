@@ -18,10 +18,49 @@ export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
 
-    // Tự động thêm /api/v10 nếu caller chỉ truyền domain mà không có /api
+    // 1. Health / Diag probe (không proxy, chỉ báo trạng thái worker)
+    if (url.pathname === '/health' || url.pathname === '/diag' || url.pathname === '/') {
+      return new Response(JSON.stringify({
+        status: 'ok',
+        proxy: 'discord-service-bot-proxy',
+        authConfigured: Boolean(env?.PROXY_SECRET),
+      }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
+
+    // 2. Fail-Closed Authentication:
+    // Bắt buộc PROXY_SECRET phải được cấu hình trong env VÀ request header x-proxy-secret phải khớp.
+    const expectedSecret = env?.PROXY_SECRET;
+    const providedSecret = request.headers.get('x-proxy-secret');
+    if (!expectedSecret || !providedSecret || providedSecret !== expectedSecret) {
+      return new Response(JSON.stringify({ error: 'Unauthorized: proxy secret missing or invalid' }), {
+        status: 401,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
+
+    // Chuẩn hóa pathname: Thêm /api/v10 nếu caller chỉ truyền path ngắn
     let pathname = url.pathname;
     if (!pathname.startsWith('/api')) {
       pathname = `/api/v10${pathname}`;
+    }
+
+    // 3. Strict Method & Route Whitelisting (v10 only):
+    // Chỉ cho phép đúng các endpoint OAuth2 và Users/Guilds cần thiết cho bot/dashboard.
+    const method = request.method.toUpperCase();
+    const isTokenExchange = method === 'POST' && pathname === '/api/v10/oauth2/token';
+    const isUserMe = method === 'GET' && pathname === '/api/v10/users/@me';
+    const isUserGuilds = method === 'GET' && pathname === '/api/v10/users/@me/guilds';
+
+    if (!isTokenExchange && !isUserMe && !isUserGuilds) {
+      return new Response(JSON.stringify({
+        error: `Forbidden: Method '${method}' on path '${pathname}' is not permitted through proxy`,
+      }), {
+        status: 403,
+        headers: { 'Content-Type': 'application/json' },
+      });
     }
 
     // Chuyển tiếp toàn bộ path và query sang discord.com
@@ -31,7 +70,8 @@ export default {
     const newHeaders = new Headers(request.headers);
     newHeaders.set('Host', 'discord.com');
 
-    // Xoá các header IP của client cũ để tránh bị Cloudflare phạt nhầm theo IP nguồn
+    // Bắt buộc xoá header xác thực bí mật và các header IP client
+    newHeaders.delete('x-proxy-secret');
     newHeaders.delete('cf-connecting-ip');
     newHeaders.delete('x-forwarded-for');
     newHeaders.delete('x-real-ip');

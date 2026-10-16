@@ -60,7 +60,7 @@ export function createDeck() {
   return deck;
 }
 
-function handValue(hand) {
+export function handValue(hand) {
   let total = 0;
   let aces = 0;
   for (const card of hand) {

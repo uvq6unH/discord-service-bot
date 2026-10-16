@@ -70,44 +70,58 @@ function normalizeReminders(reminders) {
     return [];
   }
 
-  return reminders
-    .map((item) => {
-      // Backward-compat: migrate legacy single userId → userIds array
-      let userIds;
-      if (Array.isArray(item?.userIds)) {
-        userIds = item.userIds.map(normalizeSnowflakeId).filter(Boolean);
-      } else if (item?.userId) {
-        const single = normalizeSnowflakeId(item.userId);
-        userIds = single ? [single] : [];
-      } else {
-        userIds = [];
-      }
+  const seenIds = new Set();
+  const result = [];
 
-      let roleIds;
-      if (Array.isArray(item?.roleIds)) {
-        roleIds = item.roleIds.map(normalizeSnowflakeId).filter(Boolean);
-      } else if (item?.roleId) {
-        const single = normalizeSnowflakeId(item.roleId);
-        roleIds = single ? [single] : [];
-      } else {
-        roleIds = [];
-      }
+  for (const item of reminders) {
+    // Backward-compat: migrate legacy single userId → userIds array
+    let userIds;
+    if (Array.isArray(item?.userIds)) {
+      userIds = item.userIds.map(normalizeSnowflakeId).filter(Boolean);
+    } else if (item?.userId) {
+      const single = normalizeSnowflakeId(item.userId);
+      userIds = single ? [single] : [];
+    } else {
+      userIds = [];
+    }
 
-      const rawId = String(item?.id ?? '').trim();
-      const id = rawId || `rem_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+    let roleIds;
+    if (Array.isArray(item?.roleIds)) {
+      roleIds = item.roleIds.map(normalizeSnowflakeId).filter(Boolean);
+    } else if (item?.roleId) {
+      const single = normalizeSnowflakeId(item.roleId);
+      roleIds = single ? [single] : [];
+    } else {
+      roleIds = [];
+    }
 
-      return {
-        id,
-        userIds,
-        roleIds,
-        channelId: normalizeSnowflakeId(item?.channelId),
-        message: String(item?.message ?? '').trim(),
-        time: String(item?.time ?? '').trim(),
-        repeat: ['none', 'hourly', 'daily', 'weekly', 'monthly'].includes(item?.repeat) ? item.repeat : 'none',
-      };
-    })
-    .filter((item) => item.id && item.channelId && item.message && item.time)
-    .slice(0, 50);
+    const rawId = String(item?.id ?? '').trim();
+    const id = rawId || `rem_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+    const channelId = normalizeSnowflakeId(item?.channelId);
+    const message = String(item?.message ?? '').trim();
+    const time = String(item?.time ?? '').trim();
+    const repeat = ['none', 'hourly', 'daily', 'weekly', 'monthly'].includes(item?.repeat) ? item.repeat : 'none';
+
+    if (!id || !channelId || !message || !time) continue;
+
+    // Deduplicate duplicate IDs only; preserve distinct IDs even if content matches
+    if (seenIds.has(id)) continue;
+    seenIds.add(id);
+
+    result.push({
+      id,
+      userIds,
+      roleIds,
+      channelId,
+      message,
+      time,
+      repeat,
+    });
+
+    if (result.length >= 50) break;
+  }
+
+  return result;
 }
 
 function normalizeCounters(items, currentCounters = []) {

@@ -59,7 +59,7 @@ async function getRandomQuestionsSmart(stateStore, guildId, userId, lang, level,
   return selected.sort(() => 0.5 - Math.random());
 }
 
-function buildProgressBar(current, total = 5) {
+export function buildProgressBar(current, total = 5) {
   const filled = '🟩'.repeat(current);
   const empty = '⬜'.repeat(total - current);
   return `${filled}${empty}`;

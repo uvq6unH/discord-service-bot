@@ -132,15 +132,15 @@ async function processEsportsWorkerCycle(client, configStore, redis) {
             let stageLabel = '';
             let stageColor = 0xFF0055;
 
-            if (diffMinutes >= 14.0 && diffMinutes <= 15.9) {
+            if (diffMinutes > 10.0 && diffMinutes <= 15.0) {
               stage = '15m';
               stageLabel = '15 PHÚT';
               stageColor = 0xFF4655;
-            } else if (diffMinutes >= 9.0 && diffMinutes <= 10.9) {
+            } else if (diffMinutes > 5.0 && diffMinutes <= 10.0) {
               stage = '10m';
               stageLabel = '10 PHÚT';
               stageColor = 0xFF8800;
-            } else if (diffMinutes >= 4.0 && diffMinutes <= 5.9) {
+            } else if (diffMinutes > 0.0 && diffMinutes <= 5.0) {
               stage = '5m';
               stageLabel = '5 PHÚT';
               stageColor = 0xFF0055;

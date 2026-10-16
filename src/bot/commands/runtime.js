@@ -1,4 +1,5 @@
-import { memberCanUseCommand } from '../../commandAccess.js';
+import { memberCanUseCommand, canBotExecuteInChannel } from '../../commandAccess.js';
+import { PermissionFlagsBits } from 'discord.js';
 import { AUTO_DEFER_COMMAND_TYPES } from '../constants.js';
 import { renderCommandResponse } from '../responses.js';
 
@@ -35,6 +36,18 @@ export async function createCommandContext({ client, config, configStore, comman
       ? { content: 'You do not have permission to use this command.', ephemeral: true }
       : 'You do not have permission to use this command.';
     return { denied: true, deniedResult: reply(denied) };
+  }
+
+  // Verify bot channel permissions before command execution (fail-closed for prefix commands)
+  const botCanExecute = canBotExecuteInChannel(channel, [
+    PermissionFlagsBits.SendMessages,
+    PermissionFlagsBits.ViewChannel
+  ], { failClosed: !isInteraction });
+  if (!botCanExecute.ok) {
+    if (isInteraction) {
+      return { denied: true, deniedResult: reply({ content: botCanExecute.reason, ephemeral: true }) };
+    }
+    return { denied: true, deniedResult: Promise.resolve() };
   }
 
   if (isInteraction && AUTO_DEFER_COMMAND_TYPES.has(command.type) && !source.deferred && !source.replied) {

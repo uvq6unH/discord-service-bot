@@ -253,11 +253,17 @@ export function createGuildService(redis) {
       const ctrl = new AbortController();
       const t = setTimeout(() => ctrl.abort(), FETCH_TIMEOUT_MS);
       try {
+        const headers = {
+          Authorization: `Bearer ${accessToken}`,
+          'User-Agent': DISCORD_USER_AGENT,
+        };
+        const proxySecret = process.env.DISCORD_PROXY_SECRET?.trim();
+        if (proxySecret) {
+          headers['x-proxy-secret'] = proxySecret;
+        }
+
         const res = await fetch(`${DISCORD_API}/users/@me/guilds`, {
-          headers: {
-            Authorization: `Bearer ${accessToken}`,
-            'User-Agent': DISCORD_USER_AGENT,
-          },
+          headers,
           signal: ctrl.signal,
         });
 

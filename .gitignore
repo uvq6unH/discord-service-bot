@@ -22,3 +22,6 @@ scripts/*.txt
 
 # Grapuco local metadata
 .grapuco/
+
+# Coverage
+coverage/

@@ -35,6 +35,7 @@
   },
   "devDependencies": {
     "@bitsness/grapuco-cli": "^1.12.3",
+    "@vitest/coverage-v8": "^1.6.0",
     "vitest": "^1.6.0"
   }
 }
